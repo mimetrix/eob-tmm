@@ -52,7 +52,9 @@ make -C minimm && ./demo.sh        # Track 1, no dependencies
 ```
 
 See [`prototype/README.md`](prototype/README.md) for the uBPF and verify-gate tracks
-(and the container builds on Rocky Linux 8.10).
+(and the container builds on Rocky Linux 8.10), and
+[`prototype/TOOLCHAIN.md`](prototype/TOOLCHAIN.md) for the end-to-end
+source → bytecode → verify → load → run pipeline.
 
 ## Notes
 

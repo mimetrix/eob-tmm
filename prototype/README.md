@@ -51,6 +51,7 @@ prototype/
   Containerfile         Rocky 8.10, pure uBPF (clean: gcc + clang + libelf)
   Containerfile.verify  Rocky 8.10, uBPF + PREVAIL verify gate
   hook-point-map.json   illustrative per-build hook-point map (design §5.3)
+  TOOLCHAIN.md          bytecode -> verify -> load -> run pipeline (tools/artifacts per stage)
   ../ubpf/            uBPF clone (the embedded VM); libubpf.a built by minimm/Makefile
   ../ebpf-verifier/   PREVAIL clone (the verifier); prevail-cli built separately
 ```
@@ -70,6 +71,8 @@ traffic still bends through.
 The shield is compiled to **eBPF bytecode** and executed by **uBPF embedded inside
 minimm**: minimm calls the VM at the hook point and acts on the return. This is the TMM
 model — the eBPF runs in a VM in the (kernel-bypassing) data-plane process itself.
+For the full source → bytecode → verify → load → run pipeline (the exact tool and
+artifact at each stage), see [`TOOLCHAIN.md`](TOOLCHAIN.md).
 
 Prereq (the Makefile builds `libubpf.a` from this clone):
 ```bash
