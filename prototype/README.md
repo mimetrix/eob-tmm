@@ -42,11 +42,11 @@ prototype/
     Makefile        make (reference) | make ubpf (minimm-ubpf + minimm-trace)
   shields/
     ls_shield_ubpf.bpf.c  the Live Shield as eBPF bytecode (filter / enforce)
-    ls_trace_ubpf.bpf.c   an observe-mode tracepoint (telemetry, never drops)
+    ls_trace_ubpf.bpf.c   an observe-mode tracepoint + flight-recorder trigger (telemetry, never drops)
     ls_shield_bad.bpf.c   a deliberately-unsafe shield (OOB read) the verifier must reject
   client.py         sends benign / attack / arbitrary-opcode frames
   demo.sh           Track 1 (reference shield)
-  demo-ubpf.sh      Track 2 (embedded uBPF VM): enforce holds, monitor crashes
+  demo-ubpf.sh      Track 2 (embedded uBPF VM): enforce holds, monitor crashes, flight recorder (§3.1)
   demo-verify.sh    §9 gate: PREVAIL verifies the good shield, rejects the bad one
   Containerfile         Rocky 8.10, pure uBPF (clean: gcc + clang + libelf)
   Containerfile.verify  Rocky 8.10, uBPF + PREVAIL verify gate
@@ -102,6 +102,18 @@ The host owns the enumerated outcomes (§6.1); the shield only chooses among the
 same VM at the same hook but treats the return as *telemetry* (histogrammed into the shared
 map) and **never** changes flow — eBPF observability reaching data-plane internals that
 kernel `eob` can't see. Same substrate, different host use of the result.
+
+**Flight recorder (observe-mode, substrate §3.1).** The same observe program also keeps a
+**ring of recent frames** in the shared map and **arms a dump** (it ORs `LS_FR_TRIGGER` into
+its return) when it sees the crash precondition. The host freezes and prints the run-up
+*into* the failure at the hook — *before* the relay crashes (observe never blocks) — and
+because the ring is shm-backed it **survives the crash** for post-mortem:
+```bash
+minimm-trace ctl flightrec    # dump the ring from shm, after the data plane is gone
+```
+This is the core-dump's blind spot: you get the frames leading up to the fault, not just the
+wreckage. The `demo-ubpf.sh` flight-recorder section shows both the live dump and the
+post-mortem read.
 
 ### §9 verify-before-load gate (PREVAIL)
 

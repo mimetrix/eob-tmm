@@ -17,9 +17,15 @@
 
 #include <stdint.h>
 
-#define LS_ABI_VERSION   1u
+#define LS_ABI_VERSION   2u
 #define LS_SHM_NAME      "/minimm_ls"     /* POSIX shm backing the shared map  */
 #define LS_HOOKPOINT_SYM "ls_request_eval_decision"
+
+/* Flight recorder (observe-mode "black box", substrate §3.1). LS_FR_TRIGGER is
+ * the high bit an observe program ORs into its return value to arm a dump; the
+ * low byte stays the histogram sample. Must match the bytecode (ls_trace). */
+#define LS_FR_DEPTH      8u               /* frames of run-up retained in the ring */
+#define LS_FR_TRIGGER    0x100u           /* observe-program return flag: freeze+dump */
 
 /* Enumerated outcomes the host code already knows how to take (design §6.1).
  * A shield may only *choose* among these; it cannot invent new control flow. */
@@ -47,6 +53,14 @@ struct ls_ctx {
     uint8_t  head[16];        /* first bytes of payload, for richer predicates     */
 };
 
+/* One captured frame summary in the flight recorder (substrate §3.1). */
+struct ls_fr_entry {
+    uint16_t opcode;
+    uint16_t payload_len;
+    uint32_t avail_len;
+    uint8_t  head[8];                  /* first payload bytes, for context      */
+};
+
 /* The shared "map": mode + evidence. shm-backed so an out-of-band controller
  * (minimm ctl) and, in Track 2, the bpftime map bridge can read/write it. */
 struct ls_shared {
@@ -58,6 +72,17 @@ struct ls_shared {
     volatile uint64_t trace[8];        /* observe-mode telemetry histogram      */
                                        /* (e.g. per-opcode counts from a        */
                                        /* tracepoint program; see LS_TRACE)     */
+
+    /* Flight recorder (observe-mode, substrate §3.1): a ring of the most recent
+     * frames seen at the hook, frozen + dumped when an observe program arms the
+     * trigger (LS_FR_TRIGGER). shm-backed so the run-up SURVIVES a data-plane
+     * crash for post-mortem (minimm ctl flightrec) — the core-dump's blind spot.
+     * One ring here; per-CPU in production (design §11). */
+    volatile uint32_t fr_head;         /* next write slot (mod LS_FR_DEPTH)     */
+    volatile uint64_t fr_seen;         /* total frames recorded                 */
+    volatile uint32_t fr_tripped;      /* 1 once a trigger froze the ring        */
+    volatile uint64_t fr_trip_seq;     /* fr_seen at the triggering frame        */
+    struct ls_fr_entry fr_ring[LS_FR_DEPTH];
 };
 
 /*

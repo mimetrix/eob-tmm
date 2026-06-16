@@ -14,7 +14,7 @@ RP=8080; EP=9090
 nap() { read -t "$1" -u 9 _ 2>/dev/null || true; }
 exec 9<>/dev/null
 wait_port() { for _ in $(seq 1 50); do (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; nap 0.1; done; return 1; }
-cleanup() { kill "${ECHO_PID:-0}" "${RELAY_PID:-0}" 2>/dev/null; rm -f /dev/shm/minimm_ls; }
+cleanup() { kill "${ECHO_PID:-0}" "${RELAY_PID:-0}" "${TRACE_PID:-0}" 2>/dev/null; rm -f /dev/shm/minimm_ls; }
 trap cleanup EXIT
 
 [ -f "$LS_SHIELD_OBJ" ] || { echo "shield object missing: $LS_SHIELD_OBJ (run: make -C minimm minimm-ubpf)"; exit 1; }
@@ -46,4 +46,32 @@ nap 0.3
 kill -0 "$RELAY_PID" 2>/dev/null && echo ">>> relay ALIVE (unexpected)" \
                                  || echo ">>> relay DEAD — monitor did not save the data plane (§7.1)"
 "$MM" ctl stats
+
+echo "==================== FLIGHT RECORDER (observe mode, §3.1) ===================="
+# Same embedded VM, OBSERVE mode: the program never changes flow, but it keeps a
+# ring of recent frames and arms a dump on the crash precondition. The dump
+# captures the run-up INTO the failure; because it is shm-backed, it SURVIVES the
+# data-plane crash — the post-mortem a core dump cannot give you.
+TRACE_MM="$HERE/minimm/minimm-trace"
+TRACE_OBJ="$HERE/shields/ls_trace_ubpf.bpf.o"
+kill "$RELAY_PID" 2>/dev/null; nap 0.2
+if [ -x "$TRACE_MM" ] && [ -f "$TRACE_OBJ" ]; then
+  rm -f /dev/shm/minimm_ls
+  LS_SHIELD_OBJ="$TRACE_OBJ" "$TRACE_MM" relay --listen "$RP" --upstream "127.0.0.1:$EP" >/tmp/u.trace.log 2>&1 & TRACE_PID=$!
+  wait_port 127.0.0.1 "$RP" || { echo "trace relay failed:"; cat /tmp/u.trace.log; }
+  echo "--- run-up: benign frames (recorded into the ring; flow untouched) ---"
+  set -- "1:alpha" "2:bravo" "3:charlie" "0:delta"
+  for f in "$@"; do python3 "$CLIENT" raw --op "${f%%:*}" --data "${f#*:}" >/dev/null 2>&1; done
+  echo "--- trigger: attack frame (observe never blocks -> dump, then relay dies) ---"
+  python3 "$CLIENT" attack >/dev/null 2>&1
+  nap 0.3
+  kill -0 "$TRACE_PID" 2>/dev/null && echo ">>> relay ALIVE (unexpected for observe)" \
+                                   || echo ">>> relay DEAD — observe did NOT block; the recorder captured the run-up first"
+  echo "--- live dump (emitted at the hook, before the crash) ---"
+  grep -A6 'FLIGHT RECORDER DUMP' /tmp/u.trace.log || echo "(no dump found)"
+  echo "--- post-mortem: ctl flightrec reads the ring from shm — it SURVIVED the crash ---"
+  "$TRACE_MM" ctl flightrec
+else
+  echo "(skipped: build minimm-trace with 'make -C minimm ubpf')"
+fi
 echo "### done"

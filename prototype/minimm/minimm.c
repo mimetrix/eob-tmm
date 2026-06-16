@@ -14,6 +14,7 @@
  *   minimm echo   --listen PORT                        a trivial frame sink (test upstream)
  *   minimm ctl    mode {disable|monitor|enforce}       set shield mode (shared map)
  *   minimm ctl    stats                                read evidence counters
+ *   minimm ctl    flightrec                            dump the observe-mode ring (§3.1)
  *
  * Wire framing (toy, just enough to carry an opcode): big-endian
  *   [2B opcode][2B payload_len][payload ...]
@@ -178,10 +179,48 @@ static int ls_ubpf_init(const char *obj_path)
 
 #if defined(LS_TRACE)
 /*
+ * Flight recorder (substrate §3.1): push a frame summary into the shm ring.
+ * The host owns the ring (uBPF has no native maps); the observe program only
+ * supplies the sample + the trigger flag. One ring here; per-CPU in production.
+ */
+static void ls_fr_push(const struct ls_ctx *ctx)
+{
+    uint32_t i = g_ls->fr_head;
+    struct ls_fr_entry *e = &g_ls->fr_ring[i];
+    e->opcode = ctx->opcode;
+    e->payload_len = ctx->payload_len;
+    e->avail_len = ctx->avail_len;
+    for (uint32_t k = 0; k < sizeof(e->head); k++)
+        e->head[k] = (k < ctx->avail_len && k < sizeof(ctx->head)) ? ctx->head[k] : 0;
+    g_ls->fr_head = (i + 1) % LS_FR_DEPTH;
+    g_ls->fr_seen++;
+}
+
+/* Freeze + dump the ring oldest->newest (the run-up into the trigger). */
+static void ls_fr_dump(const char *why)
+{
+    uint64_t seen = g_ls->fr_seen;
+    uint32_t depth = seen < LS_FR_DEPTH ? (uint32_t)seen : LS_FR_DEPTH;
+    uint32_t start = (g_ls->fr_head + LS_FR_DEPTH - depth) % LS_FR_DEPTH;
+    fprintf(stderr, "[minimm] *** FLIGHT RECORDER DUMP (%s): last %u frame(s) into the trigger ***\n",
+            why, depth);
+    for (uint32_t n = 0; n < depth; n++) {
+        struct ls_fr_entry *e = &g_ls->fr_ring[(start + n) % LS_FR_DEPTH];
+        fprintf(stderr, "[minimm]   t-%u: opcode=0x%04x payload_len=%u avail=%u head=%02x%02x%02x%02x%s\n",
+                depth - 1 - n, e->opcode, e->payload_len, e->avail_len,
+                e->head[0], e->head[1], e->head[2], e->head[3],
+                (n == depth - 1) ? "   <-- TRIGGER" : "");
+    }
+    g_ls->fr_tripped = 1;
+    g_ls->fr_trip_seq = seen;
+}
+
+/*
  * observe-mode tracepoint: run the program purely for telemetry and NEVER change
- * flow. The program returns a sampled value (here, the frame opcode); the host
- * histograms it into the shared map. This is eBPF observability reaching INSIDE
- * the kernel-bypassing data plane — exactly what kernel-based "eob" cannot see.
+ * flow. The program returns a sampled value (the frame opcode in the low byte)
+ * the host histograms, plus an LS_FR_TRIGGER bit that arms the flight recorder.
+ * This is eBPF observability reaching INSIDE the kernel-bypassing data plane —
+ * exactly what kernel-based "eob" cannot see.
  */
 int ls_request_eval_decision(const struct ls_ctx *ctx)
 {
@@ -190,8 +229,11 @@ int ls_request_eval_decision(const struct ls_ctx *ctx)
     struct ls_ctx local = *ctx;
     uint64_t ret = 0;
     if (ubpf_exec(g_vm, &local, sizeof(local), &ret) == 0) {
-        g_ls->trace[ret & 7]++;            /* telemetry: histogram the sample */
+        g_ls->trace[(ret & 0xff) & 7]++;   /* telemetry: histogram the sample */
         g_ls->hits++;                      /* total frames observed           */
+        ls_fr_push(ctx);                   /* flight recorder: record run-up  */
+        if ((ret & LS_FR_TRIGGER) && !g_ls->fr_tripped)
+            ls_fr_dump("crash precondition at hook");   /* freeze + dump */
     }
     return LS_PASS;                        /* OBSERVE: traffic is never affected */
 }
@@ -443,7 +485,25 @@ static int run_ctl(int argc, char **argv)
         printf("\n");
         return 0;
     }
-    fprintf(stderr, "ctl: mode {disable|monitor|enforce} | stats\n");
+    if (argc >= 1 && strcmp(argv[0], "flightrec") == 0) {
+        /* Read the flight-recorder ring straight from shm — it SURVIVES a relay
+         * crash, so this is the post-mortem view of the run-up (substrate §3.1). */
+        uint64_t seen = s->fr_seen;
+        uint32_t depth = seen < LS_FR_DEPTH ? (uint32_t)seen : LS_FR_DEPTH;
+        printf("flight recorder: seen=%llu tripped=%u trip_seq=%llu depth=%u\n",
+               (unsigned long long)seen, s->fr_tripped,
+               (unsigned long long)s->fr_trip_seq, depth);
+        uint32_t start = (s->fr_head + LS_FR_DEPTH - depth) % LS_FR_DEPTH;
+        for (uint32_t n = 0; n < depth; n++) {
+            struct ls_fr_entry *e = &s->fr_ring[(start + n) % LS_FR_DEPTH];
+            printf("  t-%u: opcode=0x%04x payload_len=%u avail=%u head=%02x%02x%02x%02x%s\n",
+                   depth - 1 - n, e->opcode, e->payload_len, e->avail_len,
+                   e->head[0], e->head[1], e->head[2], e->head[3],
+                   (s->fr_tripped && n == depth - 1) ? "   <-- TRIGGER" : "");
+        }
+        return 0;
+    }
+    fprintf(stderr, "ctl: mode {disable|monitor|enforce} | stats | flightrec\n");
     return 2;
 }
 
@@ -469,7 +529,7 @@ int main(int argc, char **argv)
             "usage:\n"
             "  %s relay --listen PORT --upstream HOST:PORT\n"
             "  %s echo  --listen PORT\n"
-            "  %s ctl   mode {disable|monitor|enforce} | stats\n", argv[0], argv[0], argv[0]);
+            "  %s ctl   mode {disable|monitor|enforce} | stats | flightrec\n", argv[0], argv[0], argv[0]);
         return 2;
     }
     if (strcmp(argv[1], "relay") == 0)
