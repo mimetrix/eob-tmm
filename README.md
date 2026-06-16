@@ -69,17 +69,27 @@ iRules only reach part of that path. Embedding the VM *in* the data plane closes
 
 ## The mechanism
 
-Rather than inject, the host **calls the VM like a library** at a designed-in hook and acts
-on the return. The host owns an enumerated set of outcomes (pass / observe / enforce-drop);
-the signed program only chooses among them — it cannot invent control flow. Every program is
-**statically verified before load** by [PREVAIL](https://github.com/vbpf/ebpf-verifier) (the
-verifier from eBPF-for-Windows), failing closed on any nonzero verdict. No kernel, no
-injection, no added privileges.
+The substrate spans **two eBPF execution engines, chosen by what the kernel can see** —
+under one signed catalog and lifecycle (design §5):
 
-Verification is a **safety** gate (memory-safe + terminating), *not* a security gate. The
-security layer — mandatory signing, authorization tiers, capability/context confinement,
-exfiltration control, audit/revocation/kill-switch, resource governance — lives *around* the
-VM (substrate §6, design §8).
+- **Control / management plane** — the native Linux daemons (httpd, tmsh, MCPD) are ordinary
+  processes, so shields are **kernel-space eBPF** attached via uprobes, gated by the kernel's
+  own verifier. This is the direct Cisco/NX-OS analog; F5 already ships kernel eBPF ("eob").
+  iControl REST (`restjavad`/`icrd`) runs on the JVM, so it uses a separate JVMTI/USDT probe
+  surface instead.
+- **Data plane (TMM)** — the kernel is structurally blind to TMM, so shields are **userspace
+  eBPF** run by an embedded uBPF VM: the host **calls the VM like a library** at a designed-in
+  hook and acts on the return — no kernel, no injection, no added privileges. Each program is
+  **statically verified before load** by [PREVAIL](https://github.com/vbpf/ebpf-verifier) (the
+  verifier from eBPF-for-Windows), failing closed on any nonzero verdict.
+
+In both engines the host owns an enumerated set of outcomes (pass / observe / enforce-drop);
+the signed program only chooses among them — it cannot invent control flow.
+
+Verification — the kernel's built-in verifier or PREVAIL — is a **safety** gate (memory-safe +
+terminating), *not* a security gate. The security layer — mandatory signing, authorization
+tiers, capability/context confinement, exfiltration control, audit/revocation/kill-switch,
+resource governance — lives *around* the VM (substrate §6, design §8).
 
 ## Contents
 

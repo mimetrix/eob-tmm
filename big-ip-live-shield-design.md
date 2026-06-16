@@ -174,7 +174,7 @@ Four layers, mechanism-agnostic above the enforcement leaf.
    +-------------------+-------------------+-------------------------+
    | Enforcement Adapter: Enforcement Adapter:  Enforcement Adapter:|
    | iRules / WAF / AFM | ctrl-plane daemon | TMM hook points        |
-   | (sanctioned today) | uprobe/syscall    | (userspace eBPF VM)    |
+   | (sanctioned today) | kernel eBPF/uprobe | (embedded userspace VM)|
    +-------------------+-------------------+-------------------------+
                               |
             +-------------------------------------------------------+
@@ -184,16 +184,16 @@ Four layers, mechanism-agnostic above the enforcement leaf.
 
 ### 5.1 Enforcement adapters
 
-Three adapters, in increasing order of audacity:
+Three adapters, in increasing order of audacity. Crucially, **two distinct eBPF execution engines are in play, chosen by what the kernel can see** — **kernel-space eBPF** for the control-plane daemons (adapter 2), an **embedded userspace VM** for TMM (adapter 3) — plus a JVM probe surface for iControl REST. They share one signed catalog and lifecycle; only the enforcement leaf differs (the layers above are mechanism-agnostic, §5).
 
 1. **iRules / Advanced WAF / AFM** — already sanctioned, reaches traffic-shaped exploits at the proxy. This remains the **first-line** data-plane shield for anything an iRule event can observe. Deployed via AS3 / iControl REST. Lowest risk; no new runtime.
-2. **Control-plane daemon hooks** — embedded userspace eBPF VM with hook points in the native daemons (httpd front end, tmsh, MCPD and the other C config daemons). This is the true Cisco analog, expressed in userspace. Low performance risk (these are not latency-critical), high CVE coverage (most disclosed TMOS CVEs are control-plane). **Note the iControl REST stack (`restjavad`/`icrd`) runs on the JVM:** native function entry/exit hook points do not reach Java methods, so its shields use a distinct JVM instrumentation surface (JVMTI / USDT-style probes the runtime exposes) rather than uprobes. The designed-in hook-point philosophy is identical; the adapter implementation is separate (see §12, Phase 2).
-3. **TMM hook points** — embedded userspace eBPF VM attaching at sanctioned points inside TMM and its plugin processes (e.g. `bd`). The crown jewel: the only mechanism that reaches data-plane-engine internals. Highest care required (§9, §10).
+2. **Control-plane daemon hooks** — **kernel-space eBPF** attached via uprobes at function entry/exit in the native daemons (httpd front end, tmsh, MCPD and the other C config daemons). These are ordinary Linux processes the kernel *can* see, so this is the **true Cisco analog** (NX-OS uses kernel eBPF) and it reuses the kernel's own in-built BPF verifier — no embedded VM needed here. F5 already ships kernel eBPF in BIG-IP eBPF Observability ("eob"), so the engine is in-house. Low performance risk (these are not latency-critical), high CVE coverage (most disclosed TMOS CVEs are control-plane). **Note the iControl REST stack (`restjavad`/`icrd`) runs on the JVM:** neither kernel uprobes nor native hooks reach Java methods, so its shields use a distinct JVM instrumentation surface (JVMTI / USDT-style probes the runtime exposes). The designed-in hook-point philosophy is identical; the adapter implementation is separate (see §12, Phase 2).
+3. **TMM hook points** — **embedded userspace eBPF VM** (uBPF + PREVAIL) attaching at sanctioned points inside TMM and its plugin processes (e.g. `bd`). Userspace precisely *because* TMM bypasses the kernel, so kernel eBPF is structurally blind to it (§2). The crown jewel: the only mechanism that reaches data-plane-engine internals. Highest care required (§9, §10).
 
 ### 5.2 The embedded eBPF VM
 
 - **uBPF**, linked as a library (~150 KB, Apache-2.0): an in-process eBPF VM with x86-64/arm64 JIT. Shields are authored as ordinary eBPF C and compiled with `clang -target bpf`. On the hot path the JIT is used (a shield invocation is an indirect call into native code; the interpreter is a debug/portability fallback). uBPF is the engine in Microsoft's eBPF-for-Windows and underneath bpftime, so the execution core is proven.
-- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield **before** the VM is allowed to load it; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read/write out of bounds or loop unbounded.
+- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield **before** the VM is allowed to load it; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read/write out of bounds or loop unbounded. (PREVAIL is the verifier for *this* userspace engine; the control-plane adapter rides the kernel's own in-tree BPF verifier instead — §5.1. Two engines, two verifiers, one catalog.)
 - uBPF has no native maps; the host provides them. Mode, hit/enforce counters, and `observe`-mode telemetry live in host memory (per-CPU on hot paths) that the lifecycle engine reads and the shield updates via registered helpers.
 
 ### 5.3 Native hook-point API and build-pipeline integration
@@ -328,7 +328,7 @@ Many CVE shields naturally target a **cold/exceptional** code path (the malforme
 Embed the userspace eBPF VM; add a native hook point in the `bd` enforcement process; ship a shield for **CVE-2026-22548** (crafted request terminating `bd` and disrupting traffic when an Advanced WAF/ASM policy is bound). Implement all three modes, signing, hit evidence to SIEM, and version-based auto-retirement. This proves the embedded-VM + lifecycle spine against a live, KEV-era-relevant bug **without touching TMM's hot path** — `bd` is a process we own and have symbols for.
 
 **Phase 2 — control-plane daemons.**
-Generalize hook points across the native daemons (httpd, tmsh, MCPD) using the uprobe adapter, and stand up the **separate JVM adapter** for the iControl REST stack (`restjavad`/`icrd`), since native uprobes cannot reach Java methods (§5.1). This is the clean Cisco analog and covers the bulk of historically disclosed TMOS CVEs (auth bypass, config-utility RCE, command injection) — many of which live precisely in the iControl REST surface, so the JVM adapter is not optional.
+Generalize hook points across the native daemons (httpd, tmsh, MCPD) using the **kernel-eBPF/uprobe adapter** (kernel-space, the Cisco analog — §5.1), and stand up the **separate JVM adapter** for the iControl REST stack (`restjavad`/`icrd`), since native uprobes cannot reach Java methods (§5.1). This is the clean Cisco analog and covers the bulk of historically disclosed TMOS CVEs (auth bypass, config-utility RCE, command injection) — many of which live precisely in the iControl REST surface, so the JVM adapter is not optional.
 
 **Phase 3 — TMM internals (the prize).**
 Sanctioned hook points inside TMM proper, on exceptional paths only, for the data-plane CVE classes nothing else can reach. Gated on Phase 1/2 proving the verifier, signing, and watchdog safety story.
