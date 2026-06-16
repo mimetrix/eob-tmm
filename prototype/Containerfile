@@ -1,0 +1,39 @@
+# Live Shield prototype — Track 2 (embedded uBPF VM) on the realistic base OS.
+#
+# Base: Rocky Linux 8.10 — the RHEL-8 family the appliance derives from. Unlike
+# the bpftime build (see Containerfile.bpftime), the uBPF track needs almost
+# nothing: plain gcc, clang for the BPF target, and libelf. No Boost, no
+# llvm-devel, no gcc-toolset, no frida, no glibc shims. This is the REAL product
+# model — the shield is eBPF bytecode run by a userspace VM embedded in the
+# (kernel-bypassing) data plane.
+#
+#   podman build -t eob-ubpf -f Containerfile .
+#   podman run --rm eob-ubpf /work/prototype/demo-ubpf.sh    # Track 2 (real model)
+#   podman run --rm eob-ubpf /work/prototype/demo.sh         # Track 1 (reference)
+#
+# No --privileged, no caps, no kernel eBPF: the eBPF runs entirely in userspace.
+FROM rockylinux:8.10
+
+# gcc/make for minimm + uBPF (plain C; base gcc 8.5 is fine), clang for the BPF
+# shield, libelf for uBPF's ELF loader, python3 for the test client.
+RUN dnf -y install gcc make git clang elfutils-libelf-devel python3 ca-certificates \
+    && dnf clean all
+
+WORKDIR /work
+
+# uBPF — the embedded VM. minimm's Makefile builds libubpf.a from this clone.
+RUN git clone --depth 1 https://github.com/iovisor/ubpf.git
+
+COPY . /work/prototype
+RUN chmod +x /work/prototype/*.sh
+
+# Track 1 (reference shield) + Track 2 (embedded uBPF VM running the eBPF shield).
+# UBPF_DIR defaults to ../../ubpf, i.e. /work/ubpf relative to /work/prototype/minimm.
+RUN make -C /work/prototype/minimm all ubpf
+
+# Sanity: the shield object and the uBPF binary must exist.
+RUN test -f /work/prototype/shields/ls_shield_ubpf.bpf.o \
+      && test -x /work/prototype/minimm/minimm-ubpf \
+      || (echo "uBPF track did not build" && exit 1)
+
+CMD ["/bin/bash"]

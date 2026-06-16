@@ -1,0 +1,12 @@
+# build output
+build.log
+
+# third-party clones (clone these yourself per prototype/README.md)
+ubpf/
+ebpf-verifier/
+
+# IP: invention/patent disclosures must never enter a shared repo
+*Disclosure*.md
+*disclosure*.md
+*Invention*.md
+*invention*.md

@@ -1,0 +1,26 @@
+{
+  "_comment": "Per-build hook-point map (design doc §5.3), here for the minimm prototype build. In production TMOS this is emitted by the build pipeline, signed, and shipped alongside the image; a shield resolves its target hook by NAME against this map, and arg_btf carries the CO-RE relocation info for the argument struct.",
+  "tmos_version": "minimm-0.1",
+  "build_id": "prototype",
+  "hook_points": [
+    {
+      "name": "ls_request_eval_decision",
+      "symbol": "ls_request_eval_decision",
+      "attach_mode": "filter",
+      "path_class": "cold",
+      "enumerated_outcomes": ["LS_PASS", "LS_DROP", "LS_RESET"],
+      "arg_btf": {
+        "arg0": {
+          "type": "const struct ls_ctx *",
+          "fields": {
+            "opcode":      "u16",
+            "payload_len": "u16",
+            "avail_len":   "u32",
+            "head":        "u8[16]"
+          }
+        }
+      },
+      "abort_branch": "host returns LS_DROP/LS_RESET before process_frame() dispatch; no state to unwind (design §6.1)"
+    }
+  ]
+}

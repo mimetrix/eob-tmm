@@ -1,0 +1,57 @@
+# Live Shield prototype — Track 2 (embedded uBPF) + the §9 PREVAIL verify gate,
+# on Rocky Linux 8.10. This is the full-safety image: every shield is statically
+# verified by PREVAIL before the embedded uBPF VM is allowed to run it.
+#
+#   podman build -t eob-verify -f Containerfile.verify .
+#   podman run --rm eob-verify /work/prototype/demo-verify.sh   # good passes, bad rejected
+#   podman run --rm eob-verify /work/prototype/demo-ubpf.sh     # Track 2 (no gate)
+#
+# Heavier than Containerfile (pure uBPF) because PREVAIL is C++23: base gcc 8.5
+# can't build it, so we add gcc-toolset-13 (used ONLY for the PREVAIL build) and
+# drop in modern Boost headers (el8 Boost 1.66 is too old). uBPF + minimm still
+# build with base gcc. No --privileged / caps / kernel eBPF anywhere.
+FROM rockylinux:8.10
+
+RUN dnf -y install dnf-plugins-core epel-release \
+    && dnf -y install gcc make git clang cmake elfutils-libelf-devel python3 \
+                      ca-certificates tar gcc-toolset-13 \
+    && dnf clean all
+
+WORKDIR /work
+
+# uBPF (embedded VM) + PREVAIL (verifier) sources.
+RUN git clone --depth 1 https://github.com/iovisor/ubpf.git \
+ && git clone --depth 1 --recurse-submodules --shallow-submodules \
+        https://github.com/vbpf/ebpf-verifier.git
+
+# Modern Boost headers for PREVAIL (header-only; el8's 1.66 is too old).
+RUN python3 -c "import urllib.request; urllib.request.urlretrieve('https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.gz','/tmp/boost.tgz')" \
+ && tar -xzf /tmp/boost.tgz -C /opt && rm -f /tmp/boost.tgz
+
+# Build PREVAIL's CLI with gcc-toolset-13 (C++23). Output: ebpf-verifier/bin/prevail.
+RUN . /opt/rh/gcc-toolset-13/enable \
+ && cd ebpf-verifier \
+ && cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -Dprevail_ENABLE_TESTS=OFF \
+          -DBOOST_HEADERS_DIR=/opt/boost_1_84_0 \
+ && cmake --build build --target prevail-cli -j"$(nproc)" \
+ && test -x bin/prevail || (echo "PREVAIL build failed" && exit 1)
+
+COPY . /work/prototype
+RUN chmod +x /work/prototype/*.sh
+
+# minimm (Track 1 + Track 2/uBPF) and both shields (good + the unsafe one).
+RUN make -C /work/prototype/minimm all ubpf \
+ && clang -O2 -target bpf -idirafter /usr/include -c \
+      /work/prototype/shields/ls_shield_bad.bpf.c \
+      -o /work/prototype/shields/ls_shield_bad.bpf.o
+
+# Point the verify gate at PREVAIL by default.
+ENV LS_VERIFIER=/work/ebpf-verifier/bin/prevail
+ENV LS_VERIFY_SECTION=.text
+
+RUN test -f /work/prototype/shields/ls_shield_ubpf.bpf.o \
+      && test -x /work/prototype/minimm/minimm-ubpf \
+      && test -x /work/ebpf-verifier/bin/prevail \
+      || (echo "verify image did not build" && exit 1)
+
+CMD ["/bin/bash"]

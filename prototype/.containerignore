@@ -1,0 +1,8 @@
+# Keep built artifacts out of the image build context — they're rebuilt in-image
+# against the el8 toolchain. (podman/buildah honor .containerignore; .dockerignore too.)
+minimm/minimm
+minimm/minimm-ubpf
+minimm/minimm-trace
+**/*.o
+*.log
+build.log
