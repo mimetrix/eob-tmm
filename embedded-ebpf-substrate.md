@@ -47,10 +47,32 @@ This is what the `eob-patch` name has pointed at all along: **eob** (observabili
 ## 3. Use-case families
 
 - **Security beyond CVE shields** — behavioral exploit detection on internal state; inline protocol-anomaly detection at the parser (pre-event); adaptive rate-limit / circuit-break on internal load; TLS/crypto policy at the record layer.
-- **Observability, dynamic & on-demand** — *bpftrace-for-TMM* (deep telemetry for a specific condition/flow/tenant, on then off); per-flow latency breakdown across internal stages; *flight recorder* (snapshot state when an error branch fires); new metrics as bytecode, no TMOS rev.
-- **Diagnostics & field support** — ship a customer a *signed probe* to characterize a production issue in situ, then remove it. No debug build, no core-dump archaeology.
+- **Observability, dynamic & on-demand** — *bpftrace-for-TMM* (deep telemetry for a specific condition/flow/tenant, on then off); per-flow latency breakdown across internal stages; *flight recorder* (snapshot state when an error branch fires — worked in §3.1); new metrics as bytecode, no TMOS rev.
+- **Diagnostics & field support** — ship a customer a *signed probe* to characterize a production issue in situ, then remove it (worked in §3.1). No debug build, no core-dump archaeology.
 - **Lightweight policy / steering** — steering, mirror-selection, A/B decisions driven by internal signals (decision in eBPF; heavy logic in iRules/WASM).
 - **Self-tuning / performance** — read internal load and nudge a knob; live hot-path profiling.
+
+### 3.1 Two diagnostic patterns, worked
+
+The diagnostics leg is the substrate's lowest-risk, highest-leverage near-term use: both patterns below are **observe-mode, read-only, and verified**, so they run on a *live production* data plane without the "a bad shield crashes TMM" exposure of `filter` mode. They turn "ship a debug build / wait for it to recur" into "load signed bytecode for a while," and they reuse the existing security spine (§6) at a lower authorization tier — read-only, but exfiltration still governed (§6.2).
+
+**Signed support probe.** F5 support/SIRT authors a small program targeting the *exact* hook + condition behind an intermittent field issue (a sporadic reset, a latency spike, a plugin misbehaving under one traffic shape), signs it, and ships it. The operator — RBAC-gated, explicit consent — loads it in observe mode; it captures precisely the needed signal, exports to the controlled sink, then is pulled. eBPF earns this specifically because it is **verified** (cannot crash or hang a customer's production box — non-negotiable for vendor code attached inline on live traffic), cleanly **removable**, and reaches **in-TMM** state that logs and iRules cannot. Design points not otherwise specified:
+
+- **Context minimization by default** — a support probe does *not* expose TLS secrets / PII / decrypted payload unless separately justified and authorized; redact by default (§6.3).
+- **Data residency** — captures land in a **customer-controlled, audited** location; the customer decides what to share with support. Auto-phone-home to F5 is the wrong default for a security appliance.
+- **Time-boxed** — auto-retirement (design §7) applies: a probe must not outlive the investigation. Expiry + kill-switch + a tamper-evident log of what was loaded and what it captured.
+
+The governance *is* the feature here: without it, "vendor loads code on my box to read my traffic" is a non-starter.
+
+**Flight recorder.** A small **per-CPU ring** of recent internal state is maintained at the relevant hook(s); on a **trigger**, the ring is frozen and dumped — yielding the run-up *into* a failure rather than the wreckage after it (the core-dump's blind spot). Two flavors: a *per-context ring* (recent state for the active flow, dumped on the error branch) and a *global tripwire* (cross-cutting state — poll-loop jitter, memory-pool pressure — dumped on an emergency-mode / watchdog event). Design points:
+
+- **Steady-state cost** — this is the one observe pattern that is *not* free when nothing is wrong: writing the ring on every event is a standing tax, hence a measured-budget decision (§11). Mitigate with a small per-CPU ring (the single-threaded poll loop makes the freeze lock-free), cheap recorded fields, or **conditional arming** (record only once a leading indicator appears).
+- **Trigger taxonomy** — entry to a known-vulnerable function, a parser reaching an error state, an assertion, a watchdog event. The trigger is itself a hook, so a flight recorder is really *two* coordinated hooks (record + trip).
+- **Dump path off the hot path** — freeze the ring cheaply; hand serialization/export to the lifecycle engine.
+
+**The combined play.** Pair `enforce` + flight recorder on the *same* condition: when a shield drops a malformed frame, the recorder simultaneously snapshots the context. Every block becomes an intelligence source — SIRT gets the exact attempt that was stopped — and it directly answers "how do you know the shield catches real attacks and isn't breaking legitimate traffic?"
+
+Both patterns reuse the same machinery — signing + RBAC, context minimization, the **one-way audited sink** (the program cannot read back or redirect its own output, so even a malicious probe cannot phone home), auto-retirement + kill-switch, tamper-evident audit log (§6.3). Neither needs new substrate.
 
 ## 4. Candidate hook points — observability & active datapath
 
