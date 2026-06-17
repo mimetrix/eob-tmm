@@ -123,6 +123,8 @@ static int matches_crash_precondition(const struct ls_ctx *ctx)
 #include "ubpf.h"
 #include <sys/wait.h>
 static struct ubpf_vm *g_vm;
+static int g_flightrec;   /* flight recorder armed (LS_FLIGHTREC); opt-in because
+                           * the ring has a steady-state cost (§3.1 / design §11) */
 
 /*
  * The §9 verify-before-load gate. If LS_VERIFIER is set (e.g. to PREVAIL's
@@ -174,10 +176,12 @@ static int ls_ubpf_init(const char *obj_path)
     }
     fprintf(stderr, "[minimm] uBPF shield loaded%s from %s\n",
             getenv("LS_VERIFIER") ? " (verified)" : "", obj_path);
+    { const char *fr = getenv("LS_FLIGHTREC"); g_flightrec = fr && *fr && *fr != '0'; }
+    if (g_flightrec)
+        fprintf(stderr, "[minimm] flight recorder ARMED (shm-backed run-up ring, §3.1)\n");
     return 0;
 }
 
-#if defined(LS_TRACE)
 /*
  * Flight recorder (substrate §3.1): push a frame summary into the shm ring.
  * The host owns the ring (uBPF has no native maps); the observe program only
@@ -215,6 +219,7 @@ static void ls_fr_dump(const char *why)
     g_ls->fr_trip_seq = seen;
 }
 
+#if defined(LS_TRACE)
 /*
  * observe-mode tracepoint: run the program purely for telemetry and NEVER change
  * flow. The program returns a sampled value (the frame opcode in the low byte)
@@ -246,13 +251,17 @@ int ls_request_eval_decision(const struct ls_ctx *ctx)
     uint64_t ret = 0;
     if (ubpf_exec(g_vm, &local, sizeof(local), &ret) != 0)
         return LS_PASS;                    /* VM error -> fail open */
+    if (g_flightrec)
+        ls_fr_push(ctx);                   /* flight recorder: record run-up (armed) */
     if (ret == 0)
         return LS_PASS;                    /* predicate did not match */
     g_ls->hits++;                          /* matched: evidence, always (§6) */
     g_ls->last_opcode = ctx->opcode;
+    if (g_flightrec && !g_ls->fr_tripped)  /* freeze the run-up INTO the matched frame */
+        ls_fr_dump("shield match at hook");
     if (ret == 2) {                        /* match + enforce */
         g_ls->enforced++;
-        return LS_DROP;                    /* host's sanctioned reject branch (§6.1) */
+        return LS_DROP;                    /* dropped — AND the forensic trail is kept */
     }
     return LS_PASS;                        /* ret==1: match + monitor -> crash (§7.1) */
 }

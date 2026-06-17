@@ -115,6 +115,13 @@ This is the core-dump's blind spot: you get the frames leading up to the fault, 
 wreckage. The `demo-ubpf.sh` flight-recorder section shows both the live dump and the
 post-mortem read.
 
+**Combined play (enforce + flight recorder).** The recorder isn't observe-only — arm it in the
+enforce build with `LS_FLIGHTREC=1` and the *same* attack is **dropped** (relay survives) while
+the run-up into the blocked attempt is **captured**: "blocked it *and* kept the forensics" (§3.1).
+Because the recorder carries a steady-state cost (§3.1 / design §11), it's opt-in rather than
+always-on. The `demo-ubpf.sh` combined-play section shows it — contrast it with the observe-only
+run, which captures the run-up but then crashes.
+
 ### §9 verify-before-load gate (PREVAIL)
 
 uBPF runs whatever bytecode it's given, so the §9 safety gate adds a **static verifier that

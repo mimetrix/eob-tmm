@@ -74,4 +74,27 @@ if [ -x "$TRACE_MM" ] && [ -f "$TRACE_OBJ" ]; then
 else
   echo "(skipped: build minimm-trace with 'make -C minimm ubpf')"
 fi
+
+echo "==================== COMBINED PLAY: enforce + flight recorder (§3.1) ===================="
+# The payoff. Same attack, but now the shield is in ENFORCE and the recorder is
+# ARMED (LS_FLIGHTREC=1). The shield DROPS the malformed frame so the relay
+# SURVIVES, *and* the recorder freezes the run-up into the blocked attempt:
+# "blocked it AND kept the forensics." Contrast the observe-only run above, which
+# captured the run-up but then crashed.
+kill "${TRACE_PID:-0}" 2>/dev/null; nap 0.2
+rm -f /dev/shm/minimm_ls
+LS_FLIGHTREC=1 "$MM" relay --listen "$RP" --upstream "127.0.0.1:$EP" >/tmp/u.combo.log 2>&1 & RELAY_PID=$!
+wait_port 127.0.0.1 "$RP" || { echo "combo relay failed:"; cat /tmp/u.combo.log; }
+"$MM" ctl mode enforce >/dev/null
+echo "--- run-up: benign frames ---"
+set -- "1:alpha" "2:bravo" "3:charlie" "0:delta"
+for f in "$@"; do python3 "$CLIENT" raw --op "${f%%:*}" --data "${f#*:}" >/dev/null 2>&1; done
+echo "--- trigger: attack frame (expect: DROPPED, relay SURVIVES, run-up captured) ---"
+python3 "$CLIENT" attack >/dev/null 2>&1
+nap 0.3
+kill -0 "$RELAY_PID" 2>/dev/null && echo ">>> relay ALIVE — shield dropped the attack (vs observe above, which crashed)" \
+                                 || echo ">>> relay DEAD (unexpected)"
+echo "--- live dump: the blocked attempt + its run-up ---"
+grep -A6 'FLIGHT RECORDER DUMP' /tmp/u.combo.log || echo "(no dump found)"
+"$MM" ctl stats
 echo "### done"

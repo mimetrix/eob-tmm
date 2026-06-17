@@ -72,7 +72,7 @@ The governance *is* the feature here: without it, "vendor loads code on my box t
 
 The prototype demonstrates this end to end: `minimm-trace` (an observe program in the embedded VM) keeps a shm-backed ring of recent frames and arms a dump on the crash precondition; the run-up prints at the hook *before* the data plane crashes, and survives it for post-mortem (`ctl flightrec`). See `prototype/README.md` and `prototype/demo-ubpf.sh`.
 
-**The combined play.** Pair `enforce` + flight recorder on the *same* condition: when a shield drops a malformed frame, the recorder simultaneously snapshots the context. Every block becomes an intelligence source — SIRT gets the exact attempt that was stopped — and it directly answers "how do you know the shield catches real attacks and isn't breaking legitimate traffic?"
+**The combined play.** Pair `enforce` + flight recorder on the *same* condition: when a shield drops a malformed frame, the recorder simultaneously snapshots the context. Every block becomes an intelligence source — SIRT gets the exact attempt that was stopped — and it directly answers "how do you know the shield catches real attacks and isn't breaking legitimate traffic?" The prototype shows this too (`LS_FLIGHTREC=1` on the enforce build): the attack is dropped, the relay survives, and the run-up into the blocked attempt is captured — the combined-play section of `prototype/demo-ubpf.sh`.
 
 Both patterns reuse the same machinery — signing + RBAC, context minimization, the **one-way audited sink** (the program cannot read back or redirect its own output, so even a malicious probe cannot phone home), auto-retirement + kill-switch, tamper-evident audit log (§6.3). Neither needs new substrate.
 
