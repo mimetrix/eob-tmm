@@ -83,7 +83,7 @@ In short: **iRules express traffic logic in the sanctioned data-model at proxy e
 | Pre-L7 / record-layer paths — TLS record parse, L3/L4 stack, protocol framers | (a) — no event fires before the vulnerable code | hook at the parser function itself |
 | Enforcement-plugin internals — `bd` / WAF / ASM | (b)+(c) — plugin-process internals invisible to the proxy model | hook *inside* the plugin process |
 | The iRule / TCL engine or rule dispatcher | — a rule cannot shield itself | a separate mechanism hooks it |
-| FastL4 / hardware-offload fast paths | (c) — flow bypasses the iRule VM | hook in the fast-path code |
+| FastL4 / hardware-offload fast paths | (c) — flow bypasses the iRule VM | hook the *software* fast path — but flows offloaded to ePVA/FPGA bypass TMM software entirely and are out of reach (§10) |
 | Internal program state — connection-table internals, memory-pool pressure, parser state machines, inter-function latency, error-branch hit-counts | (b) — no iRule command exposes it | an `observe`-mode tracepoint (§6.1) reads it in-process |
 | Code-level virtual patch for a malformed condition not surfaced as a clean field | (b) — condition invisible in the data model | inspect the raw argument at the vulnerable function |
 
@@ -309,7 +309,15 @@ Unlike Cisco's kernel-isolated shields, a Live Shield in the TMM adapter runs **
 
 ## 10. Residual dead zone (state honestly)
 
-This is the right-hand-column residual from the §2.1 coverage map. A TMM bug that crashes **before** any reachable hook point fires — e.g. a fault deep in TLS record parsing ahead of the first instrumented function — cannot be shielded by this mechanism, just as it cannot be caught by an iRule (the event never fires) or by kernel eBPF (TMM bypasses the kernel). Those require an engineering hotfix. Live Shield narrows the window for most data-plane CVEs; it does not claim to close all of them. The hook-point map should be designed to push the earliest viable instrumentation point as close to TMM's ingress as performance allows, shrinking this zone over time.
+This is the right-hand-column residual from the §2.1 coverage map. Two things fall outside this mechanism, and both are shared by every *software* control surface (iRules, WASM) — they are not unique to it:
+
+1. **A crash before the first reachable hook.** A TMM bug that faults **before** any instrumented function runs — e.g. deep in TLS record parsing ahead of the first hook — cannot be shielded, just as an iRule (the event never fires) or kernel eBPF (TMM bypasses the kernel) cannot catch it. The hook-point map should push the earliest viable instrumentation point as close to ingress as performance allows, shrinking this zone over time.
+
+2. **Traffic offloaded to hardware.** On appliances with **ePVA / FPGA (TurboFlex) / crypto offload**, some flows are switched or mitigated in silicon and never enter TMM software. An embedded userspace VM runs *in TMM software*, so it cannot see an offloaded fast path — the same way iRules and kernel eBPF cannot (§2.2). This is a **hardware boundary, not a shortcoming of the mechanism**: it is exactly the FastL4/hardware-offload hole already noted for iRules. Crucially, the high-severity data-plane CVE classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute in TMM software regardless (a flow that needs L7 inspection is escalated back off the offload path), so they remain reachable. A CVE **in** the hardware fast path itself, in the offload/escalation decision, or in a pure-L4 vector that stays offloaded, needs a firmware/FPGA fix — out of scope for any software shield.
+
+**Form-factor consequence.** The *mechanism* (an embedded VM at designed-in hooks) is identical across appliance, VE, and BIG-IP Next for Kubernetes, because all three run the same TMM data plane. **Coverage** is not: **BIG-IP VE** (pure software, no offload) is the best case — the VM sees the entire data path; an **appliance** carries the offload dead zone above; **BNK** on a DPU depends on how much traffic the DPU steers versus lands in the containerized TMM. Coverage scales inversely with how much the platform offloads to hardware.
+
+Live Shield narrows the window for most data-plane CVEs; it does not claim to close all of them. Those in the residual zone require an engineering hotfix.
 
 ## 11. Performance
 

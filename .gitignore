@@ -16,3 +16,9 @@ ebpf-verifier/
 *disclosure*.md
 *Invention*.md
 *invention*.md
+
+# tmmtrace generated shields + logs
+prototype/.tmmtrace/
+
+# AI-authored-shield-pipeline invention disclosure figures (IP — never in shared repo)
+disclosure-figures/

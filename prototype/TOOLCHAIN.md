@@ -122,8 +122,11 @@ ubpf_exec(g_vm, &ctx, sizeof(ctx), &ret);   // at ls_request_eval_decision
 
 The **host owns the enumerated outcomes** (§6.1) — `LS_PASS` / `LS_DROP`; the shield
 only chooses among them via its return value. uBPF has no native maps, so mode and
-hit/enforce counters live in host memory that the host reads and the shield updates
-through registered helpers.
+hit/enforce counters live in host memory. In the prototype the shield is a pure
+`ctx → return code` function that touches nothing else: the **host** reads that return
+and updates the counters itself (no helpers are registered). In the product a shield can
+instead update host-owned maps through a **minimal, audited set of registered helpers**
+(design §5.2) — the capability-confinement surface of `../embedded-ebpf-substrate.md` §6.3.
 
 ## Prerequisite summary
 

@@ -1,0 +1,1248 @@
+<style>
+  /* ---- tokens : light is base, dark via media + [data-theme] ---- */
+  :root{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa;
+    --border:#d3dbe3; --border-strong:#b7c2cd;
+    --text:#152029; --muted:#576673;
+    --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170;
+    --static:#a06713; --static-bg:#f5ebd7; --static-ink:#7d5210;
+    --good:#1f9e6a;
+    --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --s1:.4rem; --s2:.75rem; --s3:1.2rem; --s4:2rem; --s5:3.25rem; --s6:5rem;
+    --maxw:74rem; --prose:41rem;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c;
+      --border:#233039; --border-strong:#3a4c5c;
+      --text:#e7eef4; --muted:#8c9aa8;
+      --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee;
+      --static:#e0a94a; --static-bg:#2a2113; --static-ink:#f0c983;
+      --good:#40c78a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c;
+    --border:#233039; --border-strong:#3a4c5c;
+    --text:#e7eef4; --muted:#8c9aa8;
+    --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee;
+    --static:#e0a94a; --static-bg:#2a2113; --static-ink:#f0c983;
+    --good:#40c78a;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa;
+    --border:#d3dbe3; --border-strong:#b7c2cd;
+    --text:#152029; --muted:#576673;
+    --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170;
+    --static:#a06713; --static-bg:#f5ebd7; --static-ink:#7d5210;
+    --good:#1f9e6a;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0}
+  .page{
+    background:var(--bg); color:var(--text);
+    font-family:var(--font-sans); font-size:17px; line-height:1.62;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(1.1rem,4vw,2.5rem)}
+  .prose{max-width:var(--prose)}
+  .band{padding:var(--s6) 0; border-top:1px solid var(--border)}
+  .band:first-child{border-top:0}
+
+  .eyebrow{
+    font-family:var(--font-mono); font-size:.72rem; font-weight:600;
+    letter-spacing:.19em; text-transform:uppercase; color:var(--accent-ink);
+    margin:0 0 var(--s3);
+  }
+  h1,h2,h3{text-wrap:balance; line-height:1.08; margin:0}
+  h1{font-size:clamp(2.3rem,6.2vw,4.1rem); font-weight:680; letter-spacing:-.022em}
+  h1 em{font-style:normal; color:var(--accent-ink)}
+  h2{font-size:clamp(1.55rem,3.6vw,2.25rem); font-weight:660; letter-spacing:-.015em}
+  h3{font-size:1.06rem; font-weight:640; letter-spacing:-.005em}
+  p{margin:0} .stack>*+*{margin-top:var(--s3)}
+  .muted{color:var(--muted)}
+  strong{font-weight:660}
+  code{font-family:var(--font-mono); font-size:.87em; background:var(--surface-2);
+    border:1px solid var(--border); border-radius:4px; padding:.08em .34em}
+
+  /* ---- hero ---- */
+  .hero{position:relative; padding:clamp(4rem,11vw,8rem) 0 var(--s6)}
+  .hero::before{
+    content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(var(--border) 1px,transparent 1px),
+      linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:44px 44px; opacity:.4;
+    -webkit-mask-image:radial-gradient(120% 90% at 12% 0%,#000,transparent 70%);
+            mask-image:radial-gradient(120% 90% at 12% 0%,#000,transparent 70%);
+  }
+  .hero>*{position:relative; z-index:1}
+  .hero h1{max-width:20ch}
+  .lede{font-size:clamp(1.08rem,2vw,1.32rem); color:var(--muted); max-width:44rem; margin-top:var(--s4)}
+  .metastrip{
+    display:flex; flex-wrap:wrap; gap:.5rem var(--s3); margin-top:var(--s5);
+    font-family:var(--font-mono); font-size:.76rem; color:var(--muted);
+    letter-spacing:.03em;
+  }
+  .metastrip span{display:inline-flex; align-items:center; gap:.5rem}
+  .metastrip span::before{content:""; width:6px; height:6px; background:var(--accent); border-radius:50%}
+
+  /* ---- cards ---- */
+  .cards{display:grid; gap:var(--s3); margin-top:var(--s5);
+    grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:var(--s4)}
+  .card .n{font-family:var(--font-mono); font-size:.74rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent-ink); margin-bottom:var(--s2); display:block}
+  .card h3{margin-bottom:.5rem}
+  .card p{font-size:.95rem; color:var(--muted)}
+
+  .callout{margin-top:var(--s5); background:var(--surface-2);
+    border:1px solid var(--border); border-left:3px solid var(--accent);
+    border-radius:8px; padding:var(--s4)}
+  .callout .lbl{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent-ink)}
+  .callout p{margin-top:.55rem; color:var(--text)}
+  .lane{display:grid; grid-template-columns:1fr; gap:var(--s2); margin-top:var(--s3);
+    font-family:var(--font-mono); font-size:.82rem}
+  .lane .row{display:flex; align-items:center; gap:var(--s2); padding:.55rem .7rem;
+    border:1px dashed var(--border-strong); border-radius:6px; background:var(--surface)}
+  .lane .row.blind{color:var(--muted)}
+  .lane .row b{font-weight:640; letter-spacing:.02em}
+  .tag{font-family:var(--font-mono); font-size:.66rem; letter-spacing:.1em;
+    text-transform:uppercase; padding:.2em .5em; border-radius:4px; white-space:nowrap}
+  .tag.see{background:var(--accent-bg); color:var(--accent-ink)}
+  .tag.no{background:var(--static-bg); color:var(--static-ink)}
+
+  /* ================= interactive stage ================= */
+  .stage{
+    --local:var(--accent); --local-bg:var(--accent-bg); --local-ink:var(--accent-ink);
+    margin-top:var(--s5);
+  }
+  .stage[data-mode="static"]{--local:var(--static); --local-bg:var(--static-bg); --local-ink:var(--static-ink)}
+
+  .seg{display:inline-flex; padding:4px; gap:4px; background:var(--surface-2);
+    border:1px solid var(--border); border-radius:10px; margin-bottom:var(--s4)}
+  .seg button{
+    font-family:var(--font-mono); font-size:.8rem; letter-spacing:.02em;
+    border:0; background:transparent; color:var(--muted); cursor:pointer;
+    padding:.6rem 1rem; border-radius:7px; display:flex; align-items:center; gap:.5rem;
+    transition:background .18s,color .18s;
+  }
+  .seg button .dot{width:8px; height:8px; border-radius:50%; background:currentColor; opacity:.5}
+  .seg button.on{color:#fff; background:var(--seg-c)}
+  .seg button.on .dot{opacity:1; background:#fff}
+  .seg button[data-m="dynamic"]{--seg-c:var(--accent)}
+  .seg button[data-m="static"]{--seg-c:var(--static)}
+  .seg button.on[data-m="dynamic"]{color:#04222a}
+  .seg button.on[data-m="static"]{color:#231604}
+
+  .stagegrid{display:grid; gap:var(--s4); grid-template-columns:1fr}
+  @media(min-width:820px){.stagegrid{grid-template-columns:1.35fr 1fr; align-items:start}}
+
+  /* the host frame */
+  .frame{position:relative; background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:12px; padding:var(--s4)}
+  .frame::before,.frame::after{content:""; position:absolute; width:15px; height:15px;
+    border-color:var(--local); border-style:solid; transition:border-color .25s}
+  .frame::before{top:-1px; left:-1px; border-width:2px 0 0 2px; border-top-left-radius:5px}
+  .frame::after{bottom:-1px; right:-1px; border-width:0 2px 2px 0; border-bottom-right-radius:5px}
+  .frame .flabel{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; align-items:center}
+  .frame .flabel .pid{color:var(--local-ink)}
+  .hostbody{margin-top:var(--s3); display:flex; flex-direction:column; gap:var(--s2)}
+
+  .subbox{border:1px solid var(--border); border-radius:8px; padding:.8rem .9rem;
+    background:var(--surface-2)}
+  .subbox .k{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted)}
+  .subbox .v{font-size:.9rem; margin-top:.2rem}
+  .engine{border-style:solid; border-color:var(--border-strong)}
+  .engine .v{color:var(--text)}
+  .engine .fixed{font-family:var(--font-mono); font-size:.66rem; color:var(--good);
+    letter-spacing:.06em; margin-top:.35rem; display:inline-flex; align-items:center; gap:.4rem}
+  .engine .fixed::before{content:"■"; font-size:.6em}
+
+  /* the decision chip / slot */
+  .slot{border:1.5px dashed var(--local); border-radius:8px; padding:.5rem;
+    background:var(--local-bg); transition:border-color .25s,background .25s}
+  .chip{background:var(--surface); border:1px solid var(--local); border-radius:6px;
+    padding:.7rem .85rem; transition:opacity .2s,transform .2s}
+  .chip.out{opacity:0; transform:translateX(14px)}
+  .chip .chead{display:flex; justify-content:space-between; align-items:baseline; gap:.6rem}
+  .chip .cname{font-family:var(--font-mono); font-size:.8rem; color:var(--local-ink); font-weight:600}
+  .chip .cact{font-family:var(--font-mono); font-size:.64rem; letter-spacing:.1em;
+    padding:.15em .5em; border-radius:4px; background:var(--local-bg); color:var(--local-ink)}
+  .chip .cpred{font-size:.95rem; margin-top:.35rem; font-weight:560}
+  .chip .cbytes{font-family:var(--font-mono); font-size:.68rem; color:var(--muted);
+    margin-top:.45rem; word-break:break-all}
+  .chip .cnote{font-size:.8rem; color:var(--muted); margin-top:.4rem}
+
+  .weld{font-family:var(--font-mono); font-size:.66rem; color:var(--static-ink);
+    letter-spacing:.06em; margin-top:.5rem; display:flex; align-items:center; gap:.4rem}
+  .weld::before{content:"⛒"}
+  .slotcap{font-family:var(--font-mono); font-size:.66rem; color:var(--muted);
+    letter-spacing:.05em; margin-top:.5rem; text-align:center}
+
+  .catalog{margin-top:var(--s3)}
+  .catalog .ct{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:.5rem}
+  .catrow{display:flex; flex-wrap:wrap; gap:.5rem}
+  .catchip{font-family:var(--font-mono); font-size:.74rem; cursor:pointer;
+    border:1px solid var(--border); background:var(--surface); color:var(--muted);
+    padding:.4rem .65rem; border-radius:6px; transition:border-color .15s,color .15s}
+  .catchip:hover{border-color:var(--accent); color:var(--accent-ink)}
+  .catchip.cur{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-bg)}
+
+  /* consequences panel */
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:var(--s4)}
+  .panel h3{color:var(--local-ink)}
+  .panel .ptext{font-size:.95rem; color:var(--muted); margin-top:.5rem; min-height:3.4em}
+  .metrics{display:grid; gap:.55rem; margin-top:var(--s3)}
+  .metric{display:flex; justify-content:space-between; gap:1rem; align-items:baseline;
+    font-size:.85rem; padding-bottom:.55rem; border-bottom:1px solid var(--border)}
+  .metric .mk{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted)}
+  .metric .mv{font-weight:620; text-align:right; font-variant-numeric:tabular-nums; color:var(--local-ink)}
+
+  .act{margin-top:var(--s4); width:100%; cursor:pointer; font-family:var(--font-mono);
+    font-size:.82rem; letter-spacing:.02em; border-radius:8px; padding:.85rem 1rem;
+    border:1px solid var(--local); background:var(--local); color:#04222a; font-weight:600;
+    transition:filter .15s,transform .08s}
+  .stage[data-mode="static"] .act{color:#231604; background:transparent; color:var(--static-ink); border-style:dashed}
+  .act:hover{filter:brightness(1.06)} .act:active{transform:translateY(1px)}
+
+  .vgate{margin-top:var(--s3); display:flex; align-items:center; gap:.5rem;
+    font-family:var(--font-mono); font-size:.72rem; color:var(--muted); opacity:.55; transition:opacity .2s}
+  .vgate .pill{padding:.25em .55em; border-radius:4px; border:1px solid var(--border)}
+  .vgate.flash{opacity:1} .vgate.flash .pill{border-color:var(--good); color:var(--good)}
+
+  .log{margin-top:var(--s3); background:var(--surface-2); border:1px solid var(--border);
+    border-radius:8px; padding:.7rem .85rem; font-family:var(--font-mono); font-size:.72rem;
+    color:var(--muted); min-height:5.5em; display:flex; flex-direction:column; gap:.3rem}
+  .log .ll{opacity:0; animation:fadein .3s forwards}
+  .log .ll.ok{color:var(--good)} .log .ll.no{color:var(--static-ink)}
+  @keyframes fadein{to{opacity:1}}
+
+  .frame.rebuilding{animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+  /* kernel vs userspace versus table */
+  .versus{display:grid; gap:var(--s3); margin-top:var(--s5); grid-template-columns:1fr}
+  @media(min-width:760px){.versus{grid-template-columns:1fr 1fr}}
+  .vcol{border:1px solid var(--border); border-radius:12px; padding:var(--s4); background:var(--surface)}
+  .vcol.kern{border-color:var(--static); background:var(--static-bg)}
+  .vcol.user{border-color:var(--accent); background:var(--accent-bg)}
+  .vcol .vh{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.12em;
+    text-transform:uppercase; display:flex; align-items:center; gap:.5rem}
+  .vcol.kern .vh{color:var(--static-ink)} .vcol.user .vh{color:var(--accent-ink)}
+  .vcol h3{margin:.55rem 0 var(--s3); color:var(--text)}
+  .vlist{display:flex; flex-direction:column; gap:var(--s2)}
+  .vitem{display:flex; gap:.6rem; font-size:.92rem; align-items:flex-start}
+  .vitem .mk{flex:0 0 auto; font-family:var(--font-mono); font-weight:700; line-height:1.5}
+  .vcol.kern .vitem .mk{color:var(--static-ink)} .vcol.user .vitem .mk{color:var(--good)}
+  .vitem span{color:var(--muted)} .vitem b{color:var(--text); font-weight:620}
+  .vverdict{margin-top:var(--s3); padding-top:var(--s3); border-top:1px solid var(--border);
+    font-size:.9rem; font-weight:560}
+  .vcol.kern .vverdict{color:var(--static-ink)} .vcol.user .vverdict{color:var(--accent-ink)}
+
+  /* two-plane box */
+  .box{margin-top:var(--s5); border:2px solid var(--border-strong); border-radius:14px;
+    background:var(--surface-2); padding:var(--s3); position:relative}
+  .box>.boxlabel{position:absolute; top:-.72rem; left:1.2rem; background:var(--bg);
+    padding:0 .6rem; font-family:var(--font-mono); font-size:.7rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted)}
+  .spine{background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:.9rem 1.1rem; display:flex; flex-wrap:wrap; gap:.5rem 1.1rem; align-items:center}
+  .spine .st{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--accent-ink); font-weight:600}
+  .spine .si{font-size:.82rem; color:var(--muted)}
+  .spine .si b{color:var(--text); font-weight:600}
+  .feeds{display:flex; justify-content:center; gap:6rem; height:1.4rem; position:relative}
+  .feeds::before,.feeds::after{content:""; position:absolute; top:0; width:1px; height:100%;
+    background:var(--border-strong)}
+  .feeds::before{left:calc(50% - 3rem)} .feeds::after{left:calc(50% + 3rem)}
+  .planes{display:grid; gap:var(--s2); grid-template-columns:1fr}
+  @media(min-width:800px){.planes{grid-template-columns:1fr 1fr}}
+  .plane{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:var(--s3)}
+  .plane.data{border-color:var(--accent)}
+  .plane .ph{display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap}
+  .plane .pname{font-weight:640; font-size:1rem}
+  .plane .engtag{font-family:var(--font-mono); font-size:.66rem; letter-spacing:.05em;
+    padding:.28em .6em; border-radius:5px; white-space:nowrap; border:1px solid var(--border)}
+  .plane.ctrl .engtag{background:var(--surface-2); color:var(--muted)}
+  .plane.data .engtag{background:var(--accent-bg); color:var(--accent-ink); border-color:var(--accent)}
+  .plane .pruns{font-size:.85rem; color:var(--muted); margin-top:.5rem}
+  .plane .pcve{margin-top:var(--s2); font-size:.82rem}
+  .plane .pcve .cl{font-family:var(--font-mono); font-size:.63rem; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--muted); display:block; margin-bottom:.3rem}
+  .plane .pcve .cve{display:inline-block; font-size:.78rem; color:var(--text);
+    background:var(--surface-2); border:1px solid var(--border); border-radius:5px;
+    padding:.2em .5em; margin:0 .3rem .3rem 0}
+  .plane .psee{margin-top:var(--s2); padding-top:var(--s2); border-top:1px solid var(--border);
+    font-size:.8rem; display:flex; align-items:flex-start; gap:.45rem}
+  .plane.ctrl .psee .m{color:var(--good)} .plane.data .psee .m{color:var(--static-ink)}
+  .plane .psee .m{font-family:var(--font-mono); font-weight:700; flex:0 0 auto}
+  .plane .psee span{color:var(--muted)} .plane .psee b{color:var(--text); font-weight:600}
+
+  /* form factors */
+  .ffgrid{display:grid; gap:var(--s3); margin-top:var(--s5); grid-template-columns:1fr}
+  @media(min-width:880px){.ffgrid{grid-template-columns:repeat(3,1fr)}}
+  .ffcard{display:flex; flex-direction:column; gap:.5rem}
+  .ffhead{padding:0 .2rem var(--s2)}
+  .ffhead .fk{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--muted)}
+  .ffhead .fn{font-weight:660; font-size:1.08rem; margin-top:.25rem; letter-spacing:-.01em}
+  .ffhead .ft{font-size:.83rem; color:var(--muted); margin-top:.25rem}
+  .fflayer{border:1px solid var(--border); border-radius:9px; padding:.75rem .85rem; background:var(--surface)}
+  .fflayer .lk{font-family:var(--font-mono); font-size:.62rem; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:.5rem}
+  .fflayer .lk .vary{color:var(--static-ink); font-size:.9em}
+  .fflayer .lv{font-size:.87rem; margin-top:.3rem; color:var(--text)}
+  .fflayer.tmm{border:1.5px solid var(--accent); background:var(--accent-bg); position:relative}
+  .fflayer.tmm .lk{color:var(--accent-ink)}
+  .fflayer.tmm .lk .same{color:var(--accent-ink); font-weight:600}
+  .fflayer.tmm .lv{color:var(--text); font-weight:560}
+  .fflayer.tmm .shield{font-family:var(--font-mono); font-size:.72rem; color:var(--accent-ink);
+    margin-top:.4rem; display:flex; align-items:center; gap:.4rem}
+  .fflayer.tmm .shield::before{content:"◆"; font-size:.7em}
+  .ffconn{height:.7rem; width:2px; background:var(--border-strong); margin:0 auto}
+  .fflayer .cov{font-size:.76rem; margin-top:.5rem; padding-top:.45rem; border-top:1px dashed var(--border);
+    display:flex; gap:.45rem; align-items:flex-start; color:var(--muted)}
+  .fflayer .cov .m{flex:0 0 auto; line-height:1.35; font-size:.7rem}
+  .fflayer .cov.full .m{color:var(--good)}
+  .fflayer .cov.part .m{color:var(--static-ink)}
+  .fflayer .cov b{color:var(--text); font-weight:600}
+
+  /* shield registry */
+  .registry{margin-top:var(--s5); background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:14px; overflow:hidden}
+  .reghead{display:flex; flex-wrap:wrap; gap:var(--s3); justify-content:space-between; align-items:flex-end;
+    padding:var(--s3) var(--s4); border-bottom:1px solid var(--border); background:var(--surface-2)}
+  .reghead .rt{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted)}
+  .reghead .rv{font-size:.92rem; margin-top:.3rem}
+  .reghead .rv b{color:var(--accent-ink); font-variant-numeric:tabular-nums; font-weight:640}
+  .verbtns{display:flex; flex-wrap:wrap; gap:.4rem}
+  .verbtns button{font-family:var(--font-mono); font-size:.7rem; cursor:pointer;
+    border:1px solid var(--border-strong); background:var(--surface); color:var(--text);
+    padding:.45rem .7rem; border-radius:6px; transition:border-color .15s,color .15s,opacity .15s}
+  .verbtns button:hover:not(:disabled){border-color:var(--accent); color:var(--accent-ink)}
+  .verbtns button:disabled{opacity:.35; cursor:default}
+  .reglist{display:flex; flex-direction:column}
+  .srow{display:grid; grid-template-columns:1.5fr 1.7fr .8fr .9fr auto; gap:1rem; align-items:center;
+    padding:.9rem var(--s4); border-bottom:1px solid var(--border); font-size:.86rem;
+    transition:opacity .35s,background .35s}
+  .srow:last-child{border-bottom:0}
+  .srow.retired{opacity:.45; background:var(--surface-2)}
+  .srow .cve{font-weight:620; letter-spacing:-.01em}
+  .srow .sid{font-family:var(--font-mono); font-size:.66rem; color:var(--muted); margin-top:.15rem}
+  .srow .hook{font-family:var(--font-mono); font-size:.76rem; color:var(--muted); word-break:break-all}
+  .planetag{font-family:var(--font-mono); font-size:.58rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:.16em .45em; border-radius:4px; margin-top:.3rem; display:inline-block}
+  .planetag.data{background:var(--accent-bg); color:var(--accent-ink)}
+  .planetag.control{background:var(--surface); color:var(--muted); border:1px solid var(--border)}
+  .modechip{font-family:var(--font-mono); font-size:.66rem; padding:.2em .5em; border-radius:5px;
+    border:1px solid var(--border); color:var(--muted); white-space:nowrap}
+  .retire{font-family:var(--font-mono); font-size:.72rem; color:var(--muted); font-variant-numeric:tabular-nums}
+  .spill{font-family:var(--font-mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+    padding:.32em .62em; border-radius:20px; white-space:nowrap; display:inline-flex; align-items:center; gap:.4rem}
+  .spill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor}
+  .spill.enf{color:var(--good); border:1px solid var(--good)}
+  .spill.mon{color:var(--static-ink); border:1px solid var(--static)}
+  .spill.ret{color:var(--muted); border:1px solid var(--border-strong)}
+  .regfoot{padding:var(--s3) var(--s4); border-top:1px solid var(--border); background:var(--surface-2);
+    display:flex; flex-wrap:wrap; gap:var(--s3) var(--s5); align-items:center}
+  .budget{display:flex; align-items:center; gap:.7rem; font-family:var(--font-mono); font-size:.72rem; color:var(--muted)}
+  .bbar{width:130px; height:8px; border-radius:5px; background:var(--border); overflow:hidden}
+  .bbar i{display:block; height:100%; width:0; background:var(--accent); transition:width .35s}
+  .budget b{color:var(--text); font-variant-numeric:tabular-nums}
+  @media(max-width:760px){
+    .srow{grid-template-columns:1fr 1fr; gap:.55rem 1rem}
+    .srow .hookcell{grid-column:1 / -1}
+  }
+
+  /* observe / filter duality */
+  .duality{margin-top:var(--s5); background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:14px; padding:var(--s4)}
+  .dflow{display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:.55rem;
+    font-family:var(--font-mono); font-size:.8rem}
+  .dnode{border:1px solid var(--border-strong); border-radius:8px; padding:.55rem .85rem; background:var(--surface-2); color:var(--muted)}
+  .dnode.vm{border:1.5px solid var(--accent); background:var(--accent-bg); color:var(--accent-ink); font-weight:600}
+  .darrow{color:var(--muted); font-size:1.05rem}
+  .dfork{display:grid; gap:var(--s3); grid-template-columns:1fr; margin-top:var(--s4)}
+  @media(min-width:680px){.dfork{grid-template-columns:1fr 1fr}}
+  .dcard{border:1px solid var(--border); border-radius:10px; padding:var(--s3) var(--s4); background:var(--surface-2)}
+  .dcard.observe{border:1.5px solid var(--accent); background:var(--accent-bg)}
+  .dcard .dh{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+  .dcard.observe .dh{color:var(--accent-ink)}
+  .dcard .dv{font-size:.94rem; margin-top:.45rem} .dcard .dv b{font-weight:640}
+  .dcard .dtag{font-family:var(--font-mono); font-size:.68rem; margin-top:.55rem; color:var(--muted)}
+  .dcard.observe .dtag{color:var(--accent-ink)}
+  .dnote{text-align:center; font-family:var(--font-mono); font-size:.72rem; color:var(--muted);
+    margin-top:var(--s3); letter-spacing:.02em}
+
+  /* programmability spectrum */
+  .spectrum{display:grid; gap:var(--s3); margin-top:var(--s5); grid-template-columns:1fr}
+  @media(min-width:840px){.spectrum{grid-template-columns:repeat(3,1fr)}}
+  .surf{border:1px solid var(--border); border-radius:12px; padding:var(--s4); background:var(--surface);
+    display:flex; flex-direction:column; gap:var(--s3)}
+  .surf.new{border:1.5px solid var(--accent); background:var(--accent-bg)}
+  .surf .sname{font-weight:660; font-size:1.12rem; letter-spacing:-.01em; display:flex; align-items:center; gap:.55rem; flex-wrap:wrap}
+  .surf.new .sname{color:var(--accent-ink)}
+  .surf .snew{font-family:var(--font-mono); font-size:.56rem; letter-spacing:.1em; text-transform:uppercase;
+    padding:.25em .5em; border-radius:4px; background:var(--accent); color:#04222a; font-weight:600}
+  .surf .srole{font-size:.85rem; color:var(--muted); margin-top:-.55rem}
+  .sattr{border-top:1px solid var(--border); padding-top:.6rem}
+  .sattr .ak{font-family:var(--font-mono); font-size:.58rem; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+  .sattr .av{font-size:.87rem; margin-top:.22rem}
+  .sattr .av .em{color:var(--accent-ink); font-weight:600}
+  .surf .reach{margin-top:auto; font-family:var(--font-mono); font-size:.68rem; line-height:1.5;
+    padding:.55rem .7rem; border-radius:7px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border)}
+  .surf.new .reach{background:var(--surface); color:var(--accent-ink); border-color:var(--accent)}
+
+  /* pipeline */
+  .pipescroll{overflow-x:auto; margin-top:var(--s4); padding-bottom:.5rem}
+  .pipe{display:flex; align-items:stretch; gap:0; min-width:min-content}
+  .pstep{background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:.85rem 1rem; min-width:9.5rem; flex:0 0 auto}
+  .pstep .pk{font-family:var(--font-mono); font-size:.66rem; letter-spacing:.09em;
+    text-transform:uppercase; color:var(--muted)}
+  .pstep .pv{font-family:var(--font-mono); font-size:.82rem; margin-top:.3rem; color:var(--text)}
+  .parrow{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:0 .7rem; color:var(--muted)}
+  .parrow .pa{font-size:1.1rem; line-height:1} .parrow .pl{font-family:var(--font-mono); font-size:.6rem; margin-top:.2rem; white-space:nowrap}
+
+  pre.code{overflow-x:auto; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:var(--s3) var(--s4); margin-top:var(--s4);
+    font-family:var(--font-mono); font-size:.82rem; line-height:1.7}
+  pre.code .cm{color:var(--muted)} pre.code .hl{color:var(--accent-ink); font-weight:600}
+
+  .split{display:grid; gap:var(--s3); margin-top:var(--s4); grid-template-columns:1fr}
+  @media(min-width:640px){.split{grid-template-columns:1fr 1fr}}
+  .pill2{border:1px solid var(--border); border-radius:10px; padding:var(--s3) var(--s4); background:var(--surface)}
+  .pill2 .h{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; margin-bottom:.5rem}
+  .pill2.pay .h{color:var(--static-ink)} .pill2.get .h{color:var(--accent-ink)}
+  .pill2 p{font-size:.92rem; color:var(--muted)}
+
+  .kicker{font-size:clamp(1.35rem,3vw,1.95rem); font-weight:600; letter-spacing:-.015em;
+    max-width:34ch; line-height:1.28}
+  .kicker em{font-style:normal; color:var(--accent-ink)}
+  footer{border-top:1px solid var(--border); padding:var(--s5) 0; color:var(--muted);
+    font-family:var(--font-mono); font-size:.74rem; letter-spacing:.03em}
+  a.src{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid var(--border-strong)}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important; transition-duration:.001ms!important}
+  }
+</style>
+
+<div class="page">
+  <!-- ===================== HERO ===================== -->
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">A design proposal · embedded userspace eBPF for F5 TMM</p>
+      <h1>The behavior is identical. What changes is <em>when</em> you can change it.</h1>
+      <p class="lede">TMM runs its own network stack and bypasses the Linux kernel — which makes it
+        almost impossible to instrument from the outside. This is a plain-English case for what F5 <em>could</em>
+        build: an eBPF virtual machine embedded <em>inside</em> TMM — and what that would buy over just
+        compiling the logic in. <em>One mechanism that could ride the same data plane across appliance, VE,
+        and BIG-IP Next for Kubernetes.</em></p>
+      <p class="lede" style="font-size:1.02rem; margin-top:var(--s3)"><strong>Where this stands:</strong> a
+        proposal, not a shipped feature. A working prototype proves the core mechanism outside TMM; embedding
+        it <em>in</em> TMM is the opportunity this lays out.</p>
+      <div class="metastrip">
+        <span>uBPF — the VM</span>
+        <span>PREVAIL — the verifier</span>
+        <span>clang -target bpf</span>
+        <span>no kernel · no injection</span>
+        <span>appliance · VE · BNK</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== THE SETUP ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The setup</p>
+      <h2>Why TMM is a hard target</h2>
+      <div class="cards">
+        <div class="card">
+          <span class="n">01 · Own stack</span>
+          <h3>Its own network stack</h3>
+          <p>TMM parses packets with its own TCP/IP code and connection tables — not the operating
+             system's. The interesting logic lives in code the OS never touches.</p>
+        </div>
+        <div class="card">
+          <span class="n">02 · Kernel bypass</span>
+          <h3>It bypasses the kernel</h3>
+          <p>For speed, traffic goes NIC → TMM directly. The Linux kernel is simply not in the path,
+             so kernel-level tools have nothing to observe.</p>
+        </div>
+        <div class="card">
+          <span class="n">03 · Sealed</span>
+          <h3>Not easily instrumented</h3>
+          <p>You can't safely bolt a probe onto a running, core-pinned poll loop from outside. Anything
+             brittle here risks taking the data plane down.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="lbl">The consequence</span>
+        <p>The usual tool for this — <strong>kernel eBPF</strong> — is <em>structurally</em> blind to TMM.
+           It's not a permissions problem you fix by running as root; the traffic never passes through the
+           place the kernel can watch.</p>
+        <div class="lane">
+          <div class="row"><span class="tag see">visible</span><b>Public highway</b> — kernel-mediated traffic. Kernel eBPF's cameras are here.</div>
+          <div class="row blind"><span class="tag no">invisible</span><b>TMM's private road</b> — bypasses the kernel. The cameras see nothing.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== eBPF PRIMER ===================== -->
+  <section class="band">
+    <div class="wrap prose stack">
+      <p class="eyebrow">A 30-second primer</p>
+      <h2>What eBPF actually is</h2>
+      <p>eBPF was the Linux kernel's answer to a hard question: <strong>how do you let people run custom
+        code inside a live system without rebuilding it, and without risking a crash?</strong></p>
+      <p>The move: you write a tiny program, and before it runs a <strong>verifier</strong> reads the whole
+        thing and mathematically <em>proves</em> it will finish and only touches memory it's allowed to. Pass
+        the proof and it runs at native speed at a chosen hook; fail and it never runs at all.</p>
+      <p>That pairing — <em>change a live system</em> <span class="muted">+</span> <em>provably safe to do so</em> —
+        is the entire point. <strong>uBPF</strong> is just that engine packaged as a small library, minus the
+        kernel — which is exactly what you need to put it somewhere the kernel can't reach.</p>
+    </div>
+  </section>
+
+  <!-- ===================== KERNEL VS USERSPACE ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The obvious objection</p>
+      <h2>“eBPF already runs in the kernel — why not just use that?”</h2>
+      <p class="lede" style="margin-top:var(--s3)">Because <em>kernel</em> eBPF and <em>userspace</em> eBPF
+        are the same idea running in two different places — and where it runs decides what it can see. Kernel
+        eBPF is the mature, default choice for almost everything. It just can't reach this particular target.</p>
+
+      <div class="versus">
+        <div class="vcol kern">
+          <div class="vh"><span>◇</span>Kernel eBPF</div>
+          <h3>Runs inside the OS kernel</h3>
+          <div class="vlist">
+            <div class="vitem"><span class="mk">✓</span><span>Mature, ubiquitous, verified by the kernel's own verifier. <b>The right tool for anything the kernel handles.</b></span></div>
+            <div class="vitem"><span class="mk">✓</span><span>Sees syscalls, sockets, kernel network stack — the public highway all normal traffic drives on.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>Can only observe what passes <b>through the kernel</b>. Its vantage point is fixed.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>TMM deliberately <b>bypasses the kernel</b> — so this traffic never reaches the one place kernel eBPF can watch.</span></div>
+          </div>
+          <div class="vverdict">Structurally blind to TMM. More privilege doesn't help — the data simply isn't there to see.</div>
+        </div>
+
+        <div class="vcol user">
+          <div class="vh"><span>◆</span>Userspace eBPF (uBPF)</div>
+          <h3>The engine, embedded in the process itself</h3>
+          <div class="vlist">
+            <div class="vitem"><span class="mk">✓</span><span>Same verified-program model — minus the kernel dependency. Just a small library you link in.</span></div>
+            <div class="vitem"><span class="mk">✓</span><span>Would run <b>inside TMM's own address space</b>, at hooks on the private road — reaching state the kernel never sees.</span></div>
+            <div class="vitem"><span class="mk">✓</span><span>Not an injection or a hack: F5 owns TMM's source, so the hook points would be <b>designed in</b>.</span></div>
+            <div class="vitem"><span class="mk">—</span><span>You give up the kernel's built-in verifier, so you bring your own: <b>PREVAIL</b>, run before every load.</span></div>
+          </div>
+          <div class="vverdict">The only vantage point that reaches the data plane — because it lives in it.</div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">The rule of thumb</span>
+        <p>Use <strong>kernel eBPF</strong> wherever the kernel can see the target — it's the mature default,
+           and F5 already ships it for kernel-mediated traffic. Reach for <strong>userspace eBPF</strong> only
+           for the one thing the kernel structurally cannot reach: <em>code that bypasses it.</em> TMM is
+           exactly that case.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TWO PLANES / THE MISSION ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">What this is actually for</p>
+      <h2>One box, two planes — and a CVE can land in either</h2>
+      <p class="lede" style="margin-top:var(--s3)">The motivating use case would be <strong>Live Shield</strong>:
+        a vendor-signed, auto-retiring mitigation that blocks a specific exploit path <em>between maintenance
+        windows</em> — until the patched build ships on the normal schedule. But BIG-IP isn't one machine.
+        It's two execution environments in one box, and each would need its own live-patch engine.</p>
+
+      <div class="box">
+        <span class="boxlabel">BIG-IP appliance</span>
+        <div class="spine">
+          <span class="st">Signed catalog + lifecycle</span>
+          <span class="si">one trust spine — <b>SIRT-signed</b> shields · <b>monitor → enforce</b> · <b>auto-retire</b> when the patch lands · kill-switch</span>
+        </div>
+        <div class="feeds" aria-hidden="true"></div>
+        <div class="planes">
+          <div class="plane ctrl">
+            <div class="ph"><span class="pname">Control plane</span><span class="engtag">kernel eBPF · uprobes</span></div>
+            <p class="pruns">Ordinary RHEL-family Linux daemons — <b>httpd, tmsh, MCPD</b>, config services. Normal processes the kernel <em>can</em> see.</p>
+            <div class="pcve"><span class="cl">CVE classes here</span>
+              <span class="cve">auth bypass</span><span class="cve">config-utility RCE</span><span class="cve">command injection</span></div>
+            <div class="psee"><span class="m">✓</span><span><b>Kernel eBPF can reach these.</b> This would be the direct Cisco / NX-OS Live Protect analog — a shield attached via uprobe, gated by the kernel's own verifier. F5 already ships kernel eBPF.</span></div>
+          </div>
+          <div class="plane data">
+            <div class="ph"><span class="pname">Data plane — TMM</span><span class="engtag">userspace eBPF · uBPF</span></div>
+            <p class="pruns">F5's own microkernel with its own stack, <b>bypassing the Linux kernel</b> for all traffic. The crown jewel — and the blind spot.</p>
+            <div class="pcve"><span class="cl">CVE classes here</span>
+              <span class="cve">malformed-input crashes</span><span class="cve">parser bugs</span><span class="cve">bd termination</span></div>
+            <div class="psee"><span class="m">✕</span><span><b>Kernel eBPF is blind.</b> The only thing that could reach these is an embedded userspace VM — a shield running <em>inside</em> TMM, exactly what the rest of this page proposes.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">The punchline</span>
+        <p>It wouldn't be kernel <em>or</em> userspace eBPF — it would be <strong>both, under one signed
+           catalog</strong>, each dispatched to the plane whose CVEs it can actually reach. The control plane
+           would ride the mature kernel path; the data plane is the part only an embedded VM could protect —
+           and the part nobody else can.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FORM FACTORS ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Across the whole portfolio</p>
+      <h2>Same TMM, three very different homes</h2>
+      <p class="lede" style="margin-top:var(--s3)">BIG-IP ships in three form factors, and the shield would
+        ride all of them — because <strong>all three run the same TMM data plane</strong>. The <em>mechanism</em>
+        would be identical everywhere. What varies is <strong>coverage</strong>: an in-TMM VM sees only what runs
+        in TMM <em>software</em>, and how much that is depends on how much the platform offloads to hardware.</p>
+
+      <div class="ffgrid">
+        <!-- appliance -->
+        <div class="ffcard">
+          <div class="ffhead">
+            <div class="fk">Form factor 01</div>
+            <div class="fn">Appliance</div>
+            <div class="ft">Purpose-built hardware, TMOS. F5 owns the whole stack down to the silicon.</div>
+          </div>
+          <div class="fflayer">
+            <div class="lk"><span>Control plane</span><span class="vary">varies</span></div>
+            <div class="lv">RHEL-family daemons → <b>kernel eBPF</b> (F5 owns the kernel)</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer tmm">
+            <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
+            <div class="lv">Embedded userspace VM at designed-in hooks</div>
+            <div class="shield">uBPF shield · unchanged</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer">
+            <div class="lk"><span>Runs on · coverage</span><span class="vary">varies</span></div>
+            <div class="lv">Bare metal + ePVA / FPGA (TurboFlex) offload</div>
+            <div class="cov part"><span class="m">◐</span><span>VM sees the <b>software path</b>; offloaded FastL4 &amp; crypto bypass it</span></div>
+          </div>
+        </div>
+
+        <!-- VE -->
+        <div class="ffcard">
+          <div class="ffhead">
+            <div class="fk">Form factor 02</div>
+            <div class="fn">BIG-IP VE</div>
+            <div class="ft">The same TMOS, as a virtual machine on any hypervisor or cloud.</div>
+          </div>
+          <div class="fflayer">
+            <div class="lk"><span>Control plane</span><span class="vary">varies</span></div>
+            <div class="lv">Same RHEL daemons, in the guest → <b>kernel eBPF</b> (F5 owns the guest kernel)</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer tmm">
+            <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
+            <div class="lv">Embedded userspace VM at designed-in hooks</div>
+            <div class="shield">uBPF shield · unchanged</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer">
+            <div class="lk"><span>Runs on · coverage</span><span class="vary">varies</span></div>
+            <div class="lv">Guest VM — ESXi, KVM, Hyper-V, cloud · no offload</div>
+            <div class="cov full"><span class="m">●</span><span><b>Full</b> — every packet is in TMM software (best case)</span></div>
+          </div>
+        </div>
+
+        <!-- BNK -->
+        <div class="ffcard">
+          <div class="ffhead">
+            <div class="fk">Form factor 03</div>
+            <div class="fn">BIG-IP Next for Kubernetes <span style="color:var(--muted); font-weight:500">(BNK)</span></div>
+            <div class="ft">TMM containerized and disaggregated — Kubernetes-native, often DPU-accelerated.</div>
+          </div>
+          <div class="fflayer">
+            <div class="lk"><span>Control plane</span><span class="vary">different shape</span></div>
+            <div class="lv">K8s controllers &amp; CRDs — <b>shared node kernel</b> you may not fully control</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer tmm">
+            <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
+            <div class="lv">Embedded userspace VM at designed-in hooks</div>
+            <div class="shield">uBPF shield · unchanged</div>
+          </div>
+          <div class="ffconn" aria-hidden="true"></div>
+          <div class="fflayer">
+            <div class="lk"><span>Runs on · coverage</span><span class="vary">varies</span></div>
+            <div class="lv">Container / pod on a shared K8s node · often DPU-accelerated</div>
+            <div class="cov part"><span class="m">◐</span><span>Depends on how much the <b>DPU</b> steers vs. lands in TMM</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">Why this matters</span>
+        <p>Notice the middle band never changes. A shield that lived in the <em>host kernel</em> would need a
+           different story per form factor — and on a <strong>shared Kubernetes node you often can't control
+           the kernel at all</strong>. Embedding the VM <em>in TMM</em> would sidestep that entirely: the
+           data-plane shield would travel with TMM to bare metal, hypervisor, or container, <strong>unchanged</strong>.
+           The more the ground shifts under BIG-IP, the more that portability is worth.</p>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s3); border-left-color:var(--static)">
+        <span class="lbl" style="color:var(--static-ink)">The honest boundary — hardware offload</span>
+        <p>An in-TMM VM sees only what runs in TMM <em>software</em>. On appliances, <strong>ePVA / FPGA / crypto
+           offload</strong> deliberately keeps some traffic out of software — offloaded FastL4 flows switch in
+           silicon — so that path is a genuine dead zone for the shield. But it's invisible to <strong>iRules and
+           WASM just the same</strong> — the design already lists FastL4 as an iRule hole. It's a <em>hardware</em>
+           boundary every software surface shares, not a cost unique to this approach. And the high-severity CVE
+           classes here — L7 / parser bugs, <code>bd</code>/WAF termination — run in software anyway (a flow that
+           needs inspection is escalated back into TMM), so they stay fully reachable. On <strong>VE, with no
+           offload, the VM sees the entire data path.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== THE CONTRAST (centerpiece) ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The core idea · try it</p>
+      <h2>Two ways to put a rule in the data plane</h2>
+      <p class="lede" style="margin-top:var(--s3)">The shield is the <em>same</em> either way: read a frame,
+        decide <code>PASS</code> or <code>DROP</code>. There are two ways to get that decision into the
+        running TMM — and the difference is the whole story. Flip between them.</p>
+
+      <div class="stage" id="stage" data-mode="dynamic">
+        <div class="seg" role="group" aria-label="How the rule is loaded">
+          <button data-m="dynamic" class="on" aria-pressed="true"><span class="dot"></span>Load as bytecode</button>
+          <button data-m="static" aria-pressed="false"><span class="dot"></span>Compile it in</button>
+        </div>
+
+        <div class="stagegrid">
+          <!-- host diagram -->
+          <div class="frame" id="hostframe">
+            <div class="flabel"><span>Host binary</span><span class="pid" id="hostpid">TMM process · linked once</span></div>
+            <div class="hostbody">
+              <div class="subbox engine" id="engineBox">
+                <div class="k">uBPF engine</div>
+                <div class="v">the VM, linked into the host</div>
+                <span class="fixed">compiled once · never changes</span>
+              </div>
+              <div class="slot" id="slot">
+                <div class="chip" id="chip">
+                  <div class="chead"><span class="cname" id="cname"></span><span class="cact" id="cact"></span></div>
+                  <div class="cpred" id="cpred"></div>
+                  <div class="cbytes" id="cbytes"></div>
+                  <div class="cnote" id="cnote"></div>
+                </div>
+                <div class="weld" id="weld" hidden>welded into the build — part of the binary</div>
+                <div class="slotcap" id="slotcap"></div>
+              </div>
+            </div>
+            <div class="catalog" id="catalog">
+              <div class="ct">Signed shield catalog — load any, live · bytecode illustrative</div>
+              <div class="catrow" id="catrow"></div>
+            </div>
+          </div>
+
+          <!-- consequences -->
+          <div class="panel">
+            <h3 id="ptitle"></h3>
+            <p class="ptext" id="ptext"></p>
+            <div class="metrics">
+              <div class="metric"><span class="mk">Turnaround</span><span class="mv" id="m1"></span></div>
+              <div class="metric"><span class="mk">Reboot</span><span class="mv" id="m2"></span></div>
+              <div class="metric"><span class="mk">Host binary</span><span class="mv" id="m3"></span></div>
+              <div class="metric" style="border-bottom:0"><span class="mk">Safety check</span><span class="mv" id="m4"></span></div>
+            </div>
+            <button class="act" id="act"></button>
+            <div class="vgate" id="vgate"><span class="pill">PREVAIL verify</span><span id="vgatetxt">runs before every load</span></div>
+            <div class="log" id="log" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== OBSERVE / TRACEPOINTS ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The other half</p>
+      <h2>Shields act. Tracepoints watch. Same machinery.</h2>
+      <p class="lede" style="margin-top:var(--s3)">A shield is <em>filter</em> mode — the host acts on the
+        program's return. Flip what the host does with that return, and the exact same hook becomes a
+        <strong>tracepoint</strong>: record the value, never touch traffic. So the same investment would open a
+        second, arguably bigger door — you could sprinkle <strong>designed-in, USDT-style tracepoints</strong>
+        through TMM's source and hook them in-process with the VM: a whole observability surface kernel tracing
+        structurally can't reach.</p>
+
+      <div class="duality">
+        <div class="dflow">
+          <span class="dnode">ctx (frame / state)</span>
+          <span class="darrow">→</span>
+          <span class="dnode vm">uBPF VM</span>
+          <span class="darrow">→</span>
+          <span class="dnode">return value</span>
+        </div>
+        <div class="dfork">
+          <div class="dcard filter">
+            <div class="dh">filter — host acts on it</div>
+            <div class="dv"><b>PASS / DROP / RESET</b> — the return selects an enumerated outcome</div>
+            <div class="dtag">▸ this is a shield</div>
+          </div>
+          <div class="dcard observe">
+            <div class="dh">observe — host records it</div>
+            <div class="dv"><b>metric / histogram / ring</b> — telemetry only, flow never changes</div>
+            <div class="dtag">▸ this is a tracepoint</div>
+          </div>
+        </div>
+        <p class="dnote">same hook · same VM · same verify gate — only what the host does with the result differs</p>
+      </div>
+
+      <p style="margin-top:var(--s5); font-weight:560; font-size:1.05rem; max-width:44rem">
+        Why designed-in tracepoints, hooked in-process — and not just classic USDT?</p>
+      <div class="versus" style="margin-top:var(--s3)">
+        <div class="vcol kern">
+          <div class="vh"><span>◇</span>Classic USDT</div>
+          <h3>Static marker, hooked from outside</h3>
+          <div class="vlist">
+            <div class="vitem"><span class="mk">✓</span><span>A named probe placed in the source — better than guessing symbol offsets. The right idea.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>Hooked by an <b>external tracer over a uprobe</b> — kernel-mediated, so it's blind to TMM for the same reason everything else is.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>Attaching means the <b>injection path</b> — the brittle mechanism this design already rejected.</span></div>
+          </div>
+          <div class="vverdict">Right marker, wrong consumer — the kernel can't watch a probe on the private road.</div>
+        </div>
+        <div class="vcol user">
+          <div class="vh"><span>◆</span>Tracepoints hooked in-process</div>
+          <h3>Designed-in marker, hooked by the embedded VM</h3>
+          <div class="vlist">
+            <div class="vitem"><span class="mk">✓</span><span><b>Named &amp; typed by the developer</b> at the exact spot that matters — a stable, versioned contract, relocated across builds, not a guessed offset.</span></div>
+            <div class="vitem"><span class="mk">✓</span><span><b>Dark until lit</b> — a tracepoint with nothing attached is essentially a nop; you pay only when a program is hooked.</span></div>
+            <div class="vitem"><span class="mk">✓</span><span><b>On, then off</b> — attach bytecode to capture one condition, flow, or tenant, then detach. bpftrace-for-TMM, no reboot, no TMOS rev.</span></div>
+            <div class="vitem"><span class="mk">✓</span><span>Reaches <b>in-TMM state</b> — parser state machines, connection internals, inter-function latency, error-branch counts — none of which has an iRule field or a kernel vantage point.</span></div>
+          </div>
+          <div class="vverdict">Same "instrument by design" idea — but the consumer lives in the process, so it actually sees.</div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">Why this compounds the value</span>
+        <p>The hard, expensive part — the embedded VM, the verifier, the hook-point map, the signing and
+           lifecycle — would be built <em>once</em>. Shields (filter) and tracepoints (observe) would ride the
+           same substrate. So every tracepoint added would be <strong>cheap new observability as bytecode</strong>,
+           and the flight recorder, on-demand deep telemetry, and anomaly detection below would all fall out of
+           the same machinery — reaching state that has no other surface at all.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MANY SHIELDS AT ONCE ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">It's never just one</p>
+      <h2>Many open CVEs, many shields — loaded at once</h2>
+      <p class="lede" style="margin-top:var(--s3)">A box in the wild rarely faces a single CVE. So the
+        substrate wouldn't be one slot — it would hold a whole <strong>set</strong> of shields at once,
+        each keyed to its own CVE, at its own hook, in its own mode, retiring on its own schedule. One signed
+        catalog; one measured overhead budget. <em>Install a patched build below and watch only the matching
+        shields retire.</em></p>
+
+      <div class="registry" id="registry">
+        <div class="reghead">
+          <div>
+            <div class="rt">Live shield registry</div>
+            <div class="rv">Running build: <b id="runver">TMOS 17.5.0</b></div>
+          </div>
+          <div class="verbtns" id="verbtns" role="group" aria-label="Install a patched build"></div>
+        </div>
+        <div class="reglist" id="reglist"></div>
+        <div class="regfoot">
+          <div class="budget">Overhead budget
+            <span class="bbar"><i id="bbar"></i></span>
+            <span><b id="bnum">0</b> of 8 loaded</span>
+          </div>
+          <div class="budget" style="color:var(--muted)">verified ≠ free — the engine caps count &amp; total cost</div>
+        </div>
+      </div>
+      <p class="muted" style="font-size:.78rem; margin-top:var(--s2); font-family:var(--font-mono)">
+        CVE identifiers illustrative. One CVE (22548) matches the worked example in the design doc.</p>
+
+      <div class="cards">
+        <div class="card">
+          <span class="n">Independent lifecycle</span>
+          <h3>Each retires on its own version</h3>
+          <p>A shield would auto-disable the moment the running build crosses <em>its</em> <code>fixed_in_version</code>.
+             Patch one CVE and only that shield retires — the rest keep protecting. A partially-upgraded HA group
+             would retire per member.</p>
+        </div>
+        <div class="card">
+          <span class="n">Mixed modes &amp; planes</span>
+          <h3>Enforcing and soaking, side by side</h3>
+          <p>A control-plane auth-bypass shield can <em>enforce</em> while a data-plane parser shield <em>soaks</em>
+             in monitor — different modes, different planes, different engines, all in one registry.</p>
+        </div>
+        <div class="card">
+          <span class="n">Governed, not unlimited</span>
+          <h3>A budget, because verified ≠ cheap</h3>
+          <p>Each shield is a cheap call and an empty hook is one branch — but the engine still caps how many load
+             and their total overhead. Protection is a budget line, tracked and signed-off, not a free-for-all.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">Two shields, one hook</span>
+        <p>If two shields target the <em>same</em> hook point, the host runs them in a defined order and the
+           <strong>first <code>DROP</code> wins</strong> — fail-safe by construction. Composing mitigations never
+           produces a new control-flow effect; the host still owns every outcome.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== WHY PAY ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The trade</p>
+      <h2>Why accept a virtual machine at all?</h2>
+      <p class="lede" style="margin-top:var(--s3)">Running bytecode through a VM costs a little more than a
+        direct function call. You'd never pay that unless binding time mattered. For TMM, it's the whole game.</p>
+      <div class="cards">
+        <div class="card">
+          <span class="n">Speed</span>
+          <h3>“Rebuild the host” means reship TMOS</h3>
+          <p>Compiling the shield in makes it ride a quarterly release train with a maintenance window and
+             a reboot. During an actively exploited CVE, that's not an option. Verified bytecode could ship in
+             <strong>hours</strong>.</p>
+        </div>
+        <div class="card">
+          <span class="n">Blast radius</span>
+          <h3>Verified &amp; signed narrows who can push it</h3>
+          <p>Compiled-in C has the full run of the process and rides TMM's entire QA cycle. Sandboxed,
+             signed bytecode is provably bounded — so a faster, narrower path (SIRT signs a shield) could push
+             it to a live box without a full code change's risk.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== HOW IT RUNS ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Under the hood</p>
+      <h2>How the bytecode gets there</h2>
+      <p class="lede" style="margin-top:var(--s3)">Linking <code>libubpf.a</code> is ordinary static linking.
+        What's different is that the <em>decision</em> arrives as data, later — and passes a safety gate on the way in.</p>
+
+      <div class="pipescroll">
+        <div class="pipe">
+          <div class="pstep"><div class="pk">Source</div><div class="pv">ls_shield.c</div></div>
+          <div class="parrow"><span class="pa">→</span><span class="pl">clang -target bpf</span></div>
+          <div class="pstep"><div class="pk">Bytecode</div><div class="pv">shield.bpf.o</div></div>
+          <div class="parrow"><span class="pa">→</span><span class="pl">PREVAIL</span></div>
+          <div class="pstep"><div class="pk">Safety gate</div><div class="pv">verify · fail-closed</div></div>
+          <div class="parrow"><span class="pa">→</span><span class="pl">ubpf_load_elf</span></div>
+          <div class="pstep"><div class="pk">Into the VM</div><div class="pv">loaded, live</div></div>
+          <div class="parrow"><span class="pa">→</span><span class="pl">at the hook</span></div>
+          <div class="pstep"><div class="pk">Run</div><div class="pv">ubpf_exec → verdict</div></div>
+        </div>
+      </div>
+
+      <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
+<span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
+struct ls_ctx ctx = { .opcode = op, .payload_len = len };
+uint64_t ret = 0;
+<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// run the loaded shield</span>
+<span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
+<span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
+
+      <div class="split">
+        <div class="pill2 pay"><div class="h">What you pay</div>
+          <p>A few extra nanoseconds per invocation — an indirect call into the JIT instead of a straight
+             C branch.</p></div>
+        <div class="pill2 get"><div class="h">What you get</div>
+          <p>The decision leaves the build and becomes verified, swappable data you can load into a live,
+             kernel-bypassing data plane — in hours, provably unable to crash it.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PROGRAMMABILITY SPECTRUM ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Zoom out · the bigger picture</p>
+      <h2>A third way to program the data plane</h2>
+      <p class="lede" style="margin-top:var(--s3)">CVE shields would be just the first thing you do with it.
+        TMM's real strength was never one feature — it's <strong>dynamic programmability</strong>: changing
+        the data plane's behavior at runtime, no rebuild, no reboot. iRules established that. WASM extended
+        it. Embedded eBPF could be the <em>third surface</em> — reaching a layer the other two can't, and the
+        only one whose runtime changes would be <strong>provably safe</strong>.</p>
+
+      <div class="spectrum">
+        <div class="surf">
+          <div class="sname">iRules</div>
+          <p class="srole">Traffic logic at proxy events, in the sanctioned data-model.</p>
+          <div class="sattr"><div class="ak">Programs</div><div class="av">Connection &amp; L7 traffic decisions (TCL)</div></div>
+          <div class="sattr"><div class="ak">Runtime change</div><div class="av">Dynamic &amp; runtime-bounded — but can misbehave or get costly</div></div>
+          <div class="reach">Sees only what the proxy chose to expose, when an event fires.</div>
+        </div>
+
+        <div class="surf">
+          <div class="sname">WASM</div>
+          <p class="srole">Rich, expressive extensions in real languages.</p>
+          <div class="sattr"><div class="ak">Programs</div><div class="av">Complex custom logic, transforms, substantial partner code</div></div>
+          <div class="sattr"><div class="ak">Runtime change</div><div class="av">Dynamic &amp; sandbox-isolated — but can hang; bounded by a runtime <em>kill</em>, not a proof</div></div>
+          <div class="reach">Its own linear memory; heavier per call. Great for expressiveness.</div>
+        </div>
+
+        <div class="surf new">
+          <div class="sname">Embedded eBPF <span class="snew">proposed</span></div>
+          <p class="srole">The data plane's own code &amp; internal state.</p>
+          <div class="sattr"><div class="ak">Programs</div><div class="av"><span class="em">Verified probes, compensating controls, deep telemetry</span></div></div>
+          <div class="sattr"><div class="ak">Runtime change</div><div class="av"><span class="em">Statically verified before load</span> — provably bounded &amp; terminating; ~tens of ns</div></div>
+          <div class="reach">Reaches parsers, plugin internals, connection state, error paths — in-TMM state nothing else can see.</div>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">The slot only eBPF fills</span>
+        <p>It's the one surface that is <strong>dynamically loadable <em>and</em> statically proven safe</strong>.
+           That combination is what makes runtime change trustworthy on the paths where it's otherwise too
+           dangerous to allow — the data-plane hot path and inline security controls. iRules stays the first-line
+           traffic control; WASM owns expressive extensions; eBPF would own <em>verified, near-zero-cost
+           instrumentation and control</em>. One spectrum, a clean division of labor — not a replacement.</p>
+      </div>
+
+      <p class="eyebrow" style="margin-top:var(--s5)">So beyond CVE shields, the same substrate could unlock</p>
+      <div class="cards">
+        <div class="card">
+          <span class="n">Observability</span>
+          <h3>bpftrace-for-TMM, on demand</h3>
+          <p>Deep telemetry for one flow, tenant, or condition — loaded on, then off — reaching internal state no
+             iRule field and no kernel probe can reach. New metrics as bytecode, no TMOS rev.</p>
+        </div>
+        <div class="card">
+          <span class="n">Diagnostics</span>
+          <h3>A flight recorder</h3>
+          <p>Keep a ring of recent internal state and freeze it when an error branch fires — the run-up <em>into</em>
+             a failure, which a post-crash core dump no longer has. Ship a signed probe, then pull it.</p>
+        </div>
+        <div class="card">
+          <span class="n">Security</span>
+          <h3>Beyond a single CVE</h3>
+          <p>Protocol-anomaly detection at the parser, behavioral exploit detection on internal state, adaptive
+             rate-limit / circuit-break driven by internal load — inline, verified, before any event fires.</p>
+        </div>
+        <div class="card">
+          <span class="n">Self-tuning</span>
+          <h3>Read internal load, nudge a knob</h3>
+          <p>Live hot-path profiling and admission control that react to TMM-internal health signals — poll-loop
+             jitter, memory-pool pressure — that have no data-model surface at all.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TAKEAWAY ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The one line to remember</p>
+      <p class="kicker">Linking the VM is ordinary. What would be radical is letting the rule stop being part of
+        the build — and become <em>verified data you can load into a live data plane the kernel can't even see</em>.</p>
+      <p class="muted" style="max-width:40rem; margin-top:var(--s3); font-size:.95rem">That's the proposal. The
+        mechanism is proven in a prototype; the opportunity is to bring it inside TMM.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">Proposal explainer — modeled on the eob-tmm prototype, where the same shield is built both ways:
+      <a class="src" href="#">Track&nbsp;1 (compiled in)</a> vs <a class="src" href="#">Track&nbsp;2 (bytecode on uBPF)</a>.</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var rules = [
+    { name:"ls-cve-shield", act:"DROP", pred:"opcode ≥ 4  →  DROP",
+      bytes:"61 12 00 00 · b7 00 00 00 02 · 6d 21 01 00 · 95 00 00 00",
+      note:"Block the out-of-range opcode behind the crash CVE, before dispatch." },
+    { name:"ls-oversize", act:"DROP", pred:"payload_len > 1024  →  DROP",
+      bytes:"69 12 02 00 · 25 02 01 00 04 00 · b7 00 00 00 02 · 95 00",
+      note:"Reject frames larger than the parser was built to expect." },
+    { name:"ls-trace-op7", act:"OBSERVE", pred:"opcode == 7  →  sample",
+      bytes:"61 12 00 00 · 55 01 01 00 07 · 07 00 00 00 · 95 00 00 00",
+      note:"Telemetry only — histogram opcode 7 at the hook, never drops traffic." }
+  ];
+
+  var copy = {
+    dynamic: {
+      title:"To change the rule:",
+      text:"Drop in a new signed .bpf.o. The verifier checks it, the VM loads it — the host binary is never touched. Change it as often as you like, on a live box.",
+      pid:"TMM process · linked once",
+      m1:"~ seconds", m2:"none", m3:"unchanged", m4:"verifier, every load",
+      act:"Load the next shield  →"
+    },
+    static: {
+      title:"To change the rule:",
+      text:"The logic is welded into the binary. Changing it means recompiling the host, re-signing the build, scheduling a maintenance window, and rebooting. There is no live path.",
+      pid:"TMM binary · rule baked in",
+      m1:"~ a release cycle", m2:"required", m3:"rebuilt & reshipped", m4:"none — it's trusted C",
+      act:"Change the rule  →"
+    }
+  };
+
+  var mode = "dynamic", dyn = 0;
+  var $ = function(id){ return document.getElementById(id); };
+  var stage=$("stage"), chip=$("chip"), log=$("log"), reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  function paintChip(r){
+    $("cname").textContent = r.name;
+    $("cact").textContent = r.act;
+    $("cpred").textContent = r.pred;
+    $("cbytes").textContent = r.bytes;
+    $("cnote").textContent = r.note;
+  }
+  function buildCatalog(){
+    var row=$("catrow"); row.innerHTML="";
+    rules.forEach(function(r,i){
+      var b=document.createElement("button");
+      b.className="catchip"+(i===dyn?" cur":"");
+      b.type="button"; b.textContent=r.name;
+      b.addEventListener("click",function(){ if(mode!=="dynamic"||i===dyn) return; loadShield(i); });
+      row.appendChild(b);
+    });
+  }
+  function logLine(txt,cls){
+    var d=document.createElement("div"); d.className="ll"+(cls?" "+cls:""); d.textContent=txt;
+    log.insertBefore(d,log.firstChild);
+    while(log.children.length>4) log.removeChild(log.lastChild);
+  }
+  function flashGate(){
+    var g=$("vgate"); g.classList.add("flash"); setTimeout(function(){g.classList.remove("flash");},900);
+  }
+
+  function render(){
+    var c=copy[mode];
+    stage.dataset.mode=mode;
+    // segmented control
+    Array.prototype.forEach.call(document.querySelectorAll(".seg button"),function(b){
+      var on=b.dataset.m===mode; b.classList.toggle("on",on); b.setAttribute("aria-pressed",on);
+    });
+    // mode-specific chrome
+    $("engineBox").style.display = mode==="dynamic" ? "" : "none";
+    $("catalog").style.display   = mode==="dynamic" ? "" : "none";
+    $("weld").hidden             = mode==="dynamic";
+    $("vgate").style.display     = mode==="dynamic" ? "" : "none";
+    $("slotcap").textContent     = mode==="dynamic" ? "slotted in · swappable at runtime" : "";
+    $("slot").style.borderStyle  = mode==="dynamic" ? "dashed" : "solid";
+    $("hostpid").textContent=c.pid;
+    $("ptitle").textContent=c.title; $("ptext").textContent=c.text;
+    $("m1").textContent=c.m1; $("m2").textContent=c.m2; $("m3").textContent=c.m3; $("m4").textContent=c.m4;
+    $("act").textContent=c.act;
+    paintChip(mode==="dynamic"?rules[dyn]:rules[0]);
+    buildCatalog();
+  }
+
+  function loadShield(i){
+    dyn=i;
+    var apply=function(){ paintChip(rules[dyn]); buildCatalog(); flashGate();
+      logLine("✓ "+rules[dyn].name+" — verified · loaded in 0.3s · host untouched","ok"); };
+    if(reduce){ apply(); return; }
+    chip.classList.add("out");
+    setTimeout(function(){ apply(); chip.classList.remove("out"); },210);
+  }
+
+  function onAction(){
+    if(mode==="dynamic"){
+      loadShield((dyn+1)%rules.length);
+    } else {
+      var f=$("hostframe"); f.classList.remove("rebuilding"); void f.offsetWidth; f.classList.add("rebuilding");
+      logLine("✗ can't hot-change — the rule is in the binary","no");
+      setTimeout(function(){ logLine("recompile → re-sign build → maintenance window → reboot"); },260);
+    }
+  }
+
+  document.querySelectorAll(".seg button").forEach(function(b){
+    b.addEventListener("click",function(){ mode=b.dataset.m; render();
+      logLine(mode==="dynamic" ? "mode: bytecode on the embedded VM" : "mode: shield compiled into the host"); });
+  });
+  $("act").addEventListener("click",onAction);
+
+  render();
+  logLine("ready — the same rule, two ways to load it");
+})();
+
+/* ---- shield registry: many CVEs loaded at once, independent retirement ---- */
+(function(){
+  var builds = ["17.5.0","17.5.1","17.5.2","17.6.0"];
+  var CAP = 8;
+  var shields = [
+    {cve:"CVE-2026-21990", id:"LS-2026-21990-httpd-01", plane:"control",
+     hook:"httpd_request_eval", mode:"ENFORCE", fixed:"17.5.1", desc:"config-utility RCE (httpd)"},
+    {cve:"CVE-2026-22548", id:"LS-2026-22548-bd-01", plane:"data",
+     hook:"bd_request_eval_decision", mode:"ENFORCE", fixed:"17.5.2", desc:"bd termination via crafted WAF request"},
+    {cve:"CVE-2026-23110", id:"LS-2026-23110-h2-01", plane:"data",
+     hook:"http2_frame_parse", mode:"ENFORCE", fixed:"17.5.2", desc:"malformed HTTP/2 frame crashes TMM"},
+    {cve:"CVE-2026-24001", id:"LS-2026-24001-tls-01", plane:"data",
+     hook:"tls_clienthello_parse", mode:"MONITOR", fixed:"17.6.0", desc:"record-layer anomaly — soaking"}
+  ];
+  var cur = 0;
+  var $ = function(id){ return document.getElementById(id); };
+  function cmp(a,b){ a=a.split("."); b=b.split(".");
+    for(var i=0;i<3;i++){ var d=(+a[i]||0)-(+b[i]||0); if(d) return d<0?-1:1; } return 0; }
+  function retired(s){ return cmp(builds[cur], s.fixed) >= 0; }
+
+  function rows(){
+    var list=$("reglist"); list.innerHTML="";
+    shields.forEach(function(s){
+      var ret=retired(s);
+      var st = ret ? {c:"ret",t:"retired · auto-disabled"} :
+               s.mode==="MONITOR" ? {c:"mon",t:"soaking"} : {c:"enf",t:"enforcing"};
+      var r=document.createElement("div");
+      r.className="srow"+(ret?" retired":"");
+      r.innerHTML =
+        '<div><div class="cve">'+s.cve+'</div><div class="sid">'+s.id+'</div></div>'+
+        '<div class="hookcell"><div class="hook">'+s.hook+'</div>'+
+          '<span class="planetag '+s.plane+'">'+(s.plane==="data"?"data plane · uBPF":"control plane · kernel eBPF")+'</span></div>'+
+        '<div><span class="modechip">'+s.mode+'</span></div>'+
+        '<div class="retire">↩ '+s.fixed+'</div>'+
+        '<div><span class="spill '+st.c+'">'+st.t+'</span></div>';
+      list.appendChild(r);
+    });
+  }
+  function foot(){
+    var active=shields.filter(function(s){return !retired(s);}).length;
+    $("bnum").textContent=active;
+    $("bbar").style.width=(active/CAP*100)+"%";
+  }
+  function verbtns(){
+    var box=$("verbtns"); box.innerHTML="";
+    builds.slice(1).forEach(function(v,i){
+      var idx=i+1;
+      var b=document.createElement("button");
+      b.type="button"; b.textContent = (cur>=idx?"✓ ":"▸ install ")+v;
+      b.disabled = cur>=idx;
+      b.addEventListener("click",function(){ if(cur<idx){ cur=idx; paint(); }});
+      box.appendChild(b);
+    });
+    var reset=document.createElement("button");
+    reset.type="button"; reset.textContent="⟲ reset"; reset.disabled=cur===0;
+    reset.addEventListener("click",function(){ cur=0; paint(); });
+    box.appendChild(reset);
+  }
+  function paint(){ $("runver").textContent="TMOS "+builds[cur]; rows(); foot(); verbtns(); }
+  paint();
+})();
+</script>

@@ -90,9 +90,10 @@ This is the differentiated engineering asset: *where* in TMM a hook earns its ke
 | **Server side + response path** | server-side TLS outcomes, response codes, response-parse anomalies, OneConnect reuse stats | server-side record-parse shield (same class as client TLS), response sanitization | server-side record parse precedes `HTTP_RESPONSE`; same pre-event gap |
 | **Cross-cutting runtime** (poll loop, memory, scheduler, IPC, iRule/TCL VM) | poll-loop jitter, per-core CPU, memory-pool pressure, scheduler stalls, plugin-IPC latency, TCL-VM execution stats | admission control / backpressure under memory or CPU pressure, emergency-mode triggers, shield a CVE in the TCL VM itself | these are TMM-internal health signals with no iRule/data-model surface at all |
 
-Two cross-cutting notes:
+Three cross-cutting notes:
 - **Observe vs. active is the same hook in two modes** (design §6.1) — many of the rows above start as a read-only tracepoint (lowest risk) and graduate to an active control once the signal is trusted.
 - **Most of these are condition-scoped** (the malformed branch, the error path, the crash precondition) → cold/cheap. The genuinely hot-path ones (per-packet L3/L4 telemetry, per-flow latency) are legitimate under a measured budget (design §11), not excluded.
+- **Hardware offload bounds the L3/L4 rows.** On appliances, flows offloaded to ePVA/FPGA bypass TMM software, so an in-TMM hook cannot see them — true for iRules and kernel eBPF just the same (design §10). These rows apply to the *software* data path; **BIG-IP VE** (no offload) sees all of it. A hardware boundary, not a per-surface weakness.
 
 ## 5. The two force-multipliers
 

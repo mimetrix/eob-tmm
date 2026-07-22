@@ -1,0 +1,370 @@
+<style>
+  :root{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa;
+    --border:#d3dbe3; --border-strong:#b7c2cd;
+    --text:#152029; --muted:#576673;
+    --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170;
+    --warn:#a4442f; --warn-bg:#f6e5df; --warn-ink:#8a3320;
+    --amber:#a06713; --amber-bg:#f5ebd7; --amber-ink:#7d5210;
+    --good:#1f9e6a;
+    --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --s2:.75rem; --s3:1.2rem; --s4:2rem; --s5:3.25rem; --s6:5rem;
+    --maxw:74rem; --prose:42rem;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c;
+    --border:#233039; --border-strong:#3a4c5c;
+    --text:#e7eef4; --muted:#8c9aa8;
+    --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee;
+    --warn:#e8785f; --warn-bg:#2c1712; --warn-ink:#f3a892;
+    --amber:#e0a94a; --amber-bg:#2a2113; --amber-ink:#f0c983;
+    --good:#40c78a;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c;
+    --border:#233039; --border-strong:#3a4c5c;
+    --text:#e7eef4; --muted:#8c9aa8;
+    --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee;
+    --warn:#e8785f; --warn-bg:#2c1712; --warn-ink:#f3a892;
+    --amber:#e0a94a; --amber-bg:#2a2113; --amber-ink:#f0c983;
+    --good:#40c78a;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa;
+    --border:#d3dbe3; --border-strong:#b7c2cd;
+    --text:#152029; --muted:#576673;
+    --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170;
+    --warn:#a4442f; --warn-bg:#f6e5df; --warn-ink:#8a3320;
+    --amber:#a06713; --amber-bg:#f5ebd7; --amber-ink:#7d5210;
+    --good:#1f9e6a;
+  }
+  *{box-sizing:border-box} body{margin:0}
+  .page{background:var(--bg); color:var(--text); font-family:var(--font-sans);
+    font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(1.1rem,4vw,2.5rem)}
+  .prose{max-width:var(--prose)}
+  .band{padding:var(--s6) 0; border-top:1px solid var(--border)}
+  .band:first-child{border-top:0}
+  .eyebrow{font-family:var(--font-mono); font-size:.72rem; font-weight:600; letter-spacing:.19em;
+    text-transform:uppercase; color:var(--accent-ink); margin:0 0 var(--s3)}
+  h1,h2,h3{text-wrap:balance; line-height:1.09; margin:0}
+  h1{font-size:clamp(2.2rem,6vw,4rem); font-weight:680; letter-spacing:-.022em}
+  h1 em{font-style:normal; color:var(--accent-ink)}
+  h2{font-size:clamp(1.55rem,3.6vw,2.25rem); font-weight:660; letter-spacing:-.015em}
+  h3{font-size:1.05rem; font-weight:640}
+  p{margin:0} .stack>*+*{margin-top:var(--s3)}
+  .muted{color:var(--muted)} strong{font-weight:660}
+  code{font-family:var(--font-mono); font-size:.86em; background:var(--surface-2);
+    border:1px solid var(--border); border-radius:4px; padding:.08em .34em}
+  .lede{font-size:clamp(1.08rem,2vw,1.3rem); color:var(--muted); max-width:44rem; margin-top:var(--s4)}
+
+  .hero{position:relative; padding:clamp(4rem,10vw,7rem) 0 var(--s6)}
+  .hero::before{content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:44px 44px; opacity:.4;
+    -webkit-mask-image:radial-gradient(120% 90% at 88% 0%,#000,transparent 70%);
+            mask-image:radial-gradient(120% 90% at 88% 0%,#000,transparent 70%)}
+  .hero>*{position:relative; z-index:1}
+  .hero h1{max-width:19ch}
+  .statusline{margin-top:var(--s4); font-size:1rem; color:var(--muted); max-width:42rem}
+  .metastrip{display:flex; flex-wrap:wrap; gap:.5rem var(--s3); margin-top:var(--s5);
+    font-family:var(--font-mono); font-size:.76rem; color:var(--muted); letter-spacing:.03em}
+  .metastrip span{display:inline-flex; align-items:center; gap:.5rem}
+  .metastrip span::before{content:""; width:6px; height:6px; background:var(--accent); border-radius:50%}
+
+  .cards{display:grid; gap:var(--s3); margin-top:var(--s5); grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:var(--s4)}
+  .card .n{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--accent-ink); margin-bottom:var(--s2); display:block}
+  .card h3{margin-bottom:.5rem} .card p{font-size:.94rem; color:var(--muted)}
+
+  .callout{margin-top:var(--s5); background:var(--surface-2); border:1px solid var(--border);
+    border-left:3px solid var(--accent); border-radius:8px; padding:var(--s4)}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout .lbl{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-ink)}
+  .callout.warn .lbl{color:var(--warn-ink)}
+  .callout p{margin-top:.55rem; color:var(--text)}
+  .callout p+p{margin-top:.6rem}
+
+  /* arms-race split */
+  .race{display:grid; gap:var(--s3); margin-top:var(--s5); grid-template-columns:1fr}
+  @media(min-width:720px){.race{grid-template-columns:1fr 1fr}}
+  .rcol{border:1px solid var(--border); border-radius:12px; padding:var(--s4); background:var(--surface)}
+  .rcol.atk{border-color:var(--warn); background:var(--warn-bg)}
+  .rcol.def{border-color:var(--accent); background:var(--accent-bg)}
+  .rcol .rk{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.12em; text-transform:uppercase}
+  .rcol.atk .rk{color:var(--warn-ink)} .rcol.def .rk{color:var(--accent-ink)}
+  .rcol h3{margin:.5rem 0 .6rem} .rcol p{font-size:.94rem; color:var(--muted)}
+  .rcol .big{font-size:1.02rem; color:var(--text); font-weight:560}
+
+  /* pipeline flow */
+  .flow{margin-top:var(--s5); background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:14px; padding:var(--s4)}
+  .fstep{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start; padding:var(--s3) 0}
+  .fstep+.fstep{border-top:1px solid var(--border)}
+  .fnum{font-family:var(--font-mono); font-size:.78rem; font-weight:700; color:var(--accent-ink);
+    background:var(--accent-bg); border:1px solid var(--accent); border-radius:7px; width:2.4rem; height:2.4rem;
+    display:flex; align-items:center; justify-content:center}
+  .fstep.oracle .fnum{color:var(--good); border-color:var(--good); background:transparent}
+  .fstep.human .fnum{color:var(--amber-ink); border-color:var(--amber); background:var(--amber-bg)}
+  .fbody h3{margin-bottom:.25rem}
+  .fbody p{font-size:.92rem; color:var(--muted)}
+  .fbody .mono{font-family:var(--font-mono); font-size:.82rem; color:var(--accent-ink); margin-top:.4rem;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:.5rem .7rem; overflow-x:auto}
+  .floop{font-family:var(--font-mono); font-size:.74rem; color:var(--amber-ink); text-align:center;
+    margin-top:var(--s3); padding-top:var(--s3); border-top:1px dashed var(--border-strong)}
+
+  .oracles{display:grid; gap:var(--s3); margin-top:var(--s4); grid-template-columns:1fr}
+  @media(min-width:720px){.oracles{grid-template-columns:repeat(3,1fr)}}
+  .orc{border:1px solid var(--good); border-radius:10px; padding:var(--s3) var(--s4); background:var(--surface)}
+  .orc .ok{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--good)}
+  .orc h3{margin:.4rem 0 .35rem; font-size:1rem} .orc p{font-size:.9rem; color:var(--muted)}
+  .orc .st{font-family:var(--font-mono); font-size:.72rem; color:var(--text); margin-top:.5rem}
+  .orc .st b{color:var(--good)}
+
+  .kicker{font-size:clamp(1.3rem,3vw,1.9rem); font-weight:600; letter-spacing:-.015em; max-width:36ch; line-height:1.3}
+  .kicker em{font-style:normal; color:var(--accent-ink)}
+  .btnrow{margin-top:var(--s5); display:flex; flex-wrap:wrap; gap:var(--s3)}
+  .btn{display:inline-flex; align-items:center; gap:.5rem; font-family:var(--font-mono); font-size:.82rem;
+    text-decoration:none; border-radius:9px; padding:.85rem 1.2rem; border:1px solid var(--accent);
+    background:var(--accent); color:#04222a; font-weight:600}
+  .btn.ghost{background:transparent; color:var(--accent-ink)}
+  footer{border-top:1px solid var(--border); padding:var(--s5) 0; color:var(--muted);
+    font-family:var(--font-mono); font-size:.74rem; letter-spacing:.03em}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important; transition-duration:.001ms!important}}
+</style>
+
+<div class="page">
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">A design proposal · AI-authored data-plane shields</p>
+      <h1>AI collapsed disclosure-to-exploit. <em>So must</em> disclosure-to-mitigation.</h1>
+      <p class="lede">A pipeline that reads a CVE — advisory, proof-of-concept, patch diff — and produces a
+        <strong>machine-verified, signed, auto-retiring data-plane shield</strong>: bytecode that blocks the
+        exploit path inside F5 TMM, in hours, without a rebuild. The twist that makes AI authorship <em>safe</em>
+        here: a static verifier proves the output can't crash the box, so blast radius is bounded by proof —
+        not by trust in the model.</p>
+      <p class="statusline"><strong>Where this stands:</strong> a proposal built on the embedded-eBPF substrate.
+        The verifier and exploit-replay gates already run in a working prototype; the CVE-to-predicate front
+        stage is the piece this lays out.</p>
+      <div class="metastrip">
+        <span>CVE → predicate → bytecode</span>
+        <span>verifier-as-oracle</span>
+        <span>closed-loop, self-correcting</span>
+        <span>human on the trigger</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- premise -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The premise</p>
+      <h2>The window closed on the defender</h2>
+      <p class="lede" style="margin-top:var(--s3)">Machine-assisted vulnerability discovery reasons over huge,
+        mature codebases at machine speed. The interval from a CVE becoming known to it being exploited has
+        compressed toward zero — but a data plane still can't take an emergency maintenance window on demand.</p>
+      <div class="race">
+        <div class="rcol atk">
+          <div class="rk">Attacker, today</div>
+          <h3>AI-speed offense</h3>
+          <p class="big">Finds and weaponizes obscure conditions in hours.</p>
+          <p style="margin-top:.6rem">No safety obligation. No review board. No proof required.</p>
+        </div>
+        <div class="rcol def">
+          <div class="rk">Defender, today</div>
+          <h3>Human-speed mitigation</h3>
+          <p class="big">An expert reads the advisory, hand-writes a probe, validates it — then waits for a change window.</p>
+          <p style="margin-top:.6rem">Scarce, slow, and it doesn't scale to the volume of modern disclosure.</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="lbl">The move</span>
+        <p>Give the defender a symmetric lever: <strong>AI that authors the mitigation.</strong> But defensive AI
+          carries an obligation offensive AI never does — the output runs <em>inline in the data plane</em>, where
+          a bad program crashes the box. So the whole design turns on one question: how do you let a model write
+          code for the hot path without trusting the model?</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- why eBPF is the safe target -->
+  <section class="band">
+    <div class="wrap prose stack">
+      <p class="eyebrow">The key idea</p>
+      <h2>You don't have to trust the model</h2>
+      <p>You could never let a model write a kernel patch and ship it inline — unbounded output, no way to prove
+        it's safe. An eBPF shield is different <em>in kind</em>. It lives in a class of programs whose worst case
+        is <strong>provably harmless</strong>: a static verifier proves it terminates and touches only memory it's
+        allowed to, and the host owns the outcomes — the program can only <em>pick</em> PASS or DROP, never invent
+        control flow.</p>
+      <p>So confine generation to that class and something powerful happens: <strong>the identity of the author
+        stops mattering to blast radius.</strong> Human, toolchain, or language model — if the verifier accepts it,
+        it cannot crash or hang the data plane. An unbounded <em>trust</em> problem becomes a bounded <em>proof</em>
+        problem.</p>
+      <p>Two design decisions make it work, and they're the inventive core:</p>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <span class="n">Decision 1</span>
+        <h3>The model emits a constrained expression, not code</h3>
+        <p>Not raw bytecode, not C — a <strong>bounded predicate one-liner</strong> whose only vocabulary is the
+          typed fields of a chosen hook in a signed, per-build hook-point map. The representation itself is the
+          guardrail: the model literally can't express an unbounded loop or a wild pointer.</p>
+      </div>
+      <div class="card">
+        <span class="n">Decision 2</span>
+        <h3>The verifier is a mandatory, automatic gate</h3>
+        <p>Every candidate passes a static verifier before it can load, <strong>fail-closed</strong>. A candidate
+          that doesn't verify is discarded automatically. Safety is proven, not reviewed — which is exactly what
+          lets a machine be the author.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- the pipeline -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The pipeline</p>
+      <h2>CVE in, verified shield out — a loop that closes itself</h2>
+      <p class="lede" style="margin-top:var(--s3)">Every early stage has a <em>mechanical</em> oracle, so the loop
+        can run to green <strong>before a human ever looks</strong>. The human reviews only candidates that are
+        already proven safe, proven to block the exploit, and proven to spare legitimate traffic.</p>
+
+      <div class="flow">
+        <div class="fstep">
+          <div class="fnum">1</div>
+          <div class="fbody">
+            <h3>Comprehend the artifact</h3>
+            <p>Read the advisory / PoC / patch diff; derive the <strong>discriminating predicate</strong> — what
+              separates the exploit input from legitimate input. (The classic SIRT-analyst task.)</p>
+          </div>
+        </div>
+        <div class="fstep">
+          <div class="fnum">2</div>
+          <div class="fbody">
+            <h3>Emit a constrained one-liner</h3>
+            <p>Grounded on the signed hook-point map + types — a predicate over typed fields at a real hook, not
+              free-form code.</p>
+            <div class="mono">tmm:l7:frame /args.opcode &gt;= 4/ { drop(); }</div>
+          </div>
+        </div>
+        <div class="fstep">
+          <div class="fnum">3</div>
+          <div class="fbody">
+            <h3>Compile to sandboxed bytecode</h3>
+            <p>Deterministic, downstream of the model. The bytecode is the artifact the oracles judge.</p>
+          </div>
+        </div>
+        <div class="fstep oracle">
+          <div class="fnum">✓</div>
+          <div class="fbody">
+            <h3>Three mechanical oracles</h3>
+            <p>The candidate must clear all three — automatically. Any failure feeds the refine loop.</p>
+            <div class="oracles">
+              <div class="orc"><div class="ok">Oracle 1</div><h3>Verifies</h3>
+                <p>Static verifier proves bounded + memory-safe.</p><div class="st">fail → <b>discard</b></div></div>
+              <div class="orc"><div class="ok">Oracle 2</div><h3>Blocks the PoC</h3>
+                <p>Replay the known exploit — is the vulnerable outcome prevented?</p><div class="st">pass → <b>effective</b></div></div>
+              <div class="orc"><div class="ok">Oracle 3</div><h3>Spares legit traffic</h3>
+                <p>Action rate vs. a benign corpus below threshold.</p><div class="st">pass → <b>low FP</b></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="fstep human">
+          <div class="fnum">⚑</div>
+          <div class="fbody">
+            <h3>Human authorizes + signs</h3>
+            <p>The model <em>proposes</em>; a human <em>authorizes</em>. The signing key is never autonomous — AI
+              in the loop, human on the trigger.</p>
+          </div>
+        </div>
+        <div class="fstep">
+          <div class="fnum">↺</div>
+          <div class="fbody">
+            <h3>Deploy observe-first · time-boxed · auto-retire</h3>
+            <p>Ship telemetry-only first where possible; time-box it; auto-disable the moment the patched build is
+              detected. Every blocked attempt captures its run-up, which refines the next predicate.</p>
+          </div>
+        </div>
+        <p class="floop">↻ any oracle fails → refine &amp; regenerate (bounded retries) → or declare NON-MITIGABLE</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- shieldability -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Knowing when to say no</p>
+      <h2>“Not shieldable” is a first-class answer</h2>
+      <p class="lede" style="margin-top:var(--s3)">A synthesis system that always returns <em>something</em> is
+        dangerous. The pipeline includes a <strong>shieldability classifier</strong> that decides, from the CVE and
+        the hook-point map, whether a safe interception point even exists — and when it doesn't, says so.</p>
+      <div class="cards">
+        <div class="card"><span class="n">Needs all three</span><h3>What makes a CVE shieldable</h3>
+          <p>A hook that runs <em>before</em> the vulnerable operation, <em>exposes</em> the discriminating
+            condition in its typed args, and offers a <em>clean</em> outcome that leaves the process consistent.</p></div>
+        <div class="card"><span class="n">Honest failure</span><h3>When one is missing</h3>
+          <p>Crash-before-the-first-hook, hardware-offloaded fast path, or no clean abort branch → the classifier
+            emits <strong>NON-MITIGABLE → engineering hotfix</strong>, instead of shipping an unsafe half-measure.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- limits -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The honest limits</p>
+      <h2>Where AI does not get the keys</h2>
+      <div class="cards">
+        <div class="card"><span class="n">Verified ≠ correct</span><h3>The verifier proves safe, not <em>right</em></h3>
+          <p>A predicate too broad drops legitimate traffic (self-inflicted DoS); too narrow is bypassable. That's
+            caught by the false-positive corpus and human red-team — <strong>not</strong> the verifier. Those stay mandatory.</p></div>
+        <div class="card"><span class="n">Human on the trigger</span><h3>Signing is never autonomous</h3>
+          <p>No agent pushes to the fleet. The model drafts and self-tests; a human authorizes. Ground truth is the
+            PoC replay, not the advisory's prose — which could be wrong or poisoned.</p></div>
+        <div class="card"><span class="n">Residual dead zone</span><h3>Some CVEs aren't runtime-shieldable</h3>
+          <p>And some data-plane traffic is offloaded to hardware, invisible to any software shield. The classifier
+            names these honestly rather than pretending to cover them.</p></div>
+      </div>
+      <div class="callout warn">
+        <span class="lbl">The one thing to keep straight</span>
+        <p>The verifier is a <strong>safety</strong> gate, not a <strong>correctness</strong> gate and not a
+          <strong>security</strong> gate. It's what makes machine authorship <em>safe to attempt</em>. Making it
+          <em>correct</em> and <em>trustworthy</em> is the job of the replay oracle, the false-positive corpus,
+          mandatory signing, and human red-team — the governance around the loop.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- status + demo link -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Where this stands</p>
+      <h2>Two of the three oracles already run</h2>
+      <p class="lede" style="margin-top:var(--s3)">A working prototype — <code>tmmtrace</code> over the
+        <code>minimm</code> stand-in data plane — already compiles a bounded one-liner to an eBPF shield, gates it
+        on the real <strong>PREVAIL verifier</strong> (Oracle 1, fail-closed), and <strong>replays the exploit</strong>
+        to confirm it blocks while the data plane survives (Oracle 2). The generative front stage is a drop-in over
+        the same DSL target and the same oracles it would iterate against.</p>
+      <div class="btnrow">
+        <a class="btn" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">▶ Watch the loop run — interactive demo</a>
+        <a class="btn ghost" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">The embedded-eBPF substrate this builds on →</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The one line to remember</p>
+      <p class="kicker">Attackers got an AI that writes exploits in hours. This gives defenders an AI that writes
+        the mitigation — and a <em>proof</em> that its worst case can't take down the box.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">Proposal explainer · part of the embedded-eBPF-in-TMM series. Detailed method &amp; claims are
+      held in a separate invention disclosure.</div>
+  </footer>
+</div>

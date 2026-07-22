@@ -4,7 +4,8 @@
  * This header is the contract between three parties:
  *   1. minimm (the bent-pipe relay / "mini-TMM") that exposes hook points,
  *   2. the reference shield compiled into minimm (Track 1), and
- *   3. the bpftime-loaded eBPF shield that attaches to the hook point (Track 2).
+ *   3. the eBPF shield bytecode run by the embedded uBPF VM at the hook
+ *      point (Track 2) — no injection, no uprobe: the host calls the VM.
  *
  * It is the concrete, runnable analog of the design doc:
  *   - struct ls_ctx      <-> the per-build "arg_btf" a hook point exposes (design §5.3)
@@ -62,7 +63,9 @@ struct ls_fr_entry {
 };
 
 /* The shared "map": mode + evidence. shm-backed so an out-of-band controller
- * (minimm ctl) and, in Track 2, the bpftime map bridge can read/write it. */
+ * (minimm ctl) can read/write it. In Track 2 the *host* owns this region — uBPF
+ * has no native maps, so the VM never touches it: the host reads the shield's
+ * return value and updates the counters here itself (see minimm.c). */
 struct ls_shared {
     uint32_t abi_version;
     volatile int      mode;            /* enum ls_mode                          */
@@ -86,15 +89,18 @@ struct ls_shared {
 };
 
 /*
- * The hook point.  Designed-in, noinline, externally visible so its symbol is a
- * stable uprobe attach target (design §3.1 "instrument by design, do not inject").
+ * The hook point.  Designed-in, noinline, externally visible — a stable, named
+ * decision site the host calls directly (design §3.1, "instrument by design, do
+ * not inject": no uprobe, no injection, no runtime rewriting).
  *
  *   attach_mode: filter   (return value selects an enumerated outcome)
  *   path_class:  cold      (only the malformed condition reaches the offending op)
  *
- * Track 1: minimm compiles a *reference shield* as this function's body.
- * Track 2: built with -DLS_HOOK_STUB, the body is an inert "return LS_PASS" and a
- *          bpftime uprobe on this symbol supplies the verdict instead.
+ * Track 1 (default build): minimm compiles a *reference shield* as this
+ *          function's body — the decision logic in plain C.
+ * Track 2 (-DLS_UBPF filter / -DLS_TRACE observe): the body instead calls the
+ *          embedded uBPF VM (ubpf_exec) on the shield bytecode and acts on its
+ *          return — the real TMM model. Same symbol, same signature.
  */
 int ls_request_eval_decision(const struct ls_ctx *ctx);
 
