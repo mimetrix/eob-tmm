@@ -533,10 +533,11 @@
           <div class="vlist">
             <div class="vitem"><span class="mk">✓</span><span>Mature, ubiquitous, verified by the kernel's own verifier. <b>The right tool for anything the kernel handles.</b></span></div>
             <div class="vitem"><span class="mk">✓</span><span>Sees syscalls, sockets, kernel network stack — the public highway all normal traffic drives on.</span></div>
-            <div class="vitem"><span class="mk">✕</span><span>Can only observe what passes <b>through the kernel</b>. Its vantage point is fixed.</span></div>
-            <div class="vitem"><span class="mk">✕</span><span>TMM deliberately <b>bypasses the kernel</b> — so this traffic never reaches the one place kernel eBPF can watch.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>The packet path <b>bypasses the kernel</b> — so traffic-level observability has nothing to watch.</span></div>
+            <div class="vitem"><span class="mk">~</span><span>It <em>can</em> reach TMM's own functions with <b>uprobes</b> — but every hit traps out of TMM into the kernel and back.</span></div>
+            <div class="vitem"><span class="mk">✕</span><span>On a core-pinned poll loop that per-event boundary crossing is <b>prohibitively costly</b> — and it perturbs the very timing you're measuring.</span></div>
           </div>
-          <div class="vverdict">Structurally blind to TMM. More privilege doesn't help — the data simply isn't there to see.</div>
+          <div class="vverdict">Blind to the kernel-bypassed packet path; and where it <em>can</em> reach — code-level uprobes — the kernel round-trip per event defeats the purpose.</div>
         </div>
 
         <div class="vcol user">
@@ -553,11 +554,24 @@
       </div>
 
       <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">“But couldn't you just use uprobes?”</span>
+        <p>Fair — kernel uprobes <em>can</em> attach to TMM's userspace functions, so this isn't pure blindness
+           for code-level probing. The catch is <strong>cost</strong>: every hit traps from TMM into the kernel to
+           run the program and back — a user↔kernel boundary crossing <em>per event</em>. On TMM's core-pinned,
+           tight poll loop that's prohibitive, and it adds jitter to the exact timing you're trying to measure.
+           An embedded uBPF probe has <strong>no boundary to cross</strong> — it's a direct in-process call at
+           ~tens of ns. (A measured kernel-uprobe workload ran ~58% overhead versus ~12% for the equivalent
+           userspace tool; the in-process call is cheaper still.) And for a <em>shield</em> the kernel can't even
+           try — it forbids altering a function's outcome from a uprobe. <strong>Same signal, minus the kernel
+           round-trip.</strong></p>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
         <span class="lbl">The rule of thumb</span>
-        <p>Use <strong>kernel eBPF</strong> wherever the kernel can see the target — it's the mature default,
-           and F5 already ships it for kernel-mediated traffic. Reach for <strong>userspace eBPF</strong> only
-           for the one thing the kernel structurally cannot reach: <em>code that bypasses it.</em> TMM is
-           exactly that case.</p>
+        <p>Use <strong>kernel eBPF</strong> wherever the kernel can see the target cheaply — it's the mature
+           default, and F5 already ships it for kernel-mediated traffic. Reach for <strong>userspace eBPF</strong>
+           for what the kernel can't reach without paying to cross the boundary: <em>code on a kernel-bypass hot
+           path</em>, where a per-event kernel round-trip is the cost you can't pay. TMM is exactly that case.</p>
       </div>
     </div>
   </section>
