@@ -289,7 +289,7 @@ Mode and lifecycle state are part of the synced object: a monitor→enforce prom
 
 The enforcement primitive is the easy part; trust is the product. Shields are **not** DIY runtime rules. The lifecycle mirrors Cisco's Talos→validate→red-team→retire flow, mapped onto machinery F5 already operates:
 
-1. **Author** — F5 SIRT analyzes the exploit path and writes the shield (this formalizes what the Kxxxxx mitigation articles already do informally).
+1. **Author** — F5 SIRT analyzes the exploit path and writes the shield (this formalizes what the Kxxxxx mitigation articles already do informally). Authoring can be **AI-assisted**: a generative model drafts a bounded predicate that the verifier and an exploit-replay gate accept before a human signs — the verifier bounds a machine-authored draft's blast radius *by proof*, so the human reviews only candidates already proven safe and effective (substrate §8.5; a separate invention disclosure holds the method).
 2. **Validate** — internal SIRT pipeline checks targeting, false-positive rate, performance class, and that a clean auto-retirement path exists.
 3. **Red-team** — independent validation that the shield actually blocks the exploit and cannot be trivially bypassed.
 4. **Sign** — F5 code-signing over the canonicalized shield object + payload.

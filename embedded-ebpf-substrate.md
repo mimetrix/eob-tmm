@@ -70,7 +70,7 @@ The governance *is* the feature here: without it, "vendor loads code on my box t
 - **Trigger taxonomy** — entry to a known-vulnerable function, a parser reaching an error state, an assertion, a watchdog event. The trigger is itself a hook, so a flight recorder is really *two* coordinated hooks (record + trip).
 - **Dump path off the hot path** — freeze the ring cheaply; hand serialization/export to the lifecycle engine.
 
-The prototype demonstrates this end to end: `minimm-trace` (an observe program in the embedded VM) keeps a shm-backed ring of recent frames and arms a dump on the crash precondition; the run-up prints at the hook *before* the data plane crashes, and survives it for post-mortem (`ctl flightrec`). See `prototype/README.md` and `prototype/demo-ubpf.sh`.
+The prototype demonstrates this end to end: `minimm-trace` (an observe program in the embedded VM) keeps a shm-backed ring of recent frames and arms a dump on the crash precondition; the run-up prints at the hook *before* the data plane crashes, and survives it for post-mortem (`ctl flightrec`). See `prototype/README.md` and `prototype/demo-ubpf.sh`. The **`tmmtrace`** front-end (`prototype/tmmtrace`) makes this ergonomic: a bpftrace-style one-liner — `tmm:l7:frame /args.opcode >= 4/ { snapshot(); }` — compiles to the observe program, passes the verify gate, and arms the recorder; swapping the action verb to `drop()` authors a `filter` shield from the same grammar.
 
 **The combined play.** Pair `enforce` + flight recorder on the *same* condition: when a shield drops a malformed frame, the recorder simultaneously snapshots the context. Every block becomes an intelligence source — SIRT gets the exact attempt that was stopped — and it directly answers "how do you know the shield catches real attacks and isn't breaking legitimate traffic?" The prototype shows this too (`LS_FLIGHTREC=1` on the enforce build): the attack is dropped, the relay survives, and the run-up into the blocked attempt is captured — the combined-play section of `prototype/demo-ubpf.sh`.
 
@@ -145,6 +145,12 @@ Build the substrate once; land use cases in order (each reuses the same VM + ver
 3. **Observe-mode tracepoints for diagnostics & support** — high value, low risk (read-only), same machinery.
 4. **TMM-internal shields** on exceptional paths — the data-plane CVE classes nothing else reaches.
 5. **Hot-path hooks under a measured budget** — adaptive controls and full-fidelity telemetry where the value justifies the cost.
+
+## 8.5 A further direction: AI-assisted shield authoring
+
+CVE disclosure now moves at machine speed; the verified-shield model is unusually well suited to machine-speed *authoring* in response. Because a shield is a bounded, statically-verified program that only selects among host-owned outcomes, its worst case is **provable** — so a generative model can draft one and the **verifier becomes an automatic, fail-closed acceptance gate** on that draft: safety is proven, not trusted, which is what makes machine authorship of inline data-plane code tractable at all. A pipeline reads a CVE (advisory / PoC / patch diff), emits a bounded `tmmtrace`-style predicate grounded on the signed hook-point map, compiles it, and iterates it against **three mechanical oracles** — verifier pass, exploit-replay blocks the PoC, low false-positive against a legitimate-traffic corpus — before a human signs. A **shieldability classifier** declares "not shieldable → engineering hotfix" when no safe interception point exists. Human authorization stays non-autonomous; deployment is observe-first and auto-retiring (design §7).
+
+The prototype already runs two of the three oracles (PREVAIL verify + exploit replay via `tmmtrace`). See [`explainers/ai-shield-pipeline.html`](explainers/ai-shield-pipeline.html) (the story) and [`explainers/ai-shield-pipeline-demo.html`](explainers/ai-shield-pipeline-demo.html) (an interactive closed-loop demo). *Detailed method and claims are held in a separate invention disclosure, per IP policy.*
 
 ## 9. One-line thesis
 

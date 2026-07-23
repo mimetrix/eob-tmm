@@ -98,6 +98,8 @@ resource governance — lives *around* the VM (substrate §6, design §8).
 | [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) | The substrate: programmability spectrum, use-case families, hook-point catalog, and the security model |
 | [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) | The Live Shield design — threat model, hook-point map, modes, and trust/validation lifecycle (signing, verify-before-load, auto-retirement) |
 | [`prototype/`](prototype/) | **minimm** — a "mini-TMM" relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
+| [`prototype/tmmtrace`](prototype/tmmtrace) | **tmmtrace** — a bpftrace-style front-end to the embedded VM: one grammar spanning observe (tracepoint) and filter (CVE shield), with compile → verify → run |
+| [`explainers/`](explainers/) | Visual explainers (HTML): the substrate mechanism; and the AI-authored-shield pipeline — CVE → verified, signed, auto-retiring shield (story + interactive demo) |
 
 ## Prototype at a glance
 
@@ -110,6 +112,11 @@ Three tracks:
    **observe** (tracepoint) modes; enforce holds, monitor crashes.
 3. **PREVAIL gate** — the good program verifies and loads; a deliberately-unsafe one is
    rejected before load.
+
+Over the top, **`tmmtrace`** is a bpftrace-style front-end: write a one-liner and it compiles to a
+shield, runs the verify gate, and drives the VM in observe *or* filter mode — one grammar for
+*explore → shield*. It is also the natural target for **AI-assisted authoring** (CVE → predicate →
+verify → replay); see [`explainers/`](explainers/).
 
 ```bash
 cd prototype

@@ -6,6 +6,10 @@ the demos see [`README.md`](README.md). Everything here is what the
 [`minimm/Makefile`](minimm/Makefile), the demo scripts, and `minimm.c`'s
 `ls_verify()` / `ls_ubpf_init()` really do — no aspirational steps.
 
+> **Front-end:** [`tmmtrace`](tmmtrace) wraps this whole pipeline behind a bpftrace-style one-liner —
+> it emits the shield source, runs the verify gate, and loads the VM in observe or filter mode. The
+> stages below are what `tmmtrace` and the demo scripts drive underneath.
+
 ## The pipeline
 
 ```

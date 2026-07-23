@@ -48,6 +48,8 @@ prototype/
   demo.sh           Track 1 (reference shield)
   demo-ubpf.sh      Track 2 (embedded uBPF VM): enforce holds, monitor crashes, flight recorder (§3.1)
   demo-verify.sh    §9 gate: PREVAIL verifies the good shield, rejects the bad one
+  tmmtrace          bpftrace-style front-end: one-liner -> shield -> verify -> run (observe|filter)
+  tmmtrace-demo.sh  one tool, both halves: list, observe, enforce, combined play
   Containerfile         Rocky 8.10, pure uBPF (clean: gcc + clang + libelf)
   Containerfile.verify  Rocky 8.10, uBPF + PREVAIL verify gate
   hook-point-map.json   illustrative per-build hook-point map (design §5.3)
@@ -152,6 +154,29 @@ pure-uBPF `Containerfile`):
 podman build -t eob-verify -f Containerfile.verify .
 podman run --rm eob-verify /work/prototype/demo-verify.sh
 ```
+
+## tmmtrace — a bpftrace-style front-end
+
+`tmmtrace` turns the pipeline above into a one-liner. You write a bounded predicate against the
+hook-point map; it compiles to an eBPF shield, runs the PREVAIL verify gate, and drives the embedded
+VM — in **observe** (tracepoint) or **filter** (CVE shield) mode, chosen by the action verb. One
+grammar spans *explore → shield*:
+
+```bash
+./tmmtrace list                                                   # probes from the hook-point map
+./tmmtrace run 'tmm:l7:frame /args.opcode >= 4/ { count(); }'     # OBSERVE — watch the precondition
+./tmmtrace run 'tmm:l7:frame /args.opcode >= 4/ { drop();  }'     # FILTER  — ship the mitigation
+./tmmtrace run 'tmm:l7:frame /args.opcode >= 4/ { drop(); snapshot(); }'   # combined play
+./tmmtrace-demo.sh                                                # the whole tour
+```
+
+`count()/hist()/snapshot()` → observe (`minimm-trace`); `drop()` → filter (`minimm-ubpf`, enforce).
+Same compile → verify → load pipeline as [`TOOLCHAIN.md`](TOOLCHAIN.md); `tmmtrace` is only the
+front-end. Generated shields land in the gitignored `.tmmtrace/` build dir.
+
+This is also the target for an **AI-assisted authoring** pipeline (CVE → predicate → verify → replay);
+see [`../explainers/ai-shield-pipeline.html`](../explainers/ai-shield-pipeline.html) and the substrate
+doc §8.5.
 
 ## What is validated where
 
