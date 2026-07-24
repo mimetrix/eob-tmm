@@ -1,0 +1,259 @@
+<style>
+  :root{
+    --bg:#0e1116; --panel:#151a21; --panel-2:#1b222b; --line:#26303b; --line-2:#374453;
+    --ink:#dfe7ef; --dim:#8b9aab; --faint:#66778a;
+    --ac:#3fb9c9; --ac-dim:#1f3b41; --ac-ink:#8fe0ec;
+    --warn:#e08a5c; --ok:#57c08a; --amber:#d7a24a;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:light){:root{
+    --bg:#f3f5f8; --panel:#ffffff; --panel-2:#f6f8fa; --line:#dbe2ea; --line-2:#c2cdd8;
+    --ink:#182430; --dim:#4d5c6b; --faint:#7a8895;
+    --ac:#0e7d8c; --ac-dim:#dceff1; --ac-ink:#0a5d68;
+    --warn:#b0552d; --ok:#2c8a5c; --amber:#9a6f1e;
+  }}
+  :root[data-theme="light"]{
+    --bg:#f3f5f8; --panel:#ffffff; --panel-2:#f6f8fa; --line:#dbe2ea; --line-2:#c2cdd8;
+    --ink:#182430; --dim:#4d5c6b; --faint:#7a8895;
+    --ac:#0e7d8c; --ac-dim:#dceff1; --ac-ink:#0a5d68; --warn:#b0552d; --ok:#2c8a5c; --amber:#9a6f1e;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1116; --panel:#151a21; --panel-2:#1b222b; --line:#26303b; --line-2:#374453;
+    --ink:#dfe7ef; --dim:#8b9aab; --faint:#66778a;
+    --ac:#3fb9c9; --ac-dim:#1f3b41; --ac-ink:#8fe0ec; --warn:#e08a5c; --ok:#57c08a; --amber:#d7a24a;
+  }
+  *{box-sizing:border-box} body{margin:0}
+  .doc{background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:14.5px; line-height:1.5;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden}
+  .wrap{max-width:70rem; margin:0 auto; padding:clamp(1.4rem,3vw,2.4rem) clamp(1rem,3vw,2rem)}
+  a{color:var(--ac-ink); text-decoration:none} a:hover{text-decoration:underline}
+  code,.m{font-family:var(--mono)}
+  code{font-size:.86em; background:var(--panel-2); border:1px solid var(--line); border-radius:3px; padding:.04em .3em; color:var(--ac-ink)}
+
+  header.head{border-bottom:1px solid var(--line-2); padding-bottom:1rem; margin-bottom:1.3rem}
+  .kick{font-family:var(--mono); font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ac-ink)}
+  .kick .sep{color:var(--faint)}
+  h1{font-size:clamp(1.5rem,3.4vw,2.1rem); font-weight:680; letter-spacing:-.02em; margin:.5rem 0 0; line-height:1.12}
+  .thesis{margin-top:.7rem; font-size:clamp(1rem,1.6vw,1.12rem); color:var(--dim); max-width:60rem}
+  .thesis b{color:var(--ink); font-weight:640}
+  .meta{margin-top:.8rem; display:flex; flex-wrap:wrap; gap:.4rem .9rem; font-family:var(--mono); font-size:.72rem; color:var(--faint)}
+  .meta b{color:var(--ac-ink); font-weight:600}
+
+  .grid{display:grid; gap:.9rem; grid-template-columns:1fr}
+  @media(min-width:780px){.grid.two{grid-template-columns:1fr 1fr}}
+  section.blk{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:1rem 1.1rem; margin-top:.9rem}
+  .sh{display:flex; align-items:baseline; gap:.6rem; margin-bottom:.5rem}
+  .sn{font-family:var(--mono); font-size:.74rem; font-weight:700; color:var(--ac-ink); flex:0 0 auto}
+  .st{font-size:.98rem; font-weight:660; letter-spacing:-.01em}
+  section.blk p{margin:.4rem 0 0; color:var(--dim)}
+  section.blk p:first-of-type{margin-top:0}
+  section.blk b{color:var(--ink); font-weight:640}
+  .kv{font-family:var(--mono); font-size:.8rem; color:var(--ac-ink); background:var(--panel-2); border:1px solid var(--line);
+    border-radius:5px; padding:.5rem .6rem; margin-top:.55rem; overflow-x:auto; white-space:pre; line-height:1.5}
+
+  table{width:100%; border-collapse:collapse; margin-top:.5rem; font-size:.83rem}
+  th,td{text-align:left; padding:.4rem .55rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-family:var(--mono); font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); font-weight:600}
+  td.k{font-family:var(--mono); color:var(--ink); white-space:nowrap}
+  td .no{color:var(--warn); font-weight:600} td .yes{color:var(--ok); font-weight:600}
+  tr:last-child td{border-bottom:0}
+
+  ul.tight{margin:.5rem 0 0; padding-left:1.1rem; color:var(--dim)}
+  ul.tight li{margin:.25rem 0} ul.tight li b{color:var(--ink)}
+  ul.tight code{font-size:.85em}
+
+  .flag{display:inline-block; font-family:var(--mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+    padding:.12em .5em; border-radius:10px; border:1px solid var(--line-2); color:var(--faint); vertical-align:middle}
+  .flag.new{border-color:var(--ac); color:var(--ac-ink)}
+  .flag.risk{border-color:var(--warn); color:var(--warn)}
+
+  .note{margin-top:.55rem; font-size:.82rem; color:var(--faint); border-left:2px solid var(--line-2); padding-left:.7rem}
+  footer{margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--line); font-family:var(--mono);
+    font-size:.72rem; color:var(--faint)}
+</style>
+
+<div class="doc">
+<div class="wrap">
+
+  <header class="head">
+    <p class="kick">TMM engineering <span class="sep">·</span> technical brief <span class="sep">·</span> design proposal <span class="sep">·</span> not a shipped feature</p>
+    <h1>Embedded userspace eBPF as a third programmability surface in TMM</h1>
+    <p class="thesis">Link a small verified eBPF VM (<b>uBPF</b>) into TMM and invoke it at <b>designed-in hook points</b>
+      on the fast path. The program reads a <b>typed context</b> and returns a code selecting a <b>host-owned
+      verdict</b> — <span class="m">observe</span> (telemetry) or <span class="m">filter</span> (PASS/DROP/RESET).
+      Every program is <b>statically verified before load</b> (PREVAIL). The core needs <b>no custom helpers and no
+      verifier extension</b>: it's a pure <code>ctx → verdict</code> function; the host owns all state and effects.</p>
+    <div class="meta">
+      <span><b>engine</b> uBPF (Apache-2.0, x86-64/arm64 JIT, ~150 KB)</span>
+      <span><b>verifier</b> PREVAIL (eBPF-for-Windows; C++23)</span>
+      <span><b>invocation</b> in-process, JIT, ~tens of ns; empty hook = 1 branch</span>
+      <span><b>toolchain</b> clang -target bpf · BTF/CO-RE</span>
+    </div>
+  </header>
+
+  <div class="grid two">
+    <section class="blk">
+      <div class="sh"><span class="sn">§1</span><span class="st">Invocation model</span></div>
+      <p>The VM is a linked library, not an injection technique. At a sanctioned decision/observation site the host
+        calls it inline on the poll loop and acts on the return — no trampoline, no syscall, no kernel trap:</p>
+      <div class="kv">ubpf_exec(vm, &amp;ctx, sizeof ctx, &amp;ret);
+// ret: 0 PASS · 1 matched/monitor(pass) · 2 matched→DROP
+// ctx is r1: a typed projection of in-scope state
+// host maps ret → enumerated outcome and applies it</div>
+      <p>JIT on hot paths (indirect call into native + the program's handful of insns). The shield <b>chooses among
+        sanctioned outcomes</b>; it cannot synthesize control flow.</p>
+    </section>
+
+    <section class="blk">
+      <div class="sh"><span class="sn">§2</span><span class="st">Why in-process — vs. the field</span></div>
+      <table>
+        <tr><th>surface</th><th>disqualifier for this job</th></tr>
+        <tr><td class="k">kernel eBPF</td><td>TMM bypasses the kernel; <span class="no">blind</span> to the data path</td></tr>
+        <tr><td class="k">kernel uprobe</td><td>reaches TMM fns, but a user↔kernel crossing <span class="no">per event</span> (~58% vs ~12%); perturbs poll-loop timing</td></tr>
+        <tr><td class="k">bpftime inject</td><td>ptrace/LD_PRELOAD + rewrite; never reliably engaged; kernel forbids <code>bpf_override_return</code> on uprobes</td></tr>
+        <tr><td class="k">iRules</td><td>needs an event, a data-model field, and a reachable path — holes pre-L7 &amp; inside plugins; bypassed by FastL4</td></tr>
+        <tr><td class="k">WASM</td><td>heavier runtime entry; fuel/epoch <span class="no">kill</span>, not a termination proof</td></tr>
+        <tr><td class="k">embedded uBPF</td><td class="k"><span class="yes">in TMM's address space; verified; ~tens of ns</span></td></tr>
+      </table>
+    </section>
+  </div>
+
+  <section class="blk">
+    <div class="sh"><span class="sn">§3</span><span class="st">The <code>ctx</code> contract &amp; shieldability</span></div>
+    <div class="grid two">
+      <div>
+        <p>Each hook exposes its <b>own</b> typed <code>ctx</code> — a curated projection of the state in scope
+          there, authored by the hook's owner (context minimization: TLS secrets / PII / decrypted payload gated).
+          Emitted per build in a signed hook-point map:</p>
+        <div class="kv">{ name, offset, arg_btf, attach_mode, path_class }
+attach_mode ∈ {observe, filter}
+path_class  ∈ {hot, warm, cold}</div>
+        <p>Shields resolve by <b>name→offset</b> against the running build; field access is <b>CO-RE-relocated</b>
+          against the build's BTF and <b>fails closed</b> if a referenced field no longer exists. Version-bound,
+          not offset-fragile.</p>
+      </div>
+      <div>
+        <p><b>Shieldability</b> is exact — a CVE is runtime-mitigable at a hook iff:</p>
+        <ul class="tight">
+          <li>the hook executes <b>before</b> the vulnerable operation, <b>and</b></li>
+          <li>its <code>ctx</code> exposes the field(s) that <b>discriminate</b> the exploit, <b>and</b></li>
+          <li>a sanctioned outcome leaves TMM <b>consistent</b> (a clean abort branch exists — typically the
+            existing malformed-input/reject path).</li>
+        </ul>
+        <p class="note">No match → not runtime-shieldable at this build → engineering hotfix, or add a hook/<code>ctx</code>
+          next build. The hook-point map — richness &amp; earliness of <code>ctx</code> — is the asset, not any one shield.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid two">
+    <section class="blk">
+      <div class="sh"><span class="sn">§4</span><span class="st">No helpers, stock verifier <span class="flag new">core property</span></span></div>
+      <p>Both <span class="m">filter</span> and <span class="m">observe</span> programs are pure functions of
+        <code>ctx</code> — they <b>call nothing</b>. State and effects live host-side, applied <i>around</i> the call:</p>
+      <ul class="tight">
+        <li><b>No eBPF helpers</b> to define/register/confine — nothing to confine, sandboxed by construction.</li>
+        <li><b>PREVAIL used stock</b> — a bounded predicate over a typed <code>ctx</code> is the canonical case; you
+          configure the ctx descriptor, you don't fork the verifier.</li>
+        <li>Anything stateful (rates, timestamps, cross-flow counters) the host computes into <code>ctx</code>.</li>
+        <li><b>Per-CPU host state</b> on hot hooks → no cache-line contention across core-pinned CMP TMM instances.</li>
+      </ul>
+      <p class="note">Helpers (program writes host maps directly) are an opt-in later tier — they reintroduce the
+        verifier-integration + capability-confinement surface. Not needed for Live Shield or tracepoints.</p>
+    </section>
+
+    <section class="blk">
+      <div class="sh"><span class="sn">§5</span><span class="st">Placement &amp; performance budget</span></div>
+      <ul class="tight">
+        <li><b>Empty hook</b> = one predictable branch. Most CVE shields sit on <b>cold/exceptional</b> paths (the
+          malformed branch) → ~zero steady-state.</li>
+        <li><b>Hot</b> placement is a <b>measured budget decision</b>, not a ban: per-invocation cost + throughput/latency
+          budget + explicit sign-off. JIT mandatory; per-CPU state mandatory.</li>
+        <li><b>Watchdog:</b> TMM instance restart within N s of a load → auto-disable that program + alert.</li>
+        <li>Intrinsic in-data-plane cost — a WASM filter or iRule on the same hot hook pays the same order (heavier, for WASM).</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="blk">
+      <div class="sh"><span class="sn">§6</span><span class="st">Two planes, one catalog</span></div>
+      <table>
+        <tr><th>plane</th><th>engine</th><th>CVE classes</th></tr>
+        <tr><td class="k">control</td><td>kernel eBPF / uprobe at httpd, tmsh, MCPD</td><td>auth-bypass, config-util RCE, cmd-injection</td></tr>
+        <tr><td class="k">iControl REST</td><td>JVMTI/USDT — <code>restjavad</code>/<code>icrd</code> (JVM; uprobes miss Java)</td><td>REST auth/authz</td></tr>
+        <tr><td class="k">data (TMM)</td><td>embedded uBPF + PREVAIL</td><td>malformed-input crash, parser bugs, <code>bd</code> termination, traffic-borne RCE</td></tr>
+      </table>
+      <p class="note">Two engines, two verifiers (kernel's built-in vs PREVAIL), one signed catalog + lifecycle;
+        only the enforcement leaf differs. The Cisco Live-Protect analog covers the control plane only.</p>
+    </section>
+
+    <section class="blk">
+      <div class="sh"><span class="sn">§7</span><span class="st">Coverage bound (state honestly)</span></div>
+      <ul class="tight">
+        <li><b>Hardware offload:</b> flows switched/mitigated in <b>ePVA / FPGA (TurboFlex) / crypto</b>, and FastL4
+          hardware fast paths, never enter TMM software → out of reach of an in-software VM (as for iRules &amp;
+          kernel eBPF). L7/parser/<code>bd</code> classes escalate back into software and stay reachable.</li>
+        <li><b>Mechanism identical across form factors; coverage varies:</b> <b>VE</b> (no offload) sees the whole
+          data path; <b>appliance</b> carries the offload dead zone; <b>BNK</b> depends on DPU steering vs. what lands in the containerized TMM.</li>
+        <li><b>Residual dead zone:</b> a crash <b>before</b> the earliest reachable hook (e.g. deep in record parse) → engineering hotfix.</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="blk">
+      <div class="sh"><span class="sn">§8</span><span class="st">Two independent safety obligations</span></div>
+      <ul class="tight">
+        <li><b>Verifier — safe to <i>run</i>:</b> proves bounded execution + memory safety. Load-bearing; nonzero verdict ⇒ reject (fail-closed).</li>
+        <li><b>Filter contract — safe to <i>take</i>:</b> the decision point sits before any state an abort would unwind;
+          <code>DROP/RESET</code> is an <b>existing</b> reject branch; outcomes are host-enumerated. <b>No
+          <code>bpf_override_return</code>-style synthesized unwind</b> — that skips cleanup/locks/refcounts on a poll loop = corruption.</li>
+        <li><b>Verified ≠ secure:</b> mandatory signing (checked before the verifier sees bytecode), RBAC/authz tiers,
+          one-way audited exfil sink, attestation/inventory, CRL-style revocation + kill-switch.</li>
+      </ul>
+    </section>
+
+    <section class="blk">
+      <div class="sh"><span class="sn">§9</span><span class="st">Lifecycle &amp; HA</span></div>
+      <ul class="tight">
+        <li><b>Device-group object</b> propagated over <b>config-sync</b> → the sync channel is in the trust path;
+          the signature/authorization travels with it.</li>
+        <li><b>monitor → enforce</b> promotion is change-controlled. <b>Crash-class</b> shields ship
+          <b>enforce-on-arrival</b> (monitor can't be soaked against live crash traffic; FP validation is lab-side).</li>
+        <li><b>Auto-retire</b> on <code>running_version ≥ fixed_in_version</code>, <b>per member</b> in mixed-version groups.
+          A <code>DROP/RESET</code> is a mitigation, not a health signal — must not mark a pool member/VS down.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="blk">
+    <div class="sh"><span class="sn">§10</span><span class="st">AI-assisted authoring <span class="flag new">further direction</span></span></div>
+    <p>Because a shield is a bounded, verifier-proved, host-outcome-selecting program, its worst case is provable —
+      so a generative model can <b>draft</b> one and the verifier is an automatic, fail-closed <b>oracle</b> on the
+      draft (blast radius bounded by proof, not by trust in the model). The model emits a <b>bounded predicate</b>
+      over the signed hook-map/BTF — a constrained IR, never free-form bytecode — iterated against three mechanical
+      gates before a human signs: <span class="m">verifier · exploit-replay · false-positive vs legit corpus</span>.
+      A shieldability classifier returns <span class="m">non-mitigable</span> when no hook's <code>ctx</code> expresses
+      the condition. Human holds the signing key; deployment observe-first + auto-retiring.</p>
+  </section>
+
+  <section class="blk">
+    <div class="sh"><span class="sn">§11</span><span class="st">Open questions / risks <span class="flag risk">gate Phase 3</span></span></div>
+    <ul class="tight">
+      <li><b>VM-in-TMM stability</b> — the program's single biggest technical risk; watchdog + verifier + cold-path
+        default are the controls. Don't touch TMM's hot path until proven on <code>bd</code> (Phase 1) &amp; control plane (Phase 2).</li>
+      <li><b>Hook-point-map / BTF drift</b> — hard CI ownership: no build ships without a current map; no shield ships without a resolvable target + field.</li>
+      <li><b>Toolchain</b> — PREVAIL is C++23 (needs gcc-toolset-13 / modern Boost on the TMOS base OS); uBPF + PREVAIL enter the TCB (consume &amp; harden, not fork).</li>
+      <li><b>Per-CPU footprint</b> on hot hooks across CMP; <b>offload dead zone</b> messaging vs. AdvWAF virtual-patching &amp; EOB positioning.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Design proposal · embedded-eBPF-in-TMM. Detailed method &amp; claims held in a separate invention disclosure.
+    Companion (general-audience) explainers: <a href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here</a>.
+  </footer>
+
+</div>
+</div>
