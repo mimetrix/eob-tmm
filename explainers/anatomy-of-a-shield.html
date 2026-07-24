@@ -88,6 +88,17 @@
   .pill2.pay .h{color:var(--amber-ink)} .pill2.get .h{color:var(--accent-ink)}
   .pill2 p{font-size:.92rem; color:var(--muted)}
 
+  .phase{margin-top:var(--s4); border:1px solid var(--border); border-left:3px solid var(--accent);
+    border-radius:10px; background:var(--surface); padding:var(--s4)}
+  .phase.b{border-left-color:var(--amber)}
+  .phase .pk{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-ink)}
+  .phase.b .pk{color:var(--amber-ink)}
+  .phase h3{font-size:1.08rem; font-weight:660; margin:.35rem 0 0}
+  .steps{margin:var(--s3) 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.7rem}
+  .steps li{display:grid; grid-template-columns:1.6rem 1fr; gap:.7rem; align-items:baseline; font-size:.95rem; color:var(--muted)}
+  .steps li b{color:var(--text); font-weight:640} .steps li .muted{color:var(--muted)}
+  .steps li .sn{font-family:var(--font-mono); font-size:.8rem; font-weight:700; color:var(--accent-ink)}
+  .phase.b .steps li .sn{color:var(--amber-ink)}
   .kicker{font-size:clamp(1.3rem,3vw,1.85rem); font-weight:600; letter-spacing:-.015em; max-width:36ch; line-height:1.3}
   .kicker em{font-style:normal; color:var(--accent-ink)}
   footer{border-top:1px solid var(--border); padding:var(--s5) 0; color:var(--muted); font-family:var(--font-mono); font-size:.74rem}
@@ -234,6 +245,50 @@ uint64_t ret = 0;
           — you describe the <code>ctx</code> layout, you don't modify the verifier. Anything stateful (a rate, a
           timestamp, a cross-flow counter) the host computes and drops into <code>ctx</code>. Helpers — letting the
           program touch host state directly — are an <em>optional, later</em> tier, not a prerequisite.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIFECYCLE: where ctx comes from -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">The lifecycle · step by step</p>
+      <h2>Where <code>ctx</code> comes from — and how a shield uses it</h2>
+      <p class="lede" style="margin-top:var(--s3)">The key thing that clears up "how can a generic context stop a
+        specific bug": <code>ctx</code> is not generic, and it's not the shield's. Each hook has its own
+        developer-authored <code>ctx</code>, built into TMM <em>before any threat exists</em>. A shield is then
+        written against one that already fits.</p>
+
+      <div class="phase a">
+        <div class="pk">Phase A · ahead of time — TMM's own engineers</div>
+        <h3>The instrumentation surface is built first</h3>
+        <ol class="steps">
+          <li><span class="sn">1</span><span>A developer places a <b>hook</b> at a sanctioned point in TMM's source — say, just before frames are dispatched.</span></li>
+          <li><span class="sn">2</span><span>The same developer defines that hook's <b><code>ctx</code></b> — a typed struct exposing the fields actually available there (<code>opcode</code>, <code>payload_len</code>, header bytes…), secrets deliberately withheld. A different hook gets a different <code>ctx</code>.</span></li>
+          <li><span class="sn">3</span><span>The build emits a <b>signed hook-point map</b>: every hook's name, its <code>ctx</code> type, its attach mode — the catalog of what can be instrumented and what each point exposes.</span></li>
+          <li><span class="sn">4</span><span>Ships <b>inert</b> — a hook with nothing attached costs ~one branch (dark until lit). <em>No threat exists yet; the surface is already in place.</em></span></li>
+        </ol>
+      </div>
+
+      <div class="phase b">
+        <div class="pk">Phase B · when a specific threat appears</div>
+        <h3>A shield is written against a <code>ctx</code> that already fits</h3>
+        <ol class="steps">
+          <li><span class="sn">5</span><span>Reduce the threat to its <b>discriminating condition</b> — what separates an exploit from legitimate traffic. (Example: <code>opcode ≥ 4</code> indexes past a 4-entry handler table and crashes the parser.)</span></li>
+          <li><span class="sn">6</span><span>Find a hook whose <code>ctx</code> <b>already exposes that field</b>, running <em>before</em> the vulnerable operation. Here the frame hook's <code>ctx</code> has <code>opcode</code>. <b>Match.</b> <span class="muted">(No match → not runtime-shieldable — the shieldability question, covered in the AI-shields explainer.)</span></span></li>
+          <li><span class="sn">7</span><span>Write the shield — a tiny function over that pre-existing <code>ctx</code>: <code>if (ctx.opcode ≥ 4) drop()</code>. Compile to bytecode.</span></li>
+          <li><span class="sn">8</span><span><b>Verify</b> (PREVAIL, fail-closed), <b>sign</b>, and <b>load</b> it into the VM at that hook — now the hook is lit.</span></li>
+          <li><span class="sn">9</span><span>Per frame at runtime: the host fills <code>ctx</code> from the live frame → the shield returns a code → the host applies its outcome. On <code>2</code>, it <b>DROPs the bad frame before the vulnerable code runs</b>.</span></li>
+          <li><span class="sn">10</span><span><b>Auto-retires</b> when the patched build ships and the running version crosses the fix.</span></li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="lbl">The point</span>
+        <p>It's never an arbitrary <code>ctx</code> solving an arbitrary bug — it's a <strong>match</strong> between
+          a pre-built, developer-authored <code>ctx</code> (Phase A) and the exact field the exploit turns on
+          (Phase B). <code>ctx</code> is a curated view of real state at a designed-in point; the shield just reads
+          the field that's already there.</p>
       </div>
     </div>
   </section>
