@@ -1040,6 +1040,33 @@ uint64_t ret = 0;
            HTTP/2 hook exposes stream counts — always described by the build's typed hook-point map.</p>
       </div>
 
+      <h3 style="margin-top:var(--s5); font-size:1.2rem">How <code>ctx</code> relates to a CVE</h3>
+      <p class="muted" style="margin-top:.6rem; max-width:44rem; font-size:1rem">A shield can only stop what
+        <code>ctx</code> lets it see. So the field the hook exposes and the condition the CVE makes dangerous are
+        the <strong>same fact from two sides</strong>:</p>
+
+      <div class="dflow" style="margin-top:var(--s3); justify-content:flex-start; gap:.75rem">
+        <span class="dnode"><b>ctx.opcode</b> — the field the hook exposes</span>
+        <span class="darrow">⟷</span>
+        <span class="dnode vm"><b>opcode ≥ 4</b> — the condition the CVE abuses</span>
+      </div>
+      <p class="muted" style="margin-top:.75rem; max-width:44rem; font-size:.92rem; font-family:var(--font-mono)">
+        the shield is just: <span style="color:var(--accent-ink)">if (ctx.opcode ≥ 4) drop()</span> — it exists
+        only because the field that reveals the exploit is in the context.</p>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">The shieldability rule</span>
+        <p>A CVE is shieldable at a hook <em>only if</em> that hook runs <strong>before</strong> the vulnerable
+           operation <strong>and</strong> its <code>ctx</code> exposes the field(s) that tell the exploit apart.
+           If no hook's <code>ctx</code> can express the condition, the CVE isn't runtime-shieldable — that's the
+           residual dead zone, and it needs an engineering fix (an AI pipeline would flag it
+           <em>non-mitigable</em>). The flip side is the opportunity: <strong>designing <code>ctx</code> richly
+           and early is what makes whole future CVE classes catchable</strong> — which is why the hook-point map,
+           not any single shield, is the real asset. One caveat — if the discriminating field is sensitive
+           (say it only shows in decrypted payload), exposing it in <code>ctx</code> is also an authorization
+           decision, so "is it shieldable?" and "may the probe see what it needs?" are the same question.</p>
+      </div>
+
       <div class="split">
         <div class="pill2 pay"><div class="h">What you pay</div>
           <p>A few extra nanoseconds per invocation — an indirect call into the JIT instead of a straight
