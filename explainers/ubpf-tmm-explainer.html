@@ -976,6 +976,63 @@
         the decision, arriving as data, later, and passing a safety gate on the way in. Change the bytecode and
         you change what the box does, without touching the binary.</p>
 
+      <p style="margin-top:var(--s4); max-width:44rem; font-size:1.05rem">So what do you load? A shield is a
+        tiny function: it reads a <strong>context</strong> — <code>ctx</code> — and returns a verdict. Three
+        pieces tell the whole story: the <em>context</em> it's handed, the <em>shield</em> itself, and the
+        <em>host</em> that calls it.</p>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">First, what is <code>ctx</code>?</span>
+        <p>Short for <strong>context</strong> — the program's entire view of the world. At each hook the host
+           packs the relevant facts into a small, <em>typed</em> struct (as you'll see: the frame's opcode, its
+           length, a few header bytes) and hands the VM a pointer to it. The shield reads <code>ctx</code>,
+           decides, and returns a number. It <strong>can't reach anything else</strong> — not other connections,
+           not host memory, not the disk — only the fields this hook chose to expose. That narrowness is doing
+           real work: it's half of why the verifier can <em>prove</em> the program safe (bounded reads over a
+           known struct), and it's the <strong>context minimization</strong> the security model leans on — a
+           probe sees only what its hook grants, and sensitive fields (TLS secrets, payloads) are withheld unless
+           separately authorized. Different hook, different <code>ctx</code>: a TLS hook exposes handshake
+           fields, an HTTP/2 hook exposes stream counts — always described by the build's typed hook-point map.</p>
+      </div>
+
+      <div class="codecap"><span class="em">1 · The context it's handed</span>
+        <span class="tiny">— <code>ctx</code>'s actual type. The build's hook-point map defines it; the shield may read these fields and nothing else.</span></div>
+      <pre class="code"><span class="cm">// ls_ctx — the typed context this hook exposes: five fields describing</span>
+<span class="cm">// one frame. (A different hook — TLS, HTTP/2 — hands over a different ctx.)</span>
+struct ls_ctx {
+    uint16_t opcode;       <span class="cm">// the field the synthetic CVE abuses</span>
+    uint16_t payload_len;  <span class="cm">// declared length from the frame header</span>
+    uint32_t avail_len;    <span class="cm">// bytes actually buffered</span>
+    uint32_t mode;         <span class="cm">// host-supplied: 1 = monitor, 2 = enforce</span>
+    uint8_t  head[16];     <span class="cm">// first payload bytes, for richer predicates</span>
+};</pre>
+
+      <div class="codecap"><span class="em">2 · The shield itself</span>
+        <span class="tiny">— the whole thing: <code>ls_shield.c</code>, which compiles to the bytecode <code>shield.bpf.o</code>.</span></div>
+      <pre class="code"><span class="cm">// ls_shield.c — a complete Live Shield. Compiled with clang -target bpf,</span>
+<span class="cm">// this ~6 lines becomes shield.bpf.o, the bytecode that runs at the hook.</span>
+<span class="cm">// A shield is just a function: read ctx, return a verdict.</span>
+uint64_t <span class="hl">ls_decision</span>(struct ls_ctx *ctx)   <span class="cm">// ctx = the frame's fields, above</span>
+{
+    if (ctx-&gt;opcode &gt;= 4)                  <span class="cm">// the SIRT predicate: never a valid opcode</span>
+        return ctx-&gt;mode == ENFORCE ? 2    <span class="cm">// 2 = matched → host DROPs</span>
+                                    : 1;   <span class="cm">// 1 = matched, monitor → host passes</span>
+    return 0;                              <span class="cm">// 0 = PASS — not the attack, forward it</span>
+}</pre>
+
+      <div class="codecap"><span class="em">3 · The host (TMM) that calls it</span>
+        <span class="tiny">— packs the frame into <code>ctx</code>, runs the shield, and acts on the return.</span></div>
+      <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
+<span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
+struct ls_ctx ctx = { .opcode = op, .payload_len = len };  <span class="cm">// pack the frame into ctx</span>
+uint64_t ret = 0;
+<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// ← runs ls_decision() above, over ctx</span>
+<span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
+<span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
+
+      <p style="margin-top:var(--s5); max-width:44rem; font-size:1.05rem">That C source doesn't run as C. Here's
+        the short path it travels to become a live decision at the hook — compiled, <strong>proven safe</strong>,
+        loaded, run:</p>
       <div class="pipescroll">
         <div class="pipe">
           <div class="pstep"><div class="pk">Source</div><div class="pv">ls_shield.c</div></div>
@@ -988,56 +1045,6 @@
           <div class="parrow"><span class="pa">→</span><span class="pl">at the hook</span></div>
           <div class="pstep"><div class="pk">Run</div><div class="pv">ubpf_exec → verdict</div></div>
         </div>
-      </div>
-
-      <div class="codecap"><span class="em">What the hook hands the shield</span>
-        <span class="tiny">— <code>ctx</code>'s type. The build's hook-point map defines it; the shield may read these fields and nothing else.</span></div>
-      <pre class="code"><span class="cm">// ls_ctx — the typed context this hook exposes. This IS the shield's</span>
-<span class="cm">// whole world: five fields describing one frame. No pointers out, no</span>
-<span class="cm">// other memory. (A TLS hook would hand over a different ctx.)</span>
-struct ls_ctx {
-    uint16_t opcode;       <span class="cm">// the field the synthetic CVE abuses</span>
-    uint16_t payload_len;  <span class="cm">// declared length from the frame header</span>
-    uint32_t avail_len;    <span class="cm">// bytes actually buffered</span>
-    uint32_t mode;         <span class="cm">// host-supplied: 1 = monitor, 2 = enforce</span>
-    uint8_t  head[16];     <span class="cm">// first payload bytes, for richer predicates</span>
-};</pre>
-
-      <div class="codecap"><span class="em">This is the shield</span>
-        <span class="tiny">— the whole thing. It's <code>ls_shield.c</code> → <code>shield.bpf.o</code>, the first two pipeline stages above.</span></div>
-      <pre class="code"><span class="cm">// ls_shield.c — a complete Live Shield. Compiled with clang -target bpf,</span>
-<span class="cm">// this ~6 lines becomes shield.bpf.o, the bytecode that flows through the</span>
-<span class="cm">// pipeline above. A shield is just a function: read ctx, return a verdict.</span>
-uint64_t <span class="hl">ls_decision</span>(struct ls_ctx *ctx)   <span class="cm">// ctx = the frame's fields</span>
-{
-    if (ctx-&gt;opcode &gt;= 4)                  <span class="cm">// the SIRT predicate: never a valid opcode</span>
-        return ctx-&gt;mode == ENFORCE ? 2    <span class="cm">// 2 = matched → host DROPs</span>
-                                    : 1;   <span class="cm">// 1 = matched, monitor → host passes</span>
-    return 0;                              <span class="cm">// 0 = PASS — not the attack, forward it</span>
-}</pre>
-
-      <div class="codecap"><span class="em">This is the host (TMM)</span>
-        <span class="tiny">— it calls the shield at the hook and acts on the return. The last two pipeline stages.</span></div>
-      <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
-<span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
-struct ls_ctx ctx = { .opcode = op, .payload_len = len };  <span class="cm">// pack the frame into ctx</span>
-uint64_t ret = 0;
-<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// ← runs ls_decision() above, over ctx</span>
-<span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
-<span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
-
-      <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">What is <code>ctx</code>?</span>
-        <p>Short for <strong>context</strong> — the program's entire view of the world. At each hook the host
-           packs the relevant facts into a small, <em>typed</em> struct (here: the frame's opcode, its length, a
-           few header bytes) and hands the VM a pointer to it. The shield reads <code>ctx</code>, decides, and
-           returns a number. It <strong>can't reach anything else</strong> — not other connections, not host
-           memory, not the disk — only the fields this hook chose to expose. That narrowness is doing real work:
-           it's half of why the verifier can <em>prove</em> the program safe (bounded reads over a known struct),
-           and it's the <strong>context minimization</strong> the security model leans on — a probe sees only
-           what its hook grants, and sensitive fields (TLS secrets, payloads) are withheld unless separately
-           authorized. Different hook, different <code>ctx</code>: a TLS hook exposes handshake fields, an
-           HTTP/2 hook exposes stream counts — always described by the build's typed hook-point map.</p>
       </div>
 
       <h3 style="margin-top:var(--s5); font-size:1.2rem">How <code>ctx</code> relates to a CVE</h3>
