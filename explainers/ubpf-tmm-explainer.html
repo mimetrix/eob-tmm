@@ -1097,6 +1097,26 @@ uint64_t ret = 0;
           <p>The decision leaves the build and becomes verified, swappable data you can load into a live,
              kernel-bypassing data plane — in hours, provably unable to crash it.</p></div>
       </div>
+
+      <div class="callout" style="margin-top:var(--s5)">
+        <span class="lbl">And it's smaller than it looks — no helpers, stock verifier</span>
+        <p>Look again at the shield: it <strong>calls nothing</strong>. It reads <code>ctx</code> and returns a
+          number — the host does all the rest (counts hits, keeps the ring, applies the verdict). Everything on
+          this page — shields <em>and</em> tracepoints — is that shape. Two hard parts you'd expect simply aren't
+          there:</p>
+        <p>• <strong>No helper functions.</strong> In eBPF, "helpers" are the calls a program makes back into the
+          host — the surface you'd have to design, register, and lock down. A pure <code>ctx</code>→verdict
+          program has none, so there's nothing to build or confine: it's <strong>sandboxed by construction</strong>.
+          <br>• <strong>No verifier to extend.</strong> A bounded check over a typed struct is the textbook case
+          the verifier already proves — so <strong>PREVAIL is used as-is</strong>. You describe the <code>ctx</code>
+          layout; you don't modify the verifier.</p>
+        <p>Anything stateful (a rate, a timestamp, a cross-flow counter) the host computes and drops into
+          <code>ctx</code>. Richer programs that manipulate host state directly — via helpers — are an
+          <em>optional, later</em> tier, not a prerequisite. The whole Live-Shield-plus-tracepoint substrate is
+          buildable without either. And a new tracepoint is just <em>define a <code>ctx</code>, place a hook,
+          publish it</em> — so the team can grow the instrumentation surface incrementally, USDT-style, in normal
+          releases.</p>
+      </div>
     </div>
   </section>
 

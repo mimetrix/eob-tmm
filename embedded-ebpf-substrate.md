@@ -86,7 +86,7 @@ Both patterns reuse the same machinery — signing + RBAC, context minimization,
 
 ## 4. Candidate hook points — observability & active datapath
 
-This is the differentiated engineering asset: *where* in TMM a hook earns its keep. Below are candidate points by data-path stage, in both modes. (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per §11.)
+This is the differentiated engineering asset: *where* in TMM a hook earns its keep. Below are candidate points by data-path stage, in both modes. A concrete, named candidate set — with per-hook `ctx` fields and their observability/debug/RCA use — is proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md). (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per §11.)
 
 | Data-path stage | **Observe** (tracepoint) | **Active** (datapath control) | Why eBPF (what iRules / kernel eBPF miss) |
 |---|---|---|---|
