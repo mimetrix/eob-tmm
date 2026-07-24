@@ -403,22 +403,22 @@
     padding:.55rem .7rem; border-radius:7px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border)}
   .surf.new .reach{background:var(--surface); color:var(--accent-ink); border-color:var(--accent)}
 
-  /* pipeline */
-  .pipescroll{overflow-x:auto; margin-top:var(--s4); padding-bottom:.5rem}
-  .pipe{display:flex; align-items:stretch; gap:0; min-width:min-content; padding-right:var(--s3)}
+  /* pipeline — always fits its width (shrinks to fit, never scrolls) */
+  .pipescroll{margin-top:var(--s4)}
+  .pipe{display:flex; align-items:stretch; gap:0}
   .pstep{background:var(--surface); border:1px solid var(--border); border-radius:8px;
-    padding:.85rem 1rem; min-width:8.5rem; flex:0 0 auto}
-  .pstep .pk{font-family:var(--font-mono); font-size:.66rem; letter-spacing:.09em;
-    text-transform:uppercase; color:var(--muted)}
-  .pstep .pv{font-family:var(--font-mono); font-size:.82rem; margin-top:.3rem; color:var(--text)}
-  .parrow{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:0 .7rem; color:var(--muted)}
-  .parrow .pa{font-size:1.1rem; line-height:1} .parrow .pl{font-family:var(--font-mono); font-size:.6rem; margin-top:.2rem; white-space:nowrap}
-  /* stack the pipeline vertically on narrower panels so nothing is clipped */
-  @media(max-width:900px){
-    .pipescroll{overflow-x:visible}
-    .pipe{flex-direction:column; align-items:stretch; min-width:0; padding-right:0}
-    .pstep{min-width:0; width:100%}
+    padding:.7rem .75rem; flex:1 1 0; min-width:0}
+  .pstep .pk{font-family:var(--font-mono); font-size:.62rem; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--muted); overflow-wrap:anywhere}
+  .pstep .pv{font-family:var(--font-mono); font-size:.76rem; margin-top:.3rem; color:var(--text); overflow-wrap:anywhere}
+  .parrow{flex:0 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:0 .35rem; color:var(--muted); min-width:0}
+  .parrow .pa{font-size:1rem; line-height:1} .parrow .pl{font-family:var(--font-mono); font-size:.56rem;
+    margin-top:.2rem; text-align:center; overflow-wrap:anywhere}
+  /* stack the pipeline vertically on narrower panels so nothing is cramped */
+  @media(max-width:820px){
+    .pipe{flex-direction:column; align-items:stretch}
+    .pstep{width:100%; flex:0 0 auto}
     .parrow{flex-direction:row; gap:.5rem; padding:.45rem 0}
     .parrow .pa{transform:rotate(90deg)} .parrow .pl{margin-top:0}
   }
