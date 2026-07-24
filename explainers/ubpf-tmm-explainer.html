@@ -990,6 +990,19 @@
         </div>
       </div>
 
+      <div class="codecap"><span class="em">What the hook hands the shield</span>
+        <span class="tiny">— <code>ctx</code>'s type. The build's hook-point map defines it; the shield may read these fields and nothing else.</span></div>
+      <pre class="code"><span class="cm">// ls_ctx — the typed context this hook exposes. This IS the shield's</span>
+<span class="cm">// whole world: five fields describing one frame. No pointers out, no</span>
+<span class="cm">// other memory. (A TLS hook would hand over a different ctx.)</span>
+struct ls_ctx {
+    uint16_t opcode;       <span class="cm">// the field the synthetic CVE abuses</span>
+    uint16_t payload_len;  <span class="cm">// declared length from the frame header</span>
+    uint32_t avail_len;    <span class="cm">// bytes actually buffered</span>
+    uint32_t mode;         <span class="cm">// host-supplied: 1 = monitor, 2 = enforce</span>
+    uint8_t  head[16];     <span class="cm">// first payload bytes, for richer predicates</span>
+};</pre>
+
       <div class="codecap"><span class="em">This is the shield</span>
         <span class="tiny">— the whole thing. It's <code>ls_shield.c</code> → <code>shield.bpf.o</code>, the first two pipeline stages above.</span></div>
       <pre class="code"><span class="cm">// ls_shield.c — a complete Live Shield. Compiled with clang -target bpf,</span>
