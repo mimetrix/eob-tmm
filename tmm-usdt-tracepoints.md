@@ -21,6 +21,8 @@ The reason a rich catalog is affordable:
 > `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. Same grammar authors a `filter`
 > shield by swapping the action verb — observe and enforce share the machinery (substrate §6.1).
 
+**Two companion utilities.** `tmmtrace` is the *summary* consumer — bpftrace-for-TMM: counters, histograms, predicates, shields. `tmmdump` (proposed) is the *capture* consumer — tcpdump-for-TMM: it streams a bounded window of the **actual bytes** at a hook off the box, the only viable tap for a kernel-bypassed data plane (§10.6). One summarizes, one captures; both are thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
+
 ## 2. Conventions
 
 - **Naming:** `tmm:<stage>:<event>` — e.g. `tmm:l4:conn_state`, `tmm:bd:request_eval`, `tmm:rt:poll_stall`.
@@ -121,6 +123,30 @@ A narrowly-scoped observe program targeting the *exact* hook + condition behind 
 
 ### 10.5 Combined play — enforce **and** capture
 Pair a `filter` shield with a flight recorder on the *same* condition (e.g. `tmm:l7:parse_error`): the malformed frame is **dropped** (data plane survives) *and* the run-up into the blocked attempt is **captured**. Every block becomes an intelligence source for SIRT, and it directly answers "how do you know the shield catches real attacks and isn't breaking legit traffic?" (Worked in the prototype: `LS_FLIGHTREC=1`.)
+
+### 10.6 Targeted data capture / streaming — `tmmdump`
+Sometimes you don't want a summary, you want **the actual bytes** traversing the proxy. Standard capture (tcpdump, SPAN, tc/XDP) is **blind to TMM's kernel-bypassed fast path** — the packets never enter the kernel. The only viable tap is **in-process, where the VM already sits.** But the single-threaded, core-pinned poll loop forbids bulk work inline, so the division of labor is strict:
+
+> **The VM selects. The host streams. Nothing blocks the poll loop.**
+
+- **Select inline (cheap, verified).** The program matches the target — a 5-tuple, tenant, hook, or predicate — and signals "capture this." Tiny and bounded; it is *not* the pipe.
+- **Bounded copy.** The host copies a **window** — headers, first *N* bytes, or one field (a *byte-window* `ctx`) — into a per-CPU ring. Not full payloads by default.
+- **Drain off-loop.** A separate, lower-priority path serializes the ring to the sink, using cycles only when the data plane has them.
+- **Drop, don't block.** Under sink pressure, **drop samples and count the drops** — never stall forwarding for observability.
+
+Levers that keep it tractable: **target** (one flow, not all), **sample** (1-in-*N* under load), **window** (bounded bytes), **redact** (context minimization). Dark-until-lit; full-fidelity capture of all flows at line rate is a measured-budget decision (design §11), and traffic offloaded to ePVA/FPGA isn't in software to capture (design §10).
+
+**Payoff:** in-process at L7 means **decrypted** application data — post-TLS content no wire tap can give you without the keys — which is also why it sits at the **strictest authorization tier**: signed, RBAC-gated, redact-by-default, time-boxed, one-way audited sink (substrate §6.3). "Vendor streams my decrypted traffic" is a non-starter *without* that governance.
+
+**`tmmdump`** is the proposed utility — `tmmtrace : bpftrace :: tmmdump : tcpdump`, both over the in-process VM:
+
+```
+tmmdump --hook tmm:l7:http_request --filter 'args.method == POST' --snap 256 --ttl 5m --sink file
+tmmdump --flow 10.0.0.5:443 --decrypted --snap 512      # decrypted L7 — strict authz tier
+tmmdump --hook tmm:tls:record --headers-only            # bounded window, no payload
+```
+
+The VM program is the **selector** (verified inline); `tmmdump` (the host) owns the bounded copy + off-loop export. It is deliberately distinct from `tmmtrace`'s scalar summaries — heavier, governed, capture-oriented. *(Proposed; the prototype's shm-backed `head[]` ring is the reduction-to-practice kernel of the copy-and-drain path.)*
 
 ---
 

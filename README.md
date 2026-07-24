@@ -99,7 +99,7 @@ resource governance — lives *around* the VM (substrate §6, design §8).
 | [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) | The Live Shield design — threat model, hook-point map, modes, and trust/validation lifecycle (signing, verify-before-load, auto-retirement) |
 | [`prototype/`](prototype/) | **minimm** — a "mini-TMM" relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
 | [`prototype/tmmtrace`](prototype/tmmtrace) | **tmmtrace** — a bpftrace-style front-end to the embedded VM: one grammar spanning observe (tracepoint) and filter (CVE shield), with compile → verify → run |
-| [`explainers/`](explainers/) | Visual explainers (HTML): the substrate mechanism; and the AI-authored-shield pipeline — CVE → verified, signed, auto-retiring shield (story + interactive demo) |
+| [`explainers/`](explainers/) | Visual explainers (HTML) — start at [`index.html`](explainers/index.html): the substrate mechanism; the TMM tracepoint catalog; and the AI-authored-shield pipeline (story + interactive demo) |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
 
 ## Prototype at a glance

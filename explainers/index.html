@@ -1,0 +1,107 @@
+<style>
+  :root{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa;
+    --border:#d3dbe3; --border-strong:#b7c2cd; --text:#152029; --muted:#576673;
+    --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170; --amber-ink:#7d5210;
+    --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c; --border:#233039; --border-strong:#3a4c5c;
+    --text:#e7eef4; --muted:#8c9aa8; --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee; --amber-ink:#f0c983;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a0f14; --surface:#111922; --surface-2:#0e151c; --border:#233039; --border-strong:#3a4c5c;
+    --text:#e7eef4; --muted:#8c9aa8; --accent:#2cc5d6; --accent-bg:#0e2a30; --accent-ink:#8fe4ee; --amber-ink:#f0c983;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f7fa; --border:#d3dbe3; --border-strong:#b7c2cd;
+    --text:#152029; --muted:#576673; --accent:#0b8ea0; --accent-bg:#e0f2f5; --accent-ink:#076170; --amber-ink:#7d5210;
+  }
+  *{box-sizing:border-box} body{margin:0}
+  .page{min-height:100vh; background:var(--bg); color:var(--text); font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; position:relative; overflow-x:hidden}
+  .page::before{content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:44px 44px; opacity:.35;
+    -webkit-mask-image:radial-gradient(130% 80% at 50% 0%,#000,transparent 72%);
+            mask-image:radial-gradient(130% 80% at 50% 0%,#000,transparent 72%)}
+  .wrap{position:relative; z-index:1; width:100%; max-width:64rem; margin:0 auto; padding:clamp(2.5rem,6vw,4.5rem) clamp(1.1rem,4vw,2.5rem);
+    flex:1; display:flex; flex-direction:column; justify-content:center}
+
+  .eyebrow{font-family:var(--font-mono); font-size:.72rem; font-weight:600; letter-spacing:.19em;
+    text-transform:uppercase; color:var(--accent-ink); margin:0 0 1.1rem}
+  h1{font-size:clamp(2rem,5vw,3.3rem); font-weight:680; letter-spacing:-.022em; margin:0; line-height:1.08; text-wrap:balance; max-width:24ch}
+  h1 em{font-style:normal; color:var(--accent-ink)}
+  .lede{font-size:clamp(1.05rem,1.9vw,1.28rem); color:var(--muted); max-width:52rem; margin-top:1.3rem; line-height:1.5}
+  .lede b{color:var(--text); font-weight:600}
+
+  .grid{display:grid; gap:1rem; margin-top:clamp(2rem,4vw,3rem); grid-template-columns:1fr}
+  @media(min-width:720px){.grid{grid-template-columns:1fr 1fr}}
+  .tile{display:flex; flex-direction:column; gap:.5rem; text-decoration:none; color:inherit;
+    background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:1.4rem 1.5rem;
+    transition:border-color .15s,transform .1s,box-shadow .15s}
+  .tile:hover{border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px -14px var(--accent)}
+  .tile:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+  .tile.feature{border-left:3px solid var(--accent)}
+  .tcat{font-family:var(--font-mono); font-size:.64rem; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-ink)}
+  .ttitle{font-size:1.18rem; font-weight:660; letter-spacing:-.01em; display:flex; align-items:center; gap:.5rem}
+  .ttitle .ar{color:var(--muted); transition:transform .15s}
+  .tile:hover .ttitle .ar{transform:translateX(3px); color:var(--accent-ink)}
+  .tdesc{font-size:.92rem; color:var(--muted); line-height:1.5}
+  .tmeta{margin-top:.2rem; font-family:var(--font-mono); font-size:.66rem; color:var(--muted); letter-spacing:.03em}
+  .tmeta.live{color:var(--accent-ink)}
+
+  .foot{position:relative; z-index:1; border-top:1px solid var(--border); padding:1.3rem clamp(1.1rem,4vw,2.5rem);
+    font-family:var(--font-mono); font-size:.72rem; color:var(--muted); text-align:center; letter-spacing:.02em}
+  .foot b{color:var(--text)}
+  @media (prefers-reduced-motion:reduce){.tile{transition:none} .tile:hover{transform:none}}
+</style>
+
+<div class="page">
+  <div class="wrap">
+    <p class="eyebrow">F5 TMM · embedded userspace eBPF · a design proposal</p>
+    <h1>A verified, in-data-plane <em>programmability surface</em> for TMM.</h1>
+    <p class="lede">TMM runs its own stack and bypasses the kernel — which makes it powerful and nearly
+      impossible to instrument from outside. Embed a small, <b>verified</b> eBPF VM <em>inside</em> it and you get
+      a third programmability surface: <b>observe</b> internal state, and <b>enforce</b> surgical CVE mitigations —
+      loadable in hours, provably unable to crash the box. Four explainers, start anywhere:</p>
+
+    <div class="grid">
+      <a class="tile feature" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
+        <span class="tcat">Start here · the mechanism</span>
+        <span class="ttitle">The embedded-eBPF substrate <span class="ar">→</span></span>
+        <span class="tdesc">Why TMM is a hard target, why kernel eBPF can't reach it, and what embedding the VM buys —
+          compile-in vs. load-as-bytecode, two planes, three form factors, no helpers / stock verifier.</span>
+        <span class="tmeta">interactive · ~10 min</span>
+      </a>
+
+      <a class="tile" href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3">
+        <span class="tcat">Observe · debug · RCA</span>
+        <span class="ttitle">The TMM tracepoint catalog <span class="ar">→</span></span>
+        <span class="tdesc">A proposed set of designed-in tracepoints laid over the data path — click any to see the
+          <code>ctx</code> it exposes and the root-cause signal it unlocks. Plus the flight-recorder / capture patterns.</span>
+        <span class="tmeta">interactive map</span>
+      </a>
+
+      <a class="tile" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">
+        <span class="tcat">Enforce · the AI angle</span>
+        <span class="ttitle">AI-authored shields — the story <span class="ar">→</span></span>
+        <span class="tdesc">CVE in, verified-signed-auto-retiring shield out. Why a static verifier is what makes machine
+          authorship of inline data-plane code safe — blast radius bounded by proof, not trust.</span>
+        <span class="tmeta">~8 min read</span>
+      </a>
+
+      <a class="tile" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">
+        <span class="tcat">Enforce · try it</span>
+        <span class="ttitle">Run the pipeline <span class="ar">→</span></span>
+        <span class="tdesc">Push a CVE through the closed loop — predicate → one-liner → verify → replay → false-positive →
+          sign → deploy. One passes clean, one self-corrects, one is declared un-shieldable.</span>
+        <span class="tmeta live">interactive demo</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="foot"><b>A proposal, not a shipped feature.</b> A working prototype (<code>minimm</code> · <code>tmmtrace</code>)
+    proves the core mechanism; detailed method &amp; claims live in a separate invention disclosure.</div>
+</div>

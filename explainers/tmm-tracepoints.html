@@ -265,6 +265,12 @@
           <p>Pair a filter shield with a recorder on the same condition: the malformed frame is dropped (box
              survives) <em>and</em> the run-up into the blocked attempt is captured. Every block feeds SIRT.</p>
           <div class="uses">tmm:l7:parse_error ◆ + flight recorder</div></div>
+        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">Pattern 06 · tmmdump</span><h3>Targeted data capture / streaming</h3>
+          <p>The <em>actual bytes</em>, not a summary — the one tap a kernel-bypassed data plane allows. The VM
+             <strong>selects</strong> (a flow, a condition); the host streams a bounded window <strong>off the
+             poll loop</strong>, drop-not-block. In-process at L7 → <strong>decrypted</strong> payload no wire tap
+             can give you (strictest authz tier). <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code>.</p>
+          <div class="uses">tmmdump --flow 10.0.0.5:443 --decrypted --snap 512</div></div>
       </div>
     </div>
   </section>
@@ -293,7 +299,8 @@
     <div class="wrap">Related in this series:
       <a href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">the embedded-eBPF substrate</a>
       · <a href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the pipeline</a>
-      · <a href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>.</div>
+      · <a href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>
+      · <a href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here (index)</a>.</div>
     <div class="wrap" style="margin-top:.7rem">Proposal explainer · from <code>tmm-usdt-tracepoints.md</code>.
       Field lists illustrative; exact hook placement + <code>ctx</code> set against TMM source per build.</div>
   </footer>
