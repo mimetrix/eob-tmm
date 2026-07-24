@@ -241,7 +241,7 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">From signal to capability</p>
-      <h2>Five patterns that turn tracepoints into RCA features — plus a capture companion</h2>
+      <h2>Five patterns that turn tracepoints into RCA features</h2>
       <p class="lede" style="margin-top:var(--s3)">The catalog is raw signal. These reusable shapes turn it into
         named capabilities — each built from the same observe machinery, no helpers, no verifier work.</p>
       <div class="rca">
@@ -265,12 +265,28 @@
           <p>Pair a filter shield with a recorder on the same condition: the malformed frame is dropped (box
              survives) <em>and</em> the run-up into the blocked attempt is captured. Every block feeds SIRT.</p>
           <div class="uses">tmm:l7:parse_error ◆ + flight recorder</div></div>
-        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">Companion tool · tmmdump <span style="color:var(--amber-ink)">(proposed)</span></span><h3>Targeted data capture / streaming</h3>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPANION TOOLS -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">Two ways to consume a tracepoint</p>
+      <h2>Summarize it, or capture it</h2>
+      <p class="lede" style="margin-top:var(--s3)">Same tracepoints, two thin front-ends over the embedded VM —
+        one <em>aggregates</em>, one <em>streams the actual bytes</em>. The tcpdump-to-bpftrace pairing, for a
+        kernel-bypassed data plane: <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code>.</p>
+      <div class="rca" style="grid-template-columns:repeat(auto-fit,minmax(18rem,1fr))">
+        <div class="rcard"><span class="ri">tmmtrace · working prototype</span><h3>Summarize — bpftrace-for-TMM</h3>
+          <p>A one-liner counts, histograms, or predicates over <code>ctx</code>; the same grammar authors a shield
+             by swapping the action verb. The summary-and-decision consumer — and the one that runs today.</p>
+          <div class="uses">tmmtrace run 'tmm:l7:http2_frame { @ = hist(args.n_streams); }'</div></div>
+        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">tmmdump · proposed</span><h3>Capture — tcpdump-for-TMM</h3>
           <p>The <em>actual bytes</em>, not a summary — the one tap a kernel-bypassed data plane allows. The VM
-             <strong>selects</strong> (a flow, a condition); the host streams a bounded window <strong>off the
-             poll loop</strong>, drop-not-block. In-process at L7 → <strong>decrypted</strong> payload no wire tap
-             can give you (strictest authz tier). <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code> — where
-             <code>tmmtrace</code> is the working prototype and <code>tmmdump</code> is proposed.</p>
+             <strong>selects</strong> (a flow, a condition); the host streams a bounded window <strong>off the poll
+             loop</strong>, drop-not-block. In-process at L7 → <strong>decrypted</strong> payload no wire tap can
+             give you, at the strictest authz tier.</p>
           <div class="uses">tmmdump --flow 10.0.0.5:443 --decrypted --snap 512</div></div>
       </div>
     </div>
