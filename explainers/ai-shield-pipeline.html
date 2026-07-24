@@ -324,6 +324,16 @@
           <p>Crash-before-the-first-hook, hardware-offloaded fast path, or no clean abort branch → the classifier
             emits <strong>NON-MITIGABLE → engineering hotfix</strong>, instead of shipping an unsafe half-measure.</p></div>
       </div>
+      <div class="callout">
+        <span class="lbl">The same fact, two sides — and the real asset</span>
+        <p>A shield exists <em>only</em> because the field that reveals the exploit is already exposed by a hook:
+          the field it hands over (say <code>ctx.opcode</code>) and the condition the CVE abuses
+          (<code>opcode ≥ 4</code>) are one fact seen from two sides. So <strong>designing the hook contexts richly
+          and early is what makes whole future CVE classes catchable</strong> — the hook-point map, not any single
+          shield, is the real asset. One caveat: if the discriminating field is sensitive (only in decrypted
+          payload), exposing it is also an authorization decision — "is it shieldable?" and "may the probe see what
+          it needs?" are the same question.</p>
+      </div>
     </div>
   </section>
 

@@ -101,9 +101,8 @@
       <p class="eyebrow">A design proposal · deep dive</p>
       <h1>Anatomy of a shield — <em>read <code>ctx</code>, return a verdict.</em></h1>
       <p class="lede">The companion deep-dive to the substrate explainer. A shield is a tiny function — this walks
-        it end to end: what the hook hands it, the shield itself, the host that calls it, the compile → verify →
-        load pipeline, and how the shape of <code>ctx</code> decides which CVEs are even shieldable. No prior eBPF
-        needed.</p>
+        it end to end: what the hook hands it, the shield itself, the host that calls it, and the compile → verify →
+        load pipeline. Just the eBPF technology — no prior eBPF needed.</p>
     </div>
   </header>
 
@@ -149,7 +148,7 @@
       <pre class="code"><span class="cm">// ls_ctx — the typed context this hook exposes: five fields describing</span>
 <span class="cm">// one frame. (A different hook — TLS, HTTP/2 — hands over a different ctx.)</span>
 struct ls_ctx {
-    uint16_t opcode;       <span class="cm">// the field the synthetic CVE abuses</span>
+    uint16_t opcode;       <span class="cm">// the field the example shield checks</span>
     uint16_t payload_len;  <span class="cm">// declared length from the frame header</span>
     uint32_t avail_len;    <span class="cm">// bytes actually buffered</span>
     uint32_t mode;         <span class="cm">// host-supplied: 1 = monitor, 2 = enforce</span>
@@ -235,39 +234,6 @@ uint64_t ret = 0;
           — you describe the <code>ctx</code> layout, you don't modify the verifier. Anything stateful (a rate, a
           timestamp, a cross-flow counter) the host computes and drops into <code>ctx</code>. Helpers — letting the
           program touch host state directly — are an <em>optional, later</em> tier, not a prerequisite.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTX ↔ CVE -->
-  <section class="band">
-    <div class="wrap">
-      <p class="eyebrow">The hinge</p>
-      <h2>How <code>ctx</code> decides which CVEs are shieldable</h2>
-      <p class="muted" style="margin-top:var(--s3); max-width:44rem; font-size:1.05rem">A shield can only stop what
-        <code>ctx</code> lets it see. So the field the hook exposes and the condition the CVE makes dangerous are
-        the <strong>same fact from two sides</strong>:</p>
-
-      <div class="dflow" style="margin-top:var(--s3)">
-        <span class="dnode"><b>ctx.opcode</b> — the field the hook exposes</span>
-        <span class="darrow">⟷</span>
-        <span class="dnode vm"><b>opcode ≥ 4</b> — the condition the CVE abuses</span>
-      </div>
-      <p class="muted" style="margin-top:.75rem; max-width:44rem; font-size:.92rem; font-family:var(--font-mono)">
-        the shield is just: <span style="color:var(--accent-ink)">if (ctx.opcode ≥ 4) drop()</span> — it exists
-        only because the field that reveals the exploit is in the context.</p>
-
-      <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">The shieldability rule</span>
-        <p>A CVE is shieldable at a hook <em>only if</em> that hook runs <strong>before</strong> the vulnerable
-           operation <strong>and</strong> its <code>ctx</code> exposes the field(s) that tell the exploit apart.
-           If no hook's <code>ctx</code> can express the condition, the CVE isn't runtime-shieldable — that's the
-           residual dead zone, and it needs an engineering fix (an AI pipeline would flag it
-           <em>non-mitigable</em>). The flip side is the opportunity: <strong>designing <code>ctx</code> richly
-           and early is what makes whole future CVE classes catchable</strong> — which is why the hook-point map,
-           not any single shield, is the real asset. One caveat — if the discriminating field is sensitive
-           (say it only shows in decrypted payload), exposing it in <code>ctx</code> is also an authorization
-           decision, so "is it shieldable?" and "may the probe see what it needs?" are the same question.</p>
       </div>
     </div>
   </section>
