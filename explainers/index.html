@@ -44,9 +44,14 @@
 
   .grid{display:grid; gap:1rem; margin-top:clamp(2rem,4vw,3rem); grid-template-columns:1fr}
   @media(min-width:720px){.grid{grid-template-columns:1fr 1fr}}
-  .tile{display:flex; flex-direction:column; gap:.5rem; text-decoration:none; color:inherit;
+  .tile{position:relative; display:flex; flex-direction:column; gap:.5rem; text-decoration:none; color:inherit;
     background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:1.4rem 1.5rem;
     transition:border-color .15s,transform .1s,box-shadow .15s}
+  .tnum{position:absolute; top:1.15rem; right:1.2rem; width:1.7rem; height:1.7rem; border-radius:50%;
+    border:1px solid var(--border-strong); color:var(--muted); font-family:var(--font-mono); font-size:.78rem;
+    font-weight:700; display:flex; align-items:center; justify-content:center}
+  .tile.feature .tnum{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-bg)}
+  .tile:hover .tnum{border-color:var(--accent); color:var(--accent-ink)}
   .tile:hover{border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 24px -14px var(--accent)}
   .tile:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
   .tile.feature{border-left:3px solid var(--accent)}
@@ -82,10 +87,11 @@
       <b>dynamically loadable and provably safe</b> — and TMM, which runs its own stack and bypasses the kernel,
       offers none from the outside. Embed a small <b>verified</b> eBPF VM <em>inside</em> it and you get exactly
       that. The same verifier is even what lets an <em>AI-authored</em> change be safe to run — machine-speed
-      adaptation for a machine-speed world. Five explainers, start anywhere:</p>
+      adaptation for a machine-speed world. Five explainers below — numbered as a reading path, but dip in anywhere:</p>
 
     <div class="grid">
       <a class="tile feature" style="grid-column:1 / -1" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
+        <span class="tnum">1</span>
         <span class="tcat">Start here · the mechanism</span>
         <span class="ttitle">The embedded-eBPF substrate <span class="ar">→</span></span>
         <span class="tdesc">Why TMM is a hard target, why kernel eBPF can't reach it, and what embedding the VM buys —
@@ -94,6 +100,7 @@
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">
+        <span class="tnum">2</span>
         <span class="tcat">Go deeper · the mechanism</span>
         <span class="ttitle">Anatomy of a shield <span class="ar">→</span></span>
         <span class="tdesc">A shield end to end — the <code>ctx</code> struct it reads, the ~6-line program, the host call, and
@@ -102,6 +109,7 @@
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3">
+        <span class="tnum">3</span>
         <span class="tcat">Observe · debug · RCA</span>
         <span class="ttitle">The TMM tracepoint catalog <span class="ar">→</span></span>
         <span class="tdesc">A proposed set of designed-in tracepoints laid over the data path — click any to see the
@@ -110,6 +118,7 @@
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">
+        <span class="tnum">4</span>
         <span class="tcat">Enforce · the AI angle</span>
         <span class="ttitle">AI-authored shields — the story <span class="ar">→</span></span>
         <span class="tdesc">CVE in, verified-signed-auto-retiring shield out. Why a static verifier is what makes machine
@@ -118,6 +127,7 @@
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">
+        <span class="tnum">5</span>
         <span class="tcat">Enforce · try it</span>
         <span class="ttitle">Run the pipeline <span class="ar">→</span></span>
         <span class="tdesc">Push a CVE through the closed loop — predicate → one-liner → verify → replay → false-positive →
