@@ -88,13 +88,15 @@
   <header class="head">
     <p class="kick">TMM engineering <span class="sep">·</span> technical brief <span class="sep">·</span> design proposal</p>
     <h1>A verified, in-data-plane programmability surface for TMM</h1>
-    <p class="thesis">Compute in the age of AI moves faster than the release cycle — software is discovered,
-      exploited, and iterated at machine speed, so the systems running it must adapt at <b>runtime</b>, not freeze
-      until the next build. Two requirements follow, and they are <b>co-equal</b>: <b>runtime security mitigation</b>
-      and <b>runtime programmability</b>. Both need the same thing TMM offers from nowhere outside — a data-plane
-      surface that is <b>dynamically loadable and provably safe</b>. Embed a verified userspace eBPF VM
-      (uBPF + PREVAIL) at designed-in hooks and you have it: <span class="m">observe</span> or
-      <span class="m">enforce</span>, loaded in hours, statically proven unable to hang or corrupt the poll loop.</p>
+    <p class="thesis">The AI age collapsed every delivery timeline — new data-plane capability, new instrumentation,
+      and urgent fixes are all expected in hours, not on the release train. Call it the <b>race to zero</b>. It
+      forces two <b>co-equal</b> requirements: <b>runtime security mitigation</b> (block a live threat in place, no
+      release) and <b>runtime programmability</b> (extend what the data plane <i>does</i> — new telemetry and
+      behavior — as verified bytecode against well-defined hooks). Both need one thing TMM offers from nowhere
+      outside: a data-plane surface that is <b>dynamically loadable and provably safe</b>. Embed a verified
+      userspace eBPF VM (uBPF + PREVAIL) at designed-in <b>USDT-style hook points</b> and you have it —
+      <span class="m">observe</span> or <span class="m">enforce</span>, installed in hours under a proof it can't
+      hang or corrupt the poll loop.</p>
     <div class="meta">
       <span><b>engine</b> uBPF (Apache-2.0, x86-64/arm64 JIT, ~150 KB)</span>
       <span><b>verifier</b> PREVAIL (eBPF-for-Windows; C++23)</span>
@@ -105,9 +107,10 @@
 
   <section class="blk lead">
     <div class="sh"><span class="sn">§1</span><span class="st">Problem → requirements</span></div>
-    <p>TMOS behavior ships on a release train. AI-speed discovery, exploitation, and iteration do not wait for it —
-      which opens an exposure-and-adaptation gap the quarterly cadence structurally cannot close. That single
-      reality forces two requirements, not separate wishes but two faces of "adapt the running data plane":</p>
+    <p>TMOS behavior ships on a release train; the AI age moved everything else to machine speed — new capability,
+      new instrumentation, and urgent fixes all expected in hours. Call it the <b>race to zero</b>: the gap between
+      needing the data plane to change and it changing must shrink toward nothing. It forces two co-equal
+      requirements — two faces of "adapt the running data plane":</p>
     <div class="reqs">
       <span class="lbl">forced by the reality →</span>
       <span class="req">runtime security mitigation</span>
@@ -119,8 +122,9 @@
         <div class="dd">Block a specific live threat <b>in place, in hours, with no release</b> — a surgical,
           reversible, vendor-signed control between maintenance windows. <span class="m">(Live Shield.)</span></div></div>
       <div class="duocol"><div class="dt">runtime programmability</div>
-        <div class="dd"><b>Observe, adapt, and extend</b> the running data plane on demand — deep in-TMM telemetry,
-          diagnostics, steering, self-tuning; new behavior as bytecode, no TMOS rev. <span class="m">(eob-for-TMM.)</span></div></div>
+        <div class="dd"><b>Extend what the data plane does</b> — new telemetry, diagnostics, steering, behavior — as
+          verified bytecode against <b>well-defined hook points (USDT-style)</b>, no TMOS rev. Proven-safe
+          installation is what makes it deployable inline. <span class="m">(eob-for-TMM.)</span></div></div>
     </div>
     <p class="note">The constraint is the crux: both need a surface that is <b>dynamically loadable AND provably
       safe</b>, reaching the <b>data plane's own code &amp; internal state</b>. iRules are event/data-model/reachability

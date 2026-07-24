@@ -73,21 +73,25 @@
   <div class="wrap">
     <p class="eyebrow">F5 TMM · embedded userspace eBPF · a design proposal</p>
     <h1>A verified, in-data-plane <em>programmability surface</em> for TMM.</h1>
-    <p class="lede" style="color:var(--text)"><b>Compute in the age of AI moves faster than the release cycle.
-      Software is discovered, exploited, and iterated at machine speed — so the systems running it have to be
-      adaptable at <em>runtime</em>, not frozen until the next build.</b></p>
+    <p class="lede" style="color:var(--text)"><b>The AI age collapsed every delivery timeline. New data-plane
+      capability, new instrumentation, and urgent fixes are all expected in hours now — not on the next release
+      train. Call it the <em>race to zero</em>: the gap between needing the data plane to change and it changing
+      has to shrink toward nothing.</b></p>
     <div class="derive">
       <span class="dl">that reality forces two requirements →</span>
       <span class="dchip">runtime security mitigation</span>
       <span class="plus">+</span>
       <span class="dchip">programmability</span>
     </div>
-    <p class="lede" style="margin-top:1.1rem">The first blocks a live threat in place, in hours, with no release;
-      the second observes, adapts, and extends the running data plane on demand. Both need one surface that is
-      <b>dynamically loadable and provably safe</b> — and TMM, which runs its own stack and bypasses the kernel,
-      offers none from the outside. Embed a small <b>verified</b> eBPF VM <em>inside</em> it and you get exactly
-      that. The same verifier is even what lets an <em>AI-authored</em> change be safe to run — machine-speed
-      adaptation for a machine-speed world. Five explainers below — numbered as a reading path, but dip in anywhere:</p>
+    <p class="lede" style="margin-top:1.1rem"><b>Security</b> is the half that's easy to picture: block a live
+      threat in place, in hours, with no release. <b>Programmability</b> is the equal half: extend what the running
+      data plane <em>does</em> — new telemetry, new logic, new behavior — delivered as verified bytecode against
+      well-defined hook points, with the installation itself proven safe. Both need one surface that is
+      <b>dynamically loadable and provably safe</b>, reaching the data plane's own code and state — which TMM, with
+      its own stack and kernel bypass, offers from nowhere outside. Embed a small <b>verified</b> eBPF VM
+      <em>inside</em> it, at designed-in hooks, and you have it. The same verifier even lets an <em>AI-authored</em>
+      change be safe to run — machine-speed delivery for a machine-speed world. Five explainers below — numbered as
+      a reading path, but dip in anywhere:</p>
 
     <div class="grid">
       <a class="tile feature" style="grid-column:1 / -1" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
