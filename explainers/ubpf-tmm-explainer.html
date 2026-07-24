@@ -1030,6 +1030,21 @@ uint64_t ret = 0;
 <span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
 <span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
 
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">Who defines <code>ctx</code>? TMM does — before any shield exists</span>
+        <p>Notice the ordering: the hook and its <code>ctx</code> are part of <strong>TMM's</strong> source, not
+           the shield's. They're designed in ahead of time and emitted in the signed, per-build hook-point map;
+           a shield is always written <em>against</em> a <code>ctx</code> that already exists — it consumes the
+           contract, it never defines it. And that <code>ctx</code> is a designed <strong>window onto state TMM
+           already holds</strong> at this point — the frame it's parsing, a connection's counters — a typed,
+           curated slice, <em>not</em> raw memory. That's what separates this from injection (no guessing a
+           struct's layout at some random function) and what lets a hook expose <code>opcode</code> while
+           withholding the TLS secret sitting right beside it. The consequence for mitigation is exact:
+           <strong>the distinguishing information has to already be in TMM's state at a hook that runs before the
+           vulnerable operation</strong> — if it is, a shield can read it through <code>ctx</code> and act; if
+           it isn't, there's nothing to write a shield against.</p>
+      </div>
+
       <p style="margin-top:var(--s5); max-width:44rem; font-size:1.05rem">That C source doesn't run as C. Here's
         the short path it travels to become a live decision at the hook — compiled, <strong>proven safe</strong>,
         loaded, run:</p>
