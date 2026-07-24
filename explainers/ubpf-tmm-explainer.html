@@ -840,7 +840,8 @@
         as data, passing a safety gate on the way in. Change the bytecode and you change what the box does, without
         touching the binary.</p>
       <p style="margin-top:var(--s4); font-size:1.05rem">And the shield itself is tiny: a pure function that reads
-        a curated context (<code>ctx</code>) and returns one of a few <strong>host-owned</strong> verdicts. It calls
+        a curated context (<code>ctx</code>, its input) and <strong>returns a code</strong> that picks one of a few
+        outcomes the <strong>host</strong> owns (PASS / DROP). It calls
         nothing — so there are <strong>no eBPF helpers</strong> to build or secure, and the verifier is used
         <strong>stock</strong>. Anything stateful, the host computes and hands in through <code>ctx</code>.</p>
       <div class="callout" style="margin-top:var(--s4)">
