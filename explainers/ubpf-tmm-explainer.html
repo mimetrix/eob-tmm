@@ -423,6 +423,11 @@
     .parrow .pa{transform:rotate(90deg)} .parrow .pl{margin-top:0}
   }
 
+  .codecap{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); margin-top:var(--s4); display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap}
+  .codecap .em{color:var(--accent-ink); font-weight:600}
+  .codecap .tiny{text-transform:none; letter-spacing:0; font-size:.9em; color:var(--muted)}
+  .codecap + pre.code{margin-top:.5rem}
   pre.code{overflow-x:auto; background:var(--surface); border:1px solid var(--border);
     border-radius:10px; padding:var(--s3) var(--s4); margin-top:var(--s4);
     font-family:var(--font-mono); font-size:.82rem; line-height:1.7}
@@ -982,13 +987,26 @@
         </div>
       </div>
 
+      <div class="codecap"><span class="em">This is the shield</span>
+        <span class="tiny">— the whole thing. It's <code>ls_shield.c</code> → <code>shield.bpf.o</code>, the first two pipeline stages above.</span></div>
+      <pre class="code"><span class="cm">// ls_shield.c — a complete Live Shield. Compiled with clang -target bpf,</span>
+<span class="cm">// this ~6 lines becomes shield.bpf.o, the bytecode that flows through the</span>
+<span class="cm">// pipeline above. A shield is just a function: read ctx, return a verdict.</span>
+uint64_t <span class="hl">ls_decision</span>(struct ls_ctx *ctx)   <span class="cm">// ctx = the frame's fields</span>
+{
+    if (ctx-&gt;opcode &gt;= 4)                  <span class="cm">// the SIRT predicate: never a valid opcode</span>
+        return ctx-&gt;mode == ENFORCE ? 2    <span class="cm">// 2 = matched → host DROPs</span>
+                                    : 1;   <span class="cm">// 1 = matched, monitor → host passes</span>
+    return 0;                              <span class="cm">// 0 = PASS — not the attack, forward it</span>
+}</pre>
+
+      <div class="codecap"><span class="em">This is the host (TMM)</span>
+        <span class="tiny">— it calls the shield at the hook and acts on the return. The last two pipeline stages.</span></div>
       <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
 <span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
-<span class="cm">// ctx = the "context": a small struct the host fills with the fields of</span>
-<span class="cm">//       the thing at this hook (here, one frame). It is all the program sees.</span>
-struct ls_ctx ctx = { .opcode = op, .payload_len = len };
+struct ls_ctx ctx = { .opcode = op, .payload_len = len };  <span class="cm">// pack the frame into ctx</span>
 uint64_t ret = 0;
-<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// run the shield over ctx</span>
+<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// ← runs ls_decision() above, over ctx</span>
 <span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
 <span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
 
