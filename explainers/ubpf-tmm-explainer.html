@@ -970,8 +970,11 @@
     <div class="wrap">
       <p class="eyebrow">Under the hood</p>
       <h2>How the bytecode gets there</h2>
-      <p class="lede" style="margin-top:var(--s3)">Linking <code>libubpf.a</code> is ordinary static linking.
-        What's different is that the <em>decision</em> arrives as data, later — and passes a safety gate on the way in.</p>
+      <p class="lede" style="margin-top:var(--s3)">Linking <code>libubpf.a</code> is ordinary static linking —
+        but on its own it <strong>does nothing</strong>. You've compiled in an empty engine: a VM with no program
+        to run. It sits inert until a shield's <em>bytecode</em> is loaded into it at runtime — <em>that's</em>
+        the decision, arriving as data, later, and passing a safety gate on the way in. Change the bytecode and
+        you change what the box does, without touching the binary.</p>
 
       <div class="pipescroll">
         <div class="pipe">
