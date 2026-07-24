@@ -814,7 +814,7 @@
 
       <div class="duality">
         <div class="dflow">
-          <span class="dnode">ctx (frame / state)</span>
+          <span class="dnode">ctx — the frame's fields</span>
           <span class="darrow">→</span>
           <span class="dnode vm">uBPF VM</span>
           <span class="darrow">→</span>
@@ -984,11 +984,27 @@
 
       <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
 <span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
+<span class="cm">// ctx = the "context": a small struct the host fills with the fields of</span>
+<span class="cm">//       the thing at this hook (here, one frame). It is all the program sees.</span>
 struct ls_ctx ctx = { .opcode = op, .payload_len = len };
 uint64_t ret = 0;
-<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// run the loaded shield</span>
+<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// run the shield over ctx</span>
 <span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
 <span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">What is <code>ctx</code>?</span>
+        <p>Short for <strong>context</strong> — the program's entire view of the world. At each hook the host
+           packs the relevant facts into a small, <em>typed</em> struct (here: the frame's opcode, its length, a
+           few header bytes) and hands the VM a pointer to it. The shield reads <code>ctx</code>, decides, and
+           returns a number. It <strong>can't reach anything else</strong> — not other connections, not host
+           memory, not the disk — only the fields this hook chose to expose. That narrowness is doing real work:
+           it's half of why the verifier can <em>prove</em> the program safe (bounded reads over a known struct),
+           and it's the <strong>context minimization</strong> the security model leans on — a probe sees only
+           what its hook grants, and sensitive fields (TLS secrets, payloads) are withheld unless separately
+           authorized. Different hook, different <code>ctx</code>: a TLS hook exposes handshake fields, an
+           HTTP/2 hook exposes stream counts — always described by the build's typed hook-point map.</p>
+      </div>
 
       <div class="split">
         <div class="pill2 pay"><div class="h">What you pay</div>
