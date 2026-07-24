@@ -101,7 +101,8 @@
   /* pipeline flow */
   .flow{margin-top:var(--s5); background:var(--surface); border:1px solid var(--border-strong);
     border-radius:14px; padding:var(--s4)}
-  .fstep{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start; padding:var(--s3) 0}
+  .fstep{display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--s3); align-items:start; padding:var(--s3) 0}
+  .fbody{min-width:0}
   .fstep+.fstep{border-top:1px solid var(--border)}
   .fnum{font-family:var(--font-mono); font-size:.78rem; font-weight:700; color:var(--accent-ink);
     background:var(--accent-bg); border:1px solid var(--accent); border-radius:7px; width:2.4rem; height:2.4rem;
@@ -111,12 +112,13 @@
   .fbody h3{margin-bottom:.25rem}
   .fbody p{font-size:.92rem; color:var(--muted)}
   .fbody .mono{font-family:var(--font-mono); font-size:.82rem; color:var(--accent-ink); margin-top:.4rem;
-    background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:.5rem .7rem; overflow-x:auto}
+    background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:.5rem .7rem;
+    overflow-wrap:anywhere; word-break:break-word}
   .floop{font-family:var(--font-mono); font-size:.74rem; color:var(--amber-ink); text-align:center;
     margin-top:var(--s3); padding-top:var(--s3); border-top:1px dashed var(--border-strong)}
 
-  .oracles{display:grid; gap:var(--s3); margin-top:var(--s4); grid-template-columns:1fr}
-  @media(min-width:720px){.oracles{grid-template-columns:repeat(3,1fr)}}
+  .oracles{display:grid; gap:var(--s3); margin-top:var(--s4); grid-template-columns:minmax(0,1fr)}
+  @media(min-width:720px){.oracles{grid-template-columns:repeat(3,minmax(0,1fr))}}
   .orc{border:1px solid var(--good); border-radius:10px; padding:var(--s3) var(--s4); background:var(--surface)}
   .orc .ok{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--good)}
   .orc h3{margin:.4rem 0 .35rem; font-size:1rem} .orc p{font-size:.9rem; color:var(--muted)}
