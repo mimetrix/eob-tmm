@@ -454,16 +454,6 @@
              brittle here risks taking the data plane down.</p>
         </div>
       </div>
-      <div class="callout">
-        <span class="lbl">The consequence</span>
-        <p>The usual tool for this — <strong>kernel eBPF</strong> — is <em>structurally</em> blind to TMM.
-           It's not a permissions problem you fix by running as root; the traffic never passes through the
-           place the kernel can watch.</p>
-        <div class="lane">
-          <div class="row"><span class="tag see">visible</span><b>Public highway</b> — kernel-mediated traffic. Kernel eBPF's cameras are here.</div>
-          <div class="row blind"><span class="tag no">invisible</span><b>TMM's private road</b> — bypasses the kernel. The cameras see nothing.</div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -547,11 +537,9 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">What this is actually for</p>
-      <h2>One box, two planes — and a CVE can land in either</h2>
-      <p class="lede" style="margin-top:var(--s3)">A motivating use case would be <strong>Live Shield</strong>:
-        a vendor-signed, auto-retiring mitigation that blocks a specific exploit path <em>between maintenance
-        windows</em> — until the patched build ships on the normal schedule. But BIG-IP isn't one machine.
-        It's two execution environments in one box, and each would need its own live-patch engine.</p>
+      <h2>One box, two planes</h2>
+      <p class="lede" style="margin-top:var(--s3)">BIG-IP isn't one machine — it's two execution environments in
+        one box, and each would need its own live-patch engine.</p>
 
       <div class="box">
         <span class="boxlabel">BIG-IP appliance</span>
