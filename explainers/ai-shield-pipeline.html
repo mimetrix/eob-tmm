@@ -135,6 +135,53 @@
   footer{border-top:1px solid var(--border); padding:var(--s5) 0; color:var(--muted);
     font-family:var(--font-mono); font-size:.74rem; letter-spacing:.03em}
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important; transition-duration:.001ms!important}}
+  /* shield registry */
+  .registry{margin-top:var(--s5); background:var(--surface); border:1px solid var(--border-strong);
+    border-radius:14px; overflow:hidden}
+  .reghead{display:flex; flex-wrap:wrap; gap:var(--s3); justify-content:space-between; align-items:flex-end;
+    padding:var(--s3) var(--s4); border-bottom:1px solid var(--border); background:var(--surface-2)}
+  .reghead .rt{font-family:var(--font-mono); font-size:.7rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted)}
+  .reghead .rv{font-size:.92rem; margin-top:.3rem}
+  .reghead .rv b{color:var(--accent-ink); font-variant-numeric:tabular-nums; font-weight:640}
+  .verbtns{display:flex; flex-wrap:wrap; gap:.4rem}
+  .verbtns button{font-family:var(--font-mono); font-size:.7rem; cursor:pointer;
+    border:1px solid var(--border-strong); background:var(--surface); color:var(--text);
+    padding:.45rem .7rem; border-radius:6px; transition:border-color .15s,color .15s,opacity .15s}
+  .verbtns button:hover:not(:disabled){border-color:var(--accent); color:var(--accent-ink)}
+  .verbtns button:disabled{opacity:.35; cursor:default}
+  .reglist{display:flex; flex-direction:column}
+  .srow{display:grid; grid-template-columns:1.5fr 1.7fr .8fr .9fr auto; gap:1rem; align-items:center;
+    padding:.9rem var(--s4); border-bottom:1px solid var(--border); font-size:.86rem;
+    transition:opacity .35s,background .35s}
+  .srow:last-child{border-bottom:0}
+  .srow.retired{opacity:.45; background:var(--surface-2)}
+  .srow .cve{font-weight:620; letter-spacing:-.01em}
+  .srow .sid{font-family:var(--font-mono); font-size:.66rem; color:var(--muted); margin-top:.15rem}
+  .srow .hook{font-family:var(--font-mono); font-size:.76rem; color:var(--muted); word-break:break-all}
+  .planetag{font-family:var(--font-mono); font-size:.58rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:.16em .45em; border-radius:4px; margin-top:.3rem; display:inline-block}
+  .planetag.data{background:var(--accent-bg); color:var(--accent-ink)}
+  .planetag.control{background:var(--surface); color:var(--muted); border:1px solid var(--border)}
+  .modechip{font-family:var(--font-mono); font-size:.66rem; padding:.2em .5em; border-radius:5px;
+    border:1px solid var(--border); color:var(--muted); white-space:nowrap}
+  .retire{font-family:var(--font-mono); font-size:.72rem; color:var(--muted); font-variant-numeric:tabular-nums}
+  .spill{font-family:var(--font-mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase;
+    padding:.32em .62em; border-radius:20px; white-space:nowrap; display:inline-flex; align-items:center; gap:.4rem}
+  .spill::before{content:""; width:6px; height:6px; border-radius:50%; background:currentColor}
+  .spill.enf{color:var(--good); border:1px solid var(--good)}
+  .spill.mon{color:var(--amber-ink); border:1px solid var(--amber)}
+  .spill.ret{color:var(--muted); border:1px solid var(--border-strong)}
+  .regfoot{padding:var(--s3) var(--s4); border-top:1px solid var(--border); background:var(--surface-2);
+    display:flex; flex-wrap:wrap; gap:var(--s3) var(--s5); align-items:center}
+  .budget{display:flex; align-items:center; gap:.7rem; font-family:var(--font-mono); font-size:.72rem; color:var(--muted)}
+  .bbar{width:130px; height:8px; border-radius:5px; background:var(--border); overflow:hidden}
+  .bbar i{display:block; height:100%; width:0; background:var(--accent); transition:width .35s}
+  .budget b{color:var(--text); font-variant-numeric:tabular-nums}
+  @media(max-width:760px){
+    .srow{grid-template-columns:1fr 1fr; gap:.55rem 1rem}
+    .srow .hookcell{grid-column:1 / -1}
+  }
 </style>
 
 <div class="page">
@@ -337,6 +384,67 @@
     </div>
   </section>
 
+  <!-- ===================== MANY SHIELDS AT ONCE ===================== -->
+  <section class="band">
+    <div class="wrap">
+      <p class="eyebrow">It's never just one</p>
+      <h2>Many open CVEs, many shields — loaded at once</h2>
+      <p class="lede" style="margin-top:var(--s3)">A box in the wild rarely faces a single CVE. So the
+        substrate wouldn't be one slot — it would hold a whole <strong>set</strong> of shields at once,
+        each keyed to its own CVE, at its own hook, in its own mode, retiring on its own schedule. One signed
+        catalog; one measured overhead budget. <em>Install a patched build below and watch only the matching
+        shields retire.</em></p>
+
+      <div class="registry" id="registry">
+        <div class="reghead">
+          <div>
+            <div class="rt">Live shield registry</div>
+            <div class="rv">Running build: <b id="runver">TMOS 17.5.0</b></div>
+          </div>
+          <div class="verbtns" id="verbtns" role="group" aria-label="Install a patched build"></div>
+        </div>
+        <div class="reglist" id="reglist"></div>
+        <div class="regfoot">
+          <div class="budget">Overhead budget
+            <span class="bbar"><i id="bbar"></i></span>
+            <span><b id="bnum">0</b> of 8 loaded</span>
+          </div>
+          <div class="budget" style="color:var(--muted)">verified ≠ free — the engine caps count &amp; total cost</div>
+        </div>
+      </div>
+      <p class="muted" style="font-size:.78rem; margin-top:var(--s2); font-family:var(--font-mono)">
+        CVE identifiers illustrative. One CVE (22548) matches the worked example in the design doc.</p>
+
+      <div class="cards">
+        <div class="card">
+          <span class="n">Independent lifecycle</span>
+          <h3>Each retires on its own version</h3>
+          <p>A shield would auto-disable the moment the running build crosses <em>its</em> <code>fixed_in_version</code>.
+             Patch one CVE and only that shield retires — the rest keep protecting. A partially-upgraded HA group
+             would retire per member.</p>
+        </div>
+        <div class="card">
+          <span class="n">Mixed modes &amp; planes</span>
+          <h3>Enforcing and soaking, side by side</h3>
+          <p>A control-plane auth-bypass shield can <em>enforce</em> while a data-plane parser shield <em>soaks</em>
+             in monitor — different modes, different planes, different engines, all in one registry.</p>
+        </div>
+        <div class="card">
+          <span class="n">Governed, not unlimited</span>
+          <h3>A budget, because verified ≠ cheap</h3>
+          <p>Each shield is a cheap call and an empty hook is one branch — but the engine still caps how many load
+             and their total overhead. Protection is a budget line, tracked and signed-off, not a free-for-all.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:var(--s4)">
+        <span class="lbl">Two shields, one hook</span>
+        <p>If two shields target the <em>same</em> hook point, the host runs them in a defined order and the
+           <strong>first <code>DROP</code> wins</strong> — fail-safe by construction. Composing mitigations never
+           produces a new control-flow effect; the host still owns every outcome.</p>
+      </div>
+    </div>
+  </section>
   <!-- limits -->
   <section class="band">
     <div class="wrap">
@@ -398,3 +506,67 @@
       held in a separate invention disclosure.</div>
   </footer>
 </div>
+
+<script>
+/* ---- shield registry: many CVEs loaded at once, independent retirement ---- */
+(function(){
+  var builds = ["17.5.0","17.5.1","17.5.2","17.6.0"];
+  var CAP = 8;
+  var shields = [
+    {cve:"CVE-2026-21990", id:"LS-2026-21990-httpd-01", plane:"control",
+     hook:"httpd_request_eval", mode:"ENFORCE", fixed:"17.5.1", desc:"config-utility RCE (httpd)"},
+    {cve:"CVE-2026-22548", id:"LS-2026-22548-bd-01", plane:"data",
+     hook:"bd_request_eval_decision", mode:"ENFORCE", fixed:"17.5.2", desc:"bd termination via crafted WAF request"},
+    {cve:"CVE-2026-23110", id:"LS-2026-23110-h2-01", plane:"data",
+     hook:"http2_frame_parse", mode:"ENFORCE", fixed:"17.5.2", desc:"malformed HTTP/2 frame crashes TMM"},
+    {cve:"CVE-2026-24001", id:"LS-2026-24001-tls-01", plane:"data",
+     hook:"tls_clienthello_parse", mode:"MONITOR", fixed:"17.6.0", desc:"record-layer anomaly — soaking"}
+  ];
+  var cur = 0;
+  var $ = function(id){ return document.getElementById(id); };
+  function cmp(a,b){ a=a.split("."); b=b.split(".");
+    for(var i=0;i<3;i++){ var d=(+a[i]||0)-(+b[i]||0); if(d) return d<0?-1:1; } return 0; }
+  function retired(s){ return cmp(builds[cur], s.fixed) >= 0; }
+
+  function rows(){
+    var list=$("reglist"); list.innerHTML="";
+    shields.forEach(function(s){
+      var ret=retired(s);
+      var st = ret ? {c:"ret",t:"retired · auto-disabled"} :
+               s.mode==="MONITOR" ? {c:"mon",t:"soaking"} : {c:"enf",t:"enforcing"};
+      var r=document.createElement("div");
+      r.className="srow"+(ret?" retired":"");
+      r.innerHTML =
+        '<div><div class="cve">'+s.cve+'</div><div class="sid">'+s.id+'</div></div>'+
+        '<div class="hookcell"><div class="hook">'+s.hook+'</div>'+
+          '<span class="planetag '+s.plane+'">'+(s.plane==="data"?"data plane · uBPF":"control plane · kernel eBPF")+'</span></div>'+
+        '<div><span class="modechip">'+s.mode+'</span></div>'+
+        '<div class="retire">↩ '+s.fixed+'</div>'+
+        '<div><span class="spill '+st.c+'">'+st.t+'</span></div>';
+      list.appendChild(r);
+    });
+  }
+  function foot(){
+    var active=shields.filter(function(s){return !retired(s);}).length;
+    $("bnum").textContent=active;
+    $("bbar").style.width=(active/CAP*100)+"%";
+  }
+  function verbtns(){
+    var box=$("verbtns"); box.innerHTML="";
+    builds.slice(1).forEach(function(v,i){
+      var idx=i+1;
+      var b=document.createElement("button");
+      b.type="button"; b.textContent = (cur>=idx?"✓ ":"▸ install ")+v;
+      b.disabled = cur>=idx;
+      b.addEventListener("click",function(){ if(cur<idx){ cur=idx; paint(); }});
+      box.appendChild(b);
+    });
+    var reset=document.createElement("button");
+    reset.type="button"; reset.textContent="⟲ reset"; reset.disabled=cur===0;
+    reset.addEventListener("click",function(){ cur=0; paint(); });
+    box.appendChild(reset);
+  }
+  function paint(){ $("runver").textContent="TMOS "+builds[cur]; rows(); foot(); verbtns(); }
+  paint();
+})();
+</script>
