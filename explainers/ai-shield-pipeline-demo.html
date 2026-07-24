@@ -147,7 +147,8 @@
       <p class="lede">Pick a vulnerability and run the loop. The pipeline derives a predicate, emits a constrained
         one-liner, compiles it, and puts it through three mechanical oracles — verifier, exploit-replay, and a
         false-positive check — before a human ever signs. One scenario passes clean, one fails an oracle and
-        self-corrects, one is declared un-shieldable. This mirrors the working <code>tmmtrace</code> prototype.</p>
+        self-corrects, one is declared un-shieldable. This mirrors the mechanism of the working <code>tmmtrace</code>
+        prototype — two of the three oracles run today (see the note below).</p>
 
       <div class="controls">
         <div class="clabel">1 · choose a CVE</div>
@@ -182,10 +183,12 @@
       </div>
     </div>
 
-    <p class="note">Illustrative CVE identifiers and bytecode. The mechanism is real: in the prototype,
-      <code>tmmtrace compile</code> runs the actual PREVAIL verifier (Oracle 1, fail-closed) and
-      <code>tmmtrace run</code> replays the exploit against an embedded-VM data plane (Oracle 2). The
-      CVE→predicate step shown here is the generative stage the pipeline adds on top.
+    <p class="note">Illustrative CVE identifiers and bytecode. <strong>What runs today vs. what's proposed:</strong>
+      in the prototype, <code>tmmtrace compile</code> runs the actual PREVAIL verifier (Oracle 1, fail-closed) and
+      <code>tmmtrace run</code> replays the exploit against an embedded-VM data plane (Oracle 2) — those two
+      oracles are real. The CVE→predicate generative stage, the false-positive corpus (Oracle 3), and the
+      sign/deploy lifecycle shown here are the <em>proposed</em> additions on top; the demo animates the whole
+      loop to show the shape.
       <br><br><strong>One thing the pipeline never invents:</strong> the hooks and the typed <code>ctx</code>
       fields the predicate is written over are <em>TMM's</em> — a signed, per-build hook-point map that exists
       before any of this runs. The model only <em>selects</em> a hook and reads the fields it already exposes;
@@ -221,7 +224,7 @@
 
   var SCEN = {
     clean:{
-      code:"CVE-2026-22548", name:"bd termination via crafted frame",
+      code:"CVE-2026-22548", name:"bd (WAF engine) termination via crafted frame",
       desc:"Out-of-range opcode reaches an unchecked handler table → data-plane process dies.",
       tag:"clean", tagc:"clean", hint:"a clean case — all three oracles pass on the first try",
       artifact:"advisory + PoC: opcode 0x4242 crashes bd; handler table has 4 entries",
@@ -352,7 +355,7 @@
     beats.push({gap:600, fn:function(){ st("compile","done"); log("  shield.bpf.o (632 B)","dim"); }});
 
     // first oracle pass
-    Array.prototype.push.apply(beats, oracleBeats(s, s.refine?1:0));
+    Array.prototype.push.apply(beats, oracleBeats(s, 0));
 
     if(s.refine){
       beats.push({gap:750, fn:function(){ st("o3","fail"); verdict("o3","fail","fail");
@@ -363,7 +366,7 @@
         // reset oracle rows for retry
         ["o1","o2","o3"].forEach(function(id){ st(id,""); $("stg-"+id).querySelector(".verdict").style.display="none"; });
       }});
-      Array.prototype.push.apply(beats, oracleBeats(s.refine, 2));
+      Array.prototype.push.apply(beats, oracleBeats(s.refine, 1));
       beats.push({gap:700, fn:function(){ st("o3","done"); verdict("o3","pass","pass");
         log("✓ false-positive "+s.refine.fp+"% < 1% — legit traffic spared","ok"); }});
     } else {
@@ -373,7 +376,7 @@
 
     // sign + deploy
     beats.push({gap:600, fn:function(){ st("sign","active"); log("→ candidate cleared all oracles — await human","dim"); }});
-    beats.push({gap:800, fn:function(){ st("sign","done"); verdict("sign","signed","pass"); log("✓ SIRT authorized + signed (human on the trigger)","ok"); }});
+    beats.push({gap:800, fn:function(){ st("sign","done"); verdict("sign","signed","pass"); log("✓ SIRT (F5 security team) authorized + signed — human on the trigger","ok"); }});
     beats.push({gap:500, fn:function(){ st("deploy","active"); $("deploy").classList.add("on"); }});
     beats.push({gap:500, fn:function(){ $("d-obs").classList.add("lit"); log("deploy: observe-first (telemetry only)","hi"); }});
     beats.push({gap:600, fn:function(){ $("d-enf").classList.add("lit"); log("promote: enforce — attack now dropped inline","hi"); }});

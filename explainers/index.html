@@ -65,7 +65,8 @@
     <p class="lede">TMM runs its own stack and bypasses the kernel — which makes it powerful and nearly
       impossible to instrument from outside. Embed a small, <b>verified</b> eBPF VM <em>inside</em> it and you get
       a third programmability surface: <b>observe</b> internal state, and <b>enforce</b> surgical CVE mitigations —
-      loadable in hours, provably unable to crash the box. Four explainers, start anywhere:</p>
+      loadable in hours, and proven — by a verifier — unable to hang or corrupt the data plane. Four explainers,
+      start anywhere:</p>
 
     <div class="grid">
       <a class="tile feature" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
@@ -73,7 +74,7 @@
         <span class="ttitle">The embedded-eBPF substrate <span class="ar">→</span></span>
         <span class="tdesc">Why TMM is a hard target, why kernel eBPF can't reach it, and what embedding the VM buys —
           compile-in vs. load-as-bytecode, two planes, three form factors, no helpers / stock verifier.</span>
-        <span class="tmeta">interactive · ~10 min</span>
+        <span class="tmeta">interactive</span>
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3">
@@ -89,7 +90,7 @@
         <span class="ttitle">AI-authored shields — the story <span class="ar">→</span></span>
         <span class="tdesc">CVE in, verified-signed-auto-retiring shield out. Why a static verifier is what makes machine
           authorship of inline data-plane code safe — blast radius bounded by proof, not trust.</span>
-        <span class="tmeta">~8 min read</span>
+        <span class="tmeta">read</span>
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">
@@ -100,6 +101,9 @@
         <span class="tmeta live">interactive demo</span>
       </a>
     </div>
+    <p style="margin-top:1.2rem; font-family:var(--font-mono); font-size:.78rem; color:var(--muted)">
+      Go deeper → <a style="color:var(--accent-ink)" href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">Anatomy of a shield</a>
+      — the ctx struct, the code, and the compile → verify → load pipeline, end to end.</p>
   </div>
 
   <div class="foot"><b>A proposal, not a shipped feature.</b> A working prototype (<code>minimm</code> · <code>tmmtrace</code>)

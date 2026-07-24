@@ -582,7 +582,8 @@
       <div class="callout" style="margin-top:var(--s4)">
         <span class="lbl">The rule of thumb</span>
         <p>Use <strong>kernel eBPF</strong> wherever the kernel can see the target cheaply — it's the mature
-           default, and F5 already ships it for kernel-mediated traffic. Reach for <strong>userspace eBPF</strong>
+           default, and F5 already ships kernel eBPF for kernel-mediated traffic (BIG-IP eBPF Observability).
+           Reach for <strong>userspace eBPF</strong>
            for what the kernel can't reach without paying to cross the boundary: <em>code on a kernel-bypass hot
            path</em>, where a per-event kernel round-trip is the cost you can't pay. TMM is exactly that case.</p>
       </div>
@@ -612,13 +613,13 @@
             <p class="pruns">Ordinary RHEL-family Linux daemons — <b>httpd, tmsh, MCPD</b>, config services. Normal processes the kernel <em>can</em> see.</p>
             <div class="pcve"><span class="cl">CVE classes here</span>
               <span class="cve">auth bypass</span><span class="cve">config-utility RCE</span><span class="cve">command injection</span></div>
-            <div class="psee"><span class="m">✓</span><span><b>Kernel eBPF can reach these.</b> This would be the direct Cisco / NX-OS Live Protect analog — a shield attached via uprobe, gated by the kernel's own verifier. F5 already ships kernel eBPF.</span></div>
+            <div class="psee"><span class="m">✓</span><span><b>Kernel eBPF can reach these.</b> This would be the direct Cisco / NX-OS Live Protect analog — a shield attached via uprobe, gated by the kernel's own verifier. F5 already ships kernel eBPF (BIG-IP eBPF Observability).</span></div>
           </div>
           <div class="plane data">
             <div class="ph"><span class="pname">Data plane — TMM</span><span class="engtag">userspace eBPF · uBPF</span></div>
             <p class="pruns">F5's own microkernel with its own stack, <b>bypassing the Linux kernel</b> for all traffic. The crown jewel — and the blind spot.</p>
             <div class="pcve"><span class="cl">CVE classes here</span>
-              <span class="cve">malformed-input crashes</span><span class="cve">parser bugs</span><span class="cve">bd termination</span></div>
+              <span class="cve">malformed-input crashes</span><span class="cve">parser bugs</span><span class="cve">bd (WAF engine) termination</span></div>
             <div class="psee"><span class="m">✕</span><span><b>Kernel eBPF is blind.</b> The only thing that could reach these is an embedded userspace VM — a shield running <em>inside</em> TMM, exactly what the rest of this page proposes.</span></div>
           </div>
         </div>
@@ -805,74 +806,45 @@
     </div>
   </section>
 
-  <!-- ===================== OBSERVE / TRACEPOINTS ===================== -->
+  <!-- ===================== OBSERVE / TRACEPOINTS (brief) ===================== -->
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">The other half</p>
       <h2>Shields act. Tracepoints watch. Same machinery.</h2>
       <p class="lede" style="margin-top:var(--s3)">A shield is <em>filter</em> mode — the host acts on the
-        program's return. Flip what the host does with that return, and the exact same hook becomes a
-        <strong>tracepoint</strong>: record the value, never touch traffic. So the same investment would open a
-        second, arguably bigger door — you could sprinkle <strong>designed-in, USDT-style tracepoints</strong>
-        through TMM's source and hook them in-process with the VM: a whole observability surface kernel tracing
-        structurally can't reach.</p>
-
+        program's return. Flip what the host does with that return, and the exact same hook is a
+        <strong>tracepoint</strong>: record the value, never touch traffic. Same VM, same hook, same verify gate —
+        only the host's use of the result differs.</p>
       <div class="duality">
         <div class="dflow">
           <span class="dnode">ctx — the frame's fields</span>
-          <span class="darrow">→</span>
+          <span class="darrow">&rarr;</span>
           <span class="dnode vm">uBPF VM</span>
-          <span class="darrow">→</span>
+          <span class="darrow">&rarr;</span>
           <span class="dnode">return value</span>
         </div>
         <div class="dfork">
           <div class="dcard filter">
             <div class="dh">filter — host acts on it</div>
-            <div class="dv"><b>PASS / DROP / RESET</b> — the return selects an enumerated outcome</div>
-            <div class="dtag">▸ this is a shield</div>
+            <div class="dv"><b>PASS / DROP</b> — the return selects a host-owned outcome</div>
+            <div class="dtag">&#9656; this is a shield</div>
           </div>
           <div class="dcard observe">
             <div class="dh">observe — host records it</div>
             <div class="dv"><b>metric / histogram / ring</b> — telemetry only, flow never changes</div>
-            <div class="dtag">▸ this is a tracepoint</div>
+            <div class="dtag">&#9656; this is a tracepoint</div>
           </div>
         </div>
         <p class="dnote">same hook · same VM · same verify gate — only what the host does with the result differs</p>
       </div>
-
-      <p style="margin-top:var(--s5); font-weight:560; font-size:1.05rem; max-width:44rem">
-        Why designed-in tracepoints, hooked in-process — and not just classic USDT?</p>
-      <div class="versus" style="margin-top:var(--s3)">
-        <div class="vcol kern">
-          <div class="vh"><span>◇</span>Classic USDT</div>
-          <h3>Static marker, hooked from outside</h3>
-          <div class="vlist">
-            <div class="vitem"><span class="mk">✓</span><span>A named probe placed in the source — better than guessing symbol offsets. The right idea.</span></div>
-            <div class="vitem"><span class="mk">✕</span><span>Hooked by an <b>external tracer over a uprobe</b> — kernel-mediated, so it's blind to TMM for the same reason everything else is.</span></div>
-            <div class="vitem"><span class="mk">✕</span><span>Attaching means the <b>injection path</b> — the brittle mechanism this design already rejected.</span></div>
-          </div>
-          <div class="vverdict">Right marker, wrong consumer — the kernel can't watch a probe on the private road.</div>
-        </div>
-        <div class="vcol user">
-          <div class="vh"><span>◆</span>Tracepoints hooked in-process</div>
-          <h3>Designed-in marker, hooked by the embedded VM</h3>
-          <div class="vlist">
-            <div class="vitem"><span class="mk">✓</span><span><b>Named &amp; typed by the developer</b> at the exact spot that matters — a stable, versioned contract, relocated across builds, not a guessed offset.</span></div>
-            <div class="vitem"><span class="mk">✓</span><span><b>Dark until lit</b> — a tracepoint with nothing attached is essentially a nop; you pay only when a program is hooked.</span></div>
-            <div class="vitem"><span class="mk">✓</span><span><b>On, then off</b> — attach bytecode to capture one condition, flow, or tenant, then detach. bpftrace-for-TMM, no reboot, no TMOS rev.</span></div>
-            <div class="vitem"><span class="mk">✓</span><span>Reaches <b>in-TMM state</b> — parser state machines, connection internals, inter-function latency, error-branch counts — none of which has an iRule field or a kernel vantage point.</span></div>
-          </div>
-          <div class="vverdict">Same "instrument by design" idea — but the consumer lives in the process, so it actually sees.</div>
-        </div>
-      </div>
-
       <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">Why this compounds the value</span>
-        <p>The hard, expensive part — the embedded VM, the verifier, the hook-point map, the signing and
-           lifecycle — would be built <em>once</em>. Shields (filter) and tracepoints (observe) would ride the
-           same substrate. So every tracepoint added would be <strong>cheap new observability as bytecode</strong>,
-           and the flight recorder, on-demand deep telemetry, and anomaly detection below would all fall out of
-           the same machinery — reaching state that has no other surface at all.</p>
+        <span class="lbl">A whole observability surface — its own page</span>
+        <p>So the same investment opens a second, arguably bigger door: <strong>designed-in, USDT-style
+           tracepoints</strong> hooked in-process by the VM — reaching data-plane internals (parser state,
+           connection tables, inter-function latency) that kernel tracing structurally can't see, dark-until-lit,
+           no helpers. The catalog — every tracepoint laid over the data path, plus the flight-recorder and
+           capture patterns —
+           <a href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3" style="color:var(--accent-ink)">is its own explainer &rarr;</a></p>
       </div>
     </div>
   </section>
@@ -965,157 +937,26 @@
     </div>
   </section>
 
-  <!-- ===================== HOW IT RUNS ===================== -->
+  <!-- ===================== HOW IT RUNS (brief) ===================== -->
   <section class="band">
-    <div class="wrap">
-      <p class="eyebrow">Under the hood</p>
-      <h2>How the bytecode gets there</h2>
-      <p class="lede" style="margin-top:var(--s3)">Linking <code>libubpf.a</code> is ordinary static linking —
-        but on its own it <strong>does nothing</strong>. You've compiled in an empty engine: a VM with no program
-        to run. It sits inert until a shield's <em>bytecode</em> is loaded into it at runtime — <em>that's</em>
-        the decision, arriving as data, later, and passing a safety gate on the way in. Change the bytecode and
-        you change what the box does, without touching the binary.</p>
-
-      <p style="margin-top:var(--s4); max-width:44rem; font-size:1.05rem">So what do you load? A shield is a
-        tiny function: it reads a <strong>context</strong> — <code>ctx</code> — and returns a verdict. Three
-        pieces tell the whole story: the <em>context</em> it's handed, the <em>shield</em> itself, and the
-        <em>host</em> that calls it.</p>
-
+    <div class="wrap prose">
+      <p class="eyebrow">Under the hood, in brief</p>
+      <h2>The linked VM is inert until you load bytecode</h2>
+      <p style="margin-top:var(--s3); color:var(--muted); font-size:1.05rem">Linking <code>libubpf.a</code> does
+        nothing on its own — you've compiled in an <strong>empty engine</strong>, a VM with no program. It sits
+        inert until a shield's <em>bytecode</em> is loaded at runtime; that load <em>is</em> the decision, arriving
+        as data, passing a safety gate on the way in. Change the bytecode and you change what the box does, without
+        touching the binary.</p>
+      <p style="margin-top:var(--s4); font-size:1.05rem">And the shield itself is tiny: a pure function that reads
+        a curated context (<code>ctx</code>) and returns one of a few <strong>host-owned</strong> verdicts. It calls
+        nothing — so there are <strong>no eBPF helpers</strong> to build or secure, and the verifier is used
+        <strong>stock</strong>. Anything stateful, the host computes and hands in through <code>ctx</code>.</p>
       <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">First, what is <code>ctx</code>?</span>
-        <p>Short for <strong>context</strong> — the program's entire view of the world. At each hook the host
-           packs the relevant facts into a small, <em>typed</em> struct (as you'll see: the frame's opcode, its
-           length, a few header bytes) and hands the VM a pointer to it. The shield reads <code>ctx</code>,
-           decides, and returns a number. It <strong>can't reach anything else</strong> — not other connections,
-           not host memory, not the disk — only the fields this hook chose to expose. That narrowness is doing
-           real work: it's half of why the verifier can <em>prove</em> the program safe (bounded reads over a
-           known struct), and it's the <strong>context minimization</strong> the security model leans on — a
-           probe sees only what its hook grants, and sensitive fields (TLS secrets, payloads) are withheld unless
-           separately authorized. Different hook, different <code>ctx</code>: a TLS hook exposes handshake
-           fields, an HTTP/2 hook exposes stream counts — always described by the build's typed hook-point map.</p>
-      </div>
-
-      <div class="codecap"><span class="em">1 · The context it's handed</span>
-        <span class="tiny">— <code>ctx</code>'s actual type. The build's hook-point map defines it; the shield may read these fields and nothing else.</span></div>
-      <pre class="code"><span class="cm">// ls_ctx — the typed context this hook exposes: five fields describing</span>
-<span class="cm">// one frame. (A different hook — TLS, HTTP/2 — hands over a different ctx.)</span>
-struct ls_ctx {
-    uint16_t opcode;       <span class="cm">// the field the synthetic CVE abuses</span>
-    uint16_t payload_len;  <span class="cm">// declared length from the frame header</span>
-    uint32_t avail_len;    <span class="cm">// bytes actually buffered</span>
-    uint32_t mode;         <span class="cm">// host-supplied: 1 = monitor, 2 = enforce</span>
-    uint8_t  head[16];     <span class="cm">// first payload bytes, for richer predicates</span>
-};</pre>
-
-      <div class="codecap"><span class="em">2 · The shield itself</span>
-        <span class="tiny">— the whole thing: <code>ls_shield.c</code>, which compiles to the bytecode <code>shield.bpf.o</code>.</span></div>
-      <pre class="code"><span class="cm">// ls_shield.c — a complete Live Shield. Compiled with clang -target bpf,</span>
-<span class="cm">// this ~6 lines becomes shield.bpf.o, the bytecode that runs at the hook.</span>
-<span class="cm">// A shield is just a function: read ctx, return a verdict.</span>
-uint64_t <span class="hl">ls_decision</span>(struct ls_ctx *ctx)   <span class="cm">// ctx = the frame's fields, above</span>
-{
-    if (ctx-&gt;opcode &gt;= 4)                  <span class="cm">// the SIRT predicate: never a valid opcode</span>
-        return ctx-&gt;mode == ENFORCE ? 2    <span class="cm">// 2 = matched → host DROPs</span>
-                                    : 1;   <span class="cm">// 1 = matched, monitor → host passes</span>
-    return 0;                              <span class="cm">// 0 = PASS — not the attack, forward it</span>
-}</pre>
-
-      <div class="codecap"><span class="em">3 · The host (TMM) that calls it</span>
-        <span class="tiny">— packs the frame into <code>ctx</code>, runs the shield, and acts on the return.</span></div>
-      <pre class="code"><span class="cm">// at the designed-in hook point, once per frame — the host calls the VM</span>
-<span class="cm">// like any function and acts on the return. No kernel. No injection.</span>
-struct ls_ctx ctx = { .opcode = op, .payload_len = len };  <span class="cm">// pack the frame into ctx</span>
-uint64_t ret = 0;
-<span class="hl">ubpf_exec</span>(g_vm, &amp;ctx, sizeof(ctx), &amp;ret);   <span class="cm">// ← runs ls_decision() above, over ctx</span>
-<span class="cm">// ret: 0 = PASS · 1 = matched/monitor (still passes) · 2 = matched → DROP</span>
-<span class="cm">//      the host owns the outcomes; the shield only picks among them</span></pre>
-
-      <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">Who defines <code>ctx</code>? TMM does — before any shield exists</span>
-        <p>Notice the ordering: the hook and its <code>ctx</code> are part of <strong>TMM's</strong> source, not
-           the shield's. They're designed in ahead of time and emitted in the signed, per-build hook-point map;
-           a shield is always written <em>against</em> a <code>ctx</code> that already exists — it consumes the
-           contract, it never defines it. And that <code>ctx</code> is a designed <strong>window onto state TMM
-           already holds</strong> at this point — the frame it's parsing, a connection's counters — a typed,
-           curated slice, <em>not</em> raw memory. That's what separates this from injection (no guessing a
-           struct's layout at some random function) and what lets a hook expose <code>opcode</code> while
-           withholding the TLS secret sitting right beside it. The consequence for mitigation is exact:
-           <strong>the distinguishing information has to already be in TMM's state at a hook that runs before the
-           vulnerable operation</strong> — if it is, a shield can read it through <code>ctx</code> and act; if
-           it isn't, there's nothing to write a shield against.</p>
-      </div>
-
-      <p style="margin-top:var(--s5); max-width:44rem; font-size:1.05rem">That C source doesn't run as C. Here's
-        the short path it travels to become a live decision at the hook — compiled, <strong>proven safe</strong>,
-        loaded, run:</p>
-      <div class="pipescroll">
-        <div class="pipe">
-          <div class="pstep"><div class="pk">Source</div><div class="pv">ls_shield.c</div></div>
-          <div class="parrow"><span class="pa">→</span><span class="pl">clang -target bpf</span></div>
-          <div class="pstep"><div class="pk">Bytecode</div><div class="pv">shield.bpf.o</div></div>
-          <div class="parrow"><span class="pa">→</span><span class="pl">PREVAIL</span></div>
-          <div class="pstep"><div class="pk">Safety gate</div><div class="pv">verify · fail-closed</div></div>
-          <div class="parrow"><span class="pa">→</span><span class="pl">ubpf_load_elf</span></div>
-          <div class="pstep"><div class="pk">Into the VM</div><div class="pv">loaded, live</div></div>
-          <div class="parrow"><span class="pa">→</span><span class="pl">at the hook</span></div>
-          <div class="pstep"><div class="pk">Run</div><div class="pv">ubpf_exec → verdict</div></div>
-        </div>
-      </div>
-
-      <h3 style="margin-top:var(--s5); font-size:1.2rem">How <code>ctx</code> relates to a CVE</h3>
-      <p class="muted" style="margin-top:.6rem; max-width:44rem; font-size:1rem">A shield can only stop what
-        <code>ctx</code> lets it see. So the field the hook exposes and the condition the CVE makes dangerous are
-        the <strong>same fact from two sides</strong>:</p>
-
-      <div class="dflow" style="margin-top:var(--s3); justify-content:flex-start; gap:.75rem">
-        <span class="dnode"><b>ctx.opcode</b> — the field the hook exposes</span>
-        <span class="darrow">⟷</span>
-        <span class="dnode vm"><b>opcode ≥ 4</b> — the condition the CVE abuses</span>
-      </div>
-      <p class="muted" style="margin-top:.75rem; max-width:44rem; font-size:.92rem; font-family:var(--font-mono)">
-        the shield is just: <span style="color:var(--accent-ink)">if (ctx.opcode ≥ 4) drop()</span> — it exists
-        only because the field that reveals the exploit is in the context.</p>
-
-      <div class="callout" style="margin-top:var(--s4)">
-        <span class="lbl">The shieldability rule</span>
-        <p>A CVE is shieldable at a hook <em>only if</em> that hook runs <strong>before</strong> the vulnerable
-           operation <strong>and</strong> its <code>ctx</code> exposes the field(s) that tell the exploit apart.
-           If no hook's <code>ctx</code> can express the condition, the CVE isn't runtime-shieldable — that's the
-           residual dead zone, and it needs an engineering fix (an AI pipeline would flag it
-           <em>non-mitigable</em>). The flip side is the opportunity: <strong>designing <code>ctx</code> richly
-           and early is what makes whole future CVE classes catchable</strong> — which is why the hook-point map,
-           not any single shield, is the real asset. One caveat — if the discriminating field is sensitive
-           (say it only shows in decrypted payload), exposing it in <code>ctx</code> is also an authorization
-           decision, so "is it shieldable?" and "may the probe see what it needs?" are the same question.</p>
-      </div>
-
-      <div class="split">
-        <div class="pill2 pay"><div class="h">What you pay</div>
-          <p>A few extra nanoseconds per invocation — an indirect call into the JIT instead of a straight
-             C branch.</p></div>
-        <div class="pill2 get"><div class="h">What you get</div>
-          <p>The decision leaves the build and becomes verified, swappable data you can load into a live,
-             kernel-bypassing data plane — in hours, provably unable to crash it.</p></div>
-      </div>
-
-      <div class="callout" style="margin-top:var(--s5)">
-        <span class="lbl">And it's smaller than it looks — no helpers, stock verifier</span>
-        <p>Look again at the shield: it <strong>calls nothing</strong>. It reads <code>ctx</code> and returns a
-          number — the host does all the rest (counts hits, keeps the ring, applies the verdict). Everything on
-          this page — shields <em>and</em> tracepoints — is that shape. Two hard parts you'd expect simply aren't
-          there:</p>
-        <p>• <strong>No helper functions.</strong> In eBPF, "helpers" are the calls a program makes back into the
-          host — the surface you'd have to design, register, and lock down. A pure <code>ctx</code>→verdict
-          program has none, so there's nothing to build or confine: it's <strong>sandboxed by construction</strong>.
-          <br>• <strong>No verifier to extend.</strong> A bounded check over a typed struct is the textbook case
-          the verifier already proves — so <strong>PREVAIL is used as-is</strong>. You describe the <code>ctx</code>
-          layout; you don't modify the verifier.</p>
-        <p>Anything stateful (a rate, a timestamp, a cross-flow counter) the host computes and drops into
-          <code>ctx</code>. Richer programs that manipulate host state directly — via helpers — are an
-          <em>optional, later</em> tier, not a prerequisite. The whole Live-Shield-plus-tracepoint substrate is
-          buildable without either. And a new tracepoint is just <em>define a <code>ctx</code>, place a hook,
-          publish it</em> — so the team can grow the instrumentation surface incrementally, USDT-style, in normal
-          releases.</p>
+        <span class="lbl">Go deeper → Anatomy of a shield</span>
+        <p>The full walkthrough — the <code>ctx</code> struct, the ~6-line shield, the host call, the
+          compile → verify → load pipeline, and how the shape of <code>ctx</code> decides which CVEs are even
+          shieldable — is a companion deep-dive.
+          <a href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496" style="color:var(--accent-ink)">Read &ldquo;Anatomy of a shield&rdquo; &rarr;</a></p>
       </div>
     </div>
   </section>
@@ -1209,9 +1050,10 @@ uint64_t ret = 0;
 
   <footer>
     <div class="wrap">Related in this series:
-      <a class="src" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the pipeline</a>
-      · <a class="src" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">the pipeline, run it (interactive)</a>
+      <a class="src" href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">anatomy of a shield (deep dive)</a>
       · <a class="src" href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3">the TMM tracepoint catalog</a>
+      · <a class="src" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the story</a>
+      · <a class="src" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>
       · <a class="src" href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here (index)</a>.</div>
     <div class="wrap" style="margin-top:.7rem">Proposal explainer — modeled on the eob-tmm prototype, where the same shield is built both ways:
       Track&nbsp;1 (compiled in) vs Track&nbsp;2 (bytecode on uBPF).</div>

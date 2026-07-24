@@ -198,7 +198,7 @@
       <h2>You don't have to trust the model</h2>
       <p>You could never let a model write a kernel patch and ship it inline — unbounded output, no way to prove
         it's safe. An eBPF shield is different <em>in kind</em>. It lives in a class of programs whose worst case
-        is <strong>provably harmless</strong>: a static verifier proves it terminates and touches only memory it's
+        is <strong>provably bounded</strong>: a static verifier proves it terminates and touches only memory it's
         allowed to, and the host owns the outcomes — the program can only <em>pick</em> PASS or DROP, never invent
         control flow.</p>
       <p>So confine generation to that class and something powerful happens: <strong>the identity of the author
@@ -252,7 +252,8 @@
           <div class="fbody">
             <h3>Comprehend the artifact</h3>
             <p>Read the advisory / PoC / patch diff; derive the <strong>discriminating predicate</strong> — what
-              separates the exploit input from legitimate input. (The classic SIRT-analyst task.)</p>
+              separates the exploit input from legitimate input. (The classic task for SIRT — F5's security
+              incident response team.)</p>
           </div>
         </div>
         <div class="fstep">

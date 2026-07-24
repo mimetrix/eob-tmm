@@ -241,7 +241,7 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">From signal to capability</p>
-      <h2>Five patterns that turn tracepoints into RCA features</h2>
+      <h2>Five patterns that turn tracepoints into RCA features — plus a capture companion</h2>
       <p class="lede" style="margin-top:var(--s3)">The catalog is raw signal. These reusable shapes turn it into
         named capabilities — each built from the same observe machinery, no helpers, no verifier work.</p>
       <div class="rca">
@@ -265,11 +265,12 @@
           <p>Pair a filter shield with a recorder on the same condition: the malformed frame is dropped (box
              survives) <em>and</em> the run-up into the blocked attempt is captured. Every block feeds SIRT.</p>
           <div class="uses">tmm:l7:parse_error ◆ + flight recorder</div></div>
-        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">Pattern 06 · tmmdump</span><h3>Targeted data capture / streaming</h3>
+        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">Companion tool · tmmdump <span style="color:var(--amber-ink)">(proposed)</span></span><h3>Targeted data capture / streaming</h3>
           <p>The <em>actual bytes</em>, not a summary — the one tap a kernel-bypassed data plane allows. The VM
              <strong>selects</strong> (a flow, a condition); the host streams a bounded window <strong>off the
              poll loop</strong>, drop-not-block. In-process at L7 → <strong>decrypted</strong> payload no wire tap
-             can give you (strictest authz tier). <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code>.</p>
+             can give you (strictest authz tier). <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code> — where
+             <code>tmmtrace</code> is the working prototype and <code>tmmdump</code> is proposed.</p>
           <div class="uses">tmmdump --flow 10.0.0.5:443 --decrypted --snap 512</div></div>
       </div>
     </div>
@@ -279,7 +280,7 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">Where to start</p>
-      <h2>Five highest-leverage, lowest-risk hooks</h2>
+      <h2>The highest-leverage, lowest-risk hooks to land first</h2>
       <p class="lede" style="margin-top:var(--s3)">If the team lands a handful first: all read-only observe,
         cold/warm, each a <code>ctx</code> + a call site — no VM, verifier, or helper work. They graduate to
         shields (where ◆) once the signal is trusted, reusing the same hook and verify gate.</p>
@@ -298,11 +299,15 @@
   <footer>
     <div class="wrap">Related in this series:
       <a href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">the embedded-eBPF substrate</a>
-      · <a href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the pipeline</a>
+      · <a href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">anatomy of a shield (deep dive)</a>
+      · <a href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the story</a>
       · <a href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>
       · <a href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here (index)</a>.</div>
     <div class="wrap" style="margin-top:.7rem">Proposal explainer · from <code>tmm-usdt-tracepoints.md</code>.
-      Field lists illustrative; exact hook placement + <code>ctx</code> set against TMM source per build.</div>
+      Field lists illustrative; exact hook placement + <code>ctx</code> set against TMM source per build.
+      A tracepoint sees only what runs in TMM <em>software</em> — on appliances, flows offloaded to ePVA/FPGA
+      (many hot L3/L4 and crypto paths) bypass software and aren't observable here; BIG-IP VE (no offload) sees
+      the whole data path.</div>
   </footer>
 </div>
 
@@ -316,7 +321,7 @@
       {n:"conntab", pc:"warm", ctx:"occupancy, high_watermark, evictions", obs:"table occupancy", rca:"pre-exhaustion run-up; eviction thrash under load"}
     ]},
     {key:"tls", name:"Client-side TLS / record layer", tps:[
-      {n:"clienthello", pc:"warm", fd:1, first:1, ctx:"tls_ver, n_exts, sni_len, ja4[32]", obs:"version/cipher mix, JA3/JA4 fingerprints", rca:"fingerprint an attacker population; malformed ClientHello BEFORE CLIENTSSL_* fires"},
+      {n:"clienthello", pc:"warm", fd:1, first:1, ctx:"tls_ver, n_exts, sni_len, ja4[32]", obs:"version/cipher mix, JA4 fingerprints", rca:"fingerprint an attacker population; malformed ClientHello BEFORE CLIENTSSL_* fires"},
       {n:"record", pc:"hot", fd:1, ctx:"rec_type, rec_len, ver, parse_state", obs:"record-layer stats", rca:"record-parse anomalies ahead of the earliest iRule hook (the dead-zone edge)"},
       {n:"handshake_done", pc:"warm", ctx:"cipher, ver, resumed, ms_elapsed", obs:"handshake outcomes / latency", rca:"handshake failure clusters; downgrade attempts"},
       {n:"reneg", pc:"cold", fd:1, ctx:"count, since_ms", obs:"renegotiation counts", rca:"renegotiation-abuse DoS"},
