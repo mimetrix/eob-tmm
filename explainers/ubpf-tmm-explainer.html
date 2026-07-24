@@ -417,8 +417,8 @@
         compiling the logic in. <em>One mechanism that could ride the same data plane across appliance, VE,
         and BIG-IP Next for Kubernetes.</em></p>
       <p class="lede" style="font-size:1.02rem; margin-top:var(--s3)"><strong>Where this stands:</strong> a
-        proposal, not a shipped feature. A working prototype proves the core mechanism outside TMM; embedding
-        it <em>in</em> TMM is the opportunity this lays out.</p>
+        proposal, not a shipped feature. Embedding a verified eBPF VM <em>inside</em> TMM — the code the kernel
+        can't reach — is the opportunity this lays out.</p>
       <div class="metastrip">
         <span>uBPF — the VM</span>
         <span>PREVAIL — the verifier</span>
@@ -548,7 +548,7 @@
     <div class="wrap">
       <p class="eyebrow">What this is actually for</p>
       <h2>One box, two planes — and a CVE can land in either</h2>
-      <p class="lede" style="margin-top:var(--s3)">The motivating use case would be <strong>Live Shield</strong>:
+      <p class="lede" style="margin-top:var(--s3)">A motivating use case would be <strong>Live Shield</strong>:
         a vendor-signed, auto-retiring mitigation that blocks a specific exploit path <em>between maintenance
         windows</em> — until the patched build ships on the normal schedule. But BIG-IP isn't one machine.
         It's two execution environments in one box, and each would need its own live-patch engine.</p>
@@ -936,8 +936,8 @@
       <p class="eyebrow">The one line to remember</p>
       <p class="kicker">Linking the VM is ordinary. What would be radical is letting the rule stop being part of
         the build — and become <em>verified data you can load into a live data plane the kernel can't even see</em>.</p>
-      <p class="muted" style="max-width:40rem; margin-top:var(--s3); font-size:.95rem">That's the proposal. The
-        mechanism is proven in a prototype; the opportunity is to bring it inside TMM.</p>
+      <p class="muted" style="max-width:40rem; margin-top:var(--s3); font-size:.95rem">That's the proposal — the
+        opportunity is to bring a verified VM inside TMM, where nothing else can reach.</p>
     </div>
   </section>
 
@@ -948,8 +948,7 @@
       · <a class="src" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the story</a>
       · <a class="src" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>
       · <a class="src" href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here (index)</a>.</div>
-    <div class="wrap" style="margin-top:.7rem">Proposal explainer — modeled on the eob-tmm prototype, where the same shield is built both ways:
-      Track&nbsp;1 (compiled in) vs Track&nbsp;2 (bytecode on uBPF).</div>
+    <div class="wrap" style="margin-top:.7rem">Proposal explainer — the same shield shown two ways: compiled into the build vs loaded as bytecode.</div>
   </footer>
 </div>
 

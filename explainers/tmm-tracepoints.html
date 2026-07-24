@@ -278,11 +278,11 @@
         one <em>aggregates</em>, one <em>streams the actual bytes</em>. The tcpdump-to-bpftrace pairing, for a
         kernel-bypassed data plane: <code>tmmtrace : bpftrace :: tmmdump : tcpdump</code>.</p>
       <div class="rca" style="grid-template-columns:repeat(auto-fit,minmax(18rem,1fr))">
-        <div class="rcard"><span class="ri">tmmtrace · working prototype</span><h3>Summarize — bpftrace-for-TMM</h3>
+        <div class="rcard"><span class="ri">tmmtrace · summarize</span><h3>Summarize — bpftrace-for-TMM</h3>
           <p>A one-liner counts, histograms, or predicates over <code>ctx</code>; the same grammar authors a shield
-             by swapping the action verb. The summary-and-decision consumer — and the one that runs today.</p>
+             by swapping the action verb. The summary-and-decision consumer.</p>
           <div class="uses">tmmtrace run 'tmm:l7:http2_frame { @ = hist(args.n_streams); }'</div></div>
-        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">tmmdump · proposed</span><h3>Capture — tcpdump-for-TMM</h3>
+        <div class="rcard" style="border-color:var(--accent)"><span class="ri" style="color:var(--accent-ink)">tmmdump · capture</span><h3>Capture — tcpdump-for-TMM</h3>
           <p>The <em>actual bytes</em>, not a summary — the one tap a kernel-bypassed data plane allows. The VM
              <strong>selects</strong> (a flow, a condition); the host streams a bounded window <strong>off the poll
              loop</strong>, drop-not-block. In-process at L7 → <strong>decrypted</strong> payload no wire tap can
