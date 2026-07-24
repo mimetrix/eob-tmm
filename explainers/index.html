@@ -62,11 +62,15 @@
   <div class="wrap">
     <p class="eyebrow">F5 TMM · embedded userspace eBPF · a design proposal</p>
     <h1>A verified, in-data-plane <em>programmability surface</em> for TMM.</h1>
-    <p class="lede">TMM runs its own stack and bypasses the kernel — which makes it powerful and nearly
-      impossible to instrument from outside. Embed a small, <b>verified</b> eBPF VM <em>inside</em> it and you get
-      a third programmability surface: <b>observe</b> internal state, and <b>enforce</b> surgical CVE mitigations —
-      loadable in hours, and proven — by a verifier — unable to hang or corrupt the data plane. Five explainers,
-      start anywhere:</p>
+    <p class="lede" style="color:var(--text)"><b>AI collapsed the gap from a CVE being disclosed to it being
+      exploited in the wild. So the defender's gap — disclosure to <em>mitigation</em> — has to collapse to match.</b></p>
+    <p class="lede" style="margin-top:1rem">That pressure is what these proposals answer, aimed at F5's
+      hardest-to-reach code. TMM runs its own stack and bypasses the kernel, so it's nearly impossible to
+      instrument from outside. Embed a small, <b>verified</b> eBPF VM <em>inside</em> it and you get a third
+      programmability surface — <b>observe</b> internal state and <b>enforce</b> surgical CVE mitigations, loadable
+      in <b>hours, not a release cycle</b>, and proven (by a verifier) unable to hang or corrupt the data plane.
+      That same verifier is what lets even an <em>AI-authored</em> fix be safe to run — machine-speed defense to
+      answer machine-speed offense. Five explainers, start anywhere:</p>
 
     <div class="grid">
       <a class="tile feature" style="grid-column:1 / -1" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
