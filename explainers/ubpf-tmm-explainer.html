@@ -517,9 +517,9 @@
            tight poll loop that's prohibitive, and it adds jitter to the exact timing you're trying to measure.
            An embedded uBPF probe has <strong>no boundary to cross</strong> — it's a direct in-process call at
            ~tens of ns. (A measured kernel-uprobe workload ran ~58% overhead versus ~12% for the equivalent
-           userspace tool; the in-process call is cheaper still.) And for a <em>shield</em> the kernel can't even
-           try — it forbids altering a function's outcome from a uprobe. <strong>Same signal, minus the kernel
-           round-trip.</strong></p>
+           userspace tool; the in-process call is cheaper still.) And for an <em>enforcing</em> program the kernel
+           can't even try — it forbids altering a function's outcome from a uprobe. <strong>Same signal, minus the
+           kernel round-trip.</strong></p>
       </div>
 
       <div class="callout" style="margin-top:var(--s4)">
@@ -545,23 +545,23 @@
         <span class="boxlabel">BIG-IP appliance</span>
         <div class="spine">
           <span class="st">Signed catalog + lifecycle</span>
-          <span class="si">one trust spine — <b>SIRT-signed</b> shields · <b>monitor → enforce</b> · <b>auto-retire</b> when the patch lands · kill-switch</span>
+          <span class="si">one trust spine — <b>signed</b> programs · <b>load / observe / enforce</b> · <b>lifecycle</b> (retire · kill-switch)</span>
         </div>
         <div class="feeds" aria-hidden="true"></div>
         <div class="planes">
           <div class="plane ctrl">
             <div class="ph"><span class="pname">Control plane</span><span class="engtag">kernel eBPF · uprobes</span></div>
             <p class="pruns">Ordinary RHEL-family Linux daemons — <b>httpd, tmsh, MCPD</b>, config services. Normal processes the kernel <em>can</em> see.</p>
-            <div class="pcve"><span class="cl">CVE classes here</span>
-              <span class="cve">auth bypass</span><span class="cve">config-utility RCE</span><span class="cve">command injection</span></div>
-            <div class="psee"><span class="m">✓</span><span><b>Kernel eBPF can reach these.</b> This would be the direct Cisco / NX-OS Live Protect analog — a shield attached via uprobe, gated by the kernel's own verifier. F5 already ships kernel eBPF (BIG-IP eBPF Observability).</span></div>
+            <div class="pcve"><span class="cl">example targets — observe or enforce</span>
+              <span class="cve">request handling</span><span class="cve">config state</span><span class="cve">auth &amp; RBAC</span></div>
+            <div class="psee"><span class="m">✓</span><span><b>Kernel eBPF can reach these.</b> Ordinary Linux processes the kernel sees — a program attached via uprobe, gated by the kernel's own verifier (the Cisco / NX-OS analog). F5 already ships kernel eBPF (BIG-IP eBPF Observability).</span></div>
           </div>
           <div class="plane data">
             <div class="ph"><span class="pname">Data plane — TMM</span><span class="engtag">userspace eBPF · uBPF</span></div>
             <p class="pruns">F5's own microkernel with its own stack, <b>bypassing the Linux kernel</b> for all traffic. The crown jewel — and the blind spot.</p>
-            <div class="pcve"><span class="cl">CVE classes here</span>
-              <span class="cve">malformed-input crashes</span><span class="cve">parser bugs</span><span class="cve">bd (WAF engine) termination</span></div>
-            <div class="psee"><span class="m">✕</span><span><b>Kernel eBPF is blind.</b> The only thing that could reach these is an embedded userspace VM — a shield running <em>inside</em> TMM, exactly what the rest of this page proposes.</span></div>
+            <div class="pcve"><span class="cl">example targets — observe or enforce</span>
+              <span class="cve">parser state</span><span class="cve">connection table</span><span class="cve">bd (WAF) internals</span></div>
+            <div class="psee"><span class="m">✕</span><span><b>Kernel eBPF is blind.</b> The only thing that could reach these — to observe <em>or</em> to enforce — is an embedded userspace VM running <em>inside</em> TMM, exactly what the rest of this page proposes.</span></div>
           </div>
         </div>
       </div>
@@ -569,9 +569,9 @@
       <div class="callout" style="margin-top:var(--s4)">
         <span class="lbl">The punchline</span>
         <p>It wouldn't be kernel <em>or</em> userspace eBPF — it would be <strong>both, under one signed
-           catalog</strong>, each dispatched to the plane whose CVEs it can actually reach. The control plane
-           would ride the mature kernel path; the data plane is the part only an embedded VM could protect —
-           and the part nobody else can.</p>
+           catalog</strong>, each dispatched to the plane it can actually reach. The control plane rides the
+           mature kernel path; the data plane is the part only an embedded VM could reach — to observe or to
+           enforce — and the part nobody else can.</p>
       </div>
     </div>
   </section>
@@ -581,7 +581,7 @@
     <div class="wrap">
       <p class="eyebrow">Across the whole portfolio</p>
       <h2>Same TMM, three very different homes</h2>
-      <p class="lede" style="margin-top:var(--s3)">BIG-IP ships in three form factors, and the shield would
+      <p class="lede" style="margin-top:var(--s3)">BIG-IP ships in three form factors, and the surface would
         ride all of them — because <strong>all three run the same TMM data plane</strong>. The <em>mechanism</em>
         would be identical everywhere. What varies is <strong>coverage</strong>: an in-TMM VM sees only what runs
         in TMM <em>software</em>, and how much that is depends on how much the platform offloads to hardware.</p>
@@ -602,7 +602,7 @@
           <div class="fflayer tmm">
             <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
             <div class="lv">Embedded userspace VM at designed-in hooks</div>
-            <div class="shield">uBPF shield · unchanged</div>
+            <div class="shield">uBPF program · unchanged</div>
           </div>
           <div class="ffconn" aria-hidden="true"></div>
           <div class="fflayer">
@@ -627,7 +627,7 @@
           <div class="fflayer tmm">
             <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
             <div class="lv">Embedded userspace VM at designed-in hooks</div>
-            <div class="shield">uBPF shield · unchanged</div>
+            <div class="shield">uBPF program · unchanged</div>
           </div>
           <div class="ffconn" aria-hidden="true"></div>
           <div class="fflayer">
@@ -652,7 +652,7 @@
           <div class="fflayer tmm">
             <div class="lk"><span>Data plane — TMM</span><span class="same">identical</span></div>
             <div class="lv">Embedded userspace VM at designed-in hooks</div>
-            <div class="shield">uBPF shield · unchanged</div>
+            <div class="shield">uBPF program · unchanged</div>
           </div>
           <div class="ffconn" aria-hidden="true"></div>
           <div class="fflayer">
@@ -665,10 +665,10 @@
 
       <div class="callout" style="margin-top:var(--s4)">
         <span class="lbl">Why this matters</span>
-        <p>Notice the middle band never changes. A shield that lived in the <em>host kernel</em> would need a
+        <p>Notice the middle band never changes. A program that lived in the <em>host kernel</em> would need a
            different story per form factor — and on a <strong>shared Kubernetes node you often can't control
            the kernel at all</strong>. Embedding the VM <em>in TMM</em> would sidestep that entirely: the
-           data-plane shield would travel with TMM to bare metal, hypervisor, or container, <strong>unchanged</strong>.
+           in-TMM program would travel with TMM to bare metal, hypervisor, or container, <strong>unchanged</strong>.
            The more the ground shifts under BIG-IP, the more that portability is worth.</p>
       </div>
 
@@ -676,11 +676,11 @@
         <span class="lbl" style="color:var(--static-ink)">The honest boundary — hardware offload</span>
         <p>An in-TMM VM sees only what runs in TMM <em>software</em>. On appliances, <strong>ePVA / FPGA / crypto
            offload</strong> deliberately keeps some traffic out of software — offloaded FastL4 flows switch in
-           silicon — so that path is a genuine dead zone for the shield. But it's invisible to <strong>iRules and
-           WASM just the same</strong> — the design already lists FastL4 as an iRule hole. It's a <em>hardware</em>
-           boundary every software surface shares, not a cost unique to this approach. And the high-severity CVE
-           classes here — L7 / parser bugs, <code>bd</code>/WAF termination — run in software anyway (a flow that
-           needs inspection is escalated back into TMM), so they stay fully reachable. On <strong>VE, with no
+           silicon — so that path is a genuine dead zone for an in-software program. But it's invisible to
+           <strong>iRules and WASM just the same</strong> — the design already lists FastL4 as an iRule hole. It's
+           a <em>hardware</em> boundary every software surface shares, not a cost unique to this approach. And the
+           high-value work here — L7 parsing, plugin internals, the error paths — runs in software anyway (a flow
+           that needs inspection is escalated back into TMM), so it stays fully reachable. On <strong>VE, with no
            offload, the VM sees the entire data path.</strong></p>
       </div>
     </div>
@@ -690,13 +690,13 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">The core idea · try it</p>
-      <h2>Two ways to put a rule in the data plane</h2>
-      <p class="lede" style="margin-top:var(--s3)">The shield is the <em>same</em> either way: read a frame,
-        decide <code>PASS</code> or <code>DROP</code>. There are two ways to get that decision into the
-        running TMM — and the difference is the whole story. Flip between them.</p>
+      <h2>Two ways to put a program in the data plane</h2>
+      <p class="lede" style="margin-top:var(--s3)">The program is the <em>same</em> either way: it reads a frame's
+        context and returns a result — a metric to <em>record</em>, or a verdict to <em>act on</em>. There are two
+        ways to get it into the running TMM — and the difference is the whole story. Flip between them.</p>
 
       <div class="stage" id="stage" data-mode="dynamic">
-        <div class="seg" role="group" aria-label="How the rule is loaded">
+        <div class="seg" role="group" aria-label="How the program is loaded">
           <button data-m="dynamic" class="on" aria-pressed="true"><span class="dot"></span>Load as bytecode</button>
           <button data-m="static" aria-pressed="false"><span class="dot"></span>Compile it in</button>
         </div>
@@ -723,7 +723,7 @@
               </div>
             </div>
             <div class="catalog" id="catalog">
-              <div class="ct">Signed shield catalog — load any, live · bytecode illustrative</div>
+              <div class="ct">Signed program catalog — observe or enforce, load any, live · bytecode illustrative</div>
               <div class="catrow" id="catrow"></div>
             </div>
           </div>
@@ -750,12 +750,12 @@
   <!-- ===================== OBSERVE / TRACEPOINTS (brief) ===================== -->
   <section class="band">
     <div class="wrap">
-      <p class="eyebrow">The other half</p>
-      <h2>Shields act. Tracepoints watch. Same machinery.</h2>
-      <p class="lede" style="margin-top:var(--s3)">A shield is <em>filter</em> mode — the host acts on the
-        program's return. Flip what the host does with that return, and the exact same hook is a
-        <strong>tracepoint</strong>: record the value, never touch traffic. Same VM, same hook, same verify gate —
-        only the host's use of the result differs.</p>
+      <p class="eyebrow">Two modes, one machinery</p>
+      <h2>Act on the result, or just record it</h2>
+      <p class="lede" style="margin-top:var(--s3)">In <em>filter</em> mode the host acts on the program's return;
+        flip what the host does with that return and the exact same hook is a <strong>tracepoint</strong> — record
+        the value, never touch traffic. Same VM, same hook, same verify gate — only the host's use of the result
+        differs. Neither mode is the "main" one; the substrate is built for both.</p>
       <div class="duality">
         <div class="dflow">
           <span class="dnode">ctx — the frame's fields</span>
@@ -768,7 +768,7 @@
           <div class="dcard filter">
             <div class="dh">filter — host acts on it</div>
             <div class="dv"><b>PASS / DROP</b> — the return selects a host-owned outcome</div>
-            <div class="dtag">&#9656; this is a shield</div>
+            <div class="dtag">&#9656; e.g. a CVE shield</div>
           </div>
           <div class="dcard observe">
             <div class="dh">observe — host records it</div>
@@ -802,16 +802,16 @@
         <div class="card">
           <span class="n">Speed</span>
           <h3>“Rebuild the host” means reship TMOS</h3>
-          <p>Compiling the shield in makes it ride a quarterly release train with a maintenance window and
-             a reboot. During an actively exploited CVE, that's not an option. Verified bytecode could ship in
-             <strong>hours</strong>.</p>
+          <p>Compiling the behavior in makes it ride a quarterly release train with a maintenance window and a
+             reboot. When you need the data plane to change fast — a new metric, a diagnosis, a live threat —
+             that's not an option. Verified bytecode could ship in <strong>hours</strong>.</p>
         </div>
         <div class="card">
           <span class="n">Blast radius</span>
           <h3>Verified &amp; signed narrows who can push it</h3>
           <p>Compiled-in C has the full run of the process and rides TMM's entire QA cycle. Sandboxed,
-             signed bytecode is provably bounded — so a faster, narrower path (SIRT signs a shield) could push
-             it to a live box without a full code change's risk.</p>
+             signed bytecode is provably bounded — so a faster, narrower path (e.g. SIRT signs a mitigation) could
+             push it to a live box without a full code change's risk.</p>
         </div>
       </div>
     </div>
@@ -824,19 +824,18 @@
       <h2>The linked VM is inert until you load bytecode</h2>
       <p style="margin-top:var(--s3); color:var(--muted); font-size:1.05rem">Linking <code>libubpf.a</code> does
         nothing on its own — you've compiled in an <strong>empty engine</strong>, a VM with no program. It sits
-        inert until a shield's <em>bytecode</em> is loaded at runtime; that load <em>is</em> the decision, arriving
+        inert until a program's <em>bytecode</em> is loaded at runtime; that load <em>is</em> the decision, arriving
         as data, passing a safety gate on the way in. Change the bytecode and you change what the box does, without
         touching the binary.</p>
-      <p style="margin-top:var(--s4); font-size:1.05rem">And the shield itself is tiny: a pure function that reads
+      <p style="margin-top:var(--s4); font-size:1.05rem">And the program itself is tiny: a pure function that reads
         a curated context (<code>ctx</code>, its input) and <strong>returns a code</strong> that picks one of a few
         outcomes the <strong>host</strong> owns (PASS / DROP). It calls
         nothing — so there are <strong>no eBPF helpers</strong> to build or secure, and the verifier is used
         <strong>stock</strong>. Anything stateful, the host computes and hands in through <code>ctx</code>.</p>
       <div class="callout" style="margin-top:var(--s4)">
         <span class="lbl">Go deeper → Anatomy of a shield</span>
-        <p>The full walkthrough — the <code>ctx</code> struct, the ~6-line shield, the host call, the
-          compile → verify → load pipeline, and how the shape of <code>ctx</code> decides which CVEs are even
-          shieldable — is a companion deep-dive.
+        <p>The full walkthrough — the <code>ctx</code> struct, the ~6-line program, the host call, and the
+          compile → verify → load pipeline — is a companion deep-dive.
           <a href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496" style="color:var(--accent-ink)">Read &ldquo;Anatomy of a shield&rdquo; &rarr;</a></p>
       </div>
     </div>
@@ -847,7 +846,7 @@
     <div class="wrap">
       <p class="eyebrow">Zoom out · the bigger picture</p>
       <h2>A third way to program the data plane</h2>
-      <p class="lede" style="margin-top:var(--s3)">CVE shields would be just the first thing you do with it.
+      <p class="lede" style="margin-top:var(--s3)">Security mitigation would be just one thing you do with it.
         TMM's real strength was never one feature — it's <strong>dynamic programmability</strong>: changing
         the data plane's behavior at runtime, no rebuild, no reboot. iRules established that. WASM extended
         it. Embedded eBPF could be the <em>third surface</em> — reaching a layer the other two can't, and the
@@ -888,7 +887,7 @@
            instrumentation and control</em>. One spectrum, a clean division of labor — not a replacement.</p>
       </div>
 
-      <p class="eyebrow" style="margin-top:var(--s5)">So beyond CVE shields, the same substrate could unlock</p>
+      <p class="eyebrow" style="margin-top:var(--s5)">A sample of what the same substrate could unlock</p>
       <div class="cards">
         <div class="card">
           <span class="n">Observability</span>
@@ -922,7 +921,7 @@
   <section class="band">
     <div class="wrap">
       <p class="eyebrow">The one line to remember</p>
-      <p class="kicker">Linking the VM is ordinary. What would be radical is letting the rule stop being part of
+      <p class="kicker">Linking the VM is ordinary. What would be radical is letting behavior stop being part of
         the build — and become <em>verified data you can load into a live data plane the kernel can't even see</em>.</p>
       <p class="muted" style="max-width:40rem; margin-top:var(--s3); font-size:.95rem">That's the proposal — the
         opportunity is to bring a verified VM inside TMM, where nothing else can reach.</p>
@@ -936,38 +935,38 @@
       · <a class="src" href="https://claude.ai/code/artifact/dcfbf61e-d268-4110-892a-635b1e316020">AI-authored shields — the story</a>
       · <a class="src" href="https://claude.ai/code/artifact/bfb2cfc9-0ab1-4f88-99f3-fecd5473ac89">run the pipeline (interactive)</a>
       · <a class="src" href="https://claude.ai/code/artifact/a219e6f9-725c-4b19-884f-ff8faff322ac">start here (index)</a>.</div>
-    <div class="wrap" style="margin-top:.7rem">Proposal explainer — the same shield shown two ways: compiled into the build vs loaded as bytecode.</div>
+    <div class="wrap" style="margin-top:.7rem">Proposal explainer — the same program shown two ways: compiled into the build vs loaded as bytecode.</div>
   </footer>
 </div>
 
 <script>
 (function(){
   var rules = [
-    { name:"ls-cve-shield", act:"DROP", pred:"opcode ≥ 4  →  DROP",
+    { name:"obs:opcode-hist", act:"OBSERVE", pred:"sample opcode  →  histogram",
+      bytes:"61 12 00 00 · 57 01 00 00 07 · 07 00 00 00 · 95 00 00 00",
+      note:"Telemetry: bucket every frame's opcode at the hook. Never touches traffic." },
+    { name:"obs:parse-latency", act:"OBSERVE", pred:"record parse_ns  →  ring",
+      bytes:"79 11 10 00 · 79 12 08 00 · 1f 21 00 00 · 95 00 00 00",
+      note:"Per-frame parse latency into a host ring — diagnostics, on then off." },
+    { name:"enf:oob-opcode", act:"DROP", pred:"opcode ≥ 4  →  DROP",
       bytes:"61 12 00 00 · b7 00 00 00 02 · 6d 21 01 00 · 95 00 00 00",
-      note:"Block the out-of-range opcode behind the crash CVE, before dispatch." },
-    { name:"ls-oversize", act:"DROP", pred:"payload_len > 1024  →  DROP",
-      bytes:"69 12 02 00 · 25 02 01 00 04 00 · b7 00 00 00 02 · 95 00",
-      note:"Reject frames larger than the parser was built to expect." },
-    { name:"ls-trace-op7", act:"OBSERVE", pred:"opcode == 7  →  sample",
-      bytes:"61 12 00 00 · 55 01 01 00 07 · 07 00 00 00 · 95 00 00 00",
-      note:"Telemetry only — histogram opcode 7 at the hook, never drops traffic." }
+      note:"Enforce: drop the out-of-range opcode before dispatch — a CVE shield, one use among many." }
   ];
 
   var copy = {
     dynamic: {
-      title:"To change the rule:",
-      text:"Drop in a new signed .bpf.o. The verifier checks it, the VM loads it — the host binary is never touched. Change it as often as you like, on a live box.",
+      title:"To change what the data plane does:",
+      text:"Drop in a new signed .bpf.o. The verifier checks it, the VM loads it — the host binary is never touched. Add, swap, or remove behavior as often as you like, on a live box.",
       pid:"TMM process · linked once",
       m1:"~ seconds", m2:"none", m3:"unchanged", m4:"verifier, every load",
-      act:"Load the next shield  →"
+      act:"Load the next program  →"
     },
     static: {
-      title:"To change the rule:",
+      title:"To change what the data plane does:",
       text:"The logic is welded into the binary. Changing it means recompiling the host, re-signing the build, scheduling a maintenance window, and rebooting. There is no live path.",
-      pid:"TMM binary · rule baked in",
+      pid:"TMM binary · behavior baked in",
       m1:"~ a release cycle", m2:"required", m3:"rebuilt & reshipped", m4:"none — it's trusted C",
-      act:"Change the rule  →"
+      act:"Change the program  →"
     }
   };
 
@@ -1037,19 +1036,19 @@
       loadShield((dyn+1)%rules.length);
     } else {
       var f=$("hostframe"); f.classList.remove("rebuilding"); void f.offsetWidth; f.classList.add("rebuilding");
-      logLine("✗ can't hot-change — the rule is in the binary","no");
+      logLine("✗ can't hot-change — the program is in the binary","no");
       setTimeout(function(){ logLine("recompile → re-sign build → maintenance window → reboot"); },260);
     }
   }
 
   document.querySelectorAll(".seg button").forEach(function(b){
     b.addEventListener("click",function(){ mode=b.dataset.m; render();
-      logLine(mode==="dynamic" ? "mode: bytecode on the embedded VM" : "mode: shield compiled into the host"); });
+      logLine(mode==="dynamic" ? "mode: bytecode on the embedded VM" : "mode: program compiled into the host"); });
   });
   $("act").addEventListener("click",onAction);
 
   render();
-  logLine("ready — the same rule, two ways to load it");
+  logLine("ready — the same program, two ways to load it");
 })();
 
 </script>
