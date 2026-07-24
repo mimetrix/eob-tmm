@@ -185,7 +185,13 @@
     <p class="note">Illustrative CVE identifiers and bytecode. The mechanism is real: in the prototype,
       <code>tmmtrace compile</code> runs the actual PREVAIL verifier (Oracle 1, fail-closed) and
       <code>tmmtrace run</code> replays the exploit against an embedded-VM data plane (Oracle 2). The
-      CVE→predicate step shown here is the generative stage the pipeline adds on top.</p>
+      CVE→predicate step shown here is the generative stage the pipeline adds on top.
+      <br><br><strong>One thing the pipeline never invents:</strong> the hooks and the typed <code>ctx</code>
+      fields the predicate is written over are <em>TMM's</em> — a signed, per-build hook-point map that exists
+      before any of this runs. The model only <em>selects</em> a hook and reads the fields it already exposes;
+      it's a consumer of that contract, never its author. That pre-existing map is also what decides
+      shieldability: no hook whose <code>ctx</code> exposes the distinguishing condition → the
+      <em>non-mitigable</em> path you can trigger above.</p>
   </div>
   <footer><div class="wrap">Interactive explainer · embedded-eBPF-in-TMM series. Method &amp; claims held in a
     separate invention disclosure.</div></footer>

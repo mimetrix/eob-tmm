@@ -223,6 +223,18 @@
           lets a machine be the author.</p>
       </div>
     </div>
+
+    <div class="callout">
+      <span class="lbl">The model picks from a menu it didn't write</span>
+      <p>Both decisions rest on one fact: the <strong>hook-point map is TMM's, not the model's</strong>. Those
+        hooks and the typed <code>ctx</code> each one exposes are designed into TMM ahead of time — signed,
+        emitted per build — <em>before</em> any pipeline runs. The model doesn't invent a hook or a field; it
+        <strong>selects</strong> a hook and writes a predicate over the fields that hook already exposes. So the
+        pre-existing catalog is itself a guardrail alongside the verifier: the AI's entire vocabulary is what
+        TMM already chose to expose, and it can't reach for instrumentation that doesn't exist. It's a
+        <strong>consumer</strong> of TMM's instrumentation contract, never its author — which is also why
+        "is this CVE even addressable?" is answered by that map (the shieldability step below), not by the model.</p>
+    </div>
   </section>
 
   <!-- the pipeline -->
