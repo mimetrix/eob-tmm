@@ -65,16 +65,24 @@
     <p class="lede">TMM runs its own stack and bypasses the kernel — which makes it powerful and nearly
       impossible to instrument from outside. Embed a small, <b>verified</b> eBPF VM <em>inside</em> it and you get
       a third programmability surface: <b>observe</b> internal state, and <b>enforce</b> surgical CVE mitigations —
-      loadable in hours, and proven — by a verifier — unable to hang or corrupt the data plane. Four explainers,
+      loadable in hours, and proven — by a verifier — unable to hang or corrupt the data plane. Five explainers,
       start anywhere:</p>
 
     <div class="grid">
-      <a class="tile feature" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
+      <a class="tile feature" style="grid-column:1 / -1" href="https://claude.ai/code/artifact/22c169f8-8a5e-42d0-b5e1-fe84f14c623a">
         <span class="tcat">Start here · the mechanism</span>
         <span class="ttitle">The embedded-eBPF substrate <span class="ar">→</span></span>
         <span class="tdesc">Why TMM is a hard target, why kernel eBPF can't reach it, and what embedding the VM buys —
           compile-in vs. load-as-bytecode, two planes, three form factors, no helpers / stock verifier.</span>
         <span class="tmeta">interactive</span>
+      </a>
+
+      <a class="tile" href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">
+        <span class="tcat">Go deeper · the mechanism</span>
+        <span class="ttitle">Anatomy of a shield <span class="ar">→</span></span>
+        <span class="tdesc">A shield end to end — the <code>ctx</code> struct it reads, the ~6-line program, the host call, and
+          the compile → verify → load pipeline. No prior eBPF needed.</span>
+        <span class="tmeta">deep dive</span>
       </a>
 
       <a class="tile" href="https://claude.ai/code/artifact/e2f89ded-dcdd-4c59-a5b0-f347d3a416e3">
@@ -101,9 +109,6 @@
         <span class="tmeta live">interactive demo</span>
       </a>
     </div>
-    <p style="margin-top:1.2rem; font-family:var(--font-mono); font-size:.78rem; color:var(--muted)">
-      Go deeper → <a style="color:var(--accent-ink)" href="https://claude.ai/code/artifact/eb6cdee6-2727-4a8e-b0a7-d897b59cb496">Anatomy of a shield</a>
-      — the ctx struct, the code, and the compile → verify → load pipeline, end to end.</p>
   </div>
 
   <div class="foot"><b>A proposal, not a shipped feature.</b> A working prototype (<code>minimm</code> · <code>tmmtrace</code>)
