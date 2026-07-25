@@ -581,7 +581,7 @@
           <span class="only-obs">Same program shape; the host <b>records</b> the return. This is
             <b>observability</b> — deep telemetry from inside a black box, on demand, then off.</span>
           <span class="only-enf">Same program shape; the host <b>acts on</b> the return. This is
-            <b>enforcement</b> — the host drops the malformed frame before the vulnerable code runs.</span>
+            <b>enforcement</b> — here, dropping the frame the program matched.</span>
         </p>
       </div>
     </div>
@@ -633,8 +633,9 @@
       bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
       machinery feeds counters, latency histograms, and flight-recorder rings for deep <em>observability</em>,
-      drives steering and self-tuning decisions, and — at a decision point — returns a verdict for inline
-      <em>enforcement</em>. Enforcement is one thing it does; it is not the point of it.</p>
+      drives steering and self-tuning decisions, and — where the host wants one — returns a value it acts on.
+      That last mode is what a <em>shield</em> specializes; returning a decision is one thing the engine does,
+      not the point of it.</p>
     <p><b>Designed-in</b> is the operative word: because F5 owns the source, hooks are deliberate, named, versioned
       insertion points published in a per-build map — <em>not</em> fragile offsets an external tool guesses at and
       rewrites into a running process. A hook with nothing attached costs about one predictable branch
@@ -644,14 +645,14 @@
 <span class="kw">struct</span> l7_ctx ctx = { .opcode = f-&gt;opcode, .len = f-&gt;len };
 <span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);
 
-<span class="c">// what ret means is the host's choice:</span>
-<span class="c">//   observe  →  a telemetry sample it records</span>
-<span class="c">//   enforce  →  a verdict:  0 PASS · 1 match · 2 DROP</span></div>
+<span class="c">// ret is the program's result; the host decides what it means:</span>
+<span class="c">//   a sample  →  recorded as a counter, histogram, or ring</span>
+<span class="c">//   a code    →  acted on — e.g. a shield's  pass / drop / reset</span></div>
     <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
-      <b>input</b>; what the return <em>means</em> is the host's choice, a sample to record or a verdict to act on.
-      Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
+      <b>input</b>; what the return <em>means</em> is the host's choice — a sample to record, or a code to act on.
+      In the <b>base tier</b>, programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
       — they read fields and return a number, and call nothing; the host owns the counters, histograms, rings,
-      and verdict logic around the call. Two consequences fall out, and they erase the
+      and any decision logic around the call. Two consequences fall out, and they erase the
       hardest parts: <b>no custom helpers</b> to define, register, or secure; and <b>stock PREVAIL</b> — a bounded
       predicate over a typed context is the canonical case the verifier already proves, so there is no fork in
       the trust path.</p>
