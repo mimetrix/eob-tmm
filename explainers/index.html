@@ -159,7 +159,20 @@
     border:1px solid currentColor; border-radius:3px; padding:.14em .45em}
   .face.program .k{color:var(--signal-ink)} .face.protect .k{color:var(--enforce-ink)}
   .face p{margin:.6rem 0 0; font-size:.92rem}
-  .unify{text-align:center; margin:1.3rem 0 0; font-size:1.05rem; color:var(--ink)}
+  .face .tag{margin:.4rem 0 0; font-size:.82rem; color:var(--muted); font-style:italic}
+  /* FP-squared equation */
+  .fp2{margin:1.9rem 0 0; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+    gap:.55rem .75rem; font-family:var(--mono)}
+  .fp2 .t{font-size:.8rem; padding:.42em .72em; border:1px solid var(--line-2); border-radius:6px;
+    background:var(--surface); white-space:nowrap}
+  .fp2 .t b{font-weight:700; margin-right:.15em}
+  .fp2 .t.prog{color:var(--signal-ink); border-color:var(--signal)}
+  .fp2 .t.prot{color:var(--enforce-ink); border-color:var(--enforce)}
+  .fp2 .op{color:var(--faint); font-size:1.15rem; font-weight:600}
+  .fp2 .r{font-size:clamp(1.7rem,5vw,2.4rem); font-weight:700; letter-spacing:-.01em; color:var(--ink);
+    line-height:1; padding:0 .1em}
+  .fp2 .r sup{font-size:.52em; vertical-align:super; color:var(--signal-ink)}
+  .unify{text-align:center; margin:1.2rem 0 0; font-size:1.02rem; color:var(--ink); max-width:56ch; margin-left:auto; margin-right:auto}
   .unify b{font-weight:640}
 
   /* generic schematic (compile vs load) */
@@ -353,23 +366,32 @@
 
   <!-- 02 NEEDS -->
   <section class="beat reveal" id="needs" data-sec="needs">
-    <p class="kicker"><span class="num">02</span> two faces of one need</p>
+    <p class="kicker"><span class="num">02</span> FP² · two faces of one need</p>
     <h2>When the world moves this fast, two demands land on the data plane. They are the same demand.</h2>
     <div class="faces">
       <div class="face program">
-        <p class="h"><span class="k">program</span> Extend what it does</p>
+        <p class="h"><span class="k">FP</span> Flexible Programmability</p>
+        <p class="tag">Extend what it does.</p>
         <p>New telemetry, new logic, new behavior in the <b>running</b> data plane — a metric you didn't
           think to collect, a diagnosis, a tuning decision — delivered against designed-in hook points,
           no rebuild.</p>
       </div>
       <div class="face protect">
-        <p class="h"><span class="k">protect</span> Mitigate what's live</p>
+        <p class="h"><span class="k">FP</span> Flexible Protection</p>
+        <p class="tag">Mitigate what's live.</p>
         <p>Block a specific, active threat <b>in place</b>, in hours, with no release — a surgical,
           reversible control that holds the line until the patched build ships on its normal schedule.</p>
       </div>
     </div>
-    <p class="unify"><b>Programmability and security are not two projects.</b> They are one requirement seen
-      from two sides: <em class="sig">change the running data plane's behavior — safely, now.</em></p>
+    <div class="fp2" aria-label="Flexible Programmability times Flexible Protection equals FP squared">
+      <span class="t prog"><b>FP</b> Flexible Programmability</span>
+      <span class="op">×</span>
+      <span class="t prot"><b>FP</b> Flexible Protection</span>
+      <span class="op">=</span>
+      <span class="r">FP<sup>2</sup></span>
+    </div>
+    <p class="unify">Two co-equal faces, both of the form <b>Flexible&nbsp;P—</b>, so it squares. One verified
+      surface delivers both: <em class="sig">change the running data plane's behavior — safely, now.</em></p>
   </section>
 
   <!-- 03 HOLDOUT -->
@@ -579,8 +601,8 @@
       programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
       even machine-speed authorship, with every change <b>proven safe before it runs</b>.</p>
     <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as the
-      same, co-equal requirement of a machine-speed world, and give TMM the one surface that satisfies both.
-      <span class="champion">Champion it.</span></p>
+      same, co-equal requirement of a machine-speed world — <b>FP²</b> — and give TMM the one surface that
+      delivers it. <span class="champion">Champion it.</span></p>
     <p class="foot">
       A design proposal — not a shipped feature.<br>
       Companion: the <a href="https://claude.ai/code/artifact/1b7050c4-f5c1-4b2e-bbbc-af197e53febc">one-page proposal</a>. &nbsp;·&nbsp; Detailed method &amp; claims are held in a separate invention disclosure.
