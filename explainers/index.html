@@ -172,7 +172,14 @@
   .fp2 .r{font-size:clamp(1.7rem,5vw,2.4rem); font-weight:700; letter-spacing:-.01em; color:var(--ink);
     line-height:1; padding:0 .1em}
   .fp2 .r sup{font-size:.52em; vertical-align:super; color:var(--signal-ink)}
-  .unify{text-align:center; margin:1.2rem 0 0; font-size:1.02rem; color:var(--ink); max-width:56ch; margin-left:auto; margin-right:auto}
+  /* co-equal triad: runtime · programmable · provably safe */
+  .triad{margin:1.9rem 0 0; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+    gap:.5rem .7rem; font-family:var(--mono)}
+  .triad .td{font-size:clamp(.95rem,2.4vw,1.28rem); font-weight:700; letter-spacing:-.01em; color:var(--ink);
+    padding:.36em .78em; border:1px solid var(--line-2); border-bottom:2px solid var(--signal);
+    border-radius:7px; background:var(--surface); white-space:nowrap}
+  .triad .tdot{color:var(--faint); font-size:1.1rem}
+  .unify{text-align:center; margin:1.2rem 0 0; font-size:1.02rem; color:var(--ink); max-width:58ch; margin-left:auto; margin-right:auto}
   .unify b{font-weight:640}
 
   /* generic schematic (compile vs load) */
@@ -336,7 +343,7 @@
 
   <!-- 00 HERO -->
   <section class="hero" id="hero" data-sec="hero">
-    <p class="eyebrow">F5 TMM · toward a <b>programmable data plane</b>, provably safe · design proposal</p>
+    <p class="eyebrow">F5 TMM · a <b>runtime, programmable, provably-safe</b> data plane · design proposal</p>
     <h1>Everything happens at machine speed now. <span class="ex">Except the data plane.</span></h1>
     <p class="sub"><b>When software needs to change, it needs to change now</b> — a config push, a hot reload, a
       redeploy in minutes. One layer in the stack still can't move that fast: the data plane that carries the traffic.</p>
@@ -412,7 +419,7 @@
   <!-- interstitial: lineage / where this fits -->
   <section class="beat reveal lineage" id="lineage" data-sec="lineage">
     <p class="kicker lin"><span class="linmark">↳</span> where this fits · a short lineage</p>
-    <h2>F5 has reached for a programmable data plane before. This complements what works — and learns from what didn't.</h2>
+    <h2>F5 has made the data plane programmable for years. This adds the one layer — and the proof — the others don't reach.</h2>
     <p>Dynamic programmability is TMM's heritage, not a new bolt-on. Each surface below programs a
       <b>different layer</b>; the point isn't to replace any of them — it's to reach the one none of them can.</p>
     <div class="tablewrap">
@@ -504,9 +511,15 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <div class="callout sig"><p>Three words: a <b>programmable data plane</b>. Dynamically loadable
-      <em class="prf">and provably safe</em> — reaching the data plane's own code and state. Programmable is what
-      others reached for; <em class="prf">provably safe</em> is the part that's new, and it's the whole difference.</p></div>
+    <div class="triad" aria-label="runtime, programmable, and provably safe — equal weight">
+      <span class="td">runtime</span><span class="tdot">·</span>
+      <span class="td">programmable</span><span class="tdot">·</span>
+      <span class="td">provably safe</span>
+    </div>
+    <p class="unify">Three properties, <b>equal weight</b> — and the one combination nothing else has. iRules and
+      DynaD change at runtime but aren't provably safe; kernel eBPF is provably safe but can't reach the data
+      plane; WASM is programmable but bounded at runtime, not by proof. <em class="sig">This is the only surface
+      that is all three</em> — reaching the data plane's own code and state.</p>
   </section>
 
   <!-- 05 SURFACE (interactive) -->
@@ -660,9 +673,9 @@
       programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
       even machine-speed authorship, with every change <b>proven safe before it runs</b>.</p>
     <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as the
-      same, co-equal requirement of a machine-speed world — <b>FP²</b> — and give TMM a <b>programmable data
-      plane</b> that's <em class="prf">provably safe</em>. That adjective is the whole game.
-      <span class="champion">Champion it.</span></p>
+      same, co-equal requirement of a machine-speed world — <b>FP²</b> — and give TMM a data plane that is, in
+      equal measure, <b>runtime</b>, <b>programmable</b>, and <b>provably safe</b> — the combination nothing else
+      has. <span class="champion">Champion it.</span></p>
     <p class="foot">
       A design proposal — not a shipped feature.<br>
       Companion: the <a href="https://claude.ai/code/artifact/1b7050c4-f5c1-4b2e-bbbc-af197e53febc">one-page proposal</a>. &nbsp;·&nbsp; Detailed method &amp; claims are held in a separate invention disclosure.
