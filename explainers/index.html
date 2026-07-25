@@ -344,7 +344,7 @@
   <a href="#move"   data-sec="move"><span class="n">04</span><span class="t">the move</span></a>
   <a href="#surface" data-sec="surface"><span class="n">05</span><span class="t">one surface</span></a>
   <a href="#unlock" data-sec="unlock"><span class="n">06</span><span class="t">what it unlocks</span></a>
-  <a href="#deep"   data-sec="deep"><span class="n">07</span><span class="t">how it works</span></a>
+  <a href="#deep"   data-sec="deep"><span class="n">07</span><span class="t">under the hood</span></a>
   <a href="#close"  data-sec="close"><span class="n">08</span><span class="t">the ask</span></a>
   <span class="foot">a design<br>proposal</span>
 </nav>
@@ -615,20 +615,24 @@
     </ul>
   </section>
 
-  <!-- divider into deep dive -->
-  <div class="divider"><div class="band"><span class="dot"></span> how it works · for the engineers</div></div>
-
   <!-- 07 DEEP DIVE -->
-  <div id="deep" data-sec="deep"></div>
+  <section class="beat reveal" id="deep" data-sec="deep" style="padding-bottom:1.2rem">
+    <p class="kicker"><span class="num">07</span> under the hood · for the engineers</p>
+    <h2>How the programmable data plane works.</h2>
+    <p class="lede">Everything above rests on one small, in-process call, gated by a static proof. Here's the
+      machinery — the call, where it sits, why it's safe to run inline, and how the surface grows.</p>
+  </section>
 
   <div class="spec reveal">
     <h3><span class="sn">7.1</span> The mechanism</h3>
     <p>A hook point is a designed-in call site. The host packs the internal state it wants to expose into a
       typed <span class="inlinecode">ctx</span>, runs the program, and reads one return value. The
-      <span class="inlinecode">ctx</span> is <b>input</b>; the return code is the <b>verdict</b> the host acts on.</p>
+      <span class="inlinecode">ctx</span> is <b>input</b>; what the return <em>means</em> is the host's choice —
+      a sample to record, or a verdict to act on.</p>
     <div class="codeblock"><span class="c">// at a designed-in hook, the host calls the VM like any function</span>
 <span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);   <span class="c">// ctx in → ret out</span>
-<span class="c">// ret → host-owned outcome:  0 = PASS   1 = matched/monitor   2 = DROP</span></div>
+<span class="c">// observe:  ret is a telemetry sample the host records</span>
+<span class="c">// enforce:  ret is a verdict —  0 = PASS   1 = matched/monitor   2 = DROP</span></div>
     <p style="margin-top:.9rem">Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
       — they read fields and return a number, and call nothing. Two consequences fall out, and they erase the
       hardest parts: <b>no custom helpers</b> to define, register, or secure; and <b>stock PREVAIL</b> — a bounded
