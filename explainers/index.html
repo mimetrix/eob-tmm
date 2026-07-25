@@ -298,7 +298,8 @@
     background:var(--signal-bg); color:var(--signal-ink); padding:.05em .35em; border-radius:3px}
 
   .codeblock{font-family:var(--mono); font-size:.78rem; line-height:1.7; background:var(--surface-2);
-    border:1px solid var(--line); border-radius:7px; padding:.9rem 1rem; margin:1rem 0 0; overflow-x:auto}
+    border:1px solid var(--line); border-radius:7px; padding:.9rem 1rem; margin:1rem 0 0;
+    overflow-x:auto; white-space:pre; tab-size:2}
   .codeblock .c{color:var(--faint)}
   .codeblock .kw{color:var(--enforce-ink)}
   .codeblock .fn{color:var(--signal-ink)}
@@ -636,11 +637,13 @@
       rewrites into a running process. A hook with nothing attached costs about one predictable branch
       (<em>dark until lit</em>); attach a signed program and it runs right there, in-process — cold path, or hot
       on a measured budget.</p>
-    <div class="codeblock"><span class="c">// inside TMM source, at a designed-in hook point:</span>
-<span class="kw">struct</span> l7_ctx ctx = { .opcode = frame-&gt;opcode, .len = frame-&gt;len };  <span class="c">// curated snapshot → input</span>
-<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);   <span class="c">// run whatever's loaded (≈1 branch if nothing)</span>
-<span class="c">// observe:  ret is a telemetry sample the host records</span>
-<span class="c">// enforce:  ret is a verdict —  0 = PASS   1 = matched/monitor   2 = DROP</span></div>
+    <div class="codeblock"><span class="c">// at a hook point in TMM: pack a curated snapshot, run the VM</span>
+<span class="kw">struct</span> l7_ctx ctx = { .opcode = f-&gt;opcode, .len = f-&gt;len };
+<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);
+
+<span class="c">// what ret means is the host's choice:</span>
+<span class="c">//   observe  →  a telemetry sample it records</span>
+<span class="c">//   enforce  →  a verdict:  0 PASS · 1 match · 2 DROP</span></div>
     <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
       <b>input</b>; what the return <em>means</em> is the host's choice, a sample to record or a verdict to act on.
       Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
