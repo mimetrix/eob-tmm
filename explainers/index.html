@@ -244,6 +244,16 @@
   .swnote{margin:1rem 0 0; font-size:.9rem; color:var(--muted)}
   .swnote b{color:var(--ink)}
   .mode-obs .swnote .only-enf{display:none} .mode-enf .swnote .only-obs{display:none}
+  /* tmmtrace DSL grammar template */
+  .dsl{margin:1.4rem 0 0; display:grid; grid-template-columns:auto auto auto; gap:.45rem 1.6rem;
+    justify-content:start; align-items:baseline; border:1px solid var(--line-2); border-radius:8px;
+    background:var(--surface-2); padding:.9rem 1rem; overflow-x:auto}
+  .dsl .dslpart{font-family:var(--mono); font-size:clamp(.82rem,1.7vw,.98rem); font-weight:700; white-space:nowrap}
+  .dsl .dslpart.hook{color:var(--signal-ink)}
+  .dsl .dslpart.pred{color:var(--muted)}
+  .dsl .dslpart.act{color:var(--ink); text-decoration:underline; text-decoration-color:var(--line-2); text-underline-offset:3px}
+  .dsl .dsllbl{font-family:var(--mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--faint); white-space:nowrap}
 
   /* unlocks list */
   ul.unlocks{list-style:none; margin:1.6rem 0 0; padding:0; display:grid; gap:.75rem}
@@ -529,8 +539,20 @@
     <h2>Program and protect are the same machinery. Only the last step differs.</h2>
     <p class="lede">At its simplest, a loaded program reads a curated context and returns a value. Whether that
       value becomes <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the
-      host's choice — not a different mechanism. Here is the <b>same</b> hook, authored as a one-liner. Flip the
-      last verb:</p>
+      host's choice — not a different mechanism.</p>
+    <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: you write a
+      one-liner, and it compiles to eBPF bytecode, clears the verifier, and attaches at a named hook. The grammar
+      is three parts:</p>
+    <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
+      <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
+      <span class="dslpart pred">/predicate/</span>
+      <span class="dslpart act">{ action }</span>
+      <span class="dsllbl">which hook</span>
+      <span class="dsllbl">when it fires</span>
+      <span class="dsllbl">what to do</span>
+    </div>
+    <p>The <span class="mono">action</span> is the only part that decides observe vs. enforce. Same hook, same
+      predicate — flip the verb:</p>
 
     <div class="switchwrap" id="switch">
       <div class="switchhead">
