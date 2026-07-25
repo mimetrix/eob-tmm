@@ -601,8 +601,10 @@
       the patched build ships: a finger in the dike between maintenance windows. But a shield is just <em>one</em>
       use — the same spine carries far more:</p>
     <ul class="unlocks">
-      <li><b>Observability into a black box.</b> Deep, on-demand telemetry from inside the kernel-bypassed
-        data plane — a flight recorder that captures the run-up <em>into</em> a failure, not the wreckage after.</li>
+      <li><b>Observability into a black box.</b> Deep, on-demand telemetry from inside the kernel-bypassed data
+        plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>) or captured
+        byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>), including a flight
+        recorder that catches the run-up <em>into</em> a failure, not the wreckage after.</li>
       <li class="sec"><b>Live mitigation — the shield.</b> Reaches a data-plane CVE that no iRule, WAF rule, or
         kernel probe can — signed, and retired automatically once the patched build lands.</li>
       <li><b>Field diagnostics &amp; self-tuning.</b> Ship a signed probe to characterize a production issue in
@@ -611,7 +613,6 @@
         not trust</em>, a model can draft a change and the verifier becomes a <b>fail-closed acceptance gate</b> —
         blast radius bounded before a human ever signs. Machine-speed authorship for a machine-speed world.</li>
     </ul>
-    <div class="analogy">tmmtrace : bpftrace &nbsp;::&nbsp; <b>tmmdump : tcpdump</b> &nbsp;— one summarizes the data plane, one captures it.</div>
   </section>
 
   <!-- divider into deep dive -->
