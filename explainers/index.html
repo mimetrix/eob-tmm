@@ -517,7 +517,7 @@
       <span class="td">provably safe</span>
     </div>
     <p class="unify">Three properties, <b>equal weight</b> — and nothing else brings all three <b>in-process</b>,
-      at the data plane. iRules and DynaD change at runtime but can't be proven safe; WASM is programmable but
+      at the data plane. iRules changes at runtime but can't be proven safe; WASM is programmable but
       bounded at runtime, not by proof; kernel eBPF is provably safe but lives in the kernel — a USDT lets it
       <em>watch</em> the data plane, not <em>act</em> inside it, and traps on every hit. <em class="sig">This is
       the only surface that is all three, in-process</em> — reaching the data plane's own code and state.</p>
