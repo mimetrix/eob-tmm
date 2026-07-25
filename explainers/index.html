@@ -625,15 +625,20 @@
 
   <div class="spec reveal">
     <h3><span class="sn">7.1</span> The mechanism</h3>
-    <p>A hook point is a designed-in call site. The host packs the internal state it wants to expose into a
-      typed <span class="inlinecode">ctx</span>, runs the program, and reads one return value. The
-      <span class="inlinecode">ctx</span> is <b>input</b>; what the return <em>means</em> is the host's choice —
-      a sample to record, or a verdict to act on.</p>
-    <div class="codeblock"><span class="c">// at a designed-in hook, the host calls the VM like any function</span>
-<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);   <span class="c">// ctx in → ret out</span>
+    <p>A <b>hook point</b> is a specific spot in TMM's own source — chosen and named by F5's engineers — where the
+      code is compiled to pause, hand the embedded VM a curated snapshot of its local state, and read one value
+      back before carrying on. <b>Designed-in</b> is the operative word: because F5 owns the source, hooks are
+      deliberate, named, versioned insertion points published in a per-build map — <em>not</em> fragile offsets an
+      external tool guesses at and rewrites into a running process. A hook with nothing loaded costs about one
+      predictable branch (<em>dark until lit</em>); load a signed program and it runs right there, in-process.</p>
+    <div class="codeblock"><span class="c">// inside TMM source, at a designed-in hook point:</span>
+<span class="kw">struct</span> l7_ctx ctx = { .opcode = frame-&gt;opcode, .len = frame-&gt;len };  <span class="c">// curated snapshot → input</span>
+<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);   <span class="c">// run whatever's loaded (≈1 branch if nothing)</span>
 <span class="c">// observe:  ret is a telemetry sample the host records</span>
 <span class="c">// enforce:  ret is a verdict —  0 = PASS   1 = matched/monitor   2 = DROP</span></div>
-    <p style="margin-top:.9rem">Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
+    <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
+      <b>input</b>; what the return <em>means</em> is the host's choice, a sample to record or a verdict to act on.
+      Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
       — they read fields and return a number, and call nothing. Two consequences fall out, and they erase the
       hardest parts: <b>no custom helpers</b> to define, register, or secure; and <b>stock PREVAIL</b> — a bounded
       predicate over a typed context is the canonical case the verifier already proves, so there is no fork in
