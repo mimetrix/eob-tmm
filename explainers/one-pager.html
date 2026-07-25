@@ -67,6 +67,9 @@
   .thesis{font-size:clamp(.95rem,1.5vw,1.05rem); color:var(--muted); margin:.7rem 0 0; max-width:60ch}
   .thesis b{color:var(--ink); font-weight:600}
   .zero{font-family:var(--mono); color:var(--enforce-ink); font-weight:600; font-style:normal}
+  .vprop{font-size:.85rem; color:var(--muted); margin:.7rem 0 0; max-width:70ch}
+  .vprop b{color:var(--ink); font-weight:600}
+  .vprop .em{color:var(--signal-ink); font-weight:600}
 
   .rule{height:1px; background:var(--line); margin:1.3rem 0; border:0}
   .lbl{font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase;
@@ -181,6 +184,10 @@
     and urgent fixes are all expected in hours now — not on the next quarterly build. Everywhere else, when
     something needs to change, it changes today. Call it the <span class="zero">race to zero</span>.
     Inside TMM, that same change is still measured in releases.</p>
+
+  <p class="vprop"><b>And the timing cuts F5's way.</b> <span class="em">Generative AI has nothing to say about
+    line-rate processing</span> — the data plane is the one layer it can't disrupt — and the proxy sits on a
+    unique, monetizable data source no model or endpoint sees.</p>
 
   <hr class="rule">
 

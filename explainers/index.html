@@ -122,6 +122,17 @@
   .gauge.go .row.slow .fill{width:92%}
   @media (prefers-reduced-motion:reduce){ .gauge .fill{transition:none} }
   .gauge .cap{grid-column:2; font-family:var(--mono); font-size:.6rem; color:var(--faint); letter-spacing:.04em}
+  /* hero value proposition — the AI-age turn */
+  .value{margin:2.1rem 0 0; max-width:41rem}
+  .value .vlead{font-size:1.02rem; color:var(--ink); font-weight:600; margin:0 0 1rem; max-width:46ch; line-height:1.45}
+  .value .vlead .em{color:var(--enforce-ink)}
+  .vgrid{display:grid; grid-template-columns:1fr 1fr; gap:1.1rem}
+  @media(max-width:620px){.vgrid{grid-template-columns:1fr; gap:.9rem}}
+  .vitem{border-left:2px solid var(--signal); padding-left:.9rem}
+  .vitem .vk{font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--signal-ink); display:block; margin-bottom:.45rem}
+  .vitem p{margin:0; font-size:.86rem; color:var(--muted); line-height:1.5; max-width:none}
+  .vitem p b{color:var(--ink); font-weight:600}
   .scrollcue{position:absolute; bottom:1.6rem; left:clamp(1.15rem,5vw,2rem); font-family:var(--mono);
     font-size:.62rem; letter-spacing:.16em; text-transform:uppercase; color:var(--faint);
     display:flex; align-items:center; gap:.5rem}
@@ -301,10 +312,20 @@
     <h1>Everything happens at machine speed now. <span class="ex">Except the data plane.</span></h1>
     <p class="sub"><b>When software needs to change, it needs to change now</b> — a config push, a hot reload, a
       redeploy in minutes. One layer in the stack still can't move that fast: the data plane that carries the traffic.</p>
-    <div class="gauge" id="gauge" aria-hidden="true">
-      <div class="row fast"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
-      <div class="row slow"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
-      <span class="cap">time from “needs to change” → “changed” — everything else collapsed; one layer didn’t</span>
+    <div class="value">
+      <p class="vlead">The turn: that same rigid layer is the <span class="em">most defensible</span> one in the age of AI.</p>
+      <div class="vgrid">
+        <div class="vitem">
+          <span class="vk">◆ AI can't touch line rate</span>
+          <p>Transformers reason in tokens over milliseconds; the data plane moves packets in nanoseconds.
+            <b>Generative AI has nothing to say about line-rate processing</b> — and isn't coming for it.</p>
+        </div>
+        <div class="vitem">
+          <span class="vk">◆ a data source only F5 sits on</span>
+          <p>The proxy sees every flow — decrypted, in context, at line rate. A vantage point no model or
+            endpoint has, and <b>uniquely F5's to monetize</b>.</p>
+        </div>
+      </div>
     </div>
     <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
   </section>
@@ -323,6 +344,11 @@
     <div class="callout"><p><b>One layer resists it:</b> the data plane. The part that actually
       moves the packets is the hardest thing in the stack to change while it runs — and in a proxy, it's
       the part most exposed to the traffic.</p></div>
+    <div class="gauge" id="gauge" aria-hidden="true">
+      <div class="row fast"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
+      <div class="row slow"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
+      <span class="cap">time from “needs to change” → “changed” — everything else collapsed; one layer didn’t</span>
+    </div>
   </section>
 
   <!-- 02 NEEDS -->
@@ -593,9 +619,16 @@
       document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
     }
 
-    /* hero gauge animation on load */
+    /* gauge fills when it scrolls into view (now lives in beat 01) */
     var gauge=document.getElementById('gauge');
-    requestAnimationFrame(function(){ setTimeout(function(){ gauge.classList.add('go'); }, 250); });
+    if(gauge){
+      if('IntersectionObserver' in window && !reduce){
+        var go=new IntersectionObserver(function(es){
+          es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); go.unobserve(e.target); } });
+        },{threshold:.35});
+        go.observe(gauge);
+      } else { gauge.classList.add('go'); }
+    }
 
     /* rail active-section tracking */
     var rail=document.querySelector('.rail');
