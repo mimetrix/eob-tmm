@@ -543,7 +543,8 @@
       host's choice — not a different mechanism.</p>
     <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
       to a full multi-probe script, it compiles to eBPF bytecode, clears the verifier, and — once <b>signed</b> —
-      attaches at the named hooks. Each probe has three parts:</p>
+      attaches at the named hooks. And it <b>spans both planes</b>: point it at a data-plane hook and it runs in
+      TMM's embedded VM; point it at a control-plane daemon and it rides kernel eBPF. Each probe has three parts:</p>
     <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
@@ -666,9 +667,13 @@
           <td><b>embedded uBPF</b> (+ PREVAIL)</td></tr>
       </tbody>
     </table></div>
-    <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier — it's the true Cisco analog.
-      The data plane is the crown jewel: an in-process VM is the <em>only</em> thing that can place a probe or a
-      shield inside TMM's own execution.</p>
+    <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier — the true Cisco analog; the
+      data plane is the crown jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's
+      own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
+      against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
+      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL), all under one
+      signed catalog and lifecycle. The same one-liner that shields a TMM parser bug shields an httpd RCE — only the
+      target changes.</p>
   </div>
 
   <div class="spec reveal">
