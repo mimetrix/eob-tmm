@@ -116,10 +116,10 @@
     border:1px solid var(--line)}
   .gauge .fill{position:absolute; top:0; left:0; bottom:0; border-radius:3px; width:0;
     transition:width 1.1s cubic-bezier(.4,0,.2,1)}
-  .gauge .row.now .fill{background:var(--signal)}
-  .gauge .row.was .fill{background:var(--line-2)}
-  .gauge.go .row.was .fill{width:88%}
-  .gauge.go .row.now .fill{width:14%}
+  .gauge .row.fast .fill{background:var(--line-2)}
+  .gauge .row.slow .fill{background:var(--enforce)}
+  .gauge.go .row.fast .fill{width:10%}
+  .gauge.go .row.slow .fill{width:92%}
   @media (prefers-reduced-motion:reduce){ .gauge .fill{transition:none} }
   .gauge .cap{grid-column:2; font-family:var(--mono); font-size:.6rem; color:var(--faint); letter-spacing:.04em}
   .scrollcue{position:absolute; bottom:1.6rem; left:clamp(1.15rem,5vw,2rem); font-family:var(--mono);
@@ -302,9 +302,9 @@
     <p class="sub"><b>The gap between needing a running system to change and it changing is racing toward
       zero</b> — across app code, infrastructure, CI. One layer holds out: the data plane that carries the traffic.</p>
     <div class="gauge" id="gauge" aria-hidden="true">
-      <div class="row was"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
-      <div class="row now"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
-      <span class="cap">time from “needs to change” → “changed”</span>
+      <div class="row fast"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
+      <div class="row slow"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
+      <span class="cap">time from “needs to change” → “changed” — everything else collapsed; one layer didn’t</span>
     </div>
     <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
   </section>
