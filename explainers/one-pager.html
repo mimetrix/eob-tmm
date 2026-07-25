@@ -1,0 +1,277 @@
+<title>The verified data plane — a proposal</title>
+<style>
+  :root{
+    --paper:#eef1f4; --sheet:#ffffff; --sheet-2:#f5f8fa;
+    --ink:#0f1720; --muted:#546575; --faint:#7d8b98;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#080b0f; --sheet:#0f161d; --sheet-2:#0c1218;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6d7c8a;
+    --line:#233039; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#5cc088;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#080b0f; --sheet:#0f161d; --sheet-2:#0c1218;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6d7c8a;
+    --line:#233039; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#5cc088;
+  }
+  :root[data-theme="light"]{
+    --paper:#eef1f4; --sheet:#ffffff; --sheet-2:#f5f8fa;
+    --ink:#0f1720; --muted:#546575; --faint:#7d8b98;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+    padding:clamp(1rem,3vw,2.4rem) clamp(0.8rem,3vw,1.5rem)}
+
+  .sheet{max-width:52rem; margin:0 auto; background:var(--sheet);
+    border:1px solid var(--line); border-radius:6px;
+    box-shadow:0 18px 50px -30px rgba(8,16,24,.5);
+    padding:clamp(1.4rem,3.4vw,2.6rem);
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:26px 26px; background-position:-1px -1px;
+    background-blend-mode:normal;
+  }
+  /* keep the grid whisper-faint so text stays crisp */
+  .sheet{position:relative}
+  .sheet::before{content:""; position:absolute; inset:0; border-radius:6px; pointer-events:none;
+    background:var(--sheet); opacity:.955}
+  .sheet > *{position:relative}
+
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono); font-size:.66rem; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--signal-ink); margin:0; display:flex; flex-wrap:wrap; gap:.35rem .7rem; align-items:baseline}
+  .eyebrow .sep{color:var(--faint)}
+  .eyebrow .tag{color:var(--faint)}
+
+  h1{font-size:clamp(1.5rem,3.6vw,2.15rem); line-height:1.12; letter-spacing:-.02em; font-weight:680;
+    margin:.85rem 0 0; text-wrap:balance; max-width:26ch}
+  h1 .hl{color:var(--signal-ink)}
+  .thesis{font-size:clamp(.95rem,1.5vw,1.05rem); color:var(--muted); margin:.7rem 0 0; max-width:60ch}
+  .thesis b{color:var(--ink); font-weight:600}
+  .zero{font-family:var(--mono); color:var(--enforce-ink); font-weight:600; font-style:normal}
+
+  .rule{height:1px; background:var(--line); margin:1.3rem 0; border:0}
+  .lbl{font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--faint); margin:0 0 .55rem}
+
+  /* two faces */
+  .faces{display:grid; grid-template-columns:1fr 1fr; gap:.8rem}
+  @media(max-width:560px){.faces{grid-template-columns:1fr}}
+  .face{border:1px solid var(--line-2); border-radius:5px; padding:.85rem .95rem; background:var(--sheet-2)}
+  .face.program{border-top:3px solid var(--signal)}
+  .face.protect{border-top:3px solid var(--enforce)}
+  .face h3{margin:0; font-size:.95rem; letter-spacing:-.01em; display:flex; align-items:baseline; gap:.5rem}
+  .face.program h3 .k{color:var(--signal-ink)}
+  .face.protect h3 .k{color:var(--enforce-ink)}
+  .face h3 .k{font-family:var(--mono); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase;
+    border:1px solid currentColor; border-radius:3px; padding:.12em .4em; opacity:.85}
+  .face p{margin:.45rem 0 0; font-size:.85rem; color:var(--muted)}
+  .unify{text-align:center; font-size:.9rem; margin:.8rem 0 0; color:var(--ink)}
+  .unify b{font-weight:600}
+  .unify .em{color:var(--muted)}
+
+  .why{font-size:.86rem; color:var(--muted); margin:0}
+  .why b{color:var(--ink); font-weight:600}
+
+  /* proposal block */
+  .proposal{border:1px solid var(--line-2); border-left:3px solid var(--signal); border-radius:5px;
+    background:var(--sheet-2); padding:1rem 1.05rem}
+  .proposal .big{font-size:.98rem; margin:0; color:var(--ink)}
+  .proposal .big b{font-weight:660; color:var(--signal-ink)}
+  .schematic{margin:.85rem 0 0; font-family:var(--mono); font-size:.72rem; display:grid; gap:.3rem}
+  .srow{display:grid; grid-template-columns:8.2rem 1fr auto; gap:.5rem; align-items:center;
+    padding:.32rem .5rem; border:1px solid var(--line); border-radius:4px; background:var(--sheet)}
+  .srow .k{color:var(--faint); text-transform:uppercase; letter-spacing:.08em; font-size:.62rem}
+  .srow .flow{color:var(--muted); overflow-x:auto; white-space:nowrap}
+  .srow .cost{font-size:.62rem; letter-spacing:.05em; text-align:right; white-space:nowrap}
+  .srow.slow .cost{color:var(--enforce-ink)}
+  .srow.fast{border-color:var(--signal); background:var(--signal-bg)}
+  .srow.fast .flow{color:var(--signal-ink)}
+  .srow.fast .cost{color:var(--signal-ink); font-weight:600}
+  @media(max-width:560px){.srow{grid-template-columns:1fr; gap:.15rem} .srow .cost{text-align:left}}
+
+  /* unlocks + safety */
+  .cols{display:grid; grid-template-columns:1.35fr 1fr; gap:1.1rem}
+  @media(max-width:620px){.cols{grid-template-columns:1fr; gap:.9rem}}
+  ul.unlocks{list-style:none; margin:0; padding:0; display:grid; gap:.4rem}
+  ul.unlocks li{font-size:.83rem; color:var(--muted); padding-left:1.1rem; position:relative}
+  ul.unlocks li::before{content:"▸"; position:absolute; left:0; color:var(--signal); font-size:.7rem; top:.15em}
+  ul.unlocks li b{color:var(--ink); font-weight:600}
+  ul.unlocks li.sec::before{color:var(--enforce)}
+  .safety{background:var(--sheet-2); border:1px solid var(--line); border-radius:5px; padding:.75rem .85rem}
+  .safety .t{font-family:var(--mono); font-size:.62rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--proof); margin:0 0 .4rem}
+  .safety p{margin:0; font-size:.8rem; color:var(--muted)}
+  .safety code{font-family:var(--mono); font-size:.78em; color:var(--ink);
+    background:var(--signal-bg); padding:.05em .3em; border-radius:3px}
+
+  /* ask */
+  .ask{border-top:2px solid var(--ink); padding-top:.9rem; margin-top:.3rem}
+  .ask h2{margin:0; font-size:1.05rem; letter-spacing:-.01em}
+  .ask p{margin:.4rem 0 0; font-size:.88rem; color:var(--muted); max-width:64ch}
+  .ask p b{color:var(--ink); font-weight:600}
+  .ask .champion{color:var(--signal-ink); font-weight:660}
+
+  .foot{margin:1.1rem 0 0; padding-top:.7rem; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:.62rem; color:var(--faint); letter-spacing:.03em;
+    display:flex; flex-wrap:wrap; gap:.3rem .8rem; justify-content:space-between}
+
+  /* ---------- PRINT: force one clean page, light, no grid ---------- */
+  @page{ size:letter portrait; margin:0.5in }
+  @media print{
+    :root, :root[data-theme="dark"]{
+      --paper:#fff; --sheet:#fff; --sheet-2:#fafbfc; --ink:#0f1720; --muted:#3f4c58; --faint:#6a7883;
+      --line:#c9d2da; --line-2:#b3bfc9; --signal:#0b7f95; --signal-bg:#eef6f8; --signal-ink:#0a5768;
+      --enforce:#8f560a; --enforce-bg:#f7efe1; --enforce-ink:#6b3f08; --proof:#256a45;
+    }
+    body{padding:0; background:#fff; font-size:10.2pt; line-height:1.36}
+    .sheet{max-width:none; border:0; border-radius:0; box-shadow:none; padding:0;
+      background-image:none}
+    .sheet::before{display:none}
+    .toolbar{display:none !important}
+    .noprint{display:none !important}
+    h1{font-size:19pt; margin-top:.35rem}
+    .thesis{font-size:9.6pt; margin-top:.4rem}
+    .rule{margin:.7rem 0}
+    .face p, .why, ul.unlocks li, .safety p, .ask p, .proposal .big{font-size:9pt}
+    .schematic{font-size:8pt}
+    .proposal, .face, .safety, .srow{break-inside:avoid}
+    .faces, .proposal, .cols, .ask{break-inside:avoid}
+  }
+
+  /* theme toggle */
+  .toolbar{max-width:52rem; margin:0 auto .7rem; display:flex; justify-content:flex-end}
+  .toolbar button{font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); background:var(--sheet); border:1px solid var(--line); border-radius:4px;
+    padding:.35em .7em; cursor:pointer}
+  .toolbar button:hover{border-color:var(--signal); color:var(--signal-ink)}
+  .toolbar button:focus-visible{outline:2px solid var(--signal); outline-offset:2px}
+</style>
+
+<div class="toolbar"><button id="themeBtn" type="button" aria-label="Toggle light or dark theme">◐ theme</button></div>
+
+<div class="sheet">
+  <p class="eyebrow">
+    <span>F5 TMM</span><span class="sep">·</span>
+    <span>Embedded verified eBPF</span><span class="sep">·</span>
+    <span class="tag">design proposal</span>
+  </p>
+
+  <h1>Let the running data plane <span class="hl">change at machine speed</span> — safely, without a release.</h1>
+
+  <p class="thesis"><b>The AI age collapsed every delivery timeline.</b> New capability, new telemetry,
+    and urgent fixes are all expected in hours now — not on the next quarterly build. The gap between
+    <b>needing the data plane to change and it changing</b> has to shrink toward nothing.
+    Call it the <span class="zero">race to zero</span>. Today, inside TMM, that gap is measured in releases.</p>
+
+  <hr class="rule">
+
+  <p class="lbl">One requirement, two faces — co-equal</p>
+  <div class="faces">
+    <div class="face program">
+      <h3><span class="k">program</span> Extend what it does</h3>
+      <p>New telemetry, new logic, new behavior in the running data plane — delivered as verified
+        bytecode against designed-in hook points, no rebuild.</p>
+    </div>
+    <div class="face protect">
+      <h3><span class="k">protect</span> Mitigate what's live</h3>
+      <p>Block a specific threat in place, in hours, with no release — a surgical, reversible control
+        that stands in until the patched build ships on schedule.</p>
+    </div>
+  </div>
+  <p class="unify"><b>The same act, either way:</b> <span class="em">change the running data plane's
+    behavior — safely, now.</span></p>
+
+  <hr class="rule">
+
+  <div class="cols" style="grid-template-columns:1fr; gap:1rem">
+    <p class="why"><b>Why it's hard here.</b> TMM is a kernel-bypass microkernel — its own network stack,
+      core-pinned poll loops. That design is <b>why it's fast</b>, and <b>why it's rigid</b>: the industry's
+      answer to safe runtime change, <b>kernel eBPF, is structurally blind to TMM</b> because TMM bypassed the
+      kernel. Changing it today means patch C → rebuild → re-qualify → ride the release train.</p>
+
+    <div class="proposal">
+      <p class="big"><b>The proposal:</b> embed a small, <b>verified</b> eBPF VM <em>inside</em> TMM at
+        designed-in hook points. Behavior loads as <b>bytecode — statically proven bounded and terminating
+        before it runs.</b> No rebuild, no reboot. Dynamically loadable <em>and</em> provably safe — the one
+        surface that is both.</p>
+      <div class="schematic" aria-hidden="false">
+        <div class="srow slow">
+          <span class="k">change today</span>
+          <span class="flow">C source → rebuild → re-qualify → release train</span>
+          <span class="cost">weeks–quarters</span>
+        </div>
+        <div class="srow fast">
+          <span class="k">the proposal</span>
+          <span class="flow">author → clang → PREVAIL verify → sign → load</span>
+          <span class="cost">hours</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <div class="cols">
+    <div>
+      <p class="lbl">What one surface unlocks</p>
+      <ul class="unlocks">
+        <li class="sec"><b>Live mitigation</b> — a signed, auto-retiring shield for a CVE nothing else can reach in TMM.</li>
+        <li><b>New telemetry &amp; logic</b> — metrics and behavior shipped as bytecode, no TMOS rev.</li>
+        <li><b>Black-box observability</b> — see inside a kernel-bypassed data plane (<span class="mono">tmmtrace</span> · <span class="mono">tmmdump</span>).</li>
+        <li><b>AI-authored, still safe</b> — the verifier is a fail-closed gate; blast radius bounded by <em>proof, not trust</em>.</li>
+      </ul>
+    </div>
+    <div class="safety">
+      <p class="t">■ why it's safe to run inline</p>
+      <p>Stock <b>PREVAIL</b> verifier, <b>no custom helpers</b>, host-owned outcomes, signed hook-point map.
+        A program can only read a curated <code>ctx</code> and return a code that picks one outcome the host
+        already owns — <code>PASS</code> / <code>DROP</code> / <code>RESET</code>. It cannot hang, scribble
+        memory, or invent control flow.</p>
+    </div>
+  </div>
+
+  <hr class="rule">
+
+  <div class="ask">
+    <h2>The data plane should stop being the holdout.</h2>
+    <p>A verified, in-process programmability surface is how the fastest layer in the stack catches up to a
+      machine-speed world — <b>one surface</b> serving observability, live mitigation, and even machine-speed
+      authorship, each change proven safe before it runs. <span class="champion">Champion the direction.</span></p>
+  </div>
+
+  <p class="foot">
+    <span>A design proposal — not a shipped feature.</span>
+    <span class="noprint"><a href="https://claude.ai/code/artifact/2e002bd8-bc27-41a1-a7aa-f53a253c7280" style="color:var(--signal-ink);text-decoration:none">Walk-through explainer →</a></span>
+    <span>Method &amp; claims held in a separate invention disclosure.</span>
+  </p>
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement, btn=document.getElementById('themeBtn');
+    btn.addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){ cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'; }
+      root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+  })();
+</script>

@@ -1,0 +1,632 @@
+<title>The verified data plane — an explainer</title>
+<style>
+  :root{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa; --surface-3:#eef2f6;
+    --ink:#0f1720; --muted:#526271; --faint:#7a8894;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54; --proof-ink:#1f5d3c;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:44rem;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#070a0e; --surface:#0f161d; --surface-2:#0c1218; --surface-3:#141d25;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a88;
+    --line:#1f2b34; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#4fb47d; --proof-ink:#7bd3a3;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#070a0e; --surface:#0f161d; --surface-2:#0c1218; --surface-3:#141d25;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a88;
+    --line:#1f2b34; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#4fb47d; --proof-ink:#7bd3a3;
+  }
+  :root[data-theme="light"]{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa; --surface-3:#eef2f6;
+    --ink:#0f1720; --muted:#526271; --faint:#7a8894;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54; --proof-ink:#1f5d3c;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.6; overflow-x:hidden}
+
+  .mono{font-family:var(--mono)}
+
+  /* top progress bar (all widths) */
+  .progress{position:fixed; top:0; left:0; height:2px; background:var(--signal); width:0;
+    z-index:60; transition:width .1s linear}
+
+  /* instrument rail (wide only) */
+  .rail{position:fixed; top:0; left:0; height:100vh; width:13rem; padding:2rem 1.2rem;
+    display:none; flex-direction:column; gap:.1rem; z-index:40;
+    border-right:1px solid var(--line); background:var(--surface-2)}
+  .rail .brand{font-family:var(--mono); font-size:.62rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--faint); margin:0 0 1.4rem; line-height:1.7}
+  .rail .brand b{color:var(--signal-ink); display:block; letter-spacing:.1em}
+  .rail a{display:flex; align-items:baseline; gap:.6rem; text-decoration:none; color:var(--faint);
+    font-family:var(--mono); font-size:.72rem; padding:.32rem 0; border:0; transition:color .15s}
+  .rail a .n{font-size:.62rem; opacity:.7; min-width:1.4rem}
+  .rail a .t{letter-spacing:.02em}
+  .rail a:hover{color:var(--muted)}
+  .rail a.active{color:var(--signal-ink)}
+  .rail a.active .n{opacity:1}
+  .rail a.active .t{position:relative}
+  .rail .foot{margin-top:auto; font-family:var(--mono); font-size:.58rem; color:var(--faint);
+    letter-spacing:.08em; line-height:1.8}
+  @media(min-width:1080px){ .rail{display:flex} .stage{padding-left:13rem} }
+
+  /* theme toggle */
+  .toolbar{position:fixed; top:.7rem; right:.8rem; z-index:60}
+  .toolbar button{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:4px;
+    padding:.4em .7em; cursor:pointer}
+  .toolbar button:hover{border-color:var(--signal); color:var(--signal-ink)}
+  .toolbar button:focus-visible{outline:2px solid var(--signal); outline-offset:2px}
+
+  /* beats */
+  .beat{max-width:var(--maxw); margin:0 auto; padding:clamp(3.4rem,10vh,7rem) clamp(1.15rem,5vw,2rem)}
+  .beat.reveal{opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s ease}
+  .beat.reveal.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion:reduce){ .beat.reveal{opacity:1; transform:none; transition:none} }
+
+  .kicker{font-family:var(--mono); font-size:.66rem; letter-spacing:.19em; text-transform:uppercase;
+    color:var(--signal-ink); margin:0 0 1rem; display:flex; align-items:center; gap:.6rem}
+  .kicker .num{color:var(--faint)}
+  .kicker.enf{color:var(--enforce-ink)}
+
+  h2{font-size:clamp(1.5rem,3.6vw,2.1rem); line-height:1.16; letter-spacing:-.02em; font-weight:670;
+    margin:0; text-wrap:balance}
+  .beat p.lede{font-size:clamp(1.02rem,1.7vw,1.18rem); color:var(--muted); margin:1.1rem 0 0; max-width:60ch}
+  .beat p.lede b{color:var(--ink); font-weight:600}
+  .beat p{font-size:1rem; color:var(--muted); max-width:62ch}
+  .beat p b{color:var(--ink); font-weight:600}
+  .beat p + p{margin-top:1rem}
+  em.sig{font-style:normal; color:var(--signal-ink); font-weight:600}
+  em.enf{font-style:normal; color:var(--enforce-ink); font-weight:600}
+  em.prf{font-style:normal; color:var(--proof-ink); font-weight:600}
+
+  /* HERO */
+  .hero{min-height:100vh; display:flex; flex-direction:column; justify-content:center;
+    max-width:var(--maxw); margin:0 auto; padding:5rem clamp(1.15rem,5vw,2rem) 3rem; position:relative}
+  .hero .eyebrow{font-family:var(--mono); font-size:.68rem; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--faint); margin:0 0 1.6rem}
+  .hero .eyebrow b{color:var(--signal-ink)}
+  .hero h1{font-size:clamp(2.1rem,6.5vw,4rem); line-height:1.04; letter-spacing:-.03em; font-weight:700;
+    margin:0; text-wrap:balance; max-width:16ch}
+  .hero h1 .ex{color:var(--enforce-ink)}
+  .hero .sub{font-size:clamp(1.05rem,2vw,1.32rem); color:var(--muted); margin:1.6rem 0 0; max-width:52ch; line-height:1.5}
+  .hero .sub b{color:var(--ink); font-weight:600}
+  /* race-to-zero gauge */
+  .gauge{margin:2.4rem 0 0; display:grid; gap:.5rem; max-width:34rem}
+  .gauge .row{display:grid; grid-template-columns:8.5rem 1fr; align-items:center; gap:.8rem;
+    font-family:var(--mono); font-size:.68rem; color:var(--faint)}
+  .gauge .track{height:6px; border-radius:3px; background:var(--surface-3); position:relative; overflow:hidden;
+    border:1px solid var(--line)}
+  .gauge .fill{position:absolute; top:0; left:0; bottom:0; border-radius:3px; width:0;
+    transition:width 1.1s cubic-bezier(.4,0,.2,1)}
+  .gauge .row.now .fill{background:var(--signal)}
+  .gauge .row.was .fill{background:var(--line-2)}
+  .gauge.go .row.was .fill{width:88%}
+  .gauge.go .row.now .fill{width:14%}
+  @media (prefers-reduced-motion:reduce){ .gauge .fill{transition:none} }
+  .gauge .cap{grid-column:2; font-family:var(--mono); font-size:.6rem; color:var(--faint); letter-spacing:.04em}
+  .scrollcue{position:absolute; bottom:1.6rem; left:clamp(1.15rem,5vw,2rem); font-family:var(--mono);
+    font-size:.62rem; letter-spacing:.16em; text-transform:uppercase; color:var(--faint);
+    display:flex; align-items:center; gap:.5rem}
+  .scrollcue .arrow{animation:bob 1.8s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+  @media (prefers-reduced-motion:reduce){ .scrollcue .arrow{animation:none} }
+
+  /* callout */
+  .callout{border-left:3px solid var(--enforce); background:var(--enforce-bg); border-radius:0 6px 6px 0;
+    padding:1rem 1.15rem; margin:1.6rem 0 0}
+  .callout p{margin:0; font-size:1rem; color:var(--ink); max-width:none}
+  .callout p b{color:var(--enforce-ink)}
+  .callout.sig{border-color:var(--signal); background:var(--signal-bg)}
+  .callout.sig p b{color:var(--signal-ink)}
+
+  /* two faces */
+  .faces{display:grid; grid-template-columns:1fr 1fr; gap:.9rem; margin:1.8rem 0 0}
+  @media(max-width:600px){.faces{grid-template-columns:1fr}}
+  .face{border:1px solid var(--line-2); border-radius:7px; padding:1.1rem 1.15rem; background:var(--surface)}
+  .face.program{border-top:3px solid var(--signal)}
+  .face.protect{border-top:3px solid var(--enforce)}
+  .face .h{margin:0; font-size:1.05rem; font-weight:640; letter-spacing:-.01em; display:flex; gap:.55rem; align-items:baseline}
+  .face .k{font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; text-transform:uppercase;
+    border:1px solid currentColor; border-radius:3px; padding:.14em .45em}
+  .face.program .k{color:var(--signal-ink)} .face.protect .k{color:var(--enforce-ink)}
+  .face p{margin:.6rem 0 0; font-size:.92rem}
+  .unify{text-align:center; margin:1.3rem 0 0; font-size:1.05rem; color:var(--ink)}
+  .unify b{font-weight:640}
+
+  /* generic schematic (compile vs load) */
+  .schematic{margin:1.7rem 0 0; font-family:var(--mono); font-size:.76rem; display:grid; gap:.4rem}
+  .srow{display:grid; grid-template-columns:8.6rem 1fr auto; gap:.6rem; align-items:center;
+    padding:.5rem .7rem; border:1px solid var(--line); border-radius:5px; background:var(--surface)}
+  .srow .k{color:var(--faint); text-transform:uppercase; letter-spacing:.08em; font-size:.62rem}
+  .srow .flow{color:var(--muted); overflow-x:auto; white-space:nowrap}
+  .srow .cost{font-size:.64rem; text-align:right; white-space:nowrap}
+  .srow.slow .cost{color:var(--enforce-ink)}
+  .srow.fast{border-color:var(--signal); background:var(--signal-bg)}
+  .srow.fast .flow{color:var(--signal-ink)} .srow.fast .cost{color:var(--signal-ink); font-weight:600}
+  @media(max-width:600px){.srow{grid-template-columns:1fr; gap:.2rem} .srow .cost{text-align:left}}
+
+  /* plane diagram */
+  .planes{display:grid; grid-template-columns:1fr 1fr; gap:.9rem; margin:1.7rem 0 0}
+  @media(max-width:600px){.planes{grid-template-columns:1fr}}
+  .plane{border:1px solid var(--line-2); border-radius:7px; padding:1rem 1.1rem; background:var(--surface)}
+  .plane .pt{font-family:var(--mono); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; margin:0 0 .5rem}
+  .plane.ctrl .pt{color:var(--proof-ink)} .plane.data .pt{color:var(--signal-ink)}
+  .plane h4{margin:0 0 .3rem; font-size:1rem}
+  .plane p{margin:.3rem 0 0; font-size:.86rem}
+  .plane .see{font-family:var(--mono); font-size:.66rem; margin-top:.7rem; padding-top:.6rem; border-top:1px dashed var(--line-2)}
+  .plane.ctrl .see{color:var(--proof-ink)} .plane.data .see b{color:var(--signal-ink)}
+
+  /* ===== interactive: observe / enforce ===== */
+  .switchwrap{margin:1.9rem 0 0; border:1px solid var(--line-2); border-radius:9px; overflow:hidden;
+    background:var(--surface)}
+  .switchhead{display:flex; align-items:center; gap:.5rem; padding:.7rem .8rem; border-bottom:1px solid var(--line);
+    background:var(--surface-2); flex-wrap:wrap}
+  .switchhead .lbl{font-family:var(--mono); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--faint); margin-right:auto}
+  .seg{display:inline-flex; border:1px solid var(--line-2); border-radius:6px; overflow:hidden; background:var(--surface)}
+  .seg button{font-family:var(--mono); font-size:.72rem; letter-spacing:.04em; border:0; background:transparent;
+    color:var(--muted); padding:.42em .9em; cursor:pointer; transition:background .15s,color .15s}
+  .seg button + button{border-left:1px solid var(--line-2)}
+  .seg button[aria-pressed="true"]{color:#fff}
+  .seg button.obs[aria-pressed="true"]{background:var(--signal)}
+  .seg button.enf[aria-pressed="true"]{background:var(--enforce)}
+  .seg button:focus-visible{outline:2px solid var(--ink); outline-offset:-2px}
+  .switchbody{padding:1.1rem 1rem 1.2rem}
+  .codeline{font-family:var(--mono); font-size:clamp(.72rem,1.5vw,.86rem); background:var(--surface-2);
+    border:1px solid var(--line); border-radius:6px; padding:.85rem .9rem; overflow-x:auto; white-space:nowrap;
+    color:var(--ink)}
+  .codeline .pin{color:var(--faint)}
+  .codeline .pred{color:var(--muted)}
+  .codeline .verb{font-weight:700; padding:.05em .15em; border-radius:3px; transition:color .2s,background .2s}
+  .codeline .verb.obs{color:var(--signal-ink); background:var(--signal-bg)}
+  .codeline .verb.enf{color:var(--enforce-ink); background:var(--enforce-bg)}
+  .pipe{display:grid; grid-template-columns:1fr auto 1fr auto 1fr; align-items:stretch; gap:.5rem;
+    margin:1.1rem 0 0; font-family:var(--mono)}
+  @media(max-width:600px){.pipe{grid-template-columns:1fr; }}
+  .pcell{border:1px solid var(--line); border-radius:6px; padding:.6rem .7rem; background:var(--surface-2); text-align:center}
+  .pcell .pk{font-size:.56rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); display:block; margin-bottom:.25rem}
+  .pcell .pv{font-size:.8rem; color:var(--ink)}
+  .parrow{align-self:center; color:var(--faint); font-size:.9rem; text-align:center}
+  @media(max-width:600px){.parrow{transform:rotate(90deg)}}
+  .pcell.out .pv{transition:color .2s}
+  .mode-obs .pcell.out .pv{color:var(--signal-ink)} .mode-enf .pcell.out .pv{color:var(--enforce-ink)}
+  .pcell.out{transition:border-color .2s}
+  .mode-obs .pcell.out{border-color:var(--signal)} .mode-enf .pcell.out{border-color:var(--enforce)}
+  .swnote{margin:1rem 0 0; font-size:.9rem; color:var(--muted)}
+  .swnote b{color:var(--ink)}
+  .mode-obs .swnote .only-enf{display:none} .mode-enf .swnote .only-obs{display:none}
+
+  /* unlocks list */
+  ul.unlocks{list-style:none; margin:1.6rem 0 0; padding:0; display:grid; gap:.75rem}
+  ul.unlocks li{font-size:.98rem; color:var(--muted); padding-left:1.3rem; position:relative; max-width:60ch}
+  ul.unlocks li::before{content:"▸"; position:absolute; left:0; color:var(--signal); top:.1em}
+  ul.unlocks li.sec::before{color:var(--enforce)}
+  ul.unlocks li.prf::before{color:var(--proof)}
+  ul.unlocks li b{color:var(--ink); font-weight:600}
+  .analogy{font-family:var(--mono); font-size:.8rem; color:var(--muted); margin:1.3rem 0 0;
+    padding:.7rem .85rem; border:1px dashed var(--line-2); border-radius:6px; overflow-x:auto; white-space:nowrap}
+  .analogy b{color:var(--signal-ink)}
+
+  /* ===== deep dive ===== */
+  .divider{max-width:var(--maxw); margin:2rem auto; padding:0 clamp(1.15rem,5vw,2rem)}
+  .divider .band{border-top:1px solid var(--line); padding-top:1.2rem; font-family:var(--mono);
+    font-size:.64rem; letter-spacing:.18em; text-transform:uppercase; color:var(--faint);
+    display:flex; align-items:center; gap:.7rem}
+  .divider .band .dot{width:6px; height:6px; border-radius:50%; background:var(--signal)}
+
+  .spec{max-width:var(--maxw); margin:0 auto; padding:1.2rem clamp(1.15rem,5vw,2rem)}
+  .spec.reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease,transform .6s ease}
+  .spec.reveal.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion:reduce){ .spec.reveal{opacity:1; transform:none; transition:none} }
+  .spec h3{font-size:1.14rem; margin:0 0 .2rem; letter-spacing:-.01em; display:flex; align-items:baseline; gap:.6rem}
+  .spec h3 .sn{font-family:var(--mono); font-size:.7rem; color:var(--signal-ink)}
+  .spec > p{font-size:.94rem; color:var(--muted); margin:.5rem 0 0; max-width:62ch}
+  .spec > p b{color:var(--ink)} .spec > p code, .inlinecode{font-family:var(--mono); font-size:.86em;
+    background:var(--signal-bg); color:var(--signal-ink); padding:.05em .35em; border-radius:3px}
+
+  .codeblock{font-family:var(--mono); font-size:.78rem; line-height:1.7; background:var(--surface-2);
+    border:1px solid var(--line); border-radius:7px; padding:.9rem 1rem; margin:1rem 0 0; overflow-x:auto}
+  .codeblock .c{color:var(--faint)}
+  .codeblock .kw{color:var(--enforce-ink)}
+  .codeblock .fn{color:var(--signal-ink)}
+  .tablewrap{overflow-x:auto; margin:1rem 0 0; border:1px solid var(--line); border-radius:7px}
+  table{border-collapse:collapse; width:100%; font-size:.84rem; min-width:34rem}
+  th,td{text-align:left; padding:.55rem .75rem; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--faint); background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td b{color:var(--ink)} td .mono{color:var(--ink)}
+  .ff td:first-child{font-family:var(--mono); color:var(--signal-ink); white-space:nowrap}
+
+  .lifecycle{display:flex; flex-wrap:wrap; gap:.4rem; margin:1rem 0 0; font-family:var(--mono); font-size:.72rem}
+  .lifecycle .step{border:1px solid var(--line-2); border-radius:5px; padding:.4em .7em; background:var(--surface);
+    color:var(--muted); white-space:nowrap}
+  .lifecycle .step b{color:var(--ink); font-weight:600}
+  .lifecycle .arr{align-self:center; color:var(--faint)}
+  .lifecycle .step.retire{border-color:var(--proof); color:var(--proof-ink)}
+
+  /* CLOSE */
+  .close{max-width:var(--maxw); margin:0 auto; padding:clamp(3.5rem,10vh,7rem) clamp(1.15rem,5vw,2rem) 4rem}
+  .close .big{font-size:clamp(1.7rem,4.4vw,2.6rem); line-height:1.14; letter-spacing:-.02em; font-weight:690;
+    margin:0; text-wrap:balance; max-width:20ch}
+  .close .big .hl{color:var(--signal-ink)}
+  .close p{font-size:1.08rem; color:var(--muted); margin:1.3rem 0 0; max-width:60ch}
+  .close p b{color:var(--ink); font-weight:600}
+  .close .champion{color:var(--signal-ink); font-weight:660}
+  .close .foot{margin:2.4rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
+  .close .foot a{color:var(--signal-ink); text-decoration:none} .close .foot a:hover{text-decoration:underline}
+</style>
+
+<div class="progress" id="progress"></div>
+<div class="toolbar"><button id="themeBtn" type="button" aria-label="Toggle light or dark theme">◐ theme</button></div>
+
+<nav class="rail" aria-label="Sections">
+  <p class="brand"><b>F5 · TMM</b>the verified<br>data plane</p>
+  <a href="#hero"   data-sec="hero"><span class="n">00</span><span class="t">machine speed</span></a>
+  <a href="#world"  data-sec="world"><span class="n">01</span><span class="t">the race to zero</span></a>
+  <a href="#needs"  data-sec="needs"><span class="n">02</span><span class="t">two faces</span></a>
+  <a href="#holdout" data-sec="holdout"><span class="n">03</span><span class="t">the holdout</span></a>
+  <a href="#move"   data-sec="move"><span class="n">04</span><span class="t">the move</span></a>
+  <a href="#surface" data-sec="surface"><span class="n">05</span><span class="t">one surface</span></a>
+  <a href="#unlock" data-sec="unlock"><span class="n">06</span><span class="t">what it unlocks</span></a>
+  <a href="#deep"   data-sec="deep"><span class="n">07</span><span class="t">how it works</span></a>
+  <a href="#close"  data-sec="close"><span class="n">08</span><span class="t">the ask</span></a>
+  <span class="foot">a design<br>proposal</span>
+</nav>
+
+<div class="stage">
+
+  <!-- 00 HERO -->
+  <section class="hero" id="hero" data-sec="hero">
+    <p class="eyebrow">F5 TMM · <b>a verified programmability surface</b> · design proposal</p>
+    <h1>Everything ships at machine speed now. <span class="ex">Except the data plane.</span></h1>
+    <p class="sub"><b>The gap between needing a running system to change and it changing is racing toward
+      zero</b> — across app code, infrastructure, CI. One layer holds out: the data plane that carries the traffic.</p>
+    <div class="gauge" id="gauge" aria-hidden="true">
+      <div class="row was"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
+      <div class="row now"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
+      <span class="cap">time from “needs to change” → “changed”</span>
+    </div>
+    <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
+  </section>
+
+  <!-- 01 WORLD -->
+  <section class="beat reveal" id="world" data-sec="world">
+    <p class="kicker"><span class="num">01</span> the race to zero</p>
+    <h2>The distance between intent and behavior is collapsing — on purpose.</h2>
+    <p class="lede">Application code hot-reloads. Infrastructure is declared and applied in minutes.
+      CI ships continuously. And on the other side, vulnerabilities are found, weaponized, and iterated
+      at <b>machine speed</b> — AI reasons over mature codebases and surfaces exploitable paths faster
+      than humans can triage them.</p>
+    <p>Everywhere in computing, the interval between <em class="sig">needing a system to behave differently</em>
+      and <em class="sig">it doing so</em> is being driven toward nothing. That is the ambient expectation now —
+      the race to zero.</p>
+    <div class="callout"><p><b>One layer resists it:</b> the data plane. The part that actually
+      moves the packets is the hardest thing in the stack to change while it runs — and in a proxy, it's
+      the part most exposed to the traffic.</p></div>
+  </section>
+
+  <!-- 02 NEEDS -->
+  <section class="beat reveal" id="needs" data-sec="needs">
+    <p class="kicker"><span class="num">02</span> two faces of one need</p>
+    <h2>When the world moves this fast, two demands land on the data plane. They are the same demand.</h2>
+    <div class="faces">
+      <div class="face program">
+        <p class="h"><span class="k">program</span> Extend what it does</p>
+        <p>New telemetry, new logic, new behavior in the <b>running</b> data plane — a metric you didn't
+          think to collect, a diagnosis, a tuning decision — delivered against designed-in hook points,
+          no rebuild.</p>
+      </div>
+      <div class="face protect">
+        <p class="h"><span class="k">protect</span> Mitigate what's live</p>
+        <p>Block a specific, active threat <b>in place</b>, in hours, with no release — a surgical,
+          reversible control that holds the line until the patched build ships on its normal schedule.</p>
+      </div>
+    </div>
+    <p class="unify"><b>Programmability and security are not two projects.</b> They are one requirement seen
+      from two sides: <em class="sig">change the running data plane's behavior — safely, now.</em></p>
+  </section>
+
+  <!-- 03 HOLDOUT -->
+  <section class="beat reveal" id="holdout" data-sec="holdout">
+    <p class="kicker"><span class="num">03</span> why the data plane holds out</p>
+    <h2>TMM is fast because it left the kernel behind. That's exactly why it's so hard to change.</h2>
+    <p class="lede">TMM is a kernel-bypass microkernel: its own network stack, its own memory manager, a
+      core-pinned poll loop that never syscalls for traffic. That architecture is <b>why it's fast</b> —
+      and <b>why it's opaque and rigid</b>.</p>
+    <p>The industry's answer to safely changing a running system is <b>eBPF in the kernel</b>. But TMM
+      bypassed the kernel — so kernel eBPF is <em class="enf">structurally blind</em> to everything TMM does
+      with the traffic. Today, changing TMM behavior means the slow lane, every time:</p>
+    <div class="schematic">
+      <div class="srow slow">
+        <span class="k">change today</span>
+        <span class="flow">C source → rebuild → re-qualify → release train</span>
+        <span class="cost">weeks–quarters</span>
+      </div>
+    </div>
+    <div class="planes">
+      <div class="plane ctrl">
+        <p class="pt">◇ control plane</p>
+        <h4>Linux daemons</h4>
+        <p>httpd, tmsh, MCPD, iControl REST — ordinary processes the kernel can see.</p>
+        <p class="see">kernel eBPF reaches this ✓</p>
+      </div>
+      <div class="plane data">
+        <p class="pt">◆ data plane</p>
+        <h4>TMM microkernel</h4>
+        <p>Own stack, poll loop, plugin processes (<span class="mono">bd</span>/WAF). Kernel-bypassed.</p>
+        <p class="see"><b>nothing outside can see in ✗</b></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 MOVE -->
+  <section class="beat reveal" id="move" data-sec="move">
+    <p class="kicker"><span class="num">04</span> the move</p>
+    <h2>What makes kernel eBPF safe isn't the kernel. It's a verifier and a tiny VM — and both are libraries.</h2>
+    <p class="lede">Strip kernel eBPF to its essence and two things do the work: a <b>static verifier</b>
+      that proves a program is bounded and memory-safe <em>before</em> it runs, and a <b>small sandboxed VM</b>
+      that executes it. Neither needs to live in the kernel.</p>
+    <p>So bring them inside. Embed a small userspace eBPF VM — <span class="inlinecode">uBPF</span>, ~150&nbsp;KB,
+      JIT-compiled — <em class="sig">inside TMM's own address space</em>, at designed-in hook points, gated by
+      a stock verifier (<span class="inlinecode">PREVAIL</span>). Now behavior arrives as <b>bytecode, proven
+      safe before it loads</b>. No rebuild. No reboot. The data plane gets a fast lane:</p>
+    <div class="schematic">
+      <div class="srow slow">
+        <span class="k">change today</span><span class="flow">C source → rebuild → re-qualify → release train</span><span class="cost">weeks–quarters</span>
+      </div>
+      <div class="srow fast">
+        <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → sign → load</span><span class="cost">hours</span>
+      </div>
+    </div>
+    <div class="callout sig"><p>The surface is one thing, and it's the thing nothing else offers:
+      <b>dynamically loadable <em>and</em> provably safe</b> — reaching the data plane's own code and state.</p></div>
+  </section>
+
+  <!-- 05 SURFACE (interactive) -->
+  <section class="beat reveal" id="surface" data-sec="surface">
+    <p class="kicker"><span class="num">05</span> one surface, both faces</p>
+    <h2>Program and protect are the same machinery. Only the last step differs.</h2>
+    <p class="lede">A loaded program reads a curated context and returns a value. Whether that value becomes
+      <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the host's choice —
+      not a different mechanism. Here is the <b>same</b> hook, authored as a one-liner. Flip the last verb:</p>
+
+    <div class="switchwrap" id="switch">
+      <div class="switchhead">
+        <span class="lbl">tmmtrace · one hook, two modes</span>
+        <div class="seg" role="group" aria-label="Choose mode">
+          <button class="obs" id="obsBtn" aria-pressed="true">observe</button>
+          <button class="enf" id="enfBtn" aria-pressed="false">enforce</button>
+        </div>
+      </div>
+      <div class="switchbody mode-obs" id="swbody">
+        <div class="codeline">
+          <span class="pin">tmm:l7:frame</span>
+          <span class="pred">/args.opcode&nbsp;&gt;=&nbsp;4/</span>
+          { <span class="verb obs" id="verb">snapshot()</span> }
+        </div>
+        <div class="pipe">
+          <div class="pcell"><span class="pk">input</span><span class="pv"><span class="mono">ctx</span> — curated fields</span></div>
+          <div class="parrow">→</div>
+          <div class="pcell"><span class="pk">program</span><span class="pv">bounded predicate<br>(verified)</span></div>
+          <div class="parrow">→</div>
+          <div class="pcell out"><span class="pk">host applies</span><span class="pv" id="outcell">records a sample<br>into a ring / metric</span></div>
+        </div>
+        <p class="swnote">
+          <span class="only-obs">Same program shape; the host <b>records</b> the return. This is
+            <b>observability</b> — deep telemetry from inside a black box, on demand, then off.</span>
+          <span class="only-enf">Same program shape; the host <b>acts on</b> the return. This is
+            <b>mitigation</b> — a live shield that drops the malformed frame before the vulnerable code runs.</span>
+        </p>
+      </div>
+    </div>
+    <p style="margin-top:1.4rem">Nothing about the VM, the verifier, or the context changed — only what the
+      host does with the answer. That symmetry <em class="sig">is</em> the thesis: one verified surface,
+      serving programmability and security as equals.</p>
+  </section>
+
+  <!-- 06 UNLOCK -->
+  <section class="beat reveal" id="unlock" data-sec="unlock">
+    <p class="kicker"><span class="num">06</span> what one surface unlocks</p>
+    <h2>Build it once, and the same spine carries far more than shields.</h2>
+    <ul class="unlocks">
+      <li><b>Observability into a black box.</b> Deep, on-demand telemetry from inside the kernel-bypassed
+        data plane — a flight recorder that captures the run-up <em>into</em> a failure, not the wreckage after.</li>
+      <li class="sec"><b>Live mitigation.</b> A signed, auto-retiring shield for a data-plane CVE that no
+        iRule, WAF rule, or kernel probe can reach — retired automatically once the patched build lands.</li>
+      <li><b>Field diagnostics &amp; self-tuning.</b> Ship a signed probe to characterize a production issue in
+        situ, then remove it. Read internal load and nudge a knob. New metrics as bytecode, no TMOS rev.</li>
+      <li class="prf"><b>AI-authored change that's still safe to run.</b> Because safety is a <em class="prf">proof,
+        not trust</em>, a model can draft a change and the verifier becomes a <b>fail-closed acceptance gate</b> —
+        blast radius bounded before a human ever signs. Machine-speed authorship for a machine-speed world.</li>
+    </ul>
+    <div class="analogy">tmmtrace : bpftrace &nbsp;::&nbsp; <b>tmmdump : tcpdump</b> &nbsp;— one summarizes the data plane, one captures it.</div>
+  </section>
+
+  <!-- divider into deep dive -->
+  <div class="divider"><div class="band"><span class="dot"></span> how it works · for the engineers</div></div>
+
+  <!-- 07 DEEP DIVE -->
+  <div id="deep" data-sec="deep"></div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.1</span> The mechanism</h3>
+    <p>A hook point is a designed-in call site. The host packs the internal state it wants to expose into a
+      typed <span class="inlinecode">ctx</span>, runs the program, and reads one return value. The
+      <span class="inlinecode">ctx</span> is <b>input</b>; the return code is the <b>verdict</b> the host acts on.</p>
+    <div class="codeblock"><span class="c">// at a designed-in hook, the host calls the VM like any function</span>
+<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);   <span class="c">// ctx in → ret out</span>
+<span class="c">// ret → host-owned outcome:  0 = PASS   1 = matched/monitor   2 = DROP</span></div>
+    <p style="margin-top:.9rem">Both observe and enforce programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
+      — they read fields and return a number, and call nothing. Two consequences fall out, and they erase the
+      hardest parts: <b>no custom helpers</b> to define, register, or secure; and <b>stock PREVAIL</b> — a bounded
+      predicate over a typed context is the canonical case the verifier already proves, so there is no fork in
+      the trust path.</p>
+  </div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.2</span> Placement — two planes, two engines, one catalog</h3>
+    <p>A single mechanism can't cover TMOS, because TMOS is two execution environments. The plane decides the engine.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Plane</th><th>What runs there</th><th>Engine</th></tr></thead>
+      <tbody>
+        <tr><td><b>Control</b></td><td>Linux daemons — httpd, tmsh, MCPD; iControl REST on the JVM</td>
+          <td>kernel eBPF / uprobe · <span class="mono">+ JVMTI</span> for Java</td></tr>
+        <tr><td><b>Data</b></td><td>TMM microkernel + plugin processes (<span class="mono">bd</span>/WAF) — kernel-bypassed</td>
+          <td><b>embedded uBPF</b> (+ PREVAIL)</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier — it's the true Cisco analog.
+      The data plane is the crown jewel: an in-process VM is the <em>only</em> thing that can place a probe or a
+      shield inside TMM's own execution.</p>
+  </div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.3</span> Three form factors — same mechanism, honest coverage</h3>
+    <p>Appliance, VE, and BIG-IP Next all run the same TMM, so the mechanism is identical. <b>Coverage</b> is not —
+      it scales inversely with how much the platform offloads to hardware.</p>
+    <div class="tablewrap"><table class="ff">
+      <thead><tr><th>Form factor</th><th>Data path</th><th>Coverage</th></tr></thead>
+      <tbody>
+        <tr><td>BIG-IP VE</td><td>pure software, no offload</td><td><b>full</b> — the VM sees the entire path</td></tr>
+        <tr><td>Appliance</td><td>ePVA / FPGA / TurboFlex offload</td><td>software path only — offloaded flows are a hardware boundary</td></tr>
+        <tr><td>BIG-IP Next (BNK)</td><td>containerized TMM, DPU-dependent</td><td>depends on how much the DPU steers vs. lands in TMM</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:.9rem"><b>Honest boundary:</b> a flow mitigated in silicon never enters TMM software, so
+      an in-TMM hook can't see it — the same limit iRules and kernel eBPF already have. The high-severity L7/parser
+      and <span class="mono">bd</span>-termination CVE classes this targets execute in software regardless, so they stay reachable.</p>
+  </div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.4</span> Why it's safe to run inline</h3>
+    <p>Executing bytecode in the data plane is powerful, which makes it a crown-jewel target. Safety is layered,
+      and the first principle is blunt: <b>verified ≠ secure</b>. PREVAIL proves a program can't crash or hang TMM;
+      it proves nothing about intent. Security is the governance <em>around</em> the VM.</p>
+    <ul class="unlocks" style="margin-top:1rem">
+      <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
+      <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; enforce needs stricter authz than observe; RBAC-gated.</li>
+      <li><b>Host-owned outcomes</b> — a program <em>chooses among</em> <span class="mono">PASS / DROP / RESET</span>; it cannot invent control flow or force an arbitrary early return.</li>
+      <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
+      <li class="sec"><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, instant kill-switch + revocation, and a per-hook perf budget with a watchdog.</li>
+    </ul>
+  </div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.5</span> Lifecycle — nothing outlives its purpose</h3>
+    <p>Every program is authored, proven, signed, loaded — and retires itself. A shield auto-disables the moment
+      the running TMOS version crosses the version that fixes its CVE; a diagnostic probe is time-boxed. No zombies.</p>
+    <div class="lifecycle">
+      <span class="step"><b>author</b> (human or AI-assisted)</span><span class="arr">→</span>
+      <span class="step"><b>clang</b> → bytecode</span><span class="arr">→</span>
+      <span class="step"><b>PREVAIL</b> verify</span><span class="arr">→</span>
+      <span class="step"><b>sign</b></span><span class="arr">→</span>
+      <span class="step"><b>load</b> → run</span><span class="arr">→</span>
+      <span class="step retire"><b>auto-retire</b></span>
+    </div>
+  </div>
+
+  <!-- 08 CLOSE -->
+  <section class="close reveal" id="close" data-sec="close">
+    <p class="kicker"><span class="num">08</span> the ask</p>
+    <p class="big">The data plane should stop being <span class="hl">the holdout</span>.</p>
+    <p>The fastest layer in the stack is the last one that can't change at machine speed. A verified, in-process
+      programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
+      even machine-speed authorship, with every change <b>proven safe before it runs</b>.</p>
+    <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as the
+      same, co-equal requirement of a machine-speed world, and give TMM the one surface that satisfies both.
+      <span class="champion">Champion it.</span></p>
+    <p class="foot">
+      A design proposal — not a shipped feature.<br>
+      Companion: the <a href="https://claude.ai/code/artifact/1b7050c4-f5c1-4b2e-bbbc-af197e53febc">one-page proposal</a>. &nbsp;·&nbsp; Detailed method &amp; claims are held in a separate invention disclosure.
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement;
+
+    /* theme toggle */
+    document.getElementById('themeBtn').addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){ cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'; }
+      root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+
+    /* scroll progress */
+    var pbar=document.getElementById('progress');
+    function onScroll(){
+      var h=document.documentElement, max=h.scrollHeight-h.clientHeight;
+      pbar.style.width=(max>0?(h.scrollTop/max*100):0)+'%';
+    }
+    addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+    /* reveal on enter */
+    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if('IntersectionObserver' in window && !reduce){
+      var io=new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+      },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+      document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+    } else {
+      document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
+    }
+
+    /* hero gauge animation on load */
+    var gauge=document.getElementById('gauge');
+    requestAnimationFrame(function(){ setTimeout(function(){ gauge.classList.add('go'); }, 250); });
+
+    /* rail active-section tracking */
+    var rail=document.querySelector('.rail');
+    var links={}; if(rail){ rail.querySelectorAll('a').forEach(function(a){ links[a.dataset.sec]=a; }); }
+    var secs=document.querySelectorAll('[data-sec]');
+    if('IntersectionObserver' in window && rail){
+      var so=new IntersectionObserver(function(es){
+        es.forEach(function(e){
+          if(e.isIntersecting){
+            var id=e.target.getAttribute('data-sec');
+            Object.keys(links).forEach(function(k){ links[k].classList.toggle('active', k===id); });
+          }
+        });
+      },{rootMargin:'-45% 0px -45% 0px', threshold:0});
+      secs.forEach(function(s){ so.observe(s); });
+    }
+
+    /* observe / enforce switch */
+    var body=document.getElementById('swbody'), verb=document.getElementById('verb'),
+        outcell=document.getElementById('outcell'),
+        obsBtn=document.getElementById('obsBtn'), enfBtn=document.getElementById('enfBtn');
+    function setMode(m){
+      var obs=(m==='obs');
+      body.classList.toggle('mode-obs',obs); body.classList.toggle('mode-enf',!obs);
+      obsBtn.setAttribute('aria-pressed', obs?'true':'false');
+      enfBtn.setAttribute('aria-pressed', obs?'false':'true');
+      verb.textContent = obs?'snapshot()':'drop()';
+      verb.className = 'verb '+(obs?'obs':'enf');
+      outcell.innerHTML = obs ? 'records a sample<br>into a ring / metric' : 'applies a verdict<br><span class="mono">DROP</span> before the vuln op';
+    }
+    obsBtn.addEventListener('click',function(){ setMode('obs'); });
+    enfBtn.addEventListener('click',function(){ setMode('enf'); });
+  })();
+</script>
