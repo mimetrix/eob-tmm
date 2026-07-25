@@ -527,9 +527,10 @@
   <section class="beat reveal" id="surface" data-sec="surface">
     <p class="kicker"><span class="num">05</span> one surface, both faces</p>
     <h2>Program and protect are the same machinery. Only the last step differs.</h2>
-    <p class="lede">A loaded program reads a curated context and returns a value. Whether that value becomes
-      <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the host's choice —
-      not a different mechanism. Here is the <b>same</b> hook, authored as a one-liner. Flip the last verb:</p>
+    <p class="lede">At its simplest, a loaded program reads a curated context and returns a value. Whether that
+      value becomes <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the
+      host's choice — not a different mechanism. Here is the <b>same</b> hook, authored as a one-liner. Flip the
+      last verb:</p>
 
     <div class="switchwrap" id="switch">
       <div class="switchhead">
@@ -563,6 +564,9 @@
     <p style="margin-top:1.4rem">Nothing about the VM, the verifier, or the context changed — only what the
       host does with the answer. That symmetry <em class="sig">is</em> the thesis: one verified surface,
       serving programmability and security as equals.</p>
+    <p style="margin-top:1rem">And read-a-context, return-a-value is just the <b>floor</b>. The hook surface is
+      designed to grow — a widening catalog of designed-in USDTs, each new context field opening more of the data
+      plane to both observation and control, with room to give programs more power over time.</p>
   </section>
 
   <!-- 06 UNLOCK -->
@@ -664,6 +668,21 @@
       <span class="step"><b>load</b> → run</span><span class="arr">→</span>
       <span class="step retire"><b>auto-retire</b></span>
     </div>
+  </div>
+
+  <div class="spec reveal">
+    <h3><span class="sn">7.6</span> The surface is built to grow</h3>
+    <p>Read-a-context, return-a-value is the <b>floor</b> — chosen for maximal safety, not the limit of the VM.
+      Two growth paths, deliberately different in cost:</p>
+    <ul class="unlocks" style="margin-top:1rem">
+      <li><b>More hooks — for free.</b> Each release can add USDTs (define a <span class="inlinecode">ctx</span>,
+        place a hook, publish it in the signed map) with <b>no VM, verifier, or helper work</b>. Every new field
+        widens what can be observed <em>and</em> enforced, so the instrumentation surface compounds over time.</li>
+      <li class="prf"><b>Helpers — if and when needed.</b> Richer, stateful programs (direct host-map access,
+        cross-flow state) can be enabled later through an <em>optional</em> helper tier. The honest trade: helpers
+        reintroduce an ABI to secure and verifier surface to manage — which is exactly why the base ships without
+        them and stays on <b>stock PREVAIL</b>. Power is available; safety stays the default.</li>
+    </ul>
   </div>
 
   <!-- 08 CLOSE -->
