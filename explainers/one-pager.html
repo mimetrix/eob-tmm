@@ -1,4 +1,4 @@
-<title>The verified data plane — a proposal</title>
+<title>The programmable data plane — a proposal</title>
 <style>
   :root{
     --paper:#eef1f4; --sheet:#ffffff; --sheet-2:#f5f8fa;
@@ -132,6 +132,7 @@
   .ask p{margin:.4rem 0 0; font-size:.88rem; color:var(--muted); max-width:64ch}
   .ask p b{color:var(--ink); font-weight:600}
   .ask .champion{color:var(--signal-ink); font-weight:660}
+  .ask p .em{color:var(--proof); font-weight:600}
 
   .foot{margin:1.1rem 0 0; padding-top:.7rem; border-top:1px solid var(--line);
     font-family:var(--mono); font-size:.62rem; color:var(--faint); letter-spacing:.03em;
@@ -174,7 +175,7 @@
 <div class="sheet">
   <p class="eyebrow">
     <span>F5 TMM</span><span class="sep">·</span>
-    <span>Embedded verified eBPF</span><span class="sep">·</span>
+    <span>a programmable data plane, provably safe</span><span class="sep">·</span>
     <span class="tag">design proposal</span>
   </p>
 
@@ -261,9 +262,10 @@
 
   <div class="ask">
     <h2>The data plane should stop being the holdout.</h2>
-    <p>A verified, in-process programmability surface is how the fastest layer in the stack catches up to a
-      machine-speed world — <b>one surface</b> serving observability, live mitigation, and even machine-speed
-      authorship, each change proven safe before it runs. <span class="champion">Champion the direction.</span></p>
+    <p>A <b>programmable data plane</b> — one that's <span class="em">provably safe</span> — is how the fastest
+      layer in the stack catches up to a machine-speed world, serving observability, live mitigation, and even
+      machine-speed authorship, each change proven safe before it runs. Programmable, others reached for;
+      <span class="em">provably safe</span> is the part that's new. <span class="champion">Champion the direction.</span></p>
   </div>
 
   <p class="foot">
