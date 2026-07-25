@@ -581,7 +581,7 @@
           <span class="only-obs">Same program shape; the host <b>records</b> the return. This is
             <b>observability</b> — deep telemetry from inside a black box, on demand, then off.</span>
           <span class="only-enf">Same program shape; the host <b>acts on</b> the return. This is
-            <b>mitigation</b> — a live shield that drops the malformed frame before the vulnerable code runs.</span>
+            <b>enforcement</b> — the host drops the malformed frame before the vulnerable code runs.</span>
         </p>
       </div>
     </div>
@@ -596,25 +596,27 @@
 
   <!-- 06 UNLOCK -->
   <section class="beat reveal" id="unlock" data-sec="unlock">
-    <p class="kicker"><span class="num">06</span> what one surface unlocks</p>
-    <h2>Build it once, and the uses compound.</h2>
-    <p class="lede">In enforce mode, that program becomes a <b>shield</b> — a small, signed program that blocks a
-      specific exploit condition <em>in place</em>, before the vulnerable code runs, and retires itself the moment
-      the patched build ships: a finger in the dike between maintenance windows. But a shield is just <em>one</em>
-      use — the same spine carries far more:</p>
+    <p class="kicker"><span class="num">06</span> what the engine unlocks</p>
+    <h2>A general-purpose platform — with one flagship security application.</h2>
+    <p class="lede">Most of what the engine unlocks is plain <b>programmability and observability</b> — the generic
+      payoff of a verified VM inside the data plane, <em>none of it a shield</em>:</p>
     <ul class="unlocks">
-      <li><b>Observability into a black box.</b> Deep, on-demand telemetry from inside the kernel-bypassed data
-        plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>) or captured
-        byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>), including a flight
-        recorder that catches the run-up <em>into</em> a failure, not the wreckage after.</li>
-      <li class="sec"><b>Live mitigation — the shield.</b> Reaches a data-plane CVE that no iRule, WAF rule, or
-        kernel probe can — signed, and retired automatically once the patched build lands.</li>
-      <li><b>Field diagnostics &amp; self-tuning.</b> Ship a signed probe to characterize a production issue in
-        situ, then remove it. Read internal load and nudge a knob. New metrics as bytecode, no TMOS rev.</li>
-      <li class="prf"><b>AI-authored change that's still safe to run.</b> Because safety is a <em class="prf">proof,
-        not trust</em>, a model can draft a change and the verifier becomes a <b>fail-closed acceptance gate</b> —
-        blast radius bounded before a human ever signs. Machine-speed authorship for a machine-speed world.</li>
+      <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
+        kernel-bypassed data plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>)
+        or captured byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>).</li>
+      <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev; read
+        internal load and nudge a knob.</li>
+      <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
+        no debug build, no core-dump archaeology.</li>
+      <li class="prf"><b>AI-authored programs.</b> Because safety is a <em class="prf">proof, not trust</em>, a model
+        can draft one and the verifier is a <b>fail-closed acceptance gate</b> — blast radius bounded before a
+        human signs.</li>
     </ul>
+    <div class="callout"><p><b>Then there's the flagship: the shield.</b> One specific application, built on the
+      <em>enforce</em> primitive plus the governance a security control demands — a signed, CVE-keyed catalog,
+      monitor→enforce modes, and auto-retirement when the patched build lands. It mitigates a live exploit — in
+      TMM <em>or</em> the control-plane daemons — that no iRule, WAF rule, or kernel probe reaches. An app on the
+      platform, not the platform itself.</p></div>
   </section>
 
   <!-- 07 DEEP DIVE -->
@@ -671,9 +673,9 @@
       data plane is the crown jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's
       own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
-      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL), all under one
-      signed catalog and lifecycle. The same one-liner that shields a TMM parser bug shields an httpd RCE — only the
-      target changes.</p>
+      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
+      engines, one trust path — retarget a program from a TMM parser to an httpd request path by changing only the
+      hook name.</p>
   </div>
 
   <div class="spec reveal">
@@ -688,9 +690,9 @@
         <tr><td>BIG-IP Next (BNK)</td><td>containerized TMM, DPU-dependent</td><td>depends on how much the DPU steers vs. lands in TMM</td></tr>
       </tbody>
     </table></div>
-    <p style="margin-top:.9rem"><b>Honest boundary:</b> a flow mitigated in silicon never enters TMM software, so
-      an in-TMM hook can't see it — the same limit iRules and kernel eBPF already have. The high-severity L7/parser
-      and <span class="mono">bd</span>-termination CVE classes this targets execute in software regardless, so they stay reachable.</p>
+    <p style="margin-top:.9rem"><b>Honest boundary:</b> a flow handled entirely in silicon never enters TMM software,
+      so an in-TMM hook can't see it — the same limit iRules and kernel eBPF already have. The L7/parser stages and
+      <span class="mono">bd</span>/WAF internals worth reaching execute in software regardless, so they stay in view.</p>
   </div>
 
   <div class="spec reveal">
@@ -709,8 +711,8 @@
 
   <div class="spec reveal">
     <h3><span class="sn">7.5</span> Lifecycle — nothing outlives its purpose</h3>
-    <p>Every program is authored, proven, signed, loaded — and retires itself. A shield auto-disables the moment
-      the running TMOS version crosses the version that fixes its CVE; a diagnostic probe is time-boxed. No zombies.</p>
+    <p>Every program is authored, proven, signed, loaded — and can carry an expiry, so nothing outlives its
+      purpose: a diagnostic probe when its window closes, a security shield when the patched build lands. No zombies.</p>
     <div class="lifecycle">
       <span class="step"><b>author</b> (human or AI-assisted)</span><span class="arr">→</span>
       <span class="step"><b>clang</b> → bytecode</span><span class="arr">→</span>
