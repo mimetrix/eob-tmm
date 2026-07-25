@@ -541,8 +541,8 @@
       value becomes <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the
       host's choice — not a different mechanism.</p>
     <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
-      to a full multi-probe script, it compiles to eBPF bytecode, clears the verifier, and attaches at the named
-      hooks. Each probe has three parts:</p>
+      to a full multi-probe script, it compiles to eBPF bytecode, clears the verifier, and — once <b>signed</b> —
+      attaches at the named hooks. Each probe has three parts:</p>
     <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
