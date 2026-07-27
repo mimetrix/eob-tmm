@@ -679,7 +679,10 @@
     <ul class="unlocks" style="margin-top:1rem">
       <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
       <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; enforce needs stricter authz than observe; RBAC-gated.</li>
-      <li><b>Host-owned outcomes</b> — a program <em>chooses among</em> <span class="mono">PASS / DROP / RESET</span>; it cannot invent control flow or force an arbitrary early return.</li>
+      <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
+        Even at an enforce point, the return merely <em>selects among</em> outcomes the host code already owns
+        (a shield's <span class="mono">pass / drop / reset</span>, for example); a program cannot invent control
+        flow or force an arbitrary early return.</li>
       <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
       <li class="sec"><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, instant kill-switch + revocation, and a per-hook perf budget with a watchdog.</li>
     </ul>
