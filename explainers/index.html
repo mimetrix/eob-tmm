@@ -199,16 +199,16 @@
   .gist .punch{font-size:clamp(1.08rem,2.1vw,1.3rem); font-weight:640; color:var(--ink);
     text-align:center; margin:1.5rem auto 0; max-width:44ch; line-height:1.45; text-wrap:balance}
   /* quiet aside card (e.g. the USDT-catalog note) */
-  .aside-note{margin:1.1rem 0 0; padding:.8rem 1rem; border:1px dashed var(--line-2); border-radius:7px;
-    font-size:.88rem; color:var(--muted); line-height:1.55}
+  .aside-note{margin:1.3rem 0 0; padding:.95rem 1.1rem; border:1px solid var(--line-2);
+    border-left:3px solid var(--line-2); border-radius:7px; font-size:.98rem; color:var(--muted); line-height:1.6}
   .aside-note b{color:var(--ink); font-weight:600}
   .unify{text-align:center; margin:1.2rem 0 0; font-size:1.02rem; color:var(--ink); max-width:58ch; margin-left:auto; margin-right:auto}
   .unify b{font-weight:640}
 
   /* generic schematic (compile vs load) */
-  .schematic{margin:1.7rem 0 0; font-family:var(--mono); font-size:.76rem; display:grid; gap:.4rem}
+  .schematic{margin:1.7rem 0 0; font-family:var(--mono); font-size:clamp(.78rem,1.6vw,.92rem); display:grid; gap:.45rem}
   .srow{display:grid; grid-template-columns:8.6rem 1fr auto; gap:.6rem; align-items:center;
-    padding:.5rem .7rem; border:1px solid var(--line); border-radius:5px; background:var(--surface)}
+    padding:.65rem .8rem; border:1px solid var(--line); border-radius:5px; background:var(--surface)}
   .srow .k{color:var(--faint); text-transform:uppercase; letter-spacing:.08em; font-size:.62rem}
   .srow .flow{color:var(--muted); overflow-x:auto; white-space:nowrap}
   .srow .cost{font-size:.64rem; text-align:right; white-space:nowrap}
@@ -483,10 +483,11 @@
       of steps; it cannot loop forever, so it can never hang a poll loop) and <b>memory-safe</b> (every load and
       store stays inside the bytes it was handed; it cannot read what it wasn't given or scribble on TMM's
       memory). Both are libraries. Neither needs the kernel.</p>
-    <p>So bring them inside. Embed a small userspace eBPF VM — <span class="inlinecode">uBPF</span>, ~150&nbsp;KB,
-      JIT-compiled — <em class="sig">inside TMM's own address space</em>, at designed-in hook points, gated by
-      a stock verifier (<span class="inlinecode">PREVAIL</span>). Now behavior arrives as <b>bytecode, proven
-      safe before it loads</b>. No rebuild. No reboot. The data plane gets a fast lane:</p>
+    <p class="lede" style="margin-top:1.2rem">So bring them inside. Embed a small userspace eBPF VM —
+      <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, JIT-compiled — <em class="sig">inside TMM's own address
+      space</em>, at designed-in hook points, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
+      Now behavior arrives as <b>bytecode, proven safe before it loads</b>. No rebuild. No reboot. The data
+      plane gets a fast lane:</p>
     <div class="schematic">
       <div class="srow slow">
         <span class="k">change today</span><span class="flow">C source → rebuild → re-qualify → release train</span><span class="cost">weeks–quarters</span>
