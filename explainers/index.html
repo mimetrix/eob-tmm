@@ -84,7 +84,6 @@
   .kicker{font-family:var(--mono); font-size:.66rem; letter-spacing:.19em; text-transform:uppercase;
     color:var(--signal-ink); margin:0 0 1rem; display:flex; align-items:center; gap:.6rem}
   .kicker .num{color:var(--faint)}
-  .kicker.enf{color:var(--enforce-ink)}
 
   h2{font-size:clamp(1.5rem,3.6vw,2.1rem); line-height:1.16; letter-spacing:-.02em; font-weight:670;
     margin:0; text-wrap:balance}
@@ -104,24 +103,10 @@
     color:var(--faint); margin:0 0 1.6rem}
   .hero .eyebrow b{color:var(--signal-ink)}
   .hero h1{font-size:clamp(2.1rem,6.5vw,4rem); line-height:1.04; letter-spacing:-.03em; font-weight:700;
-    margin:0; text-wrap:balance; max-width:16ch}
-  .hero h1 .ex{color:var(--enforce-ink)}
+    margin:0; text-wrap:balance; max-width:18ch}
+  .hero h1 em.sig{font-weight:inherit}
   .hero .sub{font-size:clamp(1.05rem,2vw,1.32rem); color:var(--muted); margin:1.6rem 0 0; max-width:52ch; line-height:1.5}
   .hero .sub b{color:var(--ink); font-weight:600}
-  /* race-to-zero gauge */
-  .gauge{margin:2.4rem 0 0; display:grid; gap:.5rem; max-width:34rem}
-  .gauge .row{display:grid; grid-template-columns:8.5rem 1fr; align-items:center; gap:.8rem;
-    font-family:var(--mono); font-size:.68rem; color:var(--faint)}
-  .gauge .track{height:6px; border-radius:3px; background:var(--surface-3); position:relative; overflow:hidden;
-    border:1px solid var(--line)}
-  .gauge .fill{position:absolute; top:0; left:0; bottom:0; border-radius:3px; width:0;
-    transition:width 1.1s cubic-bezier(.4,0,.2,1)}
-  .gauge .row.fast .fill{background:var(--line-2)}
-  .gauge .row.slow .fill{background:var(--enforce)}
-  .gauge.go .row.fast .fill{width:10%}
-  .gauge.go .row.slow .fill{width:92%}
-  @media (prefers-reduced-motion:reduce){ .gauge .fill{transition:none} }
-  .gauge .cap{grid-column:2; font-family:var(--mono); font-size:.6rem; color:var(--faint); letter-spacing:.04em}
   /* hero value proposition — the AI-age turn */
   .value{margin:2.1rem 0 0; max-width:44rem}
   .value .vlead{font-size:1rem; color:var(--ink); font-weight:600; margin:0 0 1rem; line-height:1.45; text-wrap:balance}
@@ -287,11 +272,7 @@
   ul.unlocks li.sec::before{color:var(--enforce)}
   ul.unlocks li.prf::before{color:var(--proof)}
   ul.unlocks li b{color:var(--ink); font-weight:600}
-  .analogy{font-family:var(--mono); font-size:.8rem; color:var(--muted); margin:1.3rem 0 0;
-    padding:.7rem .85rem; border:1px dashed var(--line-2); border-radius:6px; overflow-x:auto; white-space:nowrap}
-  .analogy b{color:var(--signal-ink)}
-
-  /* lineage interstitial (between 02 and 03) */
+  /* lineage interstitial (between 03 and 04) */
   .kicker.lin{color:var(--faint)}
   .kicker.lin .linmark{color:var(--signal); font-size:.95rem; letter-spacing:0}
   .lineage h2{font-size:clamp(1.35rem,3.1vw,1.85rem)}
@@ -306,12 +287,6 @@
   .st.prop{color:var(--signal-ink); border-color:var(--signal); background:var(--signal-bg)}
 
   /* ===== deep dive ===== */
-  .divider{max-width:var(--maxw); margin:2rem auto; padding:0 clamp(1.15rem,5vw,2rem)}
-  .divider .band{border-top:1px solid var(--line); padding-top:1.2rem; font-family:var(--mono);
-    font-size:.64rem; letter-spacing:.18em; text-transform:uppercase; color:var(--faint);
-    display:flex; align-items:center; gap:.7rem}
-  .divider .band .dot{width:6px; height:6px; border-radius:50%; background:var(--signal)}
-
   .spec{max-width:var(--maxw); margin:0 auto; padding:1.2rem clamp(1.15rem,5vw,2rem)}
   .spec.reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease,transform .6s ease}
   .spec.reveal.in{opacity:1; transform:none}
@@ -351,7 +326,6 @@
   .close .big .hl{color:var(--signal-ink)}
   .close p{font-size:1.08rem; color:var(--muted); margin:1.3rem 0 0; max-width:60ch}
   .close p b{color:var(--ink); font-weight:600}
-  .close .champion{color:var(--signal-ink); font-weight:660}
   .close .foot{margin:2.4rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line);
     font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
   .close .foot a{color:var(--signal-ink); text-decoration:none} .close .foot a:hover{text-decoration:underline}
@@ -438,7 +412,7 @@
       surface delivers both: <em class="sig">change the running data plane's behavior — safely, now.</em></p>
   </section>
 
-  <!-- 03 HOLDOUT -->
+  <!-- 02 HOLDOUT -->
   <section class="beat reveal" id="holdout" data-sec="holdout">
     <p class="kicker"><span class="num">02</span> a double-edged sword</p>
     <h2>TMM is fast because it left the kernel behind. That's exactly why it's so hard to change.</h2>
@@ -447,7 +421,7 @@
       and <b>why it's opaque and rigid</b>.</p>
     <p>The industry's answer to safely changing a running system is <b>eBPF in the kernel</b>. But TMM
       bypassed the kernel — so kernel eBPF is <em class="enf">structurally blind</em> to everything TMM does
-      with the traffic. Today, changing TMM behavior means the slow lane, every time:</p>
+      with the traffic. Today, changing TMM's own code means the slow lane, every time:</p>
     <div class="schematic">
       <div class="srow slow">
         <span class="k">change today</span>
@@ -475,7 +449,7 @@
       VM</b>. That's the move.</p></div>
   </section>
 
-  <!-- 04 MOVE -->
+  <!-- 03 MOVE -->
   <section class="beat reveal" id="move" data-sec="move">
     <p class="kicker"><span class="num">03</span> the move</p>
     <h2>Give TMM — a microkernel — its own eBPF.</h2>
@@ -525,8 +499,7 @@
     </div>
   </section>
 
-  <!-- 05 SURFACE (interactive) -->
-  <!-- interstitial: lineage / where this fits (positioning, after the surface is shown) -->
+  <!-- ↳ WHERE THIS FITS (lineage interstitial) -->
   <section class="beat reveal lineage" id="lineage" data-sec="lineage">
     <p class="kicker lin"><span class="linmark">↳</span> where this fits</p>
     <h2>F5 has a long history of extending programmability into the runtime data plane. This complements what already works — and modernizes the stack for the AI age.</h2>
@@ -565,14 +538,16 @@
     </div>
     <div class="callout sig"><p><b>Complementary, not a replacement.</b> iRules stays the first line for traffic
       logic; WASM is the home for rich extensions. This reaches the layer neither can — the data plane's own
-      code and state — with the property none of them had: every change <em class="prf">proven safe before
+      code and state — with the property none of them has: every change <em class="prf">proven safe before
       it loads</em>.</p></div>
   </section>
 
+  <!-- 04 SURFACE (interactive) -->
   <section class="beat reveal" id="surface" data-sec="surface">
     <p class="kicker"><span class="num">04</span> one surface, both faces</p>
     <h2>Program and protect are the same machinery. Only the last step differs.</h2>
-    <p class="lede">Here the program takes the substrate's <em>simplest</em> shape — read a curated context, return a value; the engine can do far more, but this base shape is all the symmetry needs. Whether that
+    <p class="lede">A program in its <em>simplest</em> shape reads a curated context and returns a value —
+      the engine can do far more, but this base shape is all the symmetry needs. Whether that
       value becomes <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the
       host's choice — not a different mechanism.</p>
     <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
@@ -583,7 +558,7 @@
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
       <span class="dslpart act">{ action }</span>
-      <span class="dsllbl">which hook</span>
+      <span class="dsllbl">which hook · tmm: / ctl:</span>
       <span class="dsllbl">when it fires</span>
       <span class="dsllbl">what to do</span>
     </div>
@@ -609,7 +584,7 @@
           <div class="parrow">→</div>
           <div class="pcell"><span class="pk">program</span><span class="pv">bounded predicate<br>(verified)</span></div>
           <div class="parrow">→</div>
-          <div class="pcell out"><span class="pk">host applies</span><span class="pv" id="outcell">records a sample<br>into a ring / metric</span></div>
+          <div class="pcell out"><span class="pk">host</span><span class="pv" id="outcell">records a sample<br>into a ring / metric</span></div>
         </div>
         <p class="swnote">
           <span class="only-obs">Same program shape; the host <b>records</b> the return. This is
@@ -629,7 +604,7 @@
   </section>
 
 
-  <!-- 06 UNLOCK -->
+  <!-- 05 UNLOCK -->
   <section class="beat reveal" id="unlock" data-sec="unlock">
     <p class="kicker"><span class="num">05</span> what the engine unlocks</p>
     <h2>A general-purpose platform — with one flagship security application.</h2>
@@ -639,6 +614,8 @@
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
         kernel-bypassed data plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>)
         or captured byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>).</li>
+      <li><b>A data source, tapped.</b> Verified transforms computed where the data lives — refining the proxy's
+        digital exhaust into signals and products only F5 is positioned to build.</li>
       <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev; read
         internal load and nudge a knob.</li>
       <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
@@ -654,7 +631,7 @@
       platform, not the platform itself.</p></div>
   </section>
 
-  <!-- 07 DEEP DIVE -->
+  <!-- 06 DEEP DIVE -->
   <section class="beat reveal" id="deep" data-sec="deep" style="padding-bottom:1.2rem">
     <p class="kicker"><span class="num">06</span> under the hood · for the engineers</p>
     <h2>How the programmable data plane works.</h2>
@@ -773,11 +750,11 @@
     </ul>
   </div>
 
-  <!-- 08 CLOSE -->
+  <!-- 07 CLOSE -->
   <section class="close reveal" id="close" data-sec="close">
     <p class="kicker"><span class="num">07</span> the ask</p>
     <p class="big">The data plane should stop being <span class="hl">the holdout</span>.</p>
-    <p>The fastest layer in the stack is the last one that can't change at machine speed. A verified, in-process
+    <p>The fastest layer in the stack is the last one whose own code can't change at machine speed. A verified, in-process
       programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
       even machine-speed authorship, with every change <b>proven safe before it runs</b>.</p>
     <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as the
@@ -822,17 +799,6 @@
       document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); });
     }
 
-    /* gauge fills when it scrolls into view (now lives in beat 01) */
-    var gauge=document.getElementById('gauge');
-    if(gauge){
-      if('IntersectionObserver' in window && !reduce){
-        var go=new IntersectionObserver(function(es){
-          es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); go.unobserve(e.target); } });
-        },{threshold:.35});
-        go.observe(gauge);
-      } else { gauge.classList.add('go'); }
-    }
-
     /* rail active-section tracking */
     var rail=document.querySelector('.rail');
     var links={}; if(rail){ rail.querySelectorAll('a').forEach(function(a){ links[a.dataset.sec]=a; }); }
@@ -860,7 +826,7 @@
       enfBtn.setAttribute('aria-pressed', obs?'false':'true');
       verb.textContent = obs?'snapshot()':'drop()';
       verb.className = 'verb '+(obs?'obs':'enf');
-      outcell.innerHTML = obs ? 'records a sample<br>into a ring / metric' : 'applies a verdict<br><span class="mono">DROP</span> before the vuln op';
+      outcell.innerHTML = obs ? 'records a sample<br>into a ring / metric' : 'applies a verdict —<br><span class="mono">DROP</span> the matched frame';
     }
     obsBtn.addEventListener('click',function(){ setMode('obs'); });
     enfBtn.addEventListener('click',function(){ setMode('enf'); });
