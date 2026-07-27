@@ -16,7 +16,7 @@ Every observer of enterprise traffic is structurally blind somewhere — except 
 | Observer | Structural blindness |
 |---|---|
 | Endpoint / EDR | one host; no network context; attacker-disablable |
-| NDR / packet brokers | **ciphertext** — TLS-everywhere ended the wire view |
+| NDR (network detection & response) / packet brokers | **ciphertext** — TLS-everywhere ended the wire view |
 | SIEM / cloud logs | samples + metadata, after the fact |
 | **The full proxy (TMM)** | *none* — it **terminates TLS**, so it sees **both sides of every flow, decrypted, in protocol context, at line rate** |
 
