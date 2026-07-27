@@ -107,6 +107,8 @@
   .hero h1 em.sig{font-weight:inherit}
   .hero .sub{font-size:clamp(1.05rem,2vw,1.32rem); color:var(--muted); margin:1.6rem 0 0; max-width:52ch; line-height:1.5}
   .hero .sub b{color:var(--ink); font-weight:600}
+  .hero .pivot{font-size:clamp(1rem,1.9vw,1.2rem); color:var(--ink); margin:1.4rem 0 0; max-width:54ch; line-height:1.5}
+  .hero .pivot b{color:var(--signal-ink); font-weight:640}
   /* hero value proposition — the AI-age turn */
   .value{margin:2.1rem 0 0; max-width:44rem}
   .value .vlead{font-size:1rem; color:var(--ink); font-weight:600; margin:0 0 1rem; line-height:1.45; text-wrap:balance}
@@ -394,6 +396,10 @@
       mitigation in minutes.
       The data plane already flexes at its edges — config, traffic logic — but changing its <b>own code and
       behavior</b> still waits on a release.</p>
+    <p class="pivot">The fix is small and already proven elsewhere: give TMM its <b>own eBPF engine</b> — a
+      verified VM at designed-in hooks — so its code and behavior can change at runtime, provably safely. And
+      because that engine runs <em>where the traffic lives</em>, it does more than close the gap: it turns the
+      data plane into a <b>bespoke data source</b> F5 can use to make the proxy itself smarter.</p>
     <div class="value">
       <p class="vlead">And what a turn it is. That layer touches <b>every flow — decrypted, in context, at
         line rate</b> — and today that stream is mostly <span class="em">digital exhaust</span>: seen once,
