@@ -463,10 +463,10 @@
   <!-- 04 MOVE -->
   <section class="beat reveal" id="move" data-sec="move">
     <p class="kicker"><span class="num">03</span> the move</p>
-    <h2>What makes kernel eBPF safe isn't the kernel. It's a verifier and a tiny VM — and both are libraries.</h2>
-    <p class="lede">Strip kernel eBPF to its essence and two things do the work: a <b>static verifier</b>
-      that proves a program is bounded and memory-safe <em>before</em> it runs, and a <b>small sandboxed VM</b>
-      that executes it. Neither needs to live in the kernel.</p>
+    <h2>Give TMM its own eBPF.</h2>
+    <p class="lede">It's entirely buildable, because what makes kernel eBPF safe was never the kernel: it's a
+      <b>static verifier</b> that proves a program bounded and memory-safe <em>before</em> it runs, and a
+      <b>small sandboxed VM</b> that executes it. Both are libraries. Neither needs the kernel.</p>
     <p>So bring them inside. Embed a small userspace eBPF VM — <span class="inlinecode">uBPF</span>, ~150&nbsp;KB,
       JIT-compiled — <em class="sig">inside TMM's own address space</em>, at designed-in hook points, gated by
       a stock verifier (<span class="inlinecode">PREVAIL</span>). Now behavior arrives as <b>bytecode, proven
