@@ -366,8 +366,8 @@
   <a href="#needs"  data-sec="needs"><span class="n">01</span><span class="t">two faces · FP²</span></a>
   <a href="#holdout" data-sec="holdout"><span class="n">02</span><span class="t">double-edged sword</span></a>
   <a href="#move"   data-sec="move"><span class="n">03</span><span class="t">the move</span></a>
-  <a href="#surface" data-sec="surface"><span class="n">04</span><span class="t">one surface</span></a>
   <a href="#lineage" data-sec="lineage"><span class="n">↳</span><span class="t">where this fits</span></a>
+  <a href="#surface" data-sec="surface"><span class="n">04</span><span class="t">one surface</span></a>
   <a href="#unlock" data-sec="unlock"><span class="n">05</span><span class="t">what it unlocks</span></a>
   <a href="#deep"   data-sec="deep"><span class="n">06</span><span class="t">under the hood</span></a>
   <a href="#close"  data-sec="close"><span class="n">07</span><span class="t">the ask</span></a>
@@ -526,6 +526,49 @@
   </section>
 
   <!-- 05 SURFACE (interactive) -->
+  <!-- interstitial: lineage / where this fits (positioning, after the surface is shown) -->
+  <section class="beat reveal lineage" id="lineage" data-sec="lineage">
+    <p class="kicker lin"><span class="linmark">↳</span> where this fits</p>
+    <h2>F5 has a long history of extending programmability into the runtime data plane. This complements what already works — and modernizes the stack for the AI age.</h2>
+    <p>Dynamic programmability is TMM's heritage, not a new bolt-on. Each surface below programs a
+      <b>different layer</b>; the point isn't to replace any of them — it's to reach the one none of them can.</p>
+    <div class="tablewrap">
+      <table class="lineage-t">
+        <thead><tr><th>Surface</th><th>Programs</th><th>Best at</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>iRules</b></td>
+            <td>traffic logic at proxy events</td>
+            <td>connection &amp; L7 decisions</td>
+            <td><span class="st">workhorse</span></td>
+          </tr>
+          <tr>
+            <td><b>WASM</b></td>
+            <td>rich data-plane extensions</td>
+            <td>complex logic in real languages</td>
+            <td><span class="st">emerging</span></td>
+          </tr>
+          <tr class="past">
+            <td><b>DynaD</b></td>
+            <td>dynamic data-plane logic — Lua</td>
+            <td>an earlier swing at exactly this</td>
+            <td><span class="st shelved">deprecated</span></td>
+          </tr>
+          <tr class="mine">
+            <td><b>Embedded eBPF</b><br><span class="tiny">this proposal</span></td>
+            <td>the data plane's own <b>code &amp; internal state</b></td>
+            <td>verified probes &amp; controls</td>
+            <td><span class="st prop">loadable + proven safe</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout sig"><p><b>Complementary, not a replacement.</b> iRules stays the first line for traffic
+      logic; WASM is the home for rich extensions. This reaches the layer neither can — the data plane's own
+      code and state — with the property none of them had: every change <em class="prf">proven safe before
+      it loads</em>.</p></div>
+  </section>
+
   <section class="beat reveal" id="surface" data-sec="surface">
     <p class="kicker"><span class="num">04</span> one surface, both faces</p>
     <h2>Program and protect are the same machinery. Only the last step differs.</h2>
@@ -585,48 +628,6 @@
       more power over time.</p></div>
   </section>
 
-  <!-- interstitial: lineage / where this fits (positioning, after the surface is shown) -->
-  <section class="beat reveal lineage" id="lineage" data-sec="lineage">
-    <p class="kicker lin"><span class="linmark">↳</span> where this fits</p>
-    <h2>F5 has a long history of extending programmability into the runtime data plane. This complements what already works — and modernizes the stack for the AI age.</h2>
-    <p>Dynamic programmability is TMM's heritage, not a new bolt-on. Each surface below programs a
-      <b>different layer</b>; the point isn't to replace any of them — it's to reach the one none of them can.</p>
-    <div class="tablewrap">
-      <table class="lineage-t">
-        <thead><tr><th>Surface</th><th>Programs</th><th>Best at</th><th></th></tr></thead>
-        <tbody>
-          <tr>
-            <td><b>iRules</b></td>
-            <td>traffic logic at proxy events</td>
-            <td>connection &amp; L7 decisions</td>
-            <td><span class="st">workhorse</span></td>
-          </tr>
-          <tr>
-            <td><b>WASM</b></td>
-            <td>rich data-plane extensions</td>
-            <td>complex logic in real languages</td>
-            <td><span class="st">emerging</span></td>
-          </tr>
-          <tr class="past">
-            <td><b>DynaD</b></td>
-            <td>dynamic data-plane logic — Lua</td>
-            <td>an earlier swing at exactly this</td>
-            <td><span class="st shelved">deprecated</span></td>
-          </tr>
-          <tr class="mine">
-            <td><b>Embedded eBPF</b><br><span class="tiny">this proposal</span></td>
-            <td>the data plane's own <b>code &amp; internal state</b></td>
-            <td>verified probes &amp; controls</td>
-            <td><span class="st prop">loadable + proven safe</span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="callout sig"><p><b>Complementary, not a replacement.</b> iRules stays the first line for traffic
-      logic; WASM is the home for rich extensions. This reaches the layer neither can — the data plane's own
-      code and state — with the property none of them had: every change <em class="prf">proven safe before
-      it loads</em>.</p></div>
-  </section>
 
   <!-- 06 UNLOCK -->
   <section class="beat reveal" id="unlock" data-sec="unlock">
