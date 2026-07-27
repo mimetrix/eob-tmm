@@ -335,8 +335,9 @@
   <a href="#move"   data-sec="move"><span class="n">03</span><span class="t">the move</span></a>
   <a href="#surface" data-sec="surface"><span class="n">04</span><span class="t">one surface</span></a>
   <a href="#unlock" data-sec="unlock"><span class="n">05</span><span class="t">what it unlocks</span></a>
-  <a href="#deep"   data-sec="deep"><span class="n">06</span><span class="t">under the hood</span></a>
-  <a href="#close"  data-sec="close"><span class="n">07</span><span class="t">the direction</span></a>
+  <a href="#flywheel" data-sec="flywheel"><span class="n">06</span><span class="t">the flywheel</span></a>
+  <a href="#deep"   data-sec="deep"><span class="n">07</span><span class="t">under the hood</span></a>
+  <a href="#close"  data-sec="close"><span class="n">08</span><span class="t">the direction</span></a>
   <span class="foot">a design<br>proposal</span>
 </nav>
 
@@ -586,16 +587,35 @@
       platform, not the platform itself.</p></div>
   </section>
 
-  <!-- 06 DEEP DIVE -->
+  <!-- 06 FLYWHEEL -->
+  <section class="beat reveal" id="flywheel" data-sec="flywheel">
+    <p class="kicker"><span class="num">06</span> the flywheel · at fleet scale</p>
+    <h2>Point the same probe at the data, and the proxy becomes AI's sensory organ.</h2>
+    <p class="lede">TMM terminates TLS, so it sees <b>every flow — decrypted, in context, at line rate</b>: a
+      vantage no endpoint agent or network sensor has. A <b>verified in-situ transform</b> distills that stream
+      into signal and exports <em class="sig">only the signal — the payload never leaves the box, and the
+      verifier proves it.</em> Data-minimization becomes a property of the mechanism, not a promise bolted on top.</p>
+    <div class="lifecycle" style="margin-top:1.5rem">
+      <span class="step"><b>sense</b> — probes distill traffic to features</span><span class="arr">→</span>
+      <span class="step"><b>learn</b> — features train an F5 model</span><span class="arr">→</span>
+      <span class="step"><b>act</b> — the model authors verified programs</span><span class="arr">↺</span>
+    </div>
+    <div class="callout sig"><p><b>The loop closes on one substrate.</b> Features train the model; the model
+      authors new programs; the verifier admits them; they load back into the plane — proven safe, the model
+      never in the trust path. The AI that <em>can't</em> touch line rate is fed by it: a data moat only F5 can
+      build — signal to develop and to monetize, without ever moving the data.</p></div>
+  </section>
+
+  <!-- 07 DEEP DIVE -->
   <section class="beat reveal" id="deep" data-sec="deep" style="padding-bottom:1.2rem">
-    <p class="kicker"><span class="num">06</span> under the hood · for the engineers</p>
+    <p class="kicker"><span class="num">07</span> under the hood · for the engineers</p>
     <h2>How the programmable data plane works.</h2>
     <p class="lede">Everything above rests on one small, in-process call, gated by a static proof. Here's the
       machinery — the call, where it sits, why it's safe to run inline, and how the surface grows.</p>
   </section>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.1</span> The engine &amp; its hook points</h3>
+    <h3><span class="sn">7.1</span> The engine &amp; its hook points</h3>
     <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT-compiled VM that runs arbitrary
       <em>verified</em> bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
@@ -626,7 +646,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.2</span> Placement — two planes, two engines, one catalog</h3>
+    <h3><span class="sn">7.2</span> Placement — two planes, two engines, one catalog</h3>
     <p>A single mechanism can't cover TMOS, because TMOS is two execution environments. The plane decides the engine.</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Plane</th><th>What runs there</th><th>Engine</th></tr></thead>
@@ -646,7 +666,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.3</span> Three form factors — same mechanism, honest coverage</h3>
+    <h3><span class="sn">7.3</span> Three form factors — same mechanism, honest coverage</h3>
     <p>Appliance, VE, and BIG-IP Next all run the same TMM, so the mechanism is identical. <b>Coverage</b> is not —
       it scales inversely with how much the platform offloads to hardware.</p>
     <div class="tablewrap"><table class="ff">
@@ -663,7 +683,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.4</span> Why it's safe to run inline</h3>
+    <h3><span class="sn">7.4</span> Why it's safe to run inline</h3>
     <p>Start with the load-bearing assumption, named plainly: <b>every claim on this page leans on the verifier
       being right.</b> Three reasons that's a strong bet. <b>Provenance</b> — PREVAIL is the verifier Microsoft
       ships in eBPF-for-Windows: built on abstract interpretation, a formal method rather than hand-grown
@@ -686,7 +706,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.5</span> Lifecycle — nothing outlives its purpose</h3>
+    <h3><span class="sn">7.5</span> Lifecycle — nothing outlives its purpose</h3>
     <p>Every program is authored, proven, signed, loaded — and can carry an expiry, so nothing outlives its
       purpose: a diagnostic probe when its window closes, a security shield when the patched build lands. No zombies.</p>
     <div class="lifecycle">
@@ -700,7 +720,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">6.6</span> The surface is built to grow</h3>
+    <h3><span class="sn">7.6</span> The surface is built to grow</h3>
     <p>Read-a-context, return-a-value is the <b>floor</b> — chosen for maximal safety, not the limit of the VM.
       Two growth paths, deliberately different in cost:</p>
     <ul class="unlocks" style="margin-top:1rem">
@@ -714,9 +734,9 @@
     </ul>
   </div>
 
-  <!-- 07 CLOSE -->
+  <!-- 08 CLOSE -->
   <section class="close reveal" id="close" data-sec="close">
-    <p class="kicker"><span class="num">07</span> the direction</p>
+    <p class="kicker"><span class="num">08</span> the direction</p>
     <p class="big">Make the data plane <span class="hl">runtime, programmable, and provably&nbsp;safe</span>.</p>
     <p class="rlabel">the whole story, one line per slide</p>
     <div class="recap">
@@ -732,7 +752,9 @@
         enforce</b> — the same program, flip a verb.</span></div>
       <div class="rrow"><span class="rn">05</span><span class="rt">A general-purpose platform — observability,
         diagnostics, a unique data source — with the <b>shield</b> as a powerful, enabling application.</span></div>
-      <div class="rrow"><span class="rn">06</span><span class="rt">Every change <b>proven safe before it
+      <div class="rrow"><span class="rn">06</span><span class="rt">Pointed at the data, it becomes <b>AI's sensory
+        organ</b> — signal out, payload confined; the flywheel only F5 can build.</span></div>
+      <div class="rrow"><span class="rn">07</span><span class="rt">Every change <b>proven safe before it
         runs</b> — signed, governed, self-retiring.</span></div>
     </div>
     <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as one
