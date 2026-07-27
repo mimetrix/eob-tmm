@@ -667,9 +667,15 @@
 
   <div class="spec reveal">
     <h3><span class="sn">6.4</span> Why it's safe to run inline</h3>
-    <p>Executing bytecode in the data plane is powerful, which makes it a crown-jewel target. Safety is layered,
-      and the first principle is blunt: <b>verified ≠ secure</b>. PREVAIL proves a program can't crash or hang TMM;
-      it proves nothing about intent. Security is the governance <em>around</em> the VM.</p>
+    <p>Start with the load-bearing assumption, named plainly: <b>every claim on this page leans on the verifier
+      being right.</b> Three reasons that's a strong bet. <b>Provenance</b> — PREVAIL is the verifier Microsoft
+      ships in eBPF-for-Windows: built on abstract interpretation, a formal method rather than hand-grown
+      heuristics, publicly maintained and hardened in production. <b>Narrow envelope</b> — this design uses it at
+      its best-proven case: a bounded predicate over a small typed struct, no helpers, no maps. <b>Depth</b> —
+      it is not the only gate: only F5-signed bytecode ever reaches it, and a per-hook watchdog stands behind it.
+      Trust the proof; don't depend on it alone.</p>
+    <p>The second principle is just as blunt: <b>verified ≠ secure</b>. PREVAIL proves a program can't crash or
+      hang TMM; it proves nothing about intent. Security is the governance <em>around</em> the VM:</p>
     <ul class="unlocks" style="margin-top:1rem">
       <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
       <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; enforce needs stricter authz than observe; RBAC-gated.</li>
