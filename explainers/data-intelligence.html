@@ -1,0 +1,433 @@
+<title>Data-plane intelligence — the architecture</title>
+<style>
+  :root{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa; --surface-3:#eef2f6;
+    --ink:#0f1720; --muted:#526271; --faint:#7a8894;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54; --proof-ink:#1f5d3c;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:44rem;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#070a0e; --surface:#0f161d; --surface-2:#0c1218; --surface-3:#141d25;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a88;
+    --line:#1f2b34; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#4fb47d; --proof-ink:#7bd3a3;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#070a0e; --surface:#0f161d; --surface-2:#0c1218; --surface-3:#141d25;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a88;
+    --line:#1f2b34; --line-2:#31424e;
+    --signal:#33bdd1; --signal-bg:#0c2a30; --signal-ink:#8fe1ec;
+    --enforce:#e0a24d; --enforce-bg:#2a2011; --enforce-ink:#f0c98a;
+    --proof:#4fb47d; --proof-ink:#7bd3a3;
+  }
+  :root[data-theme="light"]{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa; --surface-3:#eef2f6;
+    --ink:#0f1720; --muted:#526271; --faint:#7a8894;
+    --line:#d7dee5; --line-2:#c2ccd5;
+    --signal:#0b7f95; --signal-bg:#e2f2f5; --signal-ink:#075463;
+    --enforce:#a4620a; --enforce-bg:#f6ecdd; --enforce-ink:#77450a;
+    --proof:#2f7d54; --proof-ink:#1f5d3c;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.6; overflow-x:hidden}
+  .mono{font-family:var(--mono)}
+
+  .progress{position:fixed; top:0; left:0; height:2px; background:var(--signal); width:0; z-index:60; transition:width .1s linear}
+
+  .rail{position:fixed; top:0; left:0; height:100vh; width:13rem; padding:2rem 1.2rem; display:none;
+    flex-direction:column; gap:.1rem; z-index:40; border-right:1px solid var(--line); background:var(--surface-2)}
+  .rail .brand{font-family:var(--mono); font-size:.62rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--faint); margin:0 0 1.4rem; line-height:1.7}
+  .rail .brand b{color:var(--signal-ink); display:block; letter-spacing:.1em}
+  .rail a{display:flex; align-items:baseline; gap:.6rem; text-decoration:none; color:var(--faint);
+    font-family:var(--mono); font-size:.72rem; padding:.32rem 0; transition:color .15s}
+  .rail a .n{font-size:.62rem; opacity:.7; min-width:1.4rem}
+  .rail a:hover{color:var(--muted)}
+  .rail a.active{color:var(--signal-ink)}
+  .rail a.active .n{opacity:1}
+  .rail .foot{margin-top:auto; font-family:var(--mono); font-size:.58rem; color:var(--faint); letter-spacing:.08em; line-height:1.8}
+  .rail .foot a{color:var(--signal-ink); text-decoration:none; display:block; margin-top:.3rem}
+  @media(min-width:1080px){ .rail{display:flex} .stage{padding-left:13rem} }
+
+  .toolbar{position:fixed; top:.7rem; right:.8rem; z-index:60}
+  .toolbar button{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:.4em .7em; cursor:pointer}
+  .toolbar button:hover{border-color:var(--signal); color:var(--signal-ink)}
+  .toolbar button:focus-visible{outline:2px solid var(--signal); outline-offset:2px}
+
+  .beat{max-width:var(--maxw); margin:0 auto; padding:clamp(3rem,9vh,6rem) clamp(1.15rem,5vw,2rem)}
+  .beat.reveal{opacity:0; transform:translateY(16px); transition:opacity .7s ease, transform .7s ease}
+  .beat.reveal.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion:reduce){ .beat.reveal{opacity:1; transform:none; transition:none} }
+
+  .kicker{font-family:var(--mono); font-size:.66rem; letter-spacing:.19em; text-transform:uppercase;
+    color:var(--signal-ink); margin:0 0 1rem; display:flex; align-items:center; gap:.6rem}
+  .kicker .num{color:var(--faint)}
+  h2{font-size:clamp(1.5rem,3.6vw,2.05rem); line-height:1.16; letter-spacing:-.02em; font-weight:670; margin:0; text-wrap:balance}
+  .beat p.lede{font-size:clamp(1.02rem,1.7vw,1.18rem); color:var(--muted); margin:1.1rem 0 0; max-width:60ch}
+  .beat p.lede b{color:var(--ink); font-weight:600}
+  .beat p{font-size:1rem; color:var(--muted); max-width:62ch}
+  .beat p b{color:var(--ink); font-weight:600}
+  .beat p + p{margin-top:1rem}
+  em.sig{font-style:normal; color:var(--signal-ink); font-weight:600}
+  em.prf{font-style:normal; color:var(--proof-ink); font-weight:600}
+  .inlinecode{font-family:var(--mono); font-size:.86em; background:var(--signal-bg); color:var(--signal-ink); padding:.05em .35em; border-radius:3px}
+
+  .hero{min-height:92vh; display:flex; flex-direction:column; justify-content:center; max-width:var(--maxw);
+    margin:0 auto; padding:5rem clamp(1.15rem,5vw,2rem) 3rem; position:relative}
+  .hero .eyebrow{font-family:var(--mono); font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--faint); margin:0 0 1.6rem}
+  .hero .eyebrow b{color:var(--signal-ink)}
+  .hero h1{font-size:clamp(2rem,6vw,3.6rem); line-height:1.06; letter-spacing:-.03em; font-weight:700; margin:0; text-wrap:balance; max-width:18ch}
+  .hero h1 em{font-style:normal; color:var(--signal-ink)}
+  .hero .sub{font-size:clamp(1.05rem,2vw,1.28rem); color:var(--muted); margin:1.6rem 0 0; max-width:56ch; line-height:1.5}
+  .hero .sub b{color:var(--ink); font-weight:600}
+  .hero .comp{margin:1.8rem 0 0; font-family:var(--mono); font-size:.72rem; color:var(--faint); line-height:1.8}
+  .hero .comp a{color:var(--signal-ink); text-decoration:none}
+  .scrollcue{position:absolute; bottom:1.4rem; left:clamp(1.15rem,5vw,2rem); font-family:var(--mono); font-size:.62rem;
+    letter-spacing:.16em; text-transform:uppercase; color:var(--faint); display:flex; align-items:center; gap:.5rem}
+  .scrollcue .arrow{animation:bob 1.8s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+  @media (prefers-reduced-motion:reduce){ .scrollcue .arrow{animation:none} }
+
+  .callout{border-left:3px solid var(--signal); background:var(--signal-bg); border-radius:0 6px 6px 0; padding:1rem 1.15rem; margin:1.6rem 0 0}
+  .callout p{margin:0; font-size:1rem; color:var(--ink); max-width:none}
+  .callout p b{color:var(--signal-ink)}
+  .callout.prf{border-color:var(--proof); background:none}
+  .callout.prf p b{color:var(--proof-ink)}
+
+  .tablewrap{overflow-x:auto; margin:1.4rem 0 0; border:1px solid var(--line); border-radius:7px}
+  table{border-collapse:collapse; width:100%; font-size:.86rem; min-width:32rem}
+  th,td{text-align:left; padding:.55rem .75rem; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  td b{color:var(--ink)}
+  tr.hi td{background:var(--signal-bg)} tr.hi td b{color:var(--signal-ink)}
+
+  ul.pts{list-style:none; margin:1.3rem 0 0; padding:0; display:grid; gap:.7rem}
+  ul.pts li{font-size:.96rem; color:var(--muted); padding-left:1.3rem; position:relative; max-width:60ch}
+  ul.pts li::before{content:"▸"; position:absolute; left:0; color:var(--signal); top:.1em}
+  ul.pts li.prf::before{color:var(--proof)}
+  ul.pts li b{color:var(--ink); font-weight:600}
+
+  /* the guarantee (composition) box */
+  .guar{margin:1.6rem 0 0; border:1px solid var(--line-2); border-top:3px solid var(--proof); border-radius:9px; background:var(--surface-2); padding:1.2rem 1.2rem 1.3rem}
+  .guar .gl{font-family:var(--mono); font-size:.62rem; letter-spacing:.16em; text-transform:uppercase; color:var(--proof-ink); margin:0 0 .8rem}
+  .guar .row{display:grid; grid-template-columns:auto 1fr; gap:.6rem; align-items:baseline; margin:.5rem 0}
+  .guar .row .k{font-family:var(--mono); font-size:.72rem; font-weight:700; color:var(--signal-ink); white-space:nowrap}
+  .guar .row .v{font-size:.9rem; color:var(--muted); line-height:1.45}
+  .guar .row .v b{color:var(--ink)}
+  .guar .concl{margin:.9rem 0 0; padding-top:.8rem; border-top:1px solid var(--line); font-size:.98rem; color:var(--ink); font-weight:600; text-align:center}
+
+  /* reference-architecture flow */
+  .archflow{margin:1.8rem 0 0; display:flex; flex-direction:column}
+  .arch-top{font-family:var(--mono); font-size:.78rem; color:var(--muted); text-align:center; margin:0 0 .2rem}
+  .arch-zone{border:1px solid var(--line-2); border-radius:11px; padding:1.4rem 1rem 1.1rem; margin:.7rem 0; position:relative; background:var(--surface-2)}
+  .arch-zone .zlabel{position:absolute; top:-.65rem; left:1rem; background:var(--paper); padding:0 .5rem; font-family:var(--mono);
+    font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--faint)}
+  .arch-zone.box{border-color:var(--signal)} .arch-zone.box .zlabel{color:var(--signal-ink)}
+  .arch-zone.fleet .zlabel{color:var(--proof-ink)}
+  .arch-stage{border:1px solid var(--line); border-radius:7px; background:var(--surface); padding:.7rem .85rem; margin:.55rem 0}
+  .arch-stage:first-of-type{margin-top:0}
+  .arch-stage .st-t{font-family:var(--mono); font-size:.72rem; font-weight:700; color:var(--ink)}
+  .arch-stage .st-d{font-size:.85rem; color:var(--muted); margin-top:.25rem; line-height:1.45}
+  .arch-stage .st-d code{font-family:var(--mono); font-size:.86em; color:var(--ink)}
+  .arch-stage.verified{border-color:var(--signal); border-left-width:3px}
+  .arch-stage.verified .st-t{color:var(--signal-ink)}
+  .arch-arrow{text-align:center; color:var(--faint); font-family:var(--mono); font-size:.95rem; margin:.35rem 0; line-height:1.3}
+  .arch-arrow .note{display:block; font-size:.66rem; letter-spacing:.02em; color:var(--muted)}
+  .arch-arrow.egress .note{color:var(--proof-ink); font-weight:700}
+  .arch-out{border:1px dashed var(--signal); border-radius:7px; background:var(--signal-bg); padding:.7rem .85rem; margin:.55rem 0 0;
+    text-align:center; font-size:.9rem; color:var(--ink)}
+  .arch-out b{color:var(--signal-ink)}
+
+  /* flywheel svg */
+  .fwdiagram{margin:1.6rem 0 0}
+  .fwdiagram svg{width:100%; height:auto; max-width:40rem; display:block; margin:0 auto}
+  .fw-node{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5}
+  .fw-node.a{stroke:var(--signal)} .fw-node.c{stroke:var(--proof)}
+  .fw-title{fill:var(--ink); font-family:var(--sans); font-weight:640; font-size:12px}
+  .fw-sub{fill:var(--signal-ink); font-family:var(--mono); font-size:8.5px; letter-spacing:.14em}
+  .fw-arrow{stroke:var(--signal); stroke-width:1.5; fill:none}
+  .fw-return{stroke:var(--proof); stroke-width:1.5; fill:none; stroke-dasharray:4 3}
+  .fw-lbl{fill:var(--muted); font-family:var(--mono); font-size:10px}
+  .fw-head{fill:var(--signal)} .fw-head.r{fill:var(--proof)}
+  .fwcap{margin:.7rem 0 0; font-size:.86rem; color:var(--muted); text-align:center}
+  .fwcap b{color:var(--ink); font-weight:600}
+
+  .subh{font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase; color:var(--signal-ink); margin:1.8rem 0 .3rem}
+
+  .close{max-width:var(--maxw); margin:0 auto; padding:clamp(3rem,9vh,6rem) clamp(1.15rem,5vw,2rem) 4rem}
+  .close .big{font-size:clamp(1.6rem,4vw,2.3rem); line-height:1.16; letter-spacing:-.02em; font-weight:680; margin:0; text-wrap:balance; max-width:24ch}
+  .close .big .hl{color:var(--signal-ink)}
+  .close p{font-size:1.06rem; color:var(--muted); margin:1.2rem 0 0; max-width:60ch}
+  .close p b{color:var(--ink); font-weight:600}
+  .close .foot{margin:2.2rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line); font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.9}
+  .close .foot a{color:var(--signal-ink); text-decoration:none}
+
+  /* ---------- PRINT / PDF ---------- */
+  @media print{
+    :root, :root[data-theme="dark"]{
+      --paper:#fff; --surface:#fff; --surface-2:#f6f8fa; --surface-3:#eef2f6;
+      --ink:#0f1720; --muted:#3f4c58; --faint:#67757f; --line:#c9d2da; --line-2:#b3bfc9;
+      --signal:#0b7f95; --signal-bg:#eef6f8; --signal-ink:#0a5768;
+      --enforce:#8f560a; --enforce-bg:#f7efe1; --enforce-ink:#6b3f08; --proof:#256a45; --proof-ink:#1f5d3c;
+    }
+    @page{ size:letter portrait; margin:0.5in }
+    html{scroll-behavior:auto} body{overflow:visible}
+    .rail, .toolbar, .progress, .scrollcue{display:none !important}
+    .stage{padding-left:0 !important}
+    .beat.reveal{opacity:1 !important; transform:none !important}
+    .hero{min-height:auto !important; padding:1rem 0 2rem !important}
+    .beat{padding:1.3rem 0 !important}
+    .close{padding:1.4rem 0 !important}
+    .callout, .guar, .archflow, .arch-zone, .fwdiagram, .tablewrap, ul.pts li{break-inside:avoid}
+    a{color:var(--signal-ink) !important; text-decoration:none}
+  }
+</style>
+
+<div class="progress" id="progress"></div>
+<div class="toolbar"><button id="themeBtn" type="button" aria-label="Toggle light or dark theme">◐ theme</button></div>
+
+<nav class="rail" aria-label="Sections">
+  <p class="brand"><b>F5 · TMM</b>data-plane<br>intelligence</p>
+  <a href="#hero"   data-sec="hero"><span class="n">00</span><span class="t">sensory organ</span></a>
+  <a href="#vantage" data-sec="vantage"><span class="n">01</span><span class="t">the vantage</span></a>
+  <a href="#mech"   data-sec="mech"><span class="n">02</span><span class="t">signal out, payload in</span></a>
+  <a href="#arch"   data-sec="arch"><span class="n">03</span><span class="t">the architecture</span></a>
+  <a href="#loop"   data-sec="loop"><span class="n">04</span><span class="t">sense · learn · act</span></a>
+  <a href="#lev"    data-sec="lev"><span class="n">05</span><span class="t">the leverage</span></a>
+  <a href="#close"  data-sec="close"><span class="n">06</span><span class="t">the thesis</span></a>
+  <span class="foot">a design proposal
+    <a href="https://claude.ai/code/artifact/2e002bd8-bc27-41a1-a7aa-f53a253c7280">← the substrate explainer</a></span>
+</nav>
+
+<div class="stage">
+
+  <!-- 00 HERO -->
+  <section class="hero" id="hero" data-sec="hero">
+    <p class="eyebrow">F5 TMM · <b>data-plane intelligence</b> · design proposal</p>
+    <h1>The proxy as <em>AI's sensory organ</em>.</h1>
+    <p class="sub"><b>TMM terminates TLS — so it sees every flow, decrypted, in context, at line rate:</b> the
+      most complete view of enterprise application traffic anywhere. This page spells out the architecture that
+      turns that view into signal which makes the proxy smarter — <em class="sig">without ever moving the data.</em></p>
+    <p class="comp">Companion to the substrate explainer (<a href="https://claude.ai/code/artifact/2e002bd8-bc27-41a1-a7aa-f53a253c7280">the programmable data plane</a>).<br>
+      Detailed method &amp; claims are held in a separate invention disclosure, per IP policy.</p>
+    <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
+  </section>
+
+  <!-- 01 VANTAGE -->
+  <section class="beat reveal" id="vantage" data-sec="vantage">
+    <p class="kicker"><span class="num">01</span> the vantage</p>
+    <h2>The most complete view of application traffic — and today it's thrown away.</h2>
+    <p class="lede">Every other observer of enterprise traffic is structurally blind somewhere. The full proxy
+      isn't — because it terminates the encryption everyone else is stuck outside of.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Observer</th><th>Structural blindness</th></tr></thead>
+      <tbody>
+        <tr><td>Endpoint / EDR</td><td>one host; no network context; attacker-disablable</td></tr>
+        <tr><td>NDR (network detection &amp; response) / packet brokers</td><td><b>ciphertext</b> — TLS-everywhere ended the wire view</td></tr>
+        <tr><td>SIEM / cloud logs</td><td>samples + metadata, after the fact</td></tr>
+        <tr class="hi"><td><b>The full proxy (TMM)</b></td><td>none — sees <b>both sides of every flow, decrypted, in context, at line rate</b></td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:1.2rem">Two locks have kept that vantage <b>worth nothing</b>: you <b>can't centralize</b>
+      it — exporting decrypted line-rate payloads is infeasible (bandwidth) and impermissible (privacy, residency,
+      law) — and until now you <b>couldn't compute on it in place</b>, because running analytic code inline on a
+      kernel-bypass data plane risks crashing the path or leaking the very data you must not move.</p>
+    <div class="callout"><p><b>The verified substrate opens both locks.</b> A verified program computes on the
+      data <em>where it lives</em> and exports only the distilled result — kilobytes of signal, not gigabits of
+      payload. The next section is exactly how that stays safe.</p></div>
+  </section>
+
+  <!-- 02 MECHANISM -->
+  <section class="beat reveal" id="mech" data-sec="mech">
+    <p class="kicker"><span class="num">02</span> signal out, payload in</p>
+    <h2>Compute where the data lives — and prove only the derived signal can leave.</h2>
+    <p class="lede">"The payload never leaves the box" isn't a policy or a promise; it's a property that
+      <b>composes</b> from two independent guarantees — one from the verifier, one from the host.</p>
+    <div class="guar">
+      <p class="gl">why the raw payload has no path out</p>
+      <div class="row"><span class="k">verifier proves</span><span class="v">the program has <b>no exit of its
+        own</b> — with no helpers it does no I/O — and it <b>reads only the fields the signed hook-point map
+        declares</b>. Its sole output is one return value.</span></div>
+      <div class="row"><span class="k">host owns</span><span class="v">that single exit — a <b>one-way,
+        schema-checked sink</b> the program can't read back or redirect, which accepts only <b>derived</b> output
+        (a feature vector, a sketch, an inventory, an attestation), never raw bytes.</span></div>
+      <p class="concl">Program can't send data out · the one host channel takes only derived output → raw payload has no path off the box.</p>
+    </div>
+    <p style="margin-top:1.2rem">Data-minimization becomes a checkable property of the mechanism. You can even
+      export a <b>proof about</b> the data in place of the data — an attestation that <em>no field of a declared
+      sensitivity class was emitted</em> — which is what makes this monetizable at a regulated TLS boundary where
+      moving traffic is forbidden.</p>
+  </section>
+
+  <!-- 03 ARCHITECTURE -->
+  <section class="beat reveal" id="arch" data-sec="arch">
+    <p class="kicker"><span class="num">03</span> reference architecture · the API-discovery MVP</p>
+    <h2>Start with the lowest-hanging fruit — and it exercises the whole mechanism.</h2>
+    <p class="lede"><b>API discovery, schema-drift, and sensitive-data-exposure mapping</b> is the entry point:
+      an existing security market, <b>no model needed</b> (deterministic aggregation + light classification),
+      entirely <b>observe-mode</b> (no enforcement risk; per-request/warm — no hot-path fight). Ship it, and the
+      learning tiers are additive.</p>
+
+    <div class="archflow" role="img" aria-label="Reference architecture, top to bottom: cleartext L7 traffic enters the per-box TMM data plane; hooks expose typed structural context; a verified observe-mode extractor returns a bounded record; host aggregation builds per-endpoint schema, drift window, and exposure map; a one-way schema-checked sink emits derived inventory only, never payload, to the control plane; inventory synthesis diffs snapshots into events and surfaces an API inventory on the box; optionally, fleet aggregation turns inventory deltas into per-industry norms shipped back down.">
+      <p class="arch-top">cleartext L7 traffic ↓</p>
+      <div class="arch-zone box">
+        <span class="zlabel">◆ per box · TMM data plane</span>
+        <div class="arch-stage">
+          <div class="st-t">hooks · request-parse · response-parse</div>
+          <div class="st-d">typed <code>ctx</code>: method, host, path, header/param <b>names</b> and <b>shapes</b> — values &amp; bodies withheld by default (context minimization)</div>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-stage verified">
+          <div class="st-t">verified extractor · observe · no helpers</div>
+          <div class="st-d">returns a bounded record: <b>endpoint signature</b> (method + path→template <code>/users/{id}</code>), <b>field shape descriptors</b>, <b>sensitive-CLASS flags</b> (Luhn/PAN, email/SSN patterns — class label only, never the value)</div>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-stage">
+          <div class="st-t">host aggregation</div>
+          <div class="st-d">per-endpoint host-owned state: name-set/HLL schema, shape descriptors, volume/status counters, rolling <b>drift</b> window, class-<b>exposure</b> map</div>
+        </div>
+      </div>
+      <div class="arch-arrow egress">↓<span class="note">one-way, schema-checked sink — derived inventory only, never raw payload</span></div>
+      <div class="arch-zone">
+        <span class="zlabel">◇ control plane</span>
+        <div class="arch-stage">
+          <div class="st-t">inventory synthesis + drift diff</div>
+          <div class="st-d">snapshot → normalized API inventory + schema catalog + exposure report; diff vs. prior → <b>events</b> (shadow endpoint, schema change, new exposure)</div>
+        </div>
+        <div class="arch-out"><b>API inventory · schema catalog · drift alerts · exposure map</b><br>surfaced on the box — console / iControl REST / SIEM (a product capability)</div>
+      </div>
+      <div class="arch-arrow"><span class="note" style="color:var(--faint)">optional · later</span>↓</div>
+      <div class="arch-zone fleet">
+        <span class="zlabel">▣ fleet</span>
+        <div class="arch-stage">
+          <div class="st-t">federated aggregation</div>
+          <div class="st-d">inventory deltas / schema fingerprints (not payloads) → per-industry API norms → <b>sharper drift/anomaly detection shipped back down</b>; raw confined at the extractor</div>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:1.5rem"><b>What ships:</b> an F5 <b>API-discovery &amp; posture</b> capability <em>on the
+      box</em> — inventory, drift, and exposure delivered to the customer's own console. Governance rides along:
+      SIRT-signed programs, RBAC on any sensitive-value inspection, context minimization by default, tamper-evident
+      audit, and time-boxed auto-retirement for elevated probes.</p>
+  </section>
+
+  <!-- 04 LOOP + LEARN TIER -->
+  <section class="beat reveal" id="loop" data-sec="loop">
+    <p class="kicker"><span class="num">04</span> sense · learn · act</p>
+    <h2>Once you can extract signal safely, the loop closes.</h2>
+    <p class="lede">Features distilled in-situ train an F5 model; the model's output returns to the plane only as
+      <b>verified</b> programs — so a model can drive the data plane while staying <em>out</em> of its trust path.</p>
+
+    <div class="fwdiagram" role="img" aria-label="Loop: data plane (sense) sends features to an F5 model (learn); the model authors verified programs (act); those load back into the data plane, proven safe.">
+      <svg viewBox="0 0 620 158" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="fwah" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="fw-head"/></marker>
+          <marker id="fwahr" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="fw-head r"/></marker>
+        </defs>
+        <rect class="fw-node a" x="15" y="24" width="150" height="54" rx="8"/>
+        <text class="fw-title" x="90" y="48" text-anchor="middle">data plane</text><text class="fw-sub" x="90" y="64" text-anchor="middle">SENSE</text>
+        <rect class="fw-node" x="235" y="24" width="150" height="54" rx="8"/>
+        <text class="fw-title" x="310" y="48" text-anchor="middle">F5 model</text><text class="fw-sub" x="310" y="64" text-anchor="middle">LEARN</text>
+        <rect class="fw-node c" x="455" y="24" width="150" height="54" rx="8"/>
+        <text class="fw-title" x="530" y="48" text-anchor="middle">verified programs</text><text class="fw-sub" x="530" y="64" text-anchor="middle">ACT</text>
+        <path class="fw-arrow" d="M165,51 L226,51" marker-end="url(#fwah)"/><text class="fw-lbl" x="195" y="41" text-anchor="middle">features</text>
+        <path class="fw-arrow" d="M385,51 L446,51" marker-end="url(#fwah)"/><text class="fw-lbl" x="415" y="41" text-anchor="middle">authors</text>
+        <path class="fw-return" d="M530,78 L530,120 L90,120 L90,80" marker-end="url(#fwahr)"/>
+        <text class="fw-lbl" x="310" y="137" text-anchor="middle">loaded back in · proven safe</text>
+      </svg>
+    </div>
+    <p class="fwcap">Only distilled <b>features leave the box</b>; the payload never does, and the model never touches the data path.</p>
+
+    <p class="subh">the learn tier — placement</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Where</th><th>Model</th><th>Job</th></tr></thead>
+      <tbody>
+        <tr><td><b>On-box</b> (control plane)</td><td><b>SLM</b> — compact scorers: distilled small transformers, GBDTs, streaming anomaly detectors</td><td>real-time scoring of the live feature stream; arm/parameterize monitor programs; self-tuning — <b>no fleet round-trip, data stays local</b></td></tr>
+        <tr><td><b>Fleet</b></td><td><b>Foundation model</b> — larger, trained <b>federated</b> on aggregated features</td><td>learn cross-tenant / per-industry norms; ship distilled task heads + updates back down to every box</td></tr>
+        <tr><td><b>Human-facing</b> (off-box)</td><td><b>LLM</b> — generative</td><td>RCA narratives; <span class="mono">tmmtrace</span> natural-language → verified probe; drafting candidate programs (human-gated, verifier-admitted)</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="subh">the learn tier — supervision (mostly unsupervised early, by necessity)</p>
+    <ul class="pts">
+      <li><b>Unsupervised / self-supervised — the workhorse.</b> You start with no labels: self-supervised pretraining over protocol-event sequences learns <em>normal</em>; clustering, density estimation, and reconstruction error flag drift and novelty. Most early value — zero-day <em>behavior</em>, baselining, API drift.</li>
+      <li><b>Supervised — where labels exist.</b> Known-bad (exploit-replay corpus, PoCs, confirmed incidents) + known-good (legitimate-traffic corpus) → classifiers and the shield false-positive oracle.</li>
+      <li><b>Weak / semi-supervised — labels for free.</b> Every shield block is a confirmed positive; the flight recorder captures the exact attempt. A few confirmed labels propagate across the unlabeled mass.</li>
+      <li class="prf"><b>Bounded feedback — the act step.</b> Self-tuning is a closed control loop: adjust a knob within host-sanctioned bounds, observe the resulting feature, adapt — deliberately <em>not</em> open-ended RL in the data path.</li>
+    </ul>
+    <div class="callout prf"><p><b>The maturity curve is the build order:</b> deterministic aggregation (the MVP — no model) → unsupervised anomaly/baselining → supervised heads as labels accumulate → federated self-supervised foundation model → generative authoring, every output still admitted by the verifier. Each stage ships value alone.</p></div>
+  </section>
+
+  <!-- 05 LEVERAGE -->
+  <section class="beat reveal" id="lev" data-sec="lev">
+    <p class="kicker"><span class="num">05</span> the leverage</p>
+    <h2>The install base is already the sensor grid.</h2>
+    <p class="lede">F5 already sits in the path for a large share of the world's enterprise application traffic —
+      so this isn't a sensor network to build, it's one already <b>deployed</b>, switched on by a software capability.</p>
+    <ul class="pts">
+      <li><b>A compounding moat a latecomer can't buy.</b> Federated across the fleet, every box makes the model
+        better and the model makes every box better — catching up needs both the <b>placement</b> and the
+        <b>years of traffic</b>. And the moat needs <em>both halves</em>: the vantage (be the proxy) and the
+        verified in-process surface — no pure-play observability or security vendor has the first.</li>
+      <li><b>Captured in the product, not sold as a feed.</b> The intelligence makes the proxy itself
+        unbeatable — sharper detection, self-tuning, new capabilities — rather than being spun out as a data feed.</li>
+      <li class="prf"><b>Monetizable where no one else can even collect.</b> Because the signal leaves while the
+        payload can't, F5 can build on data <b>at a regulated TLS boundary</b> where everyone else is forbidden
+        even to gather it.</li>
+    </ul>
+  </section>
+
+  <!-- 06 CLOSE -->
+  <section class="close reveal" id="close" data-sec="close">
+    <p class="kicker"><span class="num">06</span> the thesis</p>
+    <p class="big">The data plane becomes <span class="hl">AI's sensory organ</span> — and AI returns to it as verified bytecode.</p>
+    <p>Turn traffic only F5 can see into governed signal it never has to move; compute it where it lives; close the
+      loop by letting models return to the plane only as verified programs. One vantage, one substrate — a data
+      advantage that is F5's alone to build, and safe by construction to operate.</p>
+    <p class="foot">
+      A design proposal.<br>
+      Companion: <a href="https://claude.ai/code/artifact/2e002bd8-bc27-41a1-a7aa-f53a253c7280">the programmable-data-plane explainer</a>. &nbsp;·&nbsp; Detailed method &amp; claims are held in a separate invention disclosure.
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement;
+    document.getElementById('themeBtn').addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){ cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'; }
+      root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+    var pbar=document.getElementById('progress');
+    function onScroll(){ var h=document.documentElement, max=h.scrollHeight-h.clientHeight; pbar.style.width=(max>0?(h.scrollTop/max*100):0)+'%'; }
+    addEventListener('scroll',onScroll,{passive:true}); onScroll();
+    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if('IntersectionObserver' in window && !reduce){
+      var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{threshold:.1, rootMargin:'0px 0px -8% 0px'});
+      document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+    } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
+    var rail=document.querySelector('.rail'), links={};
+    if(rail){ rail.querySelectorAll('a').forEach(function(a){ if(a.dataset.sec) links[a.dataset.sec]=a; }); }
+    if('IntersectionObserver' in window && rail){
+      var so=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ var id=e.target.getAttribute('data-sec');
+        Object.keys(links).forEach(function(k){ links[k].classList.toggle('active', k===id); }); } }); },{rootMargin:'-45% 0px -45% 0px', threshold:0});
+      document.querySelectorAll('[data-sec]').forEach(function(s){ so.observe(s); });
+    }
+  })();
+</script>

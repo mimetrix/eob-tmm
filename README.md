@@ -100,7 +100,7 @@ resource governance — lives *around* the VM (substrate §6, design §8).
 | [`data-plane-intelligence.md`](data-plane-intelligence.md) | The proxy as AI's sensory organ — the unique post-decrypt data vantage as a product moat, the sense→learn→act flywheel, tiered use-cases, and a reference architecture for the API-discovery MVP (value captured *in the product*, not sold as a feed) |
 | [`prototype/`](prototype/) | **minimm** — a "mini-TMM" relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
 | [`prototype/tmmtrace`](prototype/tmmtrace) | **tmmtrace** — a bpftrace-style front-end to the embedded VM: one grammar spanning observe (tracepoint) and filter (CVE shield), with compile → verify → run |
-| [`explainers/`](explainers/) | Visual explainers (HTML) — start at [`index.html`](explainers/index.html): the substrate mechanism; the TMM tracepoint catalog; and the AI-authored-shield pipeline (story + interactive demo) |
+| [`explainers/`](explainers/) | Visual explainers (HTML). [`index.html`](explainers/index.html) — the programmable-data-plane story (substrate mechanism, shield, tracepoints); [`data-intelligence.html`](explainers/data-intelligence.html) — the data-plane-intelligence architecture (mechanism, API-discovery MVP reference design, the learn tier); [`one-pager.html`](explainers/one-pager.html) — the print one-pager |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
 
 ## Prototype at a glance
