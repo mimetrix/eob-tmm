@@ -99,6 +99,9 @@
     background:var(--sheet-2); padding:1rem 1.05rem}
   .proposal .big{font-size:.98rem; margin:0; color:var(--ink)}
   .proposal .big b{font-weight:660; color:var(--signal-ink)}
+  .proposal .tri{margin:.8rem 0 0; font-size:.8rem; color:var(--muted); line-height:1.5}
+  .proposal .tri b{color:var(--ink); font-weight:600}
+  .proposal .tri .t3{font-family:var(--mono); font-size:.78rem; font-weight:700; color:var(--signal-ink)}
   .schematic{margin:.85rem 0 0; font-family:var(--mono); font-size:.72rem; display:grid; gap:.3rem}
   .srow{display:grid; grid-template-columns:8.2rem 1fr auto; gap:.5rem; align-items:center;
     padding:.32rem .5rem; border:1px solid var(--line); border-radius:4px; background:var(--sheet)}
@@ -146,7 +149,7 @@
       --line:#c9d2da; --line-2:#b3bfc9; --signal:#0b7f95; --signal-bg:#eef6f8; --signal-ink:#0a5768;
       --enforce:#8f560a; --enforce-bg:#f7efe1; --enforce-ink:#6b3f08; --proof:#256a45;
     }
-    body{padding:0; background:#fff; font-size:9.8pt; line-height:1.33}
+    body{padding:0; background:#fff; font-size:9.5pt; line-height:1.3}
     .sheet{max-width:none; border:0; border-radius:0; box-shadow:none; padding:0;
       background-image:none}
     .sheet::before{display:none}
@@ -175,24 +178,25 @@
 <div class="sheet">
   <p class="eyebrow">
     <span>F5 TMM</span><span class="sep">·</span>
-    <span>a runtime, programmable, provably-safe data plane</span><span class="sep">·</span>
+    <span>embedded verified eBPF</span><span class="sep">·</span>
     <span class="tag">design proposal</span>
   </p>
 
-  <h1>Let the running data plane <span class="hl">change at machine speed</span> — safely, without a release.</h1>
+  <h1>A <span class="hl">runtime, programmable, provably-safe</span> data plane.</h1>
 
-  <p class="thesis"><b>The AI age collapsed every delivery timeline.</b> New capability, new telemetry,
-    and urgent fixes are all expected in hours now — not on the next quarterly build. Everywhere else, when
-    something needs to change, it changes today. Call it the <span class="zero">race to zero</span>.
-    Inside TMM, that same change is still measured in releases.</p>
+  <p class="thesis"><b>In the generative-AI world, everything happens at machine speed —
+    <span class="zero">except deep inside the data plane</span>.</b> A config push, a redeploy, a new feature,
+    a critical mitigation: minutes, everywhere else. The data plane flexes at its edges — config, traffic
+    logic — but changing its <b>own code and behavior</b> still waits on a release.</p>
 
   <p class="vprop"><b>And the timing cuts F5's way.</b> <span class="em">Generative AI has nothing to say about
-    line-rate processing</span> — the data plane is the one layer it can't disrupt — and the proxy sits on a
-    unique, monetizable data source no model or endpoint sees.</p>
+    line-rate processing</span> — the one layer it can't disrupt — and the proxy sits on a unique data source:
+    every flow, decrypted, in context. Today that stream is digital exhaust; verified <b>in-situ transforms</b>
+    make it F5's to develop, and to monetize.</p>
 
   <hr class="rule">
 
-  <p class="lbl">One requirement, two faces — co-equal · call it FP²</p>
+  <p class="lbl">One dimension — what it's for · two co-equal faces · FP²</p>
   <div class="faces">
     <div class="face program">
       <h3><span class="k">FP</span> Flexible Programmability</h3>
@@ -212,16 +216,14 @@
   <hr class="rule">
 
   <div class="cols" style="grid-template-columns:1fr; gap:1rem">
-    <p class="why"><b>Why it's hard here.</b> TMM is a kernel-bypass microkernel — its own network stack,
-      core-pinned poll loops. That design is <b>why it's fast</b>, and <b>why it's rigid</b>: the industry's
-      answer to safe runtime change, <b>kernel eBPF, is structurally blind to TMM</b> because TMM bypassed the
-      kernel. Changing it today means patch C → rebuild → re-qualify → ride the release train.</p>
+    <p class="why"><b>TMM is a kernel.</b> Its own scheduler, memory manager, and network stack — and it
+      bypassed the Linux kernel, so <b>kernel eBPF is structurally blind to it</b>. Linux earned an in-kernel
+      eBPF VM for exactly this job; a kernel of TMM's standing and maturity deserves its own.</p>
 
     <div class="proposal">
-      <p class="big"><b>The proposal:</b> embed a small, <b>verified</b> eBPF VM <em>inside</em> TMM at
-        designed-in hook points. Behavior loads as <b>bytecode — statically proven bounded and terminating
-        before it runs.</b> No rebuild, no reboot. Dynamically loadable <em>and</em> provably safe — the one
-        surface that is both.</p>
+      <p class="big"><b>The move: give TMM its own eBPF.</b> Embed a small JIT-compiled VM (<b>uBPF</b>,
+        ~150&nbsp;KB) inside TMM at designed-in hook points, gated by the stock <b>PREVAIL</b> verifier —
+        every program <b>proven bounded and memory-safe before it loads</b>. No rebuild, no reboot:</p>
       <div class="schematic" aria-hidden="false">
         <div class="srow slow">
           <span class="k">change today</span>
@@ -229,11 +231,15 @@
           <span class="cost">weeks–quarters</span>
         </div>
         <div class="srow fast">
-          <span class="k">the proposal</span>
+          <span class="k">the move</span>
           <span class="flow">author → clang → PREVAIL verify → sign → load</span>
           <span class="cost">hours</span>
         </div>
       </div>
+      <p class="tri"><span class="t3">runtime · programmable · provably safe</span> — the combination nothing
+        else has: iRules is runtime but never provable; WASM is sandbox-killed, not proven; kernel eBPF is
+        provably safe but in the wrong kernel. <b>Complementary</b> to iRules and WASM — this reaches the layer
+        none of them can.</p>
     </div>
   </div>
 
@@ -241,30 +247,33 @@
 
   <div class="cols">
     <div>
-      <p class="lbl">What one surface unlocks</p>
+      <p class="lbl">A general-purpose platform — with one flagship app</p>
       <ul class="unlocks">
-        <li class="sec"><b>Live mitigation</b> — a signed, auto-retiring shield for a CVE nothing else can reach in TMM.</li>
-        <li><b>New telemetry &amp; logic</b> — metrics and behavior shipped as bytecode, no TMOS rev.</li>
-        <li><b>Black-box observability</b> — see inside a kernel-bypassed data plane (<span class="mono">tmmtrace</span> · <span class="mono">tmmdump</span>).</li>
-        <li><b>AI-authored, still safe</b> — the verifier is a fail-closed gate; blast radius bounded by <em>proof, not trust</em>.</li>
+        <li><b>Deep observability</b> — inside the kernel-bypassed path: <span class="mono">tmmtrace</span>
+          (bpftrace for TMM) · <span class="mono">tmmdump</span> (tcpdump for TMM) · flight recorder.</li>
+        <li><b>A data source, tapped</b> — in-situ transforms on flows only the proxy sees.</li>
+        <li><b>New logic, tuning &amp; field diagnostics</b> — shipped as bytecode, no TMOS rev.</li>
+        <li><b>AI-authored programs</b> — the verifier is a fail-closed gate; <em>proof, not trust</em>.</li>
+        <li class="sec"><b>The flagship: the shield</b> — signed, CVE-keyed, monitor→enforce, auto-retiring;
+          mitigates live exploits nothing else reaches, on either plane.</li>
       </ul>
     </div>
     <div class="safety">
-      <p class="t">■ why it's safe to run inline</p>
-      <p>Stock <b>PREVAIL</b> verifier, <b>no custom helpers</b>, host-owned outcomes, signed hook-point map.
-        A program can only read a curated <code>ctx</code> and return a code that picks one outcome the host
-        already owns — <code>PASS</code> / <code>DROP</code> / <code>RESET</code>. It cannot hang, scribble
-        memory, or invent control flow.</p>
+      <p class="t">■ the load-bearing assumption: the verifier is right</p>
+      <p><b>Provenance</b> — PREVAIL is the verifier Microsoft ships in eBPF-for-Windows (abstract
+        interpretation, production-hardened). <b>Narrow envelope</b> — used at its best-proven case: a pure
+        function of a typed <code>ctx</code>, no helpers, no maps. <b>Depth</b> — F5 signing before it, a
+        per-hook watchdog behind it; every outcome host-owned. A proof, not a promise.</p>
     </div>
   </div>
 
   <hr class="rule">
 
   <div class="ask">
-    <h2>The data plane should stop being the holdout.</h2>
-    <p>Give the fastest layer in the stack a data plane that is, in equal measure, <b>runtime</b>,
-      <b>programmable</b>, and <b>provably safe</b> — the one combination nothing else has. One surface, serving
-      observability, live mitigation, and even machine-speed authorship, each change proven safe before it runs.</p>
+    <h2>Make the data plane runtime, programmable, and provably safe.</h2>
+    <p>Not a feature request — a direction: treat runtime programmability and runtime security as one
+      requirement of a machine-speed world, served by one surface spanning both planes. The parts are proven
+      libraries; the hooks are ours to place; the safety is <span class="em">a proof, not a promise</span>.</p>
   </div>
 
   <p class="foot">
