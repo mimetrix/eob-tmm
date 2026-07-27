@@ -388,6 +388,31 @@
       </div>
     </div>
 
+    <p class="subh">build vs. reuse — the open-source floor</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Stage</th><th>Reuse (open source)</th><th>Build (net-new)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Sense</b></td>
+          <td><span class="mono">uBPF</span> + <span class="mono">PREVAIL</span> (VM + verifier), clang/LLVM + libbpf/BTF (compile, typed CO-RE), Apache DataSketches / t-digest (HLL, count-min, quantiles), Feast (feature store)</td>
+          <td>the <b>verified in-situ extractor</b> + <span class="mono">tmmtrace</span> DSL, the signed TMM hook-point map + <span class="mono">ctx</span>/BTF, and the <b>host-owned schema-checked one-way sink</b> (proof-bounded egress)</td>
+        </tr>
+        <tr>
+          <td><b>Learn</b></td>
+          <td>PyTorch / JAX (training), PyOD · River · XGBoost (anomaly, SLM), HuggingFace Transformers (sequence SSL), <b>Flower</b> or <b>NVIDIA&nbsp;FLARE</b> (federated) + Opacus (DP), ONNX Runtime · llama.cpp (on-box inference)</td>
+          <td>the <b>protocol-event feature schema &amp; self-supervised objective</b>, federation bound to the <em>proof-confined</em> sensor, and the model-registry → signed-program bridge</td>
+        </tr>
+        <tr>
+          <td><b>Act</b></td>
+          <td><span class="mono">PREVAIL</span> (reuse the gate), clang/LLVM, <b>Sigstore/cosign</b> + in-toto + TUF (sign, attest, distribute), Outlines · llguidance (grammar-constrained LLM output)</td>
+          <td>the <b>model-output → DSL candidate</b> synthesis, the <b>verifier-as-oracle refine loop</b>, and the <b>lifecycle engine</b> (observe-first, catalog, auto-retire, kill-switch)</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:.9rem; font-size:.92rem">The <b>reuse</b> column is a permissive open-source floor (the same
+      posture as the core VM + verifier — see the substrate doc's licensing note). The <b>build</b> column is where
+      F5's value lives — and it is precisely what the two invention disclosures cover.</p>
+
     <p class="subh">where the models run</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Where</th><th>Model</th><th>Job</th></tr></thead>
