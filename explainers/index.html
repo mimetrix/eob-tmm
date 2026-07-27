@@ -593,8 +593,10 @@
     <h2>Point the same probe at the data, and the proxy becomes AI's sensory organ.</h2>
     <p class="lede">TMM terminates TLS, so it sees <b>every flow — decrypted, in context, at line rate</b>: a
       vantage no endpoint agent or network sensor has. A <b>verified in-situ transform</b> distills that stream
-      into signal and exports <em class="sig">only the signal — the payload never leaves the box, and the
-      verifier proves it.</em> Data-minimization becomes a property of the mechanism, not a promise bolted on top.</p>
+      into signal — and it has no exit of its own: with no helpers, the program does no I/O (the verifier
+      enforces that), so its <em class="sig">only way out is one value handed to a host-owned sink that accepts
+      only the distilled result.</em> The signal leaves; the raw payload has no channel to. Data-minimization
+      becomes a property of the mechanism, not a promise bolted on top.</p>
     <div class="lifecycle" style="margin-top:1.5rem">
       <span class="step"><b>sense</b> — probes distill traffic to features</span><span class="arr">→</span>
       <span class="step"><b>learn</b> — features train an F5 model</span><span class="arr">→</span>
@@ -701,6 +703,7 @@
         (a shield's <span class="mono">pass / drop / reset</span>, for example); a program cannot invent control
         flow or force an arbitrary early return.</li>
       <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
+      <li><b>One-way egress</b> — with no helpers a program has no I/O of its own; it returns a value to a host-owned, schema-checked sink it cannot read back or redirect. Only host-approved <em>derived</em> output leaves, never raw payload — the composition (verifier: no exit + reads only declared fields; host: the one exit takes only the schema) that underwrites the §6 data-plane-intelligence privacy claim.</li>
       <li class="sec"><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, instant kill-switch + revocation, and a per-hook perf budget with a watchdog.</li>
     </ul>
   </div>
