@@ -338,15 +338,14 @@
 <nav class="rail" aria-label="Sections">
   <p class="brand"><b>F5 · TMM</b>the programmable<br>data plane</p>
   <a href="#hero"   data-sec="hero"><span class="n">00</span><span class="t">machine speed</span></a>
-  <a href="#world"  data-sec="world"><span class="n">01</span><span class="t">the race to zero</span></a>
-  <a href="#needs"  data-sec="needs"><span class="n">02</span><span class="t">two faces · FP²</span></a>
-  <a href="#holdout" data-sec="holdout"><span class="n">03</span><span class="t">double-edged sword</span></a>
-  <a href="#move"   data-sec="move"><span class="n">04</span><span class="t">the move</span></a>
-  <a href="#surface" data-sec="surface"><span class="n">05</span><span class="t">one surface</span></a>
+  <a href="#needs"  data-sec="needs"><span class="n">01</span><span class="t">two faces · FP²</span></a>
+  <a href="#holdout" data-sec="holdout"><span class="n">02</span><span class="t">double-edged sword</span></a>
+  <a href="#move"   data-sec="move"><span class="n">03</span><span class="t">the move</span></a>
+  <a href="#surface" data-sec="surface"><span class="n">04</span><span class="t">one surface</span></a>
   <a href="#lineage" data-sec="lineage"><span class="n">↳</span><span class="t">where this fits</span></a>
-  <a href="#unlock" data-sec="unlock"><span class="n">06</span><span class="t">what it unlocks</span></a>
-  <a href="#deep"   data-sec="deep"><span class="n">07</span><span class="t">under the hood</span></a>
-  <a href="#close"  data-sec="close"><span class="n">08</span><span class="t">the ask</span></a>
+  <a href="#unlock" data-sec="unlock"><span class="n">05</span><span class="t">what it unlocks</span></a>
+  <a href="#deep"   data-sec="deep"><span class="n">06</span><span class="t">under the hood</span></a>
+  <a href="#close"  data-sec="close"><span class="n">07</span><span class="t">the ask</span></a>
   <span class="foot">a design<br>proposal</span>
 </nav>
 
@@ -376,30 +375,9 @@
     <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
   </section>
 
-  <!-- 01 WORLD -->
-  <section class="beat reveal" id="world" data-sec="world">
-    <p class="kicker"><span class="num">01</span> the race to zero</p>
-    <h2>The distance between intent and behavior is collapsing — on purpose.</h2>
-    <p class="lede">Application code hot-reloads. Infrastructure is declared and applied in minutes.
-      CI ships continuously. And on the other side, vulnerabilities are found, weaponized, and iterated
-      at <b>machine speed</b> — AI reasons over mature codebases and surfaces exploitable paths faster
-      than humans can triage them.</p>
-    <p>Everywhere in computing, <em class="sig">the wait is disappearing</em>: what used to take a release now
-      takes a push, and “we need this changed” increasingly means “changed today.” Fast has stopped being an
-      edge and become the baseline — the race to zero.</p>
-    <div class="callout"><p><b>One layer resists it:</b> the data plane. The part that actually
-      moves the packets is the hardest thing in the stack to change while it runs — and in a proxy, it
-      <b>is</b> the traffic.</p></div>
-    <div class="gauge" id="gauge" aria-hidden="true">
-      <div class="row fast"><span>app code · infra · CI</span><div class="track"><div class="fill"></div></div></div>
-      <div class="row slow"><span>the data plane</span><div class="track"><div class="fill"></div></div></div>
-      <span class="cap">time from “needs to change” → “changed” — everything else collapsed; one layer didn’t</span>
-    </div>
-  </section>
-
-  <!-- 02 NEEDS -->
+  <!-- 01 NEEDS -->
   <section class="beat reveal" id="needs" data-sec="needs">
-    <p class="kicker"><span class="num">02</span> FP² · two faces of one need</p>
+    <p class="kicker"><span class="num">01</span> FP² · two faces of one need</p>
     <h2>When the world moves this fast, two demands land on the data plane. Functionally, they are the same demand.</h2>
     <div class="faces">
       <div class="face program">
@@ -429,7 +407,7 @@
 
   <!-- 03 HOLDOUT -->
   <section class="beat reveal" id="holdout" data-sec="holdout">
-    <p class="kicker"><span class="num">03</span> a double-edged sword</p>
+    <p class="kicker"><span class="num">02</span> a double-edged sword</p>
     <h2>TMM is fast because it left the kernel behind. That's exactly why it's so hard to change.</h2>
     <p class="lede">TMM is a kernel-bypass microkernel: its own network stack, its own memory manager, a
       core-pinned poll loop that never syscalls for traffic. That architecture is <b>why it's fast</b> —
@@ -462,7 +440,7 @@
 
   <!-- 04 MOVE -->
   <section class="beat reveal" id="move" data-sec="move">
-    <p class="kicker"><span class="num">04</span> the move</p>
+    <p class="kicker"><span class="num">03</span> the move</p>
     <h2>What makes kernel eBPF safe isn't the kernel. It's a verifier and a tiny VM — and both are libraries.</h2>
     <p class="lede">Strip kernel eBPF to its essence and two things do the work: a <b>static verifier</b>
       that proves a program is bounded and memory-safe <em>before</em> it runs, and a <b>small sandboxed VM</b>
@@ -493,9 +471,9 @@
 
   <!-- 05 SURFACE (interactive) -->
   <section class="beat reveal" id="surface" data-sec="surface">
-    <p class="kicker"><span class="num">05</span> one surface, both faces</p>
+    <p class="kicker"><span class="num">04</span> one surface, both faces</p>
     <h2>Program and protect are the same machinery. Only the last step differs.</h2>
-    <p class="lede">At its simplest, a loaded program reads a curated context and returns a value. Whether that
+    <p class="lede">Here the program takes the substrate's <em>simplest</em> shape — read a curated context, return a value; the engine can do far more, but this base shape is all the symmetry needs. Whether that
       value becomes <em class="sig">a recorded metric</em> or <em class="enf">an enforced verdict</em> is the
       host's choice — not a different mechanism.</p>
     <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
@@ -554,7 +532,7 @@
   <!-- interstitial: lineage / where this fits (positioning, after the surface is shown) -->
   <section class="beat reveal lineage" id="lineage" data-sec="lineage">
     <p class="kicker lin"><span class="linmark">↳</span> where this fits</p>
-    <h2>F5 has made the data plane programmable for years. This complements what already works — and modernizes the stack for the AI age.</h2>
+    <h2>F5 has a long history of extending programmability into the runtime data plane. This complements what already works — and modernizes the stack for the AI age.</h2>
     <p>Dynamic programmability is TMM's heritage, not a new bolt-on. Each surface below programs a
       <b>different layer</b>; the point isn't to replace any of them — it's to reach the one none of them can.</p>
     <div class="tablewrap">
@@ -596,10 +574,10 @@
 
   <!-- 06 UNLOCK -->
   <section class="beat reveal" id="unlock" data-sec="unlock">
-    <p class="kicker"><span class="num">06</span> what the engine unlocks</p>
+    <p class="kicker"><span class="num">05</span> what the engine unlocks</p>
     <h2>A general-purpose platform — with one flagship security application.</h2>
-    <p class="lede">Most of what the engine unlocks is plain <b>programmability and observability</b> — the generic
-      payoff of a verified VM inside the data plane, <em>none of it a shield</em>:</p>
+    <p class="lede">Most of what the engine is for isn't security at all — it's everyday
+      <b>programmability and observability</b> inside the data plane:</p>
     <ul class="unlocks">
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
         kernel-bypassed data plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>)
@@ -621,14 +599,14 @@
 
   <!-- 07 DEEP DIVE -->
   <section class="beat reveal" id="deep" data-sec="deep" style="padding-bottom:1.2rem">
-    <p class="kicker"><span class="num">07</span> under the hood · for the engineers</p>
+    <p class="kicker"><span class="num">06</span> under the hood · for the engineers</p>
     <h2>How the programmable data plane works.</h2>
     <p class="lede">Everything above rests on one small, in-process call, gated by a static proof. Here's the
       machinery — the call, where it sits, why it's safe to run inline, and how the surface grows.</p>
   </section>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.1</span> The engine &amp; its hook points</h3>
+    <h3><span class="sn">6.1</span> The engine &amp; its hook points</h3>
     <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT that runs arbitrary <em>verified</em>
       bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
@@ -659,7 +637,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.2</span> Placement — two planes, two engines, one catalog</h3>
+    <h3><span class="sn">6.2</span> Placement — two planes, two engines, one catalog</h3>
     <p>A single mechanism can't cover TMOS, because TMOS is two execution environments. The plane decides the engine.</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Plane</th><th>What runs there</th><th>Engine</th></tr></thead>
@@ -680,7 +658,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.3</span> Three form factors — same mechanism, honest coverage</h3>
+    <h3><span class="sn">6.3</span> Three form factors — same mechanism, honest coverage</h3>
     <p>Appliance, VE, and BIG-IP Next all run the same TMM, so the mechanism is identical. <b>Coverage</b> is not —
       it scales inversely with how much the platform offloads to hardware.</p>
     <div class="tablewrap"><table class="ff">
@@ -697,7 +675,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.4</span> Why it's safe to run inline</h3>
+    <h3><span class="sn">6.4</span> Why it's safe to run inline</h3>
     <p>Executing bytecode in the data plane is powerful, which makes it a crown-jewel target. Safety is layered,
       and the first principle is blunt: <b>verified ≠ secure</b>. PREVAIL proves a program can't crash or hang TMM;
       it proves nothing about intent. Security is the governance <em>around</em> the VM.</p>
@@ -711,7 +689,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.5</span> Lifecycle — nothing outlives its purpose</h3>
+    <h3><span class="sn">6.5</span> Lifecycle — nothing outlives its purpose</h3>
     <p>Every program is authored, proven, signed, loaded — and can carry an expiry, so nothing outlives its
       purpose: a diagnostic probe when its window closes, a security shield when the patched build lands. No zombies.</p>
     <div class="lifecycle">
@@ -725,7 +703,7 @@
   </div>
 
   <div class="spec reveal">
-    <h3><span class="sn">7.6</span> The surface is built to grow</h3>
+    <h3><span class="sn">6.6</span> The surface is built to grow</h3>
     <p>Read-a-context, return-a-value is the <b>floor</b> — chosen for maximal safety, not the limit of the VM.
       Two growth paths, deliberately different in cost:</p>
     <ul class="unlocks" style="margin-top:1rem">
@@ -741,7 +719,7 @@
 
   <!-- 08 CLOSE -->
   <section class="close reveal" id="close" data-sec="close">
-    <p class="kicker"><span class="num">08</span> the ask</p>
+    <p class="kicker"><span class="num">07</span> the ask</p>
     <p class="big">The data plane should stop being <span class="hl">the holdout</span>.</p>
     <p>The fastest layer in the stack is the last one that can't change at machine speed. A verified, in-process
       programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
