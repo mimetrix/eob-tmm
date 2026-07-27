@@ -59,6 +59,7 @@ Anything stateful (rates, time, cross-flow counters) is handled by the host comp
 - **Diagnostics & field support** — ship a customer a *signed probe* to characterize a production issue in situ, then remove it (worked in §3.1). No debug build, no core-dump archaeology.
 - **Lightweight policy / steering** — steering, mirror-selection, A/B decisions driven by internal signals (decision in eBPF; heavy logic in iRules/WASM).
 - **Self-tuning / performance** — read internal load and nudge a knob; live hot-path profiling.
+- **Data intelligence (the proxy's unique vantage)** — because TMM terminates TLS, an `observe` program can compute a **verified in-situ transform** over decrypted, in-context, line-rate traffic and emit only the *derived* signal (a feature vector, sketch, API inventory, attestation) through the host-owned sink — the payload never leaves the box. This turns the proxy's discarded traffic into a governed data source that improves the product (detection, tuning, fleet-scale baselines) on data no competitor can source. Detailed opportunity, use-cases, and a reference architecture: [`data-plane-intelligence.md`](data-plane-intelligence.md). *(Method & claims held in a separate invention disclosure, per IP policy.)*
 
 ### 3.1 Two diagnostic patterns, worked
 

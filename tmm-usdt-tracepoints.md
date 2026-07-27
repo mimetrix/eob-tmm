@@ -2,7 +2,7 @@
 
 ### A proposed set of designed-in tracepoints for TMM, consumed by the embedded userspace-eBPF VM
 
-**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
+**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-intelligence.md`](data-plane-intelligence.md) (these `ctx` fields are also the feature inputs for in-situ data intelligence), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
 
 ---

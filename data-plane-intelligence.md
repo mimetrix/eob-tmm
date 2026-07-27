@@ -76,10 +76,52 @@ The proposal's hero line is that generative AI cannot do line-rate processing. T
 
 Start with **Tier 1 API discovery.** It is an existing market, needs no model, and proves the core mechanic end-to-end — *compute in-situ, export only the signal, prove the payload stayed put*. That de-risks everything above it: once "verified extractor + proof-bounded egress" is shipping for one use case, the SLM and fleet tiers are additive, not foundational.
 
-## 6. Governance is the feature, not the friction
+## 6. Reference architecture — the API-discovery MVP
+
+**Why this one first.** API discovery, schema-drift, and sensitive-data-exposure mapping is the lowest-risk, highest-leverage entry point: it's an existing security market, needs **no model** (deterministic aggregation + light classification), runs entirely in **observe mode** (no enforcement risk; per-request/warm, condition-scoped — no hot-path budget fight), and it exercises the whole *verified-extractor + proof-bounded-egress* mechanic end to end. Ship this and the SLM/fleet tiers are additive, not foundational.
+
+```
+ ┌───────────────────────────── per box (TMM data plane) ──────────────────────────────┐
+ │  cleartext L7 traffic ─►  [ hooks: request-parse · response-parse ]                   │
+ │                             │  typed ctx: method, path, header/param NAMES + shapes   │
+ │                             │  (values & bodies withheld by default — ctx minimization)│
+ │                             ▼                                                          │
+ │                   ┌──────────────────────┐  returns a bounded record                  │
+ │  VERIFIED         │ endpoint signature,  │──────────────────────┐                     │
+ │  extractor        │ param/field shapes,  │                      ▼                     │
+ │  (observe,        │ sensitive-CLASS flags│        ┌──────── host aggregation ───────┐ │
+ │   no helpers)     └──────────────────────┘        │ per endpoint: name-set/HLL,      │ │
+ │                                                    │ shape schema, counters, rolling  │ │
+ │                                                    │ window (drift), class-exposure   │ │
+ │                                                    └───────────────┬──────────────────┘ │
+ └────────────────────────────────────────────────────────────────────┼──────────────────┘
+                       ┌──────── control plane ────────┐               │ snapshot
+                       │ inventory synthesis + drift    │◄──── one-way, schema-checked sink
+                       │ diff → events                  │      (derived inventory ONLY —
+                       └───────────────┬────────────────┘       never raw payload)
+                                       ▼
+        API inventory · schema catalog · drift alerts · sensitive-exposure map
+        surfaced on the box (console / iControl REST / SIEM) — a product capability
+                                       │  (optional, later)
+                                       ▼
+        fleet: inventory deltas / schema fingerprints → per-industry API norms
+        → sharper drift/anomaly detection shipped back down (payloads confined)
+```
+
+1. **Hooks (sensors).** Designed-in L7 observe hooks at request- and response-parse. The signed hook-point map exposes, by default, only **structural** `ctx` — method, host, path, header/param *names* and *shapes* (string/int/array/object), sizes — with values and bodies **withheld**. Sensitive-value inspection is a separately-authorized, redact-by-default capability that yields only a **class label** ("PAN present"), never the value.
+2. **Verified extractor (observe-mode, no helpers).** A small program per hook returns a bounded record: an **endpoint signature** (hash of method + a path normalized to a template, `/users/{id}`), **param/field shape descriptors**, and **sensitive-class flags** (bounded detectors — Luhn for PAN, pattern classes for email/SSN — over declared fields). Pure function of `ctx`; the verifier proves it reads only declared fields and returns only the record, so only structural/derived output can leave.
+3. **Host aggregation (per box).** The host owns compact per-endpoint state — a name-set/HLL for the schema, shape descriptors, volume/status counters, a rolling window for **drift** (new endpoint, new field, changed shape), and a **class-exposure map**. (Base tier: program returns records, host owns the maps — no helpers.)
+4. **Inventory synthesis (control plane).** A collector snapshots the aggregates into a normalized **API inventory + schema catalog + exposure report**, diffs against the prior snapshot, and raises **events** — shadow endpoint appeared, schema changed, new sensitive-field exposure.
+5. **Egress / surfacing.** The report — and optionally a **compliance attestation** ("no raw field of class X emitted") — is the *only* thing exported, through the one-way audited sink, to the box's own console / iControl REST / SIEM. Never payloads.
+6. **Fleet (optional, later).** Boxes contribute **inventory deltas / schema fingerprints** (not payloads) to a fleet aggregator that learns cross-tenant/industry API norms; those norms feed back to sharpen each box's detection. Federated; raw confined at the extractor.
+7. **Governance.** SIRT-authored signed programs; RBAC gating any sensitive-value inspection; context minimization by default; tamper-evident audit of what was extracted; time-boxed auto-retirement for any elevated-inspection probe.
+
+**What ships:** an F5 **API-discovery & posture** capability *on the box* — inventory, drift, and exposure delivered to the customer's own console, and at fleet scale the baselines that make detection better. Per §5, the value is captured in the product, not sold as a raw feed.
+
+## 7. Governance is the feature, not the friction
 
 Because extraction is verifier-bounded and egress is host-owned and schema-checked, the privacy posture *strengthens* as the data use grows: what could have been "F5 reads your decrypted traffic" becomes "F5 runs a **proven** transform that can only emit **declared** derived signal, and can attest that it did." Data-minimization, residency, and auditability are properties of the mechanism, not overlays on top of it — which is exactly what makes this monetizable at a regulated TLS boundary where centralization is forbidden.
 
-## 7. One-line thesis
+## 8. One-line thesis
 
 **The verified data plane makes the proxy AI's sensory organ — turning traffic only F5 can see into governed signal it never has to move, and closing the loop by letting models return to the plane as verified bytecode.** *Method and claims are held in a separate invention disclosure, per IP policy.*
