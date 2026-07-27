@@ -348,16 +348,16 @@
       --enforce:#8f560a; --enforce-bg:#f7efe1; --enforce-ink:#6b3f08;
       --proof:#256a45; --proof-ink:#1f5d3c;
     }
-    @page{ size:letter portrait; margin:0 }
+    @page{ size:letter portrait; margin:0.5in }
     html{ scroll-behavior:auto }
     body{ overflow:visible }
     .rail, .toolbar, .progress, .scrollcue{ display:none !important }
     .stage{ padding-left:0 !important }
     .beat.reveal, .spec.reveal{ opacity:1 !important; transform:none !important }
-    .hero{ min-height:auto !important; padding-top:1.2rem !important; padding-bottom:2rem !important }
-    .beat{ padding-top:1.4rem !important; padding-bottom:1.4rem !important }
-    .close{ padding-top:1.6rem !important; padding-bottom:1.6rem !important }
-    .spec{ padding-top:.9rem !important; padding-bottom:.9rem !important }
+    .hero{ min-height:auto !important; padding:1rem 0 2rem !important }
+    .beat{ padding:1.4rem 0 !important }
+    .close{ padding:1.6rem 0 !important }
+    .spec{ padding:.9rem 0 !important }
     .gist, .callout, .switchwrap, .fwdiagram, .tablewrap, .codeblock, .faces, .fp2,
     .planes, .schematic, .lifecycle, .misses, .recap, .dsl, .value, ul.unlocks li{ break-inside:avoid }
     a{ color:var(--signal-ink) !important; text-decoration:none }
