@@ -312,6 +312,16 @@
   .close .big .hl{color:var(--signal-ink)}
   .close p{font-size:1.08rem; color:var(--muted); margin:1.3rem 0 0; max-width:60ch}
   .close p b{color:var(--ink); font-weight:600}
+  .close .rlabel{font-family:var(--mono); font-size:.62rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--signal-ink); margin:2.2rem 0 .9rem}
+  .recap{display:grid; gap:.55rem}
+  .rrow{display:grid; grid-template-columns:1.7rem 1fr; gap:.7rem; align-items:baseline}
+  .rrow .rn{font-family:var(--mono); font-size:.66rem; color:var(--faint)}
+  .rrow .rt{font-size:.98rem; color:var(--muted); line-height:1.5; max-width:58ch}
+  .rrow .rt b{color:var(--ink); font-weight:600}
+  .close .last{font-size:clamp(1.15rem,2.4vw,1.5rem); font-weight:660; color:var(--ink);
+    margin:2.2rem 0 0; letter-spacing:-.015em; max-width:30ch; text-wrap:balance}
+  .close .last .hl{color:var(--signal-ink)}
   .close .foot{margin:2.4rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line);
     font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
   .close .foot a{color:var(--signal-ink); text-decoration:none} .close .foot a:hover{text-decoration:underline}
@@ -589,8 +599,8 @@
 
   <div class="spec reveal">
     <h3><span class="sn">6.1</span> The engine &amp; its hook points</h3>
-    <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT that runs arbitrary <em>verified</em>
-      bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
+    <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT-compiled VM that runs arbitrary
+      <em>verified</em> bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
       machinery feeds counters, latency histograms, and flight-recorder rings for deep <em>observability</em>,
       drives steering and self-tuning decisions, and — where the host wants one — returns a value it acts on.
@@ -701,14 +711,28 @@
   <!-- 07 CLOSE -->
   <section class="close reveal" id="close" data-sec="close">
     <p class="kicker"><span class="num">07</span> the direction</p>
-    <p class="big">The data plane should stop being <span class="hl">the holdout</span>.</p>
-    <p>The fastest layer in the stack is the last one whose own code can't change at machine speed. A verified, in-process
-      programmability surface is how it catches up — <b>one surface</b> serving observability, live mitigation, and
-      even machine-speed authorship, with every change <b>proven safe before it runs</b>.</p>
-    <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as the
-      same, co-equal requirement of a machine-speed world — <b>FP²</b> — and give TMM a data plane that is, in
-      equal measure, <b>runtime</b>, <b>programmable</b>, and <b>provably safe</b> — the combination nothing else
-      has.</p>
+    <p class="big">Make the data plane <span class="hl">runtime, programmable, and provably&nbsp;safe</span>.</p>
+    <p class="rlabel">the whole story, one line per slide</p>
+    <div class="recap">
+      <div class="rrow"><span class="rn">00</span><span class="rt">Everything happens at machine speed now —
+        except deep inside the data plane, the layer AI can't disrupt and only F5 can tap.</span></div>
+      <div class="rrow"><span class="rn">01</span><span class="rt">Two demands follow — <b>program it, protect
+        it</b> — functionally one demand: FP².</span></div>
+      <div class="rrow"><span class="rn">02</span><span class="rt">TMM is a <b>kernel</b> that bypassed the
+        kernel — nothing outside can reach inside it.</span></div>
+      <div class="rrow"><span class="rn">03</span><span class="rt">So give it <b>its own eBPF</b>: verifier + VM,
+        in-process, at designed-in hooks — complementing iRules and WASM.</span></div>
+      <div class="rrow"><span class="rn">04</span><span class="rt">One surface, both faces: <b>observe or
+        enforce</b> — the same program, flip a verb.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt">A general-purpose platform — observability,
+        diagnostics, a unique data source — with the <b>shield</b> as its flagship app.</span></div>
+      <div class="rrow"><span class="rn">06</span><span class="rt">Every change <b>proven safe before it
+        runs</b> — signed, governed, self-retiring.</span></div>
+    </div>
+    <p>This isn't a feature request. It's a direction: treat runtime programmability and runtime security as one
+      requirement of a machine-speed world, and give TMM the one surface that satisfies both. The parts are
+      proven libraries; the hooks are ours to place; the safety is <b>a proof, not a promise</b>.</p>
+    <p class="last">The data plane doesn't have to be <span class="hl">the exception</span>.</p>
     <p class="foot">
       A design proposal.<br>
       Companion: the <a href="https://claude.ai/code/artifact/1b7050c4-f5c1-4b2e-bbbc-af197e53febc">one-page proposal</a>. &nbsp;·&nbsp; Detailed method &amp; claims are held in a separate invention disclosure.
