@@ -465,8 +465,11 @@
     <p class="kicker"><span class="num">03</span> the move</p>
     <h2>Give TMM — a microkernel — its own eBPF.</h2>
     <p class="lede">It's entirely buildable, because what makes kernel eBPF safe was never the kernel: it's a
-      <b>static verifier</b> that proves a program bounded and memory-safe <em>before</em> it runs, and a
-      <b>small sandboxed VM</b> that executes it. Both are libraries. Neither needs the kernel.</p>
+      <b>static verifier</b> and a <b>small sandboxed VM</b>. The verifier analyzes the bytecode and proves —
+      <em>before</em> it ever runs — that the program is <b>bounded</b> (every path terminates in a known number
+      of steps; it cannot loop forever, so it can never hang a poll loop) and <b>memory-safe</b> (every load and
+      store stays inside the bytes it was handed; it cannot read what it wasn't given or scribble on TMM's
+      memory). Both are libraries. Neither needs the kernel.</p>
     <p>So bring them inside. Embed a small userspace eBPF VM — <span class="inlinecode">uBPF</span>, ~150&nbsp;KB,
       JIT-compiled — <em class="sig">inside TMM's own address space</em>, at designed-in hook points, gated by
       a stock verifier (<span class="inlinecode">PREVAIL</span>). Now behavior arrives as <b>bytecode, proven
