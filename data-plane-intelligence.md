@@ -65,10 +65,12 @@ The proposal's hero line is that generative AI cannot do line-rate processing. T
 - **Self-tuning** — features → predicted optimal knobs (buffer sizing, LB weights, reuse policy) per-tenant per-time-of-day; verified programs nudge them within host-sanctioned bounds.
 
 **Tier 3 — fleet-scale foundation model (the factory):**
-- **F5 Traffic Foundation Model** — trained federated on anonymized fleet features; productized as threat-intel feeds, per-industry baselines, and pre-trained anomaly heads shipped back down as *signed programs + model updates*.
+- **F5 Traffic Foundation Model** — trained federated on anonymized fleet features; its value is realized **inside the product** — sharper detection, self-tuning, and pre-trained anomaly heads shipped back down to every box as *signed programs + model updates* that competitors cannot source the data to match.
 - **A stronger shield factory** — the AI-shield pipeline's false-positive oracle graduates from synthetic corpora to *real fleet traffic distributions*; fleet data makes machine-authored shields measurably safer. (The security and data theses reinforce each other.)
 - **tmmtrace copilot** — plain English → verified probe, grounded on the signed hook-point map; democratizes the surface to any SE or support engineer.
-- **Compliance as a data product** — attestations computed in-situ ("no PAN crossed this boundary unencrypted, evidence attached") exported as *proofs about* data rather than data.
+- **Compliance attestations** — computed in-situ ("no PAN crossed this boundary unencrypted, evidence attached") and surfaced as a *box capability* — *proofs about* data rather than data.
+
+> **Where the value is captured — the product first.** The compounding advantage is a **better proxy**: fleet intelligence that makes every F5 box detect more, tune itself, and gain capabilities no competitor can source the data to match. **Selling the raw intelligence as an external data feed is a secondary, optional, and fraught path** — it commoditizes the edge, drags F5 into the regulated-data-broker business, and competes with the security vendors and customers F5 sells through. Capture the value in the product; treat any external data offering as a deliberate, later choice, not the plan.
 
 ## 5. Recommended build order
 
