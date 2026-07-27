@@ -164,6 +164,14 @@
   .fw-head{fill:var(--signal)} .fw-head.r{fill:var(--proof)}
   .fwcap{margin:.7rem 0 0; font-size:.86rem; color:var(--muted); text-align:center}
   .fwcap b{color:var(--ink); font-weight:600}
+  .pipe3{display:grid; gap:.7rem; margin:1.1rem 0 0}
+  .phz{border:1px solid var(--line-2); border-left:3px solid var(--signal); border-radius:8px; background:var(--surface-2); padding:.85rem 1rem}
+  .phz.c{border-left-color:var(--proof)}
+  .phz .ph-h{font-family:var(--mono); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; color:var(--signal-ink); font-weight:700; margin:0 0 .5rem}
+  .phz.c .ph-h{color:var(--proof-ink)}
+  .phz ul{margin:0; padding:0; list-style:none; display:grid; gap:.4rem}
+  .phz li{font-size:.9rem; color:var(--muted); line-height:1.5}
+  .phz li b{color:var(--ink); font-weight:600}
 
   .subh{font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase; color:var(--signal-ink); margin:1.8rem 0 .3rem}
 
@@ -352,7 +360,35 @@
     </div>
     <p class="fwcap">Only distilled <b>features leave the box</b>; the payload never does, and the model never touches the data path.</p>
 
-    <p class="subh">the learn tier — placement</p>
+    <p class="subh">the pipeline, stage by stage</p>
+    <div class="pipe3">
+      <div class="phz a">
+        <p class="ph-h">sense · traffic → features</p>
+        <ul>
+          <li>Each verified extractor emits a bounded record; the host rolls records into per-endpoint / per-flow <b>feature representations</b> — counters and quantiles (latency, sizes), protocol-state-transition sequences, header/entropy stats, and event-sequence embeddings for the foundation model. Sketches (count-min, HLL) keep them compact.</li>
+          <li>These land in a <b>feature store</b>: a rolling on-box window for real-time scoring, plus periodic anonymized snapshots contributed to the fleet. Raw payload never enters it (§02).</li>
+        </ul>
+      </div>
+      <div class="phz b">
+        <p class="ph-h">learn · features → models</p>
+        <ul>
+          <li><b>Pretrain (fleet, self-supervised):</b> a foundation model learns <em>normal</em> from unlabeled event sequences — masked / next-event / contrastive objectives across the federated corpus. No labels needed; this is where most early value lives.</li>
+          <li><b>Fine-tune (supervised, per task):</b> heads for exploit-behavior, exfil, bot, API-anomaly, trained on the labels you have — the exploit-replay corpus, confirmed incidents, the legitimate-traffic corpus.</li>
+          <li><b>Federate safely:</b> only features / gradients leave each box — secure aggregation, optional differential-privacy noise; payloads confined at the sensor.</li>
+          <li><b>Distill:</b> compress the needed heads into a small <b>on-box SLM</b> for low-latency, data-local scoring.</li>
+        </ul>
+      </div>
+      <div class="phz c">
+        <p class="ph-h">act · models → verified programs</p>
+        <ul>
+          <li>The model emits a <b>candidate</b> — a detection predicate, a bounded tuning control, or a new feature transform — <em>never</em> inline action.</li>
+          <li>It runs the <b>same gate as a shield</b>: compile → static verify (fail-closed) → sign (human-gated for anything enforcing) → observe-first → auto-retire.</li>
+          <li>Outcomes and blocks feed back as <b>fresh labels and features</b> — the loop's free supervision (every block is a confirmed positive). The model proposes; the verifier disposes; the host acts.</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="subh">where the models run</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Where</th><th>Model</th><th>Job</th></tr></thead>
       <tbody>
@@ -362,14 +398,15 @@
       </tbody>
     </table></div>
 
-    <p class="subh">the learn tier — supervision (mostly unsupervised early, by necessity)</p>
-    <ul class="pts">
-      <li><b>Unsupervised / self-supervised — the workhorse.</b> You start with no labels: self-supervised pretraining over protocol-event sequences learns <em>normal</em>; clustering, density estimation, and reconstruction error flag drift and novelty. Most early value — zero-day <em>behavior</em>, baselining, API drift.</li>
-      <li><b>Supervised — where labels exist.</b> Known-bad (exploit-replay corpus, PoCs, confirmed incidents) + known-good (legitimate-traffic corpus) → classifiers and the shield false-positive oracle.</li>
-      <li><b>Weak / semi-supervised — labels for free.</b> Every shield block is a confirmed positive; the flight recorder captures the exact attempt. A few confirmed labels propagate across the unlabeled mass.</li>
-      <li class="prf"><b>Bounded feedback — the act step.</b> Self-tuning is a closed control loop: adjust a knob within host-sanctioned bounds, observe the resulting feature, adapt — deliberately <em>not</em> open-ended RL in the data path.</li>
-    </ul>
-    <div class="callout prf"><p><b>The maturity curve is the build order:</b> deterministic aggregation (the MVP — no model) → unsupervised anomaly/baselining → supervised heads as labels accumulate → federated self-supervised foundation model → generative authoring, every output still admitted by the verifier. Each stage ships value alone.</p></div>
+    <div class="callout prf"><p><b>The maturity curve is the build order:</b> deterministic aggregation (the MVP — no model) → unsupervised anomaly/baselining → supervised heads as labels accumulate → federated self-supervised foundation model → generative authoring, every output still admitted by the verifier. Each stage ships value on its own; none blocks on the next.</p></div>
+
+    <p class="subh">a worked example — a credential-stuffing wave</p>
+    <div class="callout"><p>The on-box <b>SLM</b> scores drift in login-endpoint features — failed-auth rate, IP fan-out,
+      timing regularity — and <b>auto-arms a monitor probe</b> on the auth hook: reversible, no human needed. It
+      confirms the pattern; SIRT reviews and <b>signs a verified rate-limit / nonce-check program</b>, deployed
+      observe-first, then enforcing. Every block, plus the flight-recorder capture of the attempt, becomes a
+      <b>new label</b> that sharpens the detector across the whole fleet — <em class="sig">sense → learn → act,
+      one turn of the loop.</em></p></div>
   </section>
 
   <!-- 05 LEVERAGE -->
