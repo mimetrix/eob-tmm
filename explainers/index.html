@@ -705,9 +705,8 @@
           <td><b>embedded uBPF</b> (+ PREVAIL)</td></tr>
       </tbody>
     </table></div>
-    <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier — the true Cisco analog; the
-      data plane is the crown jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's
-      own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
+    <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier; the data plane is the crown
+      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
       kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
       engines, one trust path — retarget a program from a TMM parser to an httpd request path by changing only the
