@@ -591,21 +591,30 @@
   <section class="beat reveal" id="flywheel" data-sec="flywheel">
     <p class="kicker"><span class="num">06</span> the flywheel · at fleet scale</p>
     <h2>Point the same probe at the data, and the proxy becomes AI's sensory organ.</h2>
-    <p class="lede">TMM terminates TLS, so it sees <b>every flow — decrypted, in context, at line rate</b>: a
-      vantage no endpoint agent or network sensor has. A <b>verified in-situ transform</b> distills that stream
-      into signal — and it has no exit of its own: with no helpers, the program does no I/O (the verifier
-      enforces that), so its <em class="sig">only way out is one value handed to a host-owned sink that accepts
-      only the distilled result.</em> The signal leaves; the raw payload has no channel to. Data-minimization
-      becomes a property of the mechanism, not a promise bolted on top.</p>
+    <p class="lede">TMM terminates TLS: it sees <b>every flow — decrypted, in context, at line rate</b>, a
+      vantage no endpoint or network sensor has. That view has been <b>worthless</b> — you can't export decrypted
+      line-rate traffic (bandwidth, privacy, law), and you couldn't compute on it in place. The verified substrate
+      opens both locks: a transform runs where the data lives and exports <em class="sig">only the distilled
+      signal, never the payload</em> — the program has no other way out. A discarded stream becomes a
+      <b>product surface</b>:</p>
+    <ul class="unlocks">
+      <li><b>See the blind spots.</b> A live API inventory and sensitive-data-exposure map; malware beaconing
+        and exfil in <em>decrypted</em> server-side traffic that NDR physically cannot see.</li>
+      <li><b>Detection that learns.</b> Behavioral baselines that flag zero-day <em>behavior</em>; a shield
+        factory tuned on real fleet traffic instead of synthetic corpora.</li>
+      <li class="prf"><b>A model only F5 can train.</b> The model that has seen more real application-layer
+        traffic than anything on earth — sold as threat-intel feeds, per-industry baselines, and anomaly detectors
+        shipped back down as signed programs.</li>
+    </ul>
     <div class="lifecycle" style="margin-top:1.5rem">
       <span class="step"><b>sense</b> — probes distill traffic to features</span><span class="arr">→</span>
       <span class="step"><b>learn</b> — features train an F5 model</span><span class="arr">→</span>
       <span class="step"><b>act</b> — the model authors verified programs</span><span class="arr">↺</span>
     </div>
-    <div class="callout sig"><p><b>The loop closes on one substrate.</b> Features train the model; the model
-      authors new programs; the verifier admits them; they load back into the plane — proven safe, the model
-      never in the trust path. The AI that <em>can't</em> touch line rate is fed by it: a data moat only F5 can
-      build — signal to develop and to monetize, without ever moving the data.</p></div>
+    <div class="callout sig"><p><b>And it compounds.</b> Every deployment feeds the model; the model authors new
+      verified programs that load back into the plane — proven safe, the model never in the trust path. A data
+      moat only F5 can build — and because the signal leaves while the payload can't, one F5 can <b>monetize at a
+      regulated TLS boundary</b> where centralizing traffic is forbidden.</p></div>
   </section>
 
   <!-- 07 DEEP DIVE -->
