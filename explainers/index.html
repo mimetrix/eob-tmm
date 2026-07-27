@@ -179,6 +179,16 @@
     padding:.36em .78em; border:1px solid var(--line-2); border-bottom:2px solid var(--signal);
     border-radius:7px; background:var(--surface); white-space:nowrap}
   .triad .tdot{color:var(--faint); font-size:1.1rem}
+  /* the gist — thesis centerpiece panel (slide 03) */
+  .gist{margin:2.3rem 0 0; padding:1.6rem clamp(1rem,3.4vw,1.8rem) 1.7rem; border:1px solid var(--line-2);
+    border-top:3px solid var(--signal); border-radius:10px; background:var(--surface-2)}
+  .gist .glabel{font-family:var(--mono); font-size:.62rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--signal-ink); text-align:center; margin:0}
+  .gist .triad{margin:1rem 0 0}
+  .gist .triad .td{font-size:clamp(1.1rem,3.2vw,1.6rem); padding:.4em .85em; border-bottom-width:3px}
+  .gist > p{font-size:clamp(1.04rem,2vw,1.22rem); line-height:1.6; color:var(--ink);
+    margin:1.4rem auto 0; max-width:56ch}
+  .gist > p b{font-weight:680}
   .unify{text-align:center; margin:1.2rem 0 0; font-size:1.02rem; color:var(--ink); max-width:58ch; margin-left:auto; margin-right:auto}
   .unify b{font-weight:640}
 
@@ -474,16 +484,19 @@
       record layer, the L7 parsers, <span class="mono">bd</span>/WAF internals, the poll loop itself. Each hook
       that lands <em class="sig">immediately extends the value proposition</em>: one more place to observe, one
       more place to act.</p>
-    <div class="triad" aria-label="runtime, programmable, and provably safe — equal weight">
-      <span class="td">runtime</span><span class="tdot">·</span>
-      <span class="td">programmable</span><span class="tdot">·</span>
-      <span class="td">provably safe</span>
+    <div class="gist">
+      <p class="glabel">the whole proposal, in three words</p>
+      <div class="triad" aria-label="runtime, programmable, and provably safe — equal weight">
+        <span class="td">runtime</span><span class="tdot">·</span>
+        <span class="td">programmable</span><span class="tdot">·</span>
+        <span class="td">provably safe</span>
+      </div>
+      <p>Three properties, <b>equal weight</b> — and nothing else brings all three <b>in-process</b>,
+        at the data plane. iRules changes at runtime but can't be proven safe; WASM is programmable but
+        bounded at runtime, not by proof; kernel eBPF is provably safe but lives in the kernel — a USDT lets it
+        <em>watch</em> the data plane, not <em>act</em> inside it, and traps on every hit. <em class="sig">This is
+        the only surface that is all three, in-process</em> — reaching the data plane's own code and state.</p>
     </div>
-    <p class="unify">Three properties, <b>equal weight</b> — and nothing else brings all three <b>in-process</b>,
-      at the data plane. iRules changes at runtime but can't be proven safe; WASM is programmable but
-      bounded at runtime, not by proof; kernel eBPF is provably safe but lives in the kernel — a USDT lets it
-      <em>watch</em> the data plane, not <em>act</em> inside it, and traps on every hit. <em class="sig">This is
-      the only surface that is all three, in-process</em> — reaching the data plane's own code and state.</p>
   </section>
 
   <!-- 05 SURFACE (interactive) -->
