@@ -338,6 +338,31 @@
   .close .foot{margin:2.4rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line);
     font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
   .close .foot a{color:var(--signal-ink); text-decoration:none} .close .foot a:hover{text-decoration:underline}
+
+  /* ---------- PRINT / PDF ---------- */
+  @media print {
+    :root, :root[data-theme="dark"]{
+      --paper:#fff; --surface:#fff; --surface-2:#f6f8fa; --surface-3:#eef2f6;
+      --ink:#0f1720; --muted:#3f4c58; --faint:#67757f; --line:#c9d2da; --line-2:#b3bfc9;
+      --signal:#0b7f95; --signal-bg:#eef6f8; --signal-ink:#0a5768;
+      --enforce:#8f560a; --enforce-bg:#f7efe1; --enforce-ink:#6b3f08;
+      --proof:#256a45; --proof-ink:#1f5d3c;
+    }
+    @page{ size:letter portrait; margin:0 }
+    html{ scroll-behavior:auto }
+    body{ overflow:visible }
+    .rail, .toolbar, .progress, .scrollcue{ display:none !important }
+    .stage{ padding-left:0 !important }
+    .beat.reveal, .spec.reveal{ opacity:1 !important; transform:none !important }
+    .hero{ min-height:auto !important; padding-top:1.2rem !important; padding-bottom:2rem !important }
+    .beat{ padding-top:1.4rem !important; padding-bottom:1.4rem !important }
+    .close{ padding-top:1.6rem !important; padding-bottom:1.6rem !important }
+    .spec{ padding-top:.9rem !important; padding-bottom:.9rem !important }
+    .gist, .callout, .switchwrap, .fwdiagram, .tablewrap, .codeblock, .faces, .fp2,
+    .planes, .schematic, .lifecycle, .misses, .recap, .dsl, .value, ul.unlocks li{ break-inside:avoid }
+    a{ color:var(--signal-ink) !important; text-decoration:none }
+    .seg button{ cursor:default }
+  }
 </style>
 
 <div class="progress" id="progress"></div>
@@ -448,7 +473,7 @@
       <div class="plane data">
         <p class="pt">◆ data plane</p>
         <h4>TMM microkernel</h4>
-        <p>Own stack, poll loop, plugin processes (<span class="mono">bd</span>/WAF). Kernel-bypassed.</p>
+        <p>Own stack, poll loop, plugin processes (<span class="mono">bd</span>, the WAF/ASM engine). Kernel-bypassed.</p>
         <p class="see"><b>nothing outside can see in ✗</b></p>
       </div>
     </div>
@@ -656,8 +681,7 @@
       the model better and the model makes every box better: sharper zero-day detection, self-tuning, fewer false
       positives, whole new capabilities shipped as verified programs. That's a <b>compounding product moat a
       latecomer can't buy</b> — catching up needs both the placement and the years of traffic. The play is to keep
-      the intelligence <em>in the product</em> — using it to build a proxy no one can match — not to sell it as a
-      data feed, which gives the edge away and pits F5 against the security vendors and customers it sells through.</p>
+      the intelligence <em>in the product</em> — using it to build a proxy no one can match.</p>
     <div class="callout sig"><p><b>And the loop is safe to close.</b> The model authors new verified programs that
       load back into the plane — proven safe, the model never in the trust path — so the flywheel turns without an
       unvetted model ever touching the data path. And because the signal leaves while the payload can't, F5 can

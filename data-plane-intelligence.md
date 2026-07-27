@@ -53,6 +53,27 @@ The proposal's hero line is that generative AI cannot do line-rate processing. T
 
 **Sense → learn → act**, on one substrate, with the "act" step's blast radius bounded by proof and the model deliberately kept *out* of the inline trust path (it proposes; the verifier admits; the host acts). No competitor closes this loop, because closing it needs both halves of §2. An **F5 Traffic model**, trained federated across the fleet (features and gradients move; payloads never leave the box), becomes *the model that has seen more real application-layer behavior than anything on earth* — a data moat, not a feature.
 
+### 3.1 The "learn" tier — models & learning paradigms
+
+The learn node isn't one model; it's a tier, and the right technique shifts with **where inference must run** and **what labels you have.**
+
+**By placement — SLM ↔ foundation model ↔ LLM:**
+
+| Where | Model | Job |
+|---|---|---|
+| **On-box** (control plane) | **SLM** — compact scorers: distilled small transformers, gradient-boosted trees, streaming anomaly detectors | real-time scoring of the live feature stream; arm / parameterize monitor programs; self-tuning decisions — **no fleet round-trip, data stays local** |
+| **Fleet** | **Foundation model** — larger, trained **federated** on aggregated features | learn cross-tenant / per-industry norms and representations; ship distilled task heads + model updates back down to every box |
+| **Human-facing** (heavier, likely off-box) | **LLM** — generative | RCA narratives; `tmmtrace` natural-language → verified probe; and — via the shield pipeline — drafting candidate verified programs (the *act* arrow), **human-gated and verifier-admitted** |
+
+**By supervision — mostly unsupervised early, by necessity:**
+
+- **Unsupervised / self-supervised — the workhorse.** You start with *no labels.* Self-supervised pretraining (masked / contrastive / next-event objectives over sequences of protocol events) learns representations of *normal*; unsupervised methods (clustering, density estimation, autoencoder reconstruction error, isolation forests) flag drift and novelty. Most early value lives here — zero-day *behavior*, baselining, API drift — none of it needs a labeled corpus.
+- **Supervised — where labels exist.** Known-bad from the exploit-replay corpus / CVE PoCs / confirmed incidents; known-good from the legitimate-traffic corpus. Trains classifiers (exploit-behavior, exfil, bot) and the shield **false-positive oracle**.
+- **Weak / semi-supervised — labels for free.** The enforce loop *manufactures* labels: every shield block is a confirmed positive, and the combined-play flight recorder captures the exact attempt. A few confirmed labels propagate across the unlabeled mass — the security and data theses compounding again.
+- **Bounded feedback — the act step.** Self-tuning is a closed control loop: adjust a knob within host-sanctioned bounds, observe the resulting feature, adapt. Control-flavored, and deliberately **not** open-ended reinforcement learning in the data path.
+
+**The maturity curve (which is also the build order):** deterministic aggregation (the API-discovery MVP — *no model*) → unsupervised anomaly / baselining → supervised heads as labels accumulate → federated self-supervised foundation model → generative authoring (LLM), every output still admitted by the verifier. Each stage ships value on its own; none blocks on the next.
+
 ## 4. Use cases, tiered by what to build
 
 **Tier 1 — on-box, no model required (prove the thesis cheaply):**
