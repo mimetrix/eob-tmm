@@ -139,10 +139,53 @@ Start with **Tier 1 API discovery.** It is an existing market, needs no model, a
 
 **What ships:** an F5 **API-discovery & posture** capability *on the box* — inventory, drift, and exposure delivered to the customer's own console, and at fleet scale the baselines that make detection better. Per §5, the value is captured in the product, not sold as a raw feed.
 
-## 7. Governance is the feature, not the friction
+## 7. Build vs. reuse — the open-source floor
+
+Most of the pipeline (§3.1) assembles from mature, permissively-licensed open source; the **net-new work is exactly what the invention disclosures cover.**
+
+| Stage | Reuse (open source) | Build (net-new) |
+|---|---|---|
+| **Sense** | uBPF + PREVAIL (VM + verifier), clang/LLVM + libbpf/BTF (compile, typed CO-RE), Apache DataSketches / t-digest (HLL, count-min, quantiles), Feast (feature store) | the **verified in-situ extractor** + `tmmtrace` DSL, the signed TMM hook-point map + `ctx`/BTF, and the **host-owned schema-checked one-way sink** (proof-bounded egress) |
+| **Learn** | PyTorch / JAX (training), PyOD · River · XGBoost (anomaly, SLM), HuggingFace Transformers (sequence SSL), Flower or NVIDIA FLARE (federated) + Opacus (DP), ONNX Runtime · llama.cpp (on-box inference) | the **protocol-event feature schema & self-supervised objective**, federation bound to the *proof-confined* sensor, and the model-registry → signed-program bridge |
+| **Act** | PREVAIL (reuse the gate), clang/LLVM, Sigstore/cosign + in-toto + TUF (sign, attest, distribute), Outlines · llguidance (grammar-constrained LLM output) | the **model-output → DSL candidate** synthesis, the **verifier-as-oracle refine loop**, and the **lifecycle engine** (observe-first, catalog, auto-retire, kill-switch) |
+
+The reuse column is a permissive open-source floor — the same posture as the core VM + verifier (`big-ip-live-shield-design.md` §13). The build column is where F5's value lives.
+
+### 7.1 Reference implementations (for OSPO / engineering scoping)
+
+License + repo per candidate. **Run the §13 SBOM/license scan on pinned versions before shipping** — transitive trees drift.
+
+**Sense**
+- **uBPF** — Apache-2.0 — `github.com/iovisor/ubpf`
+- **PREVAIL** (`ebpf-verifier`) — MIT — `github.com/vbpf/ebpf-verifier`
+- **LLVM/clang** (BPF target) — Apache-2.0 w/ LLVM exception — `github.com/llvm/llvm-project`
+- **libbpf** — LGPL-2.1 **OR** BSD-2-Clause (dual) — `github.com/libbpf/libbpf`
+- **Apache DataSketches** (C++) — Apache-2.0 — `github.com/apache/datasketches-cpp`
+- **t-digest** — Apache-2.0 — `github.com/tdunning/t-digest`
+- **Feast** (feature store) — Apache-2.0 — `github.com/feast-dev/feast`
+- egress/telemetry: **OpenTelemetry** — Apache-2.0; **Vector** — MPL-2.0 — `github.com/vectordotdev/vector`  · *(avoid Redpanda — BSL, source-available, not OSI; use Kafka/NATS if a broker is needed)*
+
+**Learn**
+- **PyTorch** — BSD-3 — `github.com/pytorch/pytorch` · **JAX** — Apache-2.0 — `github.com/google/jax`
+- **PyOD** — BSD-2 · **River** — BSD-3 · **XGBoost** — Apache-2.0 · **LightGBM** — MIT
+- **HuggingFace Transformers** — Apache-2.0 — `github.com/huggingface/transformers`
+- **Flower** — Apache-2.0 — `github.com/adap/flower` · **NVIDIA FLARE** — Apache-2.0 — `github.com/NVIDIA/NVFlare`
+- **Opacus** (differential privacy) — Apache-2.0 — `github.com/pytorch/opacus`
+- on-box inference: **ONNX Runtime** — MIT — `github.com/microsoft/onnxruntime` · **llama.cpp** — MIT — `github.com/ggml-org/llama.cpp`
+
+**Act**
+- **PREVAIL** (reuse the gate) — MIT
+- **Sigstore/cosign** — Apache-2.0 — `github.com/sigstore/cosign`
+- **in-toto** (supply-chain attestation) — Apache-2.0 — `github.com/in-toto/in-toto`
+- **TUF** (`python-tuf`) — MIT/Apache-2.0 — `github.com/theupdateframework/python-tuf`
+- grammar-constrained generation: **Outlines** — Apache-2.0 — `github.com/dottxt-ai/outlines` · **llguidance** — MIT/Apache — `github.com/guidance-ai/llguidance`
+
+> **Licensing posture.** Every candidate above is permissive (Apache / BSD / MIT), with two footnotes for counsel: **MPL-2.0** (Vector) is *file-level* copyleft — fine when consumed as a separate binary, not statically linked; **Redpanda is BSL** (source-available, **not** OSI-approved) — excluded here. This mirrors the core substrate's posture; the same §13 SBOM scan applies.
+
+## 8. Governance is the feature, not the friction
 
 Because extraction is verifier-bounded and egress is host-owned and schema-checked, the privacy posture *strengthens* as the data use grows: what could have been "F5 reads your decrypted traffic" becomes "F5 runs a **proven** transform that can only emit **declared** derived signal, and can attest that it did." Data-minimization, residency, and auditability are properties of the mechanism, not overlays on top of it — which is exactly what makes this monetizable at a regulated TLS boundary where centralization is forbidden.
 
-## 8. One-line thesis
+## 9. One-line thesis
 
 **The verified data plane makes the proxy AI's sensory organ — turning traffic only F5 can see into governed signal it never has to move, and closing the loop by letting models return to the plane as verified bytecode.** *Method and claims are held in a separate invention disclosure, per IP policy.*
