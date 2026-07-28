@@ -396,6 +396,8 @@
   <section class="beat reveal" id="move" data-sec="move">
     <p class="kicker"><span class="num">02</span> the move</p>
     <h2>Give TMM — a microkernel — its own eBPF.</h2>
+    <p class="lede">F5 has a long history of extending programmability into the runtime data plane — this is its
+      next step.</p>
     <p class="lede">It's entirely buildable, because what makes kernel eBPF safe was never the kernel: it's a
       <b>static verifier</b> and a <b>small sandboxed VM</b>. The verifier analyzes the bytecode and proves —
       <em>before</em> it ever runs — that the program is <b>bounded</b> (every path terminates in a known number
@@ -443,10 +445,9 @@
       <p class="punch"><em class="sig">This is the only surface that is all three, in-process</em> — reaching
         the data plane's own code and state.</p>
     </div>
-    <div class="callout sig" style="margin-top:1.6rem"><p><b>Complementary, not a replacement.</b> F5 has a long
-      history of extending programmability into the runtime data plane — iRules stays the first line for traffic
-      logic, WASM the home for rich extensions. This reaches the layer none of them can, and modernizes that
-      lineage for the AI age.</p></div>
+    <div class="callout sig" style="margin-top:1.6rem"><p><b>Complementary, not a replacement.</b> iRules stays
+      the first line for traffic logic, WASM the home for rich extensions. This reaches the layer none of them
+      can, and modernizes that lineage for the AI age.</p></div>
   </section>
 
   <!-- 03 SURFACE (interactive) -->
