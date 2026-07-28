@@ -419,7 +419,8 @@
     </div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
       so the surface can start from what's in the code today and grow as the code does, not a blank page. A
-      <b>candidate catalog of USDT tracepoints</b> can be drawn up alongside the engine, right where that state
+      <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe
+      points designed into the source) can be drawn up alongside the engine, right where that state
       already lives: L3/L4 ingress and the connection table, the TLS
       record layer, the L7 parsers, the plugin processes, the poll loop itself. Each hook that lands adds one more
       place to observe, one more place to act.</p>
@@ -443,7 +444,7 @@
           <span class="gap"><b>provably safe</b>, but in the wrong kernel — a USDT lets it <em>watch</em> TMM,
             not act inside it, and traps on every hit</span></div>
       </div>
-      <p class="punch"><em class="sig">This is the only surface that is all three, in-process</em> — reaching
+      <p class="punch"><em class="sig">An embedded eBPF engine is the only surface that is all three, in-process</em> — reaching
         the data plane's own code and state.</p>
     </div>
     <div class="callout sig" style="margin-top:1.6rem"><p><b>Complementary, not a replacement.</b> iRules stays
