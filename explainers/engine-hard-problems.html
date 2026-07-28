@@ -123,6 +123,26 @@
   .concern p{margin:0; font-size:.92rem; color:var(--muted); max-width:none; line-height:1.5}
   .concern p b{color:var(--ink); font-weight:600}
 
+  /* budget-pass CFG diagram */
+  .bp{margin:1.5rem 0 0}
+  .bp svg{width:100%; height:auto; max-width:41rem; display:block; margin:0 auto}
+  .bp-node{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5}
+  .bp-t{fill:var(--ink); font-family:var(--sans); font-weight:640; font-size:13px}
+  .bp-s{fill:var(--muted); font-family:var(--mono); font-size:10px}
+  .bp-edge{stroke:var(--faint); stroke-width:1.5; fill:none}
+  .bp-head{fill:var(--faint)} .bp-head-a{fill:var(--accent)}
+  .bp-loop{stroke:var(--accent); stroke-width:1.5; fill:none; stroke-dasharray:4 3}
+  .bp-loop-lbl{fill:var(--accent-ink); font-family:var(--mono); font-size:10.5px}
+  .bp-math{fill:var(--ink); font-family:var(--mono); font-size:13px}
+  .bp-math .n{fill:var(--accent-ink); font-weight:700}
+  .bp-glbl{fill:var(--muted); font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase}
+  .bp-ok{fill:var(--ok-bg); stroke:var(--ok); stroke-width:1.5}
+  .bp-warn{fill:var(--warn-bg); stroke:var(--warn); stroke-width:1.5}
+  .bp-ok-t{fill:var(--ok-ink); font-family:var(--mono); font-size:11px; font-weight:600}
+  .bp-warn-t{fill:var(--warn-ink); font-family:var(--mono); font-size:11px; font-weight:600}
+  .bp-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:60ch}
+  .bp-cap b{color:var(--ink); font-weight:600}
+
   /* perimeter schematic */
   .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
   .srow{display:grid; grid-template-columns:1fr auto; gap:.7rem; align-items:center; padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
@@ -242,6 +262,37 @@
         and no helpers are involved. Time-safety is load-time policy plus a runtime backstop, exactly what the
         base tier already allows.</p>
     </div>
+    <figure class="bp">
+      <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The budget pass on one program: a verified control-flow graph with a proven loop bound of 64; worst-case path is 8 plus 10 times 64 plus 4 = 652 instructions, about 800 cycles; compared to the hook's budget it loads if under and is rejected fail-closed if over.">
+        <defs>
+          <marker id="bpah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head"/></marker>
+          <marker id="bpaha" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head-a"/></marker>
+        </defs>
+        <rect class="bp-node" x="25" y="55" width="150" height="50" rx="8"/>
+        <text class="bp-t" x="100" y="79" text-anchor="middle">entry</text>
+        <text class="bp-s" x="100" y="95" text-anchor="middle">prologue · 8 instr</text>
+        <rect class="bp-node" x="245" y="55" width="150" height="50" rx="8"/>
+        <text class="bp-t" x="320" y="79" text-anchor="middle">loop body</text>
+        <text class="bp-s" x="320" y="95" text-anchor="middle">10 instr</text>
+        <rect class="bp-node" x="465" y="55" width="150" height="50" rx="8"/>
+        <text class="bp-t" x="540" y="79" text-anchor="middle">exit</text>
+        <text class="bp-s" x="540" y="95" text-anchor="middle">epilogue · 4 instr</text>
+        <path class="bp-edge" d="M175,80 L241,80" marker-end="url(#bpah)"/>
+        <path class="bp-edge" d="M395,80 L461,80" marker-end="url(#bpah)"/>
+        <path class="bp-loop" d="M360,55 C378,16 262,16 280,55" marker-end="url(#bpaha)"/>
+        <text class="bp-loop-lbl" x="320" y="12" text-anchor="middle">≤ 64× · proven bound</text>
+        <text class="bp-math" x="320" y="142" text-anchor="middle">worst case = 8 + <tspan class="n">10×64</tspan> + 4 = <tspan class="n">652 instr</tspan> ≈ 800 cycles</text>
+        <text class="bp-glbl" x="320" y="171" text-anchor="middle">compare to the hook's budget</text>
+        <rect class="bp-ok" x="70" y="186" width="230" height="38" rx="7"/>
+        <text class="bp-ok-t" x="185" y="210" text-anchor="middle">≤ budget → load ✓</text>
+        <rect class="bp-warn" x="340" y="186" width="230" height="38" rx="7"/>
+        <text class="bp-warn-t" x="455" y="210" text-anchor="middle">&gt; budget → reject (fail closed)</text>
+      </svg>
+      <figcaption class="bp-cap">A program's <b>control-flow graph (CFG)</b> — its basic blocks and the branches
+        between them. Because the program is <em>verified</em>, every loop has a proven bound, so the
+        <b>worst-case path</b> is computable: cost it, compare to the hook's budget, load or reject. That is the
+        post-verifier budget pass, on one program.</figcaption>
+    </figure>
   </section>
 
   <!-- 02 THE INTERFACE -->
