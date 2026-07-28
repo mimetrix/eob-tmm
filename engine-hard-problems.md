@@ -10,7 +10,9 @@
 The pitch is "verified ⇒ safe, stock PREVAIL, no helpers." That is true as far as it goes, and
 it is the right *floor* — but the real engineering and the real security exposure live in four
 places the explainers understate. This is the honest register: the questions that will be
-asked first, with where each one actually lands.
+asked first, with where each one actually lands. **None is a show-stopper** — each has a known
+mitigation and a clear day-one/deferred path. They are the work to do, not a verdict against
+doing it.
 
 > **This design is not self-certifying.** Everything here is the engineering input to a **formal
 > Threat Model Analysis (TMA)** by F5 security — a **gating prerequisite** before implementation,
