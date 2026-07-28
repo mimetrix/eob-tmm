@@ -307,21 +307,6 @@
   .lifecycle .arr{align-self:center; color:var(--faint)}
   .lifecycle .step.retire{border-color:var(--proof); color:var(--proof-ink)}
 
-  /* flywheel schematic (beat 06) */
-  .fwdiagram{margin:1.6rem 0 0}
-  .fwdiagram svg{width:100%; height:auto; max-width:40rem; display:block; margin:0 auto}
-  .fw-node{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5}
-  .fw-node.a{stroke:var(--signal)}
-  .fw-node.c{stroke:var(--proof)}
-  .fw-title{fill:var(--ink); font-family:var(--sans); font-weight:640; font-size:12px}
-  .fw-sub{fill:var(--signal-ink); font-family:var(--mono); font-size:8.5px; letter-spacing:.14em}
-  .fw-arrow{stroke:var(--signal); stroke-width:1.5; fill:none}
-  .fw-return{stroke:var(--proof); stroke-width:1.5; fill:none; stroke-dasharray:4 3}
-  .fw-lbl{fill:var(--muted); font-family:var(--mono); font-size:10px}
-  .fw-head{fill:var(--signal)}
-  .fw-head.r{fill:var(--proof)}
-  .fwcap{margin:.7rem 0 0; font-size:.86rem; color:var(--muted); text-align:center}
-  .fwcap b{color:var(--ink); font-weight:600}
 
   /* CLOSE */
   .close{max-width:var(--maxw); margin:0 auto; padding:clamp(3.5rem,10vh,7rem) clamp(1.15rem,5vw,2rem) 4rem}
@@ -360,7 +345,7 @@
     .beat{ padding:1.4rem 0 !important }
     .close{ padding:1.6rem 0 !important }
     .spec{ padding:.9rem 0 !important }
-    .gist, .callout, .switchwrap, .fwdiagram, .tablewrap, .codeblock, .faces, .fp2,
+    .gist, .callout, .switchwrap, .tablewrap, .codeblock, .faces, .fp2,
     .planes, .schematic, .lifecycle, .misses, .recap, .dsl, .value, ul.unlocks li{ break-inside:avoid }
     a{ color:var(--signal-ink) !important; text-decoration:none }
     .seg button{ cursor:default }
@@ -636,63 +621,17 @@
 
   <!-- 06 FLYWHEEL -->
   <section class="beat reveal" id="flywheel" data-sec="flywheel">
-    <p class="kicker"><span class="num">06</span> the flywheel · at fleet scale</p>
+    <p class="kicker"><span class="num">06</span> the second dividend · the data</p>
     <h2>Point the same probe at the data, and the proxy becomes AI's sensory organ.</h2>
-    <p class="lede">TMM terminates TLS: it sees <b>every flow — decrypted, in context, at line rate</b>, a
-      vantage no endpoint or network sensor has. That value has stayed <b>locked away</b> — you can't export decrypted
-      line-rate traffic (bandwidth, privacy, law), and you couldn't compute on it in place. The verified substrate
-      opens both locks: a transform runs where the data lives and exports <em class="sig">only the distilled
-      signal, never the payload</em> — the program has no other way out. The stream you used to throw away
-      becomes <b>raw material for new products</b>:</p>
-    <ul class="unlocks">
-      <li><b>See the blind spots.</b> A live API inventory and sensitive-data-exposure map; malware beaconing
-        and exfil in <em>decrypted</em> server-side traffic that on-the-wire network-detection tools (NDR),
-        stuck looking at ciphertext, physically cannot see.</li>
-      <li><b>Detection that learns.</b> Behavioral baselines that flag zero-day <em>behavior</em>; a shield
-        factory tuned on real fleet traffic instead of synthetic corpora.</li>
-      <li class="prf"><b>A model only F5 can train.</b> The model that has seen more real application-layer
-        traffic than anything on earth — powering detection, tuning, and new capabilities across the whole fleet,
-        on data no competitor can source.</li>
-    </ul>
-    <div class="fwdiagram" role="img" aria-label="The flywheel: the data plane senses — probes distill traffic to features; an F5 model learns from the features; the model authors verified programs; those load back into the data plane, proven safe — closing the loop.">
-      <svg viewBox="0 0 620 158" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <marker id="fwah" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto">
-            <path d="M0,0 L6.5,3 L0,6 Z" class="fw-head"/></marker>
-          <marker id="fwahr" markerWidth="8" markerHeight="8" refX="6.5" refY="3" orient="auto">
-            <path d="M0,0 L6.5,3 L0,6 Z" class="fw-head r"/></marker>
-        </defs>
-        <rect class="fw-node a" x="15" y="24" width="150" height="54" rx="8"/>
-        <text class="fw-title" x="90" y="48" text-anchor="middle">data plane</text>
-        <text class="fw-sub" x="90" y="64" text-anchor="middle">SENSE</text>
-        <rect class="fw-node" x="235" y="24" width="150" height="54" rx="8"/>
-        <text class="fw-title" x="310" y="48" text-anchor="middle">F5 model</text>
-        <text class="fw-sub" x="310" y="64" text-anchor="middle">LEARN</text>
-        <rect class="fw-node c" x="455" y="24" width="150" height="54" rx="8"/>
-        <text class="fw-title" x="530" y="48" text-anchor="middle">verified programs</text>
-        <text class="fw-sub" x="530" y="64" text-anchor="middle">ACT</text>
-        <path class="fw-arrow" d="M165,51 L226,51" marker-end="url(#fwah)"/>
-        <text class="fw-lbl" x="195" y="41" text-anchor="middle">features</text>
-        <path class="fw-arrow" d="M385,51 L446,51" marker-end="url(#fwah)"/>
-        <text class="fw-lbl" x="415" y="41" text-anchor="middle">authors</text>
-        <path class="fw-return" d="M530,78 L530,120 L90,120 L90,80" marker-end="url(#fwahr)"/>
-        <text class="fw-lbl" x="310" y="137" text-anchor="middle">loaded back in · proven safe</text>
-      </svg>
-    </div>
-    <p class="fwcap">Only the distilled <b>features leave the box</b> — the payload never does, and the model
-      never touches the data path.</p>
-    <p style="margin-top:1.4rem"><b>And the leverage is the install base, pointed inward.</b> F5 already sits in
-      the path for a large share of the world's enterprise application traffic — not a sensor network to build,
-      one already deployed and switched on by a software capability. Federated across that fleet, every box makes
-      the model better and the model makes every box better: sharper zero-day detection, self-tuning, fewer false
-      positives, whole new capabilities shipped as verified programs. That's a <b>compounding product moat a
-      latecomer can't buy</b> — catching up needs both the placement and the years of traffic. The play is to keep
-      the intelligence <em>in the product</em> — using it to build a proxy no one can match.</p>
-    <div class="callout sig"><p><b>And the loop is safe to close.</b> The model authors new verified programs that
-      load back into the plane — proven safe, the model never in the trust path — so the flywheel turns without an
-      unvetted model ever touching the data path. And because the signal leaves while the payload can't, F5 can
-      <b>build on data at a regulated TLS boundary</b> where everyone else is forbidden even to collect it.</p></div>
-    <p style="margin-top:1.1rem; font-size:.92rem"><a href="https://claude.ai/code/artifact/dfa5982f-6b5f-4f4e-bf00-4bedaf73bacd" style="color:var(--signal-ink); text-decoration:none"><b>→ The full data-plane-intelligence architecture</b></a> — the mechanism, the API-discovery MVP reference design, and the learn tier, spelled out.</p>
+    <p class="lede">The engine has a second payoff. TMM terminates TLS: it sees <b>every flow — decrypted, in
+      context, at line rate</b>, a vantage no endpoint or network sensor has. That stream has always stayed
+      <b>locked away</b> — you can't export decrypted line-rate traffic (bandwidth, privacy, law), and you
+      couldn't compute on it in place. A verified transform opens both locks: it runs where the data lives and
+      exports <em class="sig">only the distilled signal, never the payload</em> — the program has no other way
+      out. Distilled features feed an F5 model that authors more verified programs, which load back into the
+      plane, proven safe: a <b>sense → learn → act</b> flywheel where every box makes the model better and the
+      model makes every box better — on data no competitor can source, kept <em>in the product</em>.</p>
+    <p style="margin-top:1.3rem; font-size:.95rem"><a href="https://claude.ai/code/artifact/dfa5982f-6b5f-4f4e-bf00-4bedaf73bacd" style="color:var(--signal-ink); text-decoration:none"><b>→ The full data-plane-intelligence architecture</b></a> — the one-way signal-out/payload-in guarantee, the API-discovery MVP reference design, the learn tier, and the compounding fleet moat, spelled out in its own explainer.</p>
   </section>
 
   <!-- 07 DEEP DIVE -->
