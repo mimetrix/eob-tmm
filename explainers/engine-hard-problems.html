@@ -116,6 +116,13 @@
   .deferred::before{content:"⟳"; position:absolute; left:0; color:var(--faint)}
   .deferred b{color:var(--muted); font-weight:600}
 
+  /* further-concerns list */
+  .concerns{margin:1.4rem 0 0; display:grid; gap:.6rem}
+  .concern{border:1px solid var(--line-2); border-left:3px solid var(--accent); border-radius:0 7px 7px 0; background:var(--surface); padding:.7rem .9rem}
+  .concern .cl{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--accent-ink); display:block; margin-bottom:.28rem}
+  .concern p{margin:0; font-size:.92rem; color:var(--muted); max-width:none; line-height:1.5}
+  .concern p b{color:var(--ink); font-weight:600}
+
   /* perimeter schematic */
   .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
   .srow{display:grid; grid-template-columns:1fr auto; gap:.7rem; align-items:center; padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
@@ -166,7 +173,7 @@
     .beat.reveal{ opacity:1 !important; transform:none !important }
     .hero{ min-height:auto !important; padding:1rem 0 2rem !important }
     .beat{ padding:1.3rem 0 !important } .close{ padding:1.5rem 0 !important }
-    .callout, .dayone, .schematic, .tablewrap, .recap, .close .tma, ul.checks li{ break-inside:avoid }
+    .callout, .dayone, .schematic, .tablewrap, .recap, .close .tma, .concern, ul.checks li{ break-inside:avoid }
   }
 </style>
 
@@ -180,8 +187,9 @@
   <a href="#iface" data-sec="iface"><span class="n">02</span><span class="t">the interface</span></a>
   <a href="#state" data-sec="state"><span class="n">03</span><span class="t">shared state</span></a>
   <a href="#trust" data-sec="trust"><span class="n">04</span><span class="t">the trust surface</span></a>
-  <a href="#seq" data-sec="seq"><span class="n">05</span><span class="t">sequencing</span></a>
-  <a href="#close" data-sec="close"><span class="n">06</span><span class="t">the review</span></a>
+  <a href="#further" data-sec="further"><span class="n">05</span><span class="t">further concerns</span></a>
+  <a href="#seq" data-sec="seq"><span class="n">06</span><span class="t">sequencing</span></a>
+  <a href="#close" data-sec="close"><span class="n">07</span><span class="t">the review</span></a>
   <span class="foot">a design<br>proposal</span>
 </nav>
 
@@ -302,8 +310,25 @@
   </section>
 
   <!-- 05 SEQUENCING -->
+  <!-- 05 FURTHER CONCERNS -->
+  <section class="beat reveal" id="further" data-sec="further">
+    <p class="kicker"><span class="num">05</span> further concerns</p>
+    <h2>Six more the review will raise — smaller, but real.</h2>
+    <p class="lede">The four above are load-bearing. These are the next tier: each has a stance, none changes the
+      day-one posture — and the first two are the most likely to shape what the first shippable form looks like.</p>
+    <div class="concerns">
+      <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>A certified appliance that loads code into its data plane at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate; raise it early.</p></div>
+      <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) should verify at <b>build / control-plane time</b> — only the small runtime and a signature check live in TMM's address space. This <em>shrinks</em> the §04 surface.</p></div>
+      <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter on high-assurance builds.</p></div>
+      <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
+      <div class="concern"><span class="cl">ISSU + failover</span><p>Zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
+      <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and the like won't tolerate <em>any</em> added per-packet jitter, even budgeted — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>
+    </div>
+  </section>
+
+  <!-- 06 SEQUENCING -->
   <section class="beat reveal" id="seq" data-sec="seq">
-    <p class="kicker"><span class="num">05</span> sequencing</p>
+    <p class="kicker"><span class="num">06</span> sequencing</p>
     <h2>Most of the risk retires on day one. The rest is governed and deferred.</h2>
     <p class="lede">The engine ships with the conservative half; the powerful-but-riskier half is
       <em>explicitly</em> later, not accidentally missing.</p>
@@ -322,7 +347,7 @@
 
   <!-- 06 THE REVIEW -->
   <section class="close reveal" id="close" data-sec="close">
-    <p class="kicker"><span class="num">06</span> the review</p>
+    <p class="kicker"><span class="num">07</span> the review</p>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
     <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, and <b>not</b>
       immunity from its own bugs. The engine is defensible because the <b>signing gate</b> keeps attacker input
@@ -338,7 +363,8 @@
       <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.</span></div>
       <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.</span></div>
       <div class="rrow"><span class="rn">04</span><span class="rt"><b>Trust</b> — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.</span></div>
-      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — certification, verifier-placement, uBPF-JIT maturity, multi-tenancy, ISSU, jitter — each addressable; certification and tenancy shape the first shippable form.</span></div>
+      <div class="rrow"><span class="rn">06</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
     </div>
     <p class="foot">
       A design proposal — the engineering register behind the engine explainer.<br>

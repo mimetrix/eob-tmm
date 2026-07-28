@@ -133,7 +133,35 @@ revocation. The safety proof bounds the blast radius from *crashes*; the canary 
 the signing key as the real perimeter (and its protection), and the interpreter-vs-JIT trade for
 high-assurance builds — with F5 SIRT sign-off gating implementation, not following it.
 
-## 5. Sequencing — day-one vs. deferred
+## 5. Further TMM-specific concerns
+
+The four above are load-bearing. These are the next tier — each has a stance and none changes
+the day-one posture, but the first two are the most likely to shape the first shippable form.
+
+- **Certification (FIPS 140-2/3, Common Criteria).** A certified security appliance that can load
+  code into its data plane at runtime is a certification problem — evaluators may not accept
+  "it's signed" as sufficient, and it can force a **dynamic-load-disabled certified mode** for
+  gov/finance deployments. Possibly the biggest *productization* gate; take it to certification
+  early, not late.
+- **Keep the verifier out of TMM.** PREVAIL is heavy C++/Boost; it should verify at **build/sign
+  or control-plane time**, so only the small uBPF runtime (+ a signature check) lives in TMM's
+  address space. Stated, this shrinks the §4 surface; left unstated, a reviewer assumes a large
+  dependency in the crown-jewel process.
+- **uBPF JIT maturity.** §4 is really "the verifier *and this JIT*." uBPF's arm64/x86-64 JIT is
+  far less battle-tested than the kernel's, and here a JIT bug is the RCE. Plan to
+  **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
+- **Multi-tenancy — partitions, route domains, vCMP.** BIG-IP is deeply multi-tenant, and vCMP
+  guests each run their own TMM. A program's **scope** (global vs. per-virtual-server /
+  per-partition), its **authorization**, and its **blast radius** must be tenant-aware from day
+  one — the governance model cannot be single-tenant.
+- **ISSU / hitless upgrade + failover.** F5 sells zero-downtime upgrades. Loaded programs need
+  defined behavior across an in-service upgrade and HA failover — **re-verify and reload on the
+  new TMM**, with explicit map-state handling. (Extends §3.)
+- **Jitter-sensitive deployments.** Trading, 5G UPF, and similar won't tolerate *any* added
+  per-packet jitter, even budgeted. Expect a **per-hook / per-deployment opt-out**; "dark until
+  lit" is ~a branch, but a populated hot hook costs real cycles.
+
+## 6. Sequencing — day-one vs. deferred
 
 | Concern | Day-one | Deferred / governed |
 |---|---|---|
@@ -144,7 +172,7 @@ high-assurance builds — with F5 SIRT sign-off gating implementation, not follo
 | **Trust perimeter** | signing gate + HSM key protection | — |
 | **Blast radius** | canary/watchdog auto-unload + kill-switch + revocation | automated health-driven rollback policies |
 
-## 6. The honest one-liner
+## 7. The honest one-liner
 
 > The verifier gives you memory-safety and termination — **not** WCET, **not** correctness, and
 > **not** immunity from its own bugs. The engine is defensible because the **signing gate** keeps
