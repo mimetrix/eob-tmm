@@ -1,0 +1,374 @@
+<title>Engine hard problems — a security-review register</title>
+<style>
+  :root{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa;
+    --ink:#0f1720; --muted:#516271; --faint:#79879a;
+    --line:#d6dde6; --line-2:#c1ccd7;
+    --accent:#3d5a80; --accent-bg:#e7eef6; --accent-ink:#2a466b;
+    --warn:#a4620a; --warn-bg:#f6ecdd; --warn-ink:#77450a;
+    --ok:#2f7d54; --ok-bg:#e3f0e9; --ok-ink:#1f5d3c;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:44rem;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#080b11; --surface:#0f151d; --surface-2:#0c1117;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a89;
+    --line:#1e2ا; --line:#1e2a34; --line-2:#32414f;
+    --accent:#8fabd4; --accent-bg:#131d2c; --accent-ink:#adc5e7;
+    --warn:#e0a24d; --warn-bg:#2a2011; --warn-ink:#f0c98a;
+    --ok:#4fb47d; --ok-bg:#11241a; --ok-ink:#7bd3a3;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#080b11; --surface:#0f151d; --surface-2:#0c1117;
+    --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a89;
+    --line:#1e2a34; --line-2:#32414f;
+    --accent:#8fabd4; --accent-bg:#131d2c; --accent-ink:#adc5e7;
+    --warn:#e0a24d; --warn-bg:#2a2011; --warn-ink:#f0c98a;
+    --ok:#4fb47d; --ok-bg:#11241a; --ok-ink:#7bd3a3;
+  }
+  :root[data-theme="light"]{
+    --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa;
+    --ink:#0f1720; --muted:#516271; --faint:#79879a;
+    --line:#d6dde6; --line-2:#c1ccd7;
+    --accent:#3d5a80; --accent-bg:#e7eef6; --accent-ink:#2a466b;
+    --warn:#a4620a; --warn-bg:#f6ecdd; --warn-ink:#77450a;
+    --ok:#2f7d54; --ok-bg:#e3f0e9; --ok-ink:#1f5d3c;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    -webkit-font-smoothing:antialiased; line-height:1.6; overflow-x:hidden}
+  .mono{font-family:var(--mono)}
+
+  .progress{position:fixed; top:0; left:0; height:2px; background:var(--accent); width:0; z-index:60; transition:width .1s linear}
+
+  .rail{position:fixed; top:0; left:0; height:100vh; width:13rem; padding:2rem 1.2rem; display:none;
+    flex-direction:column; gap:.1rem; z-index:40; border-right:1px solid var(--line); background:var(--surface-2)}
+  .rail .brand{font-family:var(--mono); font-size:.62rem; letter-spacing:.17em; text-transform:uppercase; color:var(--faint); margin:0 0 1.4rem; line-height:1.7}
+  .rail .brand b{color:var(--accent-ink); display:block; letter-spacing:.09em}
+  .rail a{display:flex; align-items:baseline; gap:.6rem; text-decoration:none; color:var(--faint); font-family:var(--mono); font-size:.72rem; padding:.32rem 0; transition:color .15s}
+  .rail a .n{font-size:.62rem; opacity:.7; min-width:1.4rem}
+  .rail a:hover{color:var(--muted)}
+  .rail a.active{color:var(--accent-ink)} .rail a.active .n{opacity:1}
+  .rail .foot{margin-top:auto; font-family:var(--mono); font-size:.58rem; color:var(--faint); letter-spacing:.06em; line-height:1.8}
+  @media(min-width:1080px){ .rail{display:flex} .stage{padding-left:13rem} }
+
+  .toolbar{position:fixed; top:.7rem; right:.8rem; z-index:60}
+  .toolbar button{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:.4em .7em; cursor:pointer}
+  .toolbar button:hover{border-color:var(--accent); color:var(--accent-ink)}
+  .toolbar button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  .beat{max-width:var(--maxw); margin:0 auto; padding:clamp(3.2rem,9vh,6rem) clamp(1.15rem,5vw,2rem)}
+  .beat.reveal{opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s ease}
+  .beat.reveal.in{opacity:1; transform:none}
+  @media (prefers-reduced-motion:reduce){ .beat.reveal{opacity:1; transform:none; transition:none} }
+  .kicker{font-family:var(--mono); font-size:.66rem; letter-spacing:.18em; text-transform:uppercase; color:var(--accent-ink); margin:0 0 1rem; display:flex; align-items:center; gap:.6rem}
+  .kicker .num{color:var(--faint)}
+  h2{font-size:clamp(1.45rem,3.5vw,2.05rem); line-height:1.18; letter-spacing:-.02em; font-weight:660; margin:0; text-wrap:balance}
+  .beat p.lede{font-size:clamp(1.02rem,1.7vw,1.16rem); color:var(--muted); margin:1.1rem 0 0; max-width:60ch}
+  .beat p.lede b{color:var(--ink); font-weight:600}
+  .beat p{font-size:1rem; color:var(--muted); max-width:62ch}
+  .beat p b{color:var(--ink); font-weight:600}
+  .beat p + p{margin-top:1rem}
+  em.accent{font-style:normal; color:var(--accent-ink); font-weight:600}
+  em.warn{font-style:normal; color:var(--warn-ink); font-weight:600}
+  em.ok{font-style:normal; color:var(--ok-ink); font-weight:600}
+  .inlinecode{font-family:var(--mono); font-size:.86em; background:var(--accent-bg); color:var(--accent-ink); padding:.05em .35em; border-radius:3px}
+
+  /* HERO */
+  .hero{min-height:100vh; display:flex; flex-direction:column; justify-content:center; max-width:var(--maxw); margin:0 auto; padding:5rem clamp(1.15rem,5vw,2rem) 3rem; position:relative}
+  .hero .eyebrow{font-family:var(--mono); font-size:.68rem; letter-spacing:.2em; text-transform:uppercase; color:var(--faint); margin:0 0 1.6rem}
+  .hero .eyebrow b{color:var(--accent-ink)}
+  .hero h1{font-size:clamp(2rem,6vw,3.7rem); line-height:1.06; letter-spacing:-.03em; font-weight:700; margin:0; text-wrap:balance; max-width:17ch}
+  .hero h1 em{font-style:normal; color:var(--accent-ink); font-weight:inherit}
+  .hero .sub{font-size:clamp(1.04rem,2vw,1.28rem); color:var(--muted); margin:1.6rem 0 0; max-width:56ch; line-height:1.5}
+  .hero .sub b{color:var(--ink); font-weight:600}
+  .hero .pivot{font-size:clamp(1rem,1.8vw,1.16rem); color:var(--ink); margin:1.3rem 0 0; max-width:56ch; line-height:1.5}
+  .hero .pivot b{color:var(--ok-ink); font-weight:640}
+  .chiprow{margin:2rem 0 0; display:flex; flex-wrap:wrap; align-items:center; gap:.5rem .55rem; font-family:var(--mono)}
+  .chiprow .chip{font-size:clamp(.68rem,2.2vw,.82rem); font-weight:600; letter-spacing:.02em; color:var(--muted); padding:.34em .7em; border:1px solid var(--line-2); border-bottom:2px solid var(--accent); border-radius:7px; background:var(--surface); white-space:nowrap}
+  .chiprow .dot{color:var(--faint)}
+  .scrollcue{position:absolute; bottom:1.6rem; left:clamp(1.15rem,5vw,2rem); font-family:var(--mono); font-size:.62rem; letter-spacing:.15em; text-transform:uppercase; color:var(--faint); display:flex; align-items:center; gap:.5rem}
+  .scrollcue .arrow{animation:bob 1.8s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(4px)}}
+  @media (prefers-reduced-motion:reduce){ .scrollcue .arrow{animation:none} }
+
+  /* claim-to-retire (warn) / perimeter (accent) callouts */
+  .callout{border-left:3px solid var(--warn); background:var(--warn-bg); border-radius:0 6px 6px 0; padding:.95rem 1.1rem; margin:1.5rem 0 0}
+  .callout p{margin:0; font-size:1rem; color:var(--ink); max-width:none}
+  .callout .lbl{font-family:var(--mono); font-size:.58rem; letter-spacing:.13em; text-transform:uppercase; color:var(--warn-ink); display:block; margin-bottom:.3rem}
+  .callout p b{color:var(--warn-ink)}
+  .callout.accent{border-color:var(--accent); background:var(--accent-bg)}
+  .callout.accent .lbl{color:var(--accent-ink)} .callout.accent p b{color:var(--accent-ink)}
+
+  /* day-one mitigations — green checklist */
+  .dayone{margin:1.5rem 0 0; border:1px solid var(--line-2); border-top:2px solid var(--ok); border-radius:8px; background:var(--surface); padding:1rem 1.1rem 1.05rem}
+  .dayone .h{font-family:var(--mono); font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ok-ink); margin:0 0 .6rem}
+  ul.checks{list-style:none; margin:0; padding:0; display:grid; gap:.55rem}
+  ul.checks li{font-size:.96rem; color:var(--muted); padding-left:1.5rem; position:relative; max-width:62ch}
+  ul.checks li::before{content:"✓"; position:absolute; left:0; top:.02em; color:var(--ok); font-weight:700}
+  ul.checks li b{color:var(--ink); font-weight:600}
+  .deferred{margin:.9rem 0 0; font-size:.88rem; color:var(--faint); padding-left:1.5rem; position:relative}
+  .deferred::before{content:"⟳"; position:absolute; left:0; color:var(--faint)}
+  .deferred b{color:var(--muted); font-weight:600}
+
+  /* perimeter schematic */
+  .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
+  .srow{display:grid; grid-template-columns:1fr auto; gap:.7rem; align-items:center; padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
+  .srow .flow{color:var(--muted); overflow-x:auto; white-space:nowrap}
+  .srow .tag{font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap}
+  .srow.blocked{border-color:var(--warn)} .srow.blocked .flow{color:var(--warn-ink)} .srow.blocked .tag{color:var(--warn-ink); font-weight:700}
+  .srow.pass{border-color:var(--ok); background:var(--ok-bg)} .srow.pass .flow{color:var(--ok-ink)} .srow.pass .tag{color:var(--ok-ink); font-weight:700}
+  @media(max-width:560px){.srow{grid-template-columns:1fr; gap:.2rem} }
+
+  /* sequencing table */
+  .tablewrap{overflow-x:auto; margin:1.4rem 0 0; border:1px solid var(--line); border-radius:7px}
+  table{border-collapse:collapse; width:100%; font-size:.86rem; min-width:34rem}
+  th,td{text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{font-family:var(--mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); background:var(--surface-2)}
+  thead th.d1{color:var(--ok-ink)} thead th.df{color:var(--faint)}
+  tbody tr:last-child td{border-bottom:0}
+  td:first-child{font-weight:600; color:var(--ink); white-space:nowrap}
+  td.d1{color:var(--muted)} td.d1 b{color:var(--ok-ink)}
+  td.df{color:var(--faint)}
+
+  /* CLOSE */
+  .close{max-width:var(--maxw); margin:0 auto; padding:clamp(3.4rem,9vh,6rem) clamp(1.15rem,5vw,2rem) 4rem}
+  .close .big{font-size:clamp(1.6rem,4.2vw,2.4rem); line-height:1.16; letter-spacing:-.02em; font-weight:680; margin:0; text-wrap:balance; max-width:22ch}
+  .close .big .hl{color:var(--accent-ink)}
+  .close p{font-size:1.06rem; color:var(--muted); margin:1.3rem 0 0; max-width:60ch}
+  .close p b{color:var(--ink); font-weight:600}
+  .close .tma{margin:1.5rem 0 0; border:1px solid var(--line-2); border-left:3px solid var(--accent); border-radius:0 7px 7px 0; background:var(--accent-bg); padding:1rem 1.15rem}
+  .close .tma p{margin:0; color:var(--ink)}
+  .close .tma b{color:var(--accent-ink)}
+  .close .rlabel{font-family:var(--mono); font-size:.62rem; letter-spacing:.17em; text-transform:uppercase; color:var(--accent-ink); margin:2.2rem 0 .9rem}
+  .recap{display:grid; gap:.55rem}
+  .rrow{display:grid; grid-template-columns:1.7rem 1fr; gap:.7rem; align-items:baseline}
+  .rrow .rn{font-family:var(--mono); font-size:.66rem; color:var(--faint)}
+  .rrow .rt{font-size:.97rem; color:var(--muted); line-height:1.5; max-width:58ch}
+  .rrow .rt b{color:var(--ink); font-weight:600}
+  .close .foot{margin:2.4rem 0 0; padding-top:1.1rem; border-top:1px solid var(--line); font-family:var(--mono); font-size:.66rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
+
+  @media print {
+    :root, :root[data-theme="dark"]{
+      --paper:#fff; --surface:#fff; --surface-2:#f6f8fa; --ink:#0f1720; --muted:#3f4c58; --faint:#67757f;
+      --line:#c9d2da; --line-2:#b3bfc9; --accent:#31527a; --accent-bg:#eef3f9; --accent-ink:#264straight;
+      --accent-ink:#26436a; --warn:#8f560a; --warn-bg:#f7efe1; --warn-ink:#6b3f08; --ok:#256a45; --ok-bg:#eaf3ee; --ok-ink:#1f5d3c;
+    }
+    @page{ size:letter portrait; margin:0.5in }
+    html{ scroll-behavior:auto } body{ overflow:visible }
+    .rail, .toolbar, .progress, .scrollcue{ display:none !important }
+    .stage{ padding-left:0 !important }
+    .beat.reveal{ opacity:1 !important; transform:none !important }
+    .hero{ min-height:auto !important; padding:1rem 0 2rem !important }
+    .beat{ padding:1.3rem 0 !important } .close{ padding:1.5rem 0 !important }
+    .callout, .dayone, .schematic, .tablewrap, .recap, .close .tma, ul.checks li{ break-inside:avoid }
+  }
+</style>
+
+<div class="progress" id="progress"></div>
+<div class="toolbar"><button id="themeBtn" type="button" aria-label="Toggle light or dark theme">◐ theme</button></div>
+
+<nav class="rail" aria-label="Sections">
+  <p class="brand"><b>F5 · TMM</b>engineering register<br>hard problems</p>
+  <a href="#hero" data-sec="hero"><span class="n">00</span><span class="t">the frame</span></a>
+  <a href="#time" data-sec="time"><span class="n">01</span><span class="t">time</span></a>
+  <a href="#iface" data-sec="iface"><span class="n">02</span><span class="t">the interface</span></a>
+  <a href="#state" data-sec="state"><span class="n">03</span><span class="t">shared state</span></a>
+  <a href="#trust" data-sec="trust"><span class="n">04</span><span class="t">the trust surface</span></a>
+  <a href="#seq" data-sec="seq"><span class="n">05</span><span class="t">sequencing</span></a>
+  <a href="#close" data-sec="close"><span class="n">06</span><span class="t">the review</span></a>
+  <span class="foot">a design<br>proposal</span>
+</nav>
+
+<div class="stage">
+
+  <!-- 00 HERO -->
+  <section class="hero" id="hero" data-sec="hero">
+    <p class="eyebrow">F5 TMM · <b>engineering register</b> · the honest half</p>
+    <h1>Before we build it: <em>where this gets hard</em>.</h1>
+    <p class="sub"><b>The proposal says a verified eBPF engine is safe to run inside TMM. True — as far as it
+      goes.</b> This page is the other half: the load-bearing problems a security review will raise first,
+      stated plainly, before anyone has to ask.</p>
+    <p class="pivot">None of them is a show-stopper. Each has a known mitigation and a clear day-one path.
+      They are <b>the work to do — not a verdict against doing it.</b></p>
+    <div class="chiprow" aria-label="the four themes">
+      <span class="chip">time</span><span class="dot">·</span>
+      <span class="chip">the interface</span><span class="dot">·</span>
+      <span class="chip">shared state</span><span class="dot">·</span>
+      <span class="chip">the trust surface</span>
+    </div>
+    <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
+  </section>
+
+  <!-- 01 TIME -->
+  <section class="beat reveal" id="time" data-sec="time">
+    <p class="kicker"><span class="num">01</span> time</p>
+    <h2>A proof that a program <em>terminates</em> is not a promise it fits the budget.</h2>
+    <p class="lede">The verifier proves every program halts — it bounds loop iterations, so nothing runs forever.
+      That is <b>not</b> a <b>worst-case execution time (WCET)</b>: the longest it can actually take on the
+      hardware. Halting says nothing about fitting TMM's per-packet budget.</p>
+    <div class="callout"><span class="lbl">the claim to retire</span>
+      <p>&ldquo;It's verified as bounded, so it can't hang the poll loop.&rdquo;</p></div>
+    <p style="margin-top:1.4rem">And the resource is unforgiving. TMM's poll loop is <b>single-threaded,
+      un-preemptible, run-to-completion</b> — there is no OS underneath to preempt an overrunning hook. Every
+      hook borrows cycles from the <em>same</em> loop, so <b>one misjudged hook starves every flow on that
+      core.</b> Poll loops are managed carefully or not at all.</p>
+    <div class="dayone"><p class="h">day one</p>
+      <ul class="checks">
+        <li>A <b>per-hook instruction-budget ceiling</b>, enforced at load — reject bytecode over budget.</li>
+        <li>A <b>runtime deadline / watchdog</b> that short-circuits or unloads a hook that overruns.</li>
+        <li><b>Budget by path class</b> — hot (per-packet) hooks tight; cold / error-path hooks looser.</li>
+      </ul>
+      <p class="deferred"><b>Note:</b> the verifier is necessary, not sufficient, for hot-path safety.</p>
+    </div>
+  </section>
+
+  <!-- 02 THE INTERFACE -->
+  <section class="beat reveal" id="iface" data-sec="iface">
+    <p class="kicker"><span class="num">02</span> the interface</p>
+    <h2>The VM is the easy 10%. The interface is the other 90%.</h2>
+    <p class="lede">What a program <em>sees</em> — the <span class="inlinecode">ctx</span>: which fields of the
+      flow, the buffer, the profile — plus the verified <b>helper surface</b> and the <b>map model</b>: that is
+      the real design. And it is a <b>permanent, versioned ABI</b> you carry the moment you ship it.</p>
+    <div class="callout"><span class="lbl">the claim to retire</span>
+      <p>&ldquo;The base tier is a trivial pure function of <span class="mono">ctx</span>.&rdquo; The base
+        <span class="mono">ctx</span> is real, forever-facing interface work.</p></div>
+    <p style="margin-top:1.4rem"><b>The good news, stated precisely:</b> this work is exactly the input the
+      verifier is built to consume. The task is <em class="accent">&ldquo;write the program-type
+      descriptor&rdquo;</em> — the <span class="inlinecode">ctx</span> layout, memory regions, helper prototypes
+      — <b>not</b> &ldquo;modify the verifier.&rdquo; The no-verifier-fork claim survives; the effort estimate
+      does not.</p>
+    <div class="dayone"><p class="h">day one</p>
+      <ul class="checks">
+        <li>Ship a <b>minimal, read-only <span class="mono">ctx</span></b> per hook + its program-type descriptor.</li>
+      </ul>
+      <p class="deferred"><b>Deferred:</b> helpers. Each one is a new ABI to secure and a new verifier prototype
+        — <span class="mono">ctx</span>-first, helpers-later.</p>
+    </div>
+  </section>
+
+  <!-- 03 STATE -->
+  <section class="beat reveal" id="state" data-sec="state">
+    <p class="kicker"><span class="num">03</span> shared state</p>
+    <h2>TMM is not one kernel. It's N core-pinned kernels with their own state fabric.</h2>
+    <p class="lede">Multiple TMM instances per box (<b>CMP</b>), plus <b>connection mirroring</b> to an HA peer,
+      make map and state semantics <em>harder</em> than Linux's single-kernel case — not easier.</p>
+    <div class="callout"><span class="lbl">the claim to retire</span>
+      <p>&ldquo;Maps work like they do in Linux.&rdquo;</p></div>
+    <div class="dayone"><p class="h">day one</p>
+      <ul class="checks">
+        <li><b>Per-CPU maps only</b> — no cross-TMM sharing. Matches the core-pinned model; no locking.</li>
+        <li>State that must survive failover <b>rides TMM's existing mirroring channel</b> — don't reinvent HA
+          replication inside the map layer.</li>
+      </ul>
+      <p class="deferred"><b>Deferred:</b> shared, writable maps across TMMs — they need an explicit concurrency
+        and reconciliation model.</p>
+    </div>
+  </section>
+
+  <!-- 04 THE TRUST SURFACE -->
+  <section class="beat reveal" id="trust" data-sec="trust">
+    <p class="kicker"><span class="num">04</span> the trust surface</p>
+    <h2>The verifier and its JIT run inside the crown-jewel process. This is the one a review presses hardest.</h2>
+    <p class="lede">The engine JITs native code into TMM's own address space. An <b>unsound verifier</b>, or a
+      <b>buggy JIT</b>, is arbitrary execution in the data plane — the single biggest risk class eBPF carries,
+      relocated into TMM. It is <em class="warn">sharper now that the source has been exposed</em>: an adversary
+      with the code can hunt soundness bugs directly.</p>
+    <div class="callout accent"><span class="lbl">the load-bearing point</span>
+      <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
+        verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
+        traffic-borne RCE</b>; it's a supply-chain concern, gated by signing-key protection.</p></div>
+    <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; only F5-signed bytecode reaches the verifier and JIT.">
+      <div class="srow blocked"><span class="flow">attacker-controlled bytecode → signing gate</span><span class="tag">✗ rejected</span></div>
+      <div class="srow pass"><span class="flow">F5-signed bytecode → verify → JIT</span><span class="tag">✓ runs</span></div>
+    </div>
+    <p style="margin-top:1.4rem"><b>And verified ≠ correct.</b> The proof is about memory-safety and termination,
+      not intent — a verified, signed program can still <b>black-hole traffic</b>. So blast radius needs its own
+      bound, separate from the proof.</p>
+    <div class="dayone"><p class="h">day one</p>
+      <ul class="checks">
+        <li><b>Signing gate + HSM-backed key protection</b> — the real perimeter; protect it accordingly.</li>
+        <li><b>JIT hardening</b> (W^X, guard pages) and an <b>interpreter-only high-assurance build</b> option —
+          trade JIT speed for a smaller native-code surface where it matters most.</li>
+        <li>A <b>control-plane canary</b> that auto-unloads on a health signal — the proof bounds crashes; the
+          canary bounds a bad-but-valid program.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 05 SEQUENCING -->
+  <section class="beat reveal" id="seq" data-sec="seq">
+    <p class="kicker"><span class="num">05</span> sequencing</p>
+    <h2>Most of the risk retires on day one. The rest is governed and deferred.</h2>
+    <p class="lede">The engine ships with the conservative half; the powerful-but-riskier half is
+      <em>explicitly</em> later, not accidentally missing.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Concern</th><th class="d1">Day one</th><th class="df">Deferred / governed</th></tr></thead>
+      <tbody>
+        <tr><td>Time safety</td><td class="d1">instruction-budget ceiling + watchdog</td><td class="df">tuned per-hook budgets from field data</td></tr>
+        <tr><td>Interface</td><td class="d1">read-only <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, rewrite, lookup)</td></tr>
+        <tr><td>State</td><td class="d1">per-CPU maps; failover via existing mirroring</td><td class="df">shared writable cross-TMM maps</td></tr>
+        <tr><td>Execution</td><td class="d1">interpreter or hardened JIT; W^X</td><td class="df">&mdash;</td></tr>
+        <tr><td>Trust perimeter</td><td class="d1">signing gate + HSM key protection</td><td class="df">&mdash;</td></tr>
+        <tr><td>Blast radius</td><td class="d1">canary auto-unload + kill-switch + revocation</td><td class="df">automated health-driven rollback</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- 06 THE REVIEW -->
+  <section class="close reveal" id="close" data-sec="close">
+    <p class="kicker"><span class="num">06</span> the review</p>
+    <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
+    <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, and <b>not</b>
+      immunity from its own bugs. The engine is defensible because the <b>signing gate</b> keeps attacker input
+      away from the verifier and JIT, a <b>budget + watchdog</b> bounds execution time, and a <b>canary</b>
+      bounds the blast radius of a valid-but-bad program. Verification is one layer of several.</p>
+    <div class="tma"><p><b>This design is not self-certifying.</b> Everything here is the engineering input to a
+      formal <b>Threat Model Analysis (TMA)</b> by F5 security — a <b>gating prerequisite</b> before
+      implementation, not a formality. The trust surface (§04) in particular must be threat-modeled and signed
+      off. This register is <em>what to bring to that review</em>, not a substitute for it.</p></div>
+    <p class="rlabel">the whole register, one line per problem</p>
+    <div class="recap">
+      <div class="rrow"><span class="rn">01</span><span class="rt"><b>Time</b> — termination isn't WCET; a per-hook budget + watchdog protects the un-preemptible poll loop.</span></div>
+      <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.</span></div>
+      <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.</span></div>
+      <div class="rrow"><span class="rn">04</span><span class="rt"><b>Trust</b> — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
+    </div>
+    <p class="foot">
+      A design proposal — the engineering register behind the engine explainer.<br>
+      Detailed method &amp; claims are held in a separate invention disclosure.
+    </p>
+  </section>
+
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement;
+    document.getElementById('themeBtn').addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){ cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'; }
+      root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+    var pbar=document.getElementById('progress');
+    function onScroll(){ var h=document.documentElement, max=h.scrollHeight-h.clientHeight; pbar.style.width=(max>0?(h.scrollTop/max*100):0)+'%'; }
+    addEventListener('scroll',onScroll,{passive:true}); onScroll();
+    var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if('IntersectionObserver' in window && !reduce){
+      var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+      document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+    } else { document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('in'); }); }
+    var rail=document.querySelector('.rail'); var links={};
+    if(rail){ rail.querySelectorAll('a').forEach(function(a){ links[a.dataset.sec]=a; }); }
+    if('IntersectionObserver' in window && rail){
+      var so=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ var id=e.target.getAttribute('data-sec'); Object.keys(links).forEach(function(k){ links[k].classList.toggle('active', k===id); }); } }); },{rootMargin:'-45% 0px -45% 0px', threshold:0});
+      document.querySelectorAll('[data-sec]').forEach(function(s){ so.observe(s); });
+    }
+  })();
+</script>
