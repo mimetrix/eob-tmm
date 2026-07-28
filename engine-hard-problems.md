@@ -32,6 +32,12 @@ program terminates. That is safety + termination. It is **not** a **worst-case e
 a static **instruction-count** bound is not WCET (memory stalls, JIT variance, cache effects all
 dominate).
 
+And the resource being protected is unforgiving. TMM's poll loop is **single-threaded,
+un-preemptible, run-to-completion** — there is no OS underneath to preempt an overrunning hook.
+Every hook borrows cycles from the *same* loop, so a hook that cannot be preempted must be
+*provably short*, and the budget is a **first-class scheduler concern**, not an afterthought:
+one misjudged hook starves every flow on that core. Poll loops are managed carefully or not at all.
+
 **Day-one mitigations (verification is necessary, not sufficient, for hot-path safety):**
 
 - A **per-hook instruction-budget ceiling** enforced at load — reject bytecode whose static
