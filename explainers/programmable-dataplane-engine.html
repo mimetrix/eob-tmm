@@ -401,9 +401,10 @@
     <p class="lede">It's entirely buildable, because what makes kernel eBPF safe was never the kernel: it's a
       <b>static verifier</b> and a <b>small sandboxed VM</b>. The verifier analyzes the bytecode and proves —
       <em>before</em> it ever runs — that the program is <b>bounded</b> (every path terminates in a known number
-      of steps; it cannot loop forever, so it can never hang a poll loop) and <b>memory-safe</b> (every load and
+      of steps; it cannot loop forever) and <b>memory-safe</b> (every load and
       store stays inside the bytes it was handed; it cannot read what it wasn't given or scribble on TMM's
-      memory). Both are libraries. Neither needs the kernel.</p>
+      memory). Both are libraries. Neither needs the kernel. <em>Termination isn't the whole of hot-path
+      safety — a per-hook time budget handles the rest (§5.4);</em> the verifier is the floor, not the ceiling.</p>
     <p class="lede" style="margin-top:1.2rem">So bring them inside. Embed a small userspace eBPF VM —
       <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, JIT-compiled — <em class="sig">inside TMM's own address
       space</em>, at designed-in hook points, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
@@ -631,12 +632,21 @@
       ships in eBPF-for-Windows: built on abstract interpretation, a formal method rather than hand-grown
       heuristics, publicly maintained and hardened in production. <b>Narrow envelope</b> — this design uses it at
       its best-proven case: a bounded predicate over a small typed struct, no helpers, no maps. <b>Depth</b> —
-      it is not the only gate: only F5-signed bytecode ever reaches it, and a per-hook watchdog stands behind it.
-      Trust the proof; don't depend on it alone.</p>
-    <p>The second principle is just as blunt: <b>verified ≠ secure</b>. PREVAIL proves a program can't crash or
-      hang TMM; it proves nothing about intent. Security is the governance <em>around</em> the VM:</p>
+      and this is the load-bearing point. The verifier and the JIT it feeds run <em>inside</em> TMM, so an
+      unsound verifier would mean arbitrary code in the data plane — the risk a security review will press
+      hardest. But <b>only F5-signed bytecode ever reaches the verifier or JIT</b>; attacker-controlled input
+      never touches them, so a soundness bug is not a traffic-borne RCE — it's a supply-chain concern, gated by
+      signing-key protection. A per-hook watchdog stands behind all of it. Trust the proof; don't depend on it
+      alone.</p>
+    <p>The second principle is just as blunt: <b>verified ≠ secure, and verified ≠ correct</b>. PREVAIL proves a
+      program is memory-safe and terminates — <em>not</em> that it fits the per-packet time budget, and nothing
+      about intent. Time-safety and security both live in the governance <em>around</em> the VM:</p>
     <ul class="unlocks" style="margin-top:1rem">
       <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
+      <li><b>Bounded in time, not just in steps</b> — a proof that a program <em>terminates</em> is not a
+        <b>worst-case execution time (WCET)</b>: the longest it can actually take on the hardware. So each hook
+        adds an <b>instruction-budget ceiling</b> at load and a <b>runtime deadline</b> — a provably-terminating
+        program still can't overrun the poll loop's per-packet budget.</li>
       <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; a program that
         <em>acts</em> needs stricter authz than one that only observes; RBAC-gated.</li>
       <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
@@ -649,7 +659,9 @@
         only its declared <span class="mono">ctx</span> fields and has no exit of its own; the host owns the single
         sink — so only host-approved <em>derived</em> output ever leaves, never raw memory.</li>
       <li><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, instant kill-switch +
-        revocation, and a per-hook perf budget with a watchdog.</li>
+        revocation, a per-hook perf budget with a watchdog, and a <b>control-plane canary that auto-unloads on a
+        health signal</b> — because a verified, signed program can still be <em>wrong</em> (black-hole or
+        misroute traffic); the proof bounds crashes, the canary bounds bad-but-valid programs.</li>
     </ul>
   </div>
 

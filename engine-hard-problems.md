@@ -12,16 +12,23 @@ it is the right *floor* — but the real engineering and the real security expos
 places the explainers understate. This is the honest register: the questions that will be
 asked first, with where each one actually lands.
 
+> **This design is not self-certifying.** Everything here is the engineering input to a **formal
+> Threat Model Analysis (TMA)** by F5 security — a **gating prerequisite** before implementation,
+> not a formality. The verifier/JIT-in-the-data-plane surface (§4) in particular must be
+> threat-modeled and signed off. Read this register as *what to bring to that review*, not a
+> substitute for it.
+
 ## 1. Termination is not WCET
 
 **The claim to retire:** "PREVAIL proves the program is bounded, so it can't hang the poll loop."
 
 PREVAIL proves **halting** — it bounds loop iterations via abstract interpretation, so it
 *handles* loops (unlike the original kernel verifier's unroll-or-reject rule) and guarantees the
-program terminates. That is safety + termination. It is **not** a worst-case execution time.
+program terminates. That is safety + termination. It is **not** a **worst-case execution time
+(WCET)** — the longest wall-clock time the program can actually take on the hardware.
 "Halts in a finite number of steps" says nothing about fitting TMM's per-packet budget, and even
-a static **instruction-count** bound is not wall-clock WCET (memory stalls, JIT variance, cache
-effects all dominate).
+a static **instruction-count** bound is not WCET (memory stalls, JIT variance, cache effects all
+dominate).
 
 **Day-one mitigations (verification is necessary, not sufficient, for hot-path safety):**
 
@@ -113,6 +120,10 @@ intent or correctness. The design needs a **control-plane canary / watchdog that
 a health signal** (traffic-drop, latency, error-rate), on top of the instant kill-switch and
 revocation. The safety proof bounds the blast radius from *crashes*; the canary bounds it from
 *bad-but-valid* programs.
+
+**This is squarely a TMA item.** The threat model must center on verifier and JIT soundness,
+the signing key as the real perimeter (and its protection), and the interpreter-vs-JIT trade for
+high-assurance builds — with F5 SIRT sign-off gating implementation, not following it.
 
 ## 5. Sequencing — day-one vs. deferred
 
