@@ -143,6 +143,8 @@ Sometimes you don't want a summary, you want **the actual bytes** traversing the
 - **Drain off-loop.** A separate, lower-priority path serializes the ring to the sink, using cycles only when the data plane has them.
 - **Drop, don't block.** Under sink pressure, **drop samples and count the drops** — never stall forwarding for observability.
 
+The concrete mechanism — a per-core, single-producer, shared-memory ring where the **host emits and the program only signals** (no helpers, stock verifier), plus the reserve/commit protocol, backpressure counters, wakeup, and crash semantics — is specified in [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).
+
 Levers that keep it tractable: **target** (one flow, not all), **sample** (1-in-*N* under load), **window** (bounded bytes), **redact** (context minimization). Dark-until-lit; full-fidelity capture of all flows at line rate is a measured-budget decision (design §11), and traffic offloaded to ePVA/FPGA isn't in software to capture (design §10).
 
 **Payoff:** in-process at L7 means **decrypted** application data — post-TLS content no wire tap can give you without the keys — which is also why it sits at the **strictest authorization tier**: signed, RBAC-gated, redact-by-default, time-boxed, one-way audited sink (substrate §6.3). "Vendor streams my decrypted traffic" is a non-starter *without* that governance.
