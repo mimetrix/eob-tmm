@@ -1,6 +1,6 @@
-# TMM USDT Tracepoint Catalog — Observability, Debug & RCA
+# TMM USDT Tracepoint Catalog — the hook-point surface of the embedded eBPF framework
 
-### A proposed set of designed-in tracepoints for TMM, consumed by the embedded userspace-eBPF VM
+### A proposed set of designed-in hook points for TMM — USDT-style tracepoints plus filter-capable decision points — consumed by the embedded userspace-eBPF VM. Observability, debug & RCA are the primary lens here; CVE shields, in-situ data-intelligence, steering, and self-tuning are **peer consumers of the same hooks**. The engine is generic; the shield is one application.
 
 **Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-intelligence.md`](data-plane-intelligence.md) (these `ctx` fields are also the feature inputs for in-situ data intelligence), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
@@ -9,17 +9,26 @@
 
 ## 1. What this is (and why it's cheap)
 
-This is a candidate catalog of **USDT-style tracepoints** to build into TMM's source as a designed-in instrumentation surface. Each is a named, versioned hook that exposes a small **typed context (`ctx`)** — a curated view of the internal state present at that point. The embedded uBPF VM runs a small program at the hook in **observe mode**: it reads `ctx`, returns a value, and the host aggregates it (a counter, a histogram, a ring). The program never changes traffic.
+This is a candidate catalog of **designed-in hook points** to build into TMM's source as the generic instrumentation-and-control surface of the embedded eBPF framework. Each is a named, versioned hook that exposes a small **typed context (`ctx`)** — a curated view of the internal state present at that point. The embedded uBPF VM runs a small **verified** program at the hook; the host owns all state and effects and applies the program's return as one of an **enumerated set of outcomes** — the program cannot invent control flow.
 
-The reason a rich catalog is affordable:
+Most hooks are consumed in **observe mode**: the program reads `ctx`, returns a value, and the host aggregates it (a counter, a histogram, a ring) — traffic is untouched. A subset sit at a clean decision point and also support **act mode**: the same `ctx`-in / value-out program picks among host-owned actions (pass · drop · steer · mark · sample). Observability, debug & RCA are the primary lens of this catalog — but the **same hooks** are the surface for a spectrum of applications, of which the CVE shield is only one:
 
-- **Dark until lit.** A tracepoint with nothing attached costs ~one predictable branch. You pay only when a program is loaded onto it, on demand.
-- **No helpers, no verifier work.** An observe program is a pure function of `ctx` (read fields → return a value); the host owns all state and effects. So a new tracepoint needs **no eBPF helper** and **no verifier extension** — stock PREVAIL verifies any bounded predicate over the new `ctx` (substrate §2). Adding one is just: *define its `ctx`, place the hook, publish it in the hook-point map.*
-- **Incremental.** Each subsystem owner can instrument their own code in a normal release. The surface grows over time; every new `ctx` field widens what can be observed **and** what CVE classes become shieldable (a hook can only shield/observe what its `ctx` exposes).
+- **Observability, debug & RCA** — the focus of this catalog: bpftrace-for-TMM summaries, flight recorders, per-flow latency, in-situ field-support probes.
+- **CVE shields (Live Shield)** — a `filter`/drop program at a parser or plugin hook blocks a live exploit path between patch windows. One consumer, *not* the purpose.
+- **In-situ data-intelligence** — a verified transform distills `ctx` into features that leave the box as **signal, never payload**, feeding an F5 model (see [`data-plane-intelligence.md`](data-plane-intelligence.md)).
+- **Steering & policy** — member-selection / mirror / A-B decisions driven by internal signal.
+- **Self-tuning** — read internal load and nudge a knob; live hot-path profiling.
 
-> **Consuming a tracepoint.** With `tmmtrace`: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
-> `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. Same grammar authors a `filter`
-> shield by swapping the action verb — observe and enforce share the machinery (substrate §6.1).
+The engine is generic; the shield is one application on top of it. The reason a rich catalog is affordable:
+
+- **Dark until lit.** A hook with nothing attached costs ~one predictable branch. You pay only when a program is loaded onto it, on demand.
+- **No helpers, no verifier work.** A program is a pure function of `ctx` (read fields → return a value); the host owns all state and effects. So a new hook needs **no eBPF helper** and **no verifier extension** — stock PREVAIL verifies any bounded predicate over the new `ctx` (substrate §2). Adding one is just: *define its `ctx`, place the hook, publish it in the hook-point map.*
+- **Incremental.** Each subsystem owner can instrument their own code in a normal release. The surface grows over time; every new `ctx` field widens what can be **observed, enforced, steered, or distilled into signal** (a hook can only act on what its `ctx` exposes).
+
+> **Consuming a hook.** With `tmmtrace`: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
+> `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** authors an
+> acting program — a `filter`/drop shield, a steer, a sampler — by swapping the action verb; observe and act
+> share the machinery (substrate §6.1).
 
 **Two companion utilities.** `tmmtrace` is the *summary* consumer — bpftrace-for-TMM: counters, histograms, predicates, shields. `tmmdump` (proposed) is the *capture* consumer — tcpdump-for-TMM: it streams a bounded window of the **actual bytes** at a hook off the box, the only viable tap for a kernel-bypassed data plane (§10.6). One summarizes, one captures; both are thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
 
@@ -28,7 +37,7 @@ The reason a rich catalog is affordable:
 - **Naming:** `tmm:<stage>:<event>` — e.g. `tmm:l4:conn_state`, `tmm:bd:request_eval`, `tmm:rt:poll_stall`.
 - **`ctx` typing:** every field is a fixed-width scalar or a small fixed byte array (BTF-described per build). No pointers out; sensitive fields (keys, PII, decrypted payload) are **withheld by default** and gated behind separate authorization (substrate §6.3).
 - **`path_class`:** `hot` (per-packet/per-flow steady state), `warm` (per-connection / per-request), `cold` (exceptional / error / malformed branch). Cold is free-in-steady-state; hot is allowed under a measured budget (design §11).
-- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support `filter` (design §6.1). This catalog marks those with **◆ filter-capable**.
+- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support **act mode** — the program selects among host-owned actions (drop/`filter`, steer, mark, sample), of which a CVE `filter`/drop shield is one (design §6.1). This catalog marks act-capable hooks with **◆**.
 - **RCA columns:** *Observe* = the steady-state signal; *Debug/RCA* = what it yields when an incident is being chased (often via the flight-recorder / tripwire patterns in §10).
 
 ---
@@ -160,7 +169,7 @@ If the team lands a handful first, these give the most RCA value for the least e
 4. `tmm:tls:clienthello` — JA4 fingerprints + malformed-ClientHello detection ahead of the earliest iRule event.
 5. `tmm:l7:http2_frame` — HTTP/2 stream/frame stats covering the Rapid-Reset-style abuse family.
 
-Each is a `ctx` definition plus a call site — no VM change, no verifier work, no helper ABI. They graduate to `filter` shields (where marked ◆) once the signal is trusted, reusing the same hook and the same verify gate.
+Each is a `ctx` definition plus a call site — no VM change, no verifier work, no helper ABI. Where marked ◆ they graduate from observe to an **acting program** — a `filter`/drop shield, a steer, a sampler — once the signal is trusted, reusing the same hook and the same verify gate.
 
 ---
 
