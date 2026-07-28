@@ -526,7 +526,7 @@
   <section class="beat reveal" id="unlock" data-sec="unlock">
     <p class="kicker"><span class="num">04</span> what the engine unlocks</p>
     <h2>A general-purpose programmability platform for the data plane.</h2>
-    <p class="lede">One mechanism — read a context, return a value — covers a wide span of everyday
+    <p class="lede">One engine — a <b>verified program running at a hook</b> — covers a wide span of everyday
       <b>programmability and observability</b> inside a black box:</p>
     <ul class="unlocks">
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
@@ -534,16 +534,16 @@
         or captured byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>).</li>
       <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev — a
         metric you didn't think to collect, or reading internal load to nudge a knob.</li>
-      <li><b>Steering &amp; policy.</b> Member-selection, mirror-selection, and A/B decisions driven by internal
-        signal — the decision in eBPF, the heavy logic still in iRules or WASM.</li>
+      <li><b>In-path control.</b> Steer, sample, rate-limit, or gate a flow on an internal signal — the decision
+        computed right at the hook, inline, with no round-trip out of the data path.</li>
       <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
         no debug build, no core-dump archaeology.</li>
       <li class="prf"><b>AI-authored programs.</b> Because safety is a <em class="prf">proof, not trust</em>, a model
         can draft one and the verifier is a <b>fail-closed acceptance gate</b> — blast radius bounded before a
         human signs.</li>
     </ul>
-    <div class="callout sig"><p><b>Every one of these is the same call.</b> Read a <span class="mono">ctx</span>,
-      return a value — they differ only in what the host does with the answer. A new capability ships as
+    <div class="callout sig"><p><b>Every one of these is the same engine.</b> A verified program runs at a
+      hook; they differ only in what the host does with its result. A new capability ships as
       <b>verified bytecode</b>, on demand, then retires — not as a TMOS release.</p></div>
   </section>
 
