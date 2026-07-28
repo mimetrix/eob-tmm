@@ -464,10 +464,15 @@
       <em class="sig">records that value as a metric</em>, uses it to <em class="sig">stream a window of live
       internal state out to userspace</em> — for discovery, root-cause analysis, debugging, and uses still to
       come — or treats it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
-    <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
-      to a full multi-probe script, it compiles to eBPF bytecode, clears the verifier, and — once <b>signed</b> —
-      attaches at the named hooks. And it <b>spans both planes</b>: point it at a data-plane hook and it runs in
-      TMM's embedded VM; point it at a control-plane daemon and it rides kernel eBPF. Each probe has three parts:</p>
+    <p><b>So how would you write one?</b> Not by hand-assembling eBPF bytecode for every probe — that's a
+      compiler project each time, and it puts raw bytecode in front of the verifier with no ergonomics in
+      between. You'd use <b>tmmtrace</b>, a proposed authoring front-end: <em>bpftrace for TMM</em>. You describe
+      the probe in a small, familiar language and it does the rest — <b>compile</b> to eBPF bytecode,
+      <b>verify</b>, and, once <b>signed</b>, <b>attach</b> at the named hook. One line or a full multi-probe
+      script, same path.</p>
+    <p>And it <b>spans both planes</b> from one grammar: point a probe at a data-plane hook and it runs in TMM's
+      embedded VM; point it at a control-plane daemon and it rides kernel eBPF — one language for the whole box.
+      Each probe is <b>three parts</b>:</p>
     <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
