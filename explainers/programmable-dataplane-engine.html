@@ -560,9 +560,10 @@
     <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT-compiled VM that runs arbitrary
       <em>verified</em> bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
-      machinery feeds counters, latency histograms, and flight-recorder rings for deep <em>observability</em>, and
-      drives steering and self-tuning decisions where the host wants to act on the return. Returning a value the
-      host acts on is one thing the engine does — not the point of it.</p>
+      machinery feeds counters, latency histograms, and flight-recorder rings for deep <em>observability</em>,
+      streams captured windows of internal state out to userspace for RCA, and drives steering and self-tuning
+      where the host wants to act on the return. Returning a value the host acts on is one thing the engine does —
+      not the point of it.</p>
     <p><b>Designed-in</b> is the operative word: because F5 owns the source, hooks are deliberate, named, versioned
       insertion points published in a per-build map — <em>not</em> fragile offsets an external tool guesses at and
       rewrites into a running process. A hook with nothing attached costs about one predictable branch
@@ -573,10 +574,11 @@
 <span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);
 
 <span class="c">// ret is the program's result; the host decides what it means:</span>
-<span class="c">//   a sample  →  recorded as a counter, histogram, or ring</span>
-<span class="c">//   a code    →  acted on — e.g. steer / sample / gate under load</span></div>
+<span class="c">//   summarize  →  recorded as a counter, histogram, or ring</span>
+<span class="c">//   capture    →  a window of state streamed out to userspace (RCA, debug)</span>
+<span class="c">//   act        →  a decision applied — e.g. steer / rate-limit / gate</span></div>
     <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
-      <b>input</b>; what the return <em>means</em> is the host's choice — a sample to record, or a code to act on.
+      <b>input</b>; what the return <em>means</em> is the host's choice — a value to record, a window to capture and stream out, or a code to act on.
       In the <b>base tier</b>, programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
       — they read fields and return a number, and call nothing; the host owns the counters, histograms, rings,
       and any decision logic around the call. Two consequences fall out, and they erase the
@@ -639,7 +641,7 @@
         <em>acts</em> needs stricter authz than one that only observes; RBAC-gated.</li>
       <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
         Even at an acting hook, the return merely <em>selects among</em> outcomes the host code already owns
-        (<span class="mono">steer / sample / gate</span>, for example); a program cannot invent control
+        (<span class="mono">steer / rate-limit / gate</span>, for example); a program cannot invent control
         flow or force an arbitrary early return.</li>
       <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
       <li><b>One-way egress</b> — with no helpers a program has no I/O of its own; it returns a value to a
