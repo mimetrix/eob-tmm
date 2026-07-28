@@ -158,6 +158,28 @@
   .layer .cost{margin:.6rem 0 0; font-family:var(--mono); font-size:.64rem; letter-spacing:.03em}
   .layer.admit .cost{color:var(--ok-ink)} .layer.run .cost{color:var(--warn-ink)}
 
+  /* build-pipeline diagram */
+  .bdd{margin:1.6rem 0 0}
+  .bdd svg{width:100%; height:auto; max-width:44rem; display:block; margin:0 auto}
+  .bd-hot-bg{fill:var(--warn-bg)}
+  .bd-sep{stroke:var(--line); stroke-width:1; stroke-dasharray:2 3}
+  .bd-hot-line{stroke:var(--warn); stroke-width:1.5; stroke-dasharray:4 3; fill:none}
+  .bd-zone{fill:var(--faint); font-family:var(--mono); font-size:9px; letter-spacing:.04em; text-transform:uppercase}
+  .bd-zone.hot{fill:var(--warn-ink)}
+  .bd-node{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5}
+  .bd-node.hot{stroke:var(--warn)}
+  .bd-nt{fill:var(--ink); font-family:var(--sans); font-weight:640; font-size:12.5px}
+  .bd-ns{fill:var(--muted); font-family:var(--mono); font-size:9px}
+  .bd-edge{stroke:var(--faint); stroke-width:1.5; fill:none} .bd-head{fill:var(--faint)}
+  .bd-chip{fill:var(--accent-bg); stroke:none}
+  .bd-chip.key{fill:var(--surface); stroke:var(--accent); stroke-width:1.2}
+  .bd-ct{fill:var(--accent-ink); font-family:var(--mono); font-size:9.5px}
+  .bd-brk{stroke:var(--line-2); stroke-width:1; fill:none}
+  .bd-blbl{fill:var(--muted); font-family:var(--mono); font-size:9.5px}
+  .bd-blbl.hot{fill:var(--warn-ink)}
+  .bd-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:62ch}
+  .bd-cap b{color:var(--ink); font-weight:600}
+
   /* perimeter schematic */
   .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
   .srow{display:grid; grid-template-columns:1fr auto; gap:.7rem; align-items:center; padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
@@ -318,6 +340,52 @@
         program's basic blocks and the branches between them. Because it's <em>verified</em>, every loop has a
         proven bound, so the <b>worst-case path</b> is computable: cost it, gate on the hook's budget, load or
         reject. Layer ② (the deadline) then guards the one thing this can't see — wall-clock time.</figcaption>
+    </figure>
+    <figure class="bdd">
+      <svg viewBox="0 0 720 154" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline from source to hot path. compile (dev/CI) emits bytecode; verify (PREVAIL), budget pass, and sign — the F5 build-and-sign pipeline, off-box, once per program — emit a verified, budget-stamped, signed program; load attaches it to a hook on the control plane; run executes it per packet in the TMM data plane. Everything except run is amortized off the data path; only run is per-packet in the poll loop.">
+        <defs>
+          <marker id="bdah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bd-head"/></marker>
+        </defs>
+        <rect class="bd-hot-bg" x="598" y="6" width="118" height="114" rx="6"/>
+        <line class="bd-sep" x1="125" y1="8" x2="125" y2="118"/>
+        <line class="bd-sep" x1="479" y1="8" x2="479" y2="118"/>
+        <line class="bd-hot-line" x1="598" y1="6" x2="598" y2="120"/>
+        <text class="bd-zone" x="66" y="16" text-anchor="middle">dev / CI</text>
+        <text class="bd-zone" x="302" y="16" text-anchor="middle">F5 build + sign · per program</text>
+        <text class="bd-zone" x="538" y="16" text-anchor="middle">control plane · on-box</text>
+        <text class="bd-zone hot" x="657" y="16" text-anchor="middle">data plane · runtime</text>
+        <rect class="bd-node" x="14" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="66" y="53" text-anchor="middle">compile</text><text class="bd-ns" x="66" y="68" text-anchor="middle">author · clang</text>
+        <rect class="bd-node" x="132" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="184" y="53" text-anchor="middle">verify</text><text class="bd-ns" x="184" y="68" text-anchor="middle">PREVAIL</text>
+        <rect class="bd-node" x="250" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="302" y="53" text-anchor="middle">budget pass</text><text class="bd-ns" x="302" y="68" text-anchor="middle">static</text>
+        <rect class="bd-node" x="368" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="420" y="53" text-anchor="middle">sign</text><text class="bd-ns" x="420" y="68" text-anchor="middle">HSM key</text>
+        <rect class="bd-node" x="486" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="538" y="53" text-anchor="middle">load</text><text class="bd-ns" x="538" y="68" text-anchor="middle">attach</text>
+        <rect class="bd-node hot" x="604" y="32" width="104" height="48" rx="8"/>
+        <text class="bd-nt" x="656" y="53" text-anchor="middle">run</text><text class="bd-ns" x="656" y="68" text-anchor="middle">per packet</text>
+        <path class="bd-edge" d="M118,56 L129,56" marker-end="url(#bdah)"/>
+        <path class="bd-edge" d="M236,56 L247,56" marker-end="url(#bdah)"/>
+        <path class="bd-edge" d="M354,56 L365,56" marker-end="url(#bdah)"/>
+        <path class="bd-edge" d="M472,56 L483,56" marker-end="url(#bdah)"/>
+        <path class="bd-edge" d="M590,56 L601,56" marker-end="url(#bdah)"/>
+        <rect class="bd-chip" x="14" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="66" y="102" text-anchor="middle">bytecode</text>
+        <rect class="bd-chip" x="132" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="184" y="102" text-anchor="middle">verified</text>
+        <rect class="bd-chip" x="250" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="302" y="102" text-anchor="middle">+ budget bound</text>
+        <rect class="bd-chip key" x="368" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="420" y="102" text-anchor="middle">signed program</text>
+        <rect class="bd-chip" x="486" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="538" y="102" text-anchor="middle">on a hook</text>
+        <path class="bd-brk" d="M14,131 L14,126 L590,126 L590,131"/>
+        <text class="bd-blbl" x="302" y="145" text-anchor="middle">amortized — once per program / per build · off the data path</text>
+        <path class="bd-brk" d="M604,131 L604,126 L708,126 L708,131"/>
+        <text class="bd-blbl hot" x="656" y="145" text-anchor="middle">per packet · poll loop</text>
+      </svg>
+      <figcaption class="bd-cap"><b>From source to hot path</b> — where each step runs and what it emits. Everything
+        left of the divider is <b>amortized</b> (once per program, or per TMOS build) and runs <b>off the data
+        path</b>; only <b>run</b> executes per packet, in the poll loop. Separately, each <b>TMOS build</b> emits
+        the config the pipeline consumes — the signed hook-point map, the ctx/BTF descriptors, the per-hook budget
+        table, and the cost model.</figcaption>
     </figure>
   </section>
 
