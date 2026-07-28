@@ -344,7 +344,7 @@
       needs to change, it changes now — a config push, a hot reload, a redeploy, a new capability in minutes.
       The data plane already flexes at its edges — config, traffic logic — but changing its <b>own code and
       behavior</b> still waits on a release train.</p>
-    <p class="pivot">The fix is small and already proven elsewhere: give TMM its <b>own eBPF engine</b> — a
+    <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
       reboot, no release train.</p>

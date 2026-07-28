@@ -381,7 +381,7 @@
       mitigation in minutes.
       The data plane already flexes at its edges — config, traffic logic — but changing its <b>own code and
       behavior</b> still waits on a release.</p>
-    <p class="pivot">The fix is small and already proven elsewhere: give TMM its <b>own eBPF engine</b> — a
+    <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hooks — so its code and behavior can change at runtime, provably safely. And
       because that engine runs <em>where the traffic lives</em>, it does more than close the gap: it turns the
       data plane into a <b>bespoke data source</b> F5 can use to make the proxy itself smarter.</p>
