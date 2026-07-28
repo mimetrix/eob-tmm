@@ -1,16 +1,17 @@
-# Embedded eBPF Engine — Hard Problems & Security-Review Register
+# Embedded eBPF Engine — Hard Problems & Engineering Register
 
-### The load-bearing problems the explainers gloss: what a TMM engineer and a security review will ask first, what's day-one vs. deferred, and the honest mitigations
+### The load-bearing problems the explainers gloss — real-time, interface & scope, distributed state, security, certification, operations. What building this actually entails, surfaced up front: what's day-one vs. deferred, and the honest mitigations
 
 **Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring)
-**Audience:** TMM core engineering, F5 SIRT / security review, architecture
+**Audience:** TMM core engineering, architecture, F5 SIRT / security review, product & certification
 
 ---
 
 The pitch is "verified ⇒ safe, stock PREVAIL, no helpers." That is true as far as it goes, and
-it is the right *floor* — but the real engineering and the real security exposure live in four
-places the explainers understate. This is the honest register: the questions that will be
-asked first, with where each one actually lands. **None is a show-stopper** — each has a known
+it is the right *floor* — but the hard parts of actually *building* it span several places the
+explainers understate: real-time behavior, interface and scope, shared state, the trust surface,
+and productization — **engineering as much as security.** This is the honest register — surfaced
+up front, not waiting for a review to reveal it — with where each problem lands. **None is a show-stopper** — each has a known
 mitigation and a clear day-one/deferred path. They are the work to do, not a verdict against
 doing it.
 
