@@ -143,6 +143,21 @@
   .bp-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:60ch}
   .bp-cap b{color:var(--ink); font-weight:600}
 
+  /* two-layer time-safety cards */
+  .layers{margin:1.4rem 0 0; display:grid; grid-template-columns:1fr 1fr; gap:.9rem}
+  @media(max-width:600px){.layers{grid-template-columns:1fr}}
+  .layer{border:1px solid var(--line-2); border-radius:8px; background:var(--surface); padding:1rem 1.05rem}
+  .layer.admit{border-top:3px solid var(--ok)}
+  .layer.run{border-top:3px solid var(--warn)}
+  .layer .lh{font-family:var(--mono); font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; margin:0 0 .5rem}
+  .layer.admit .lh{color:var(--ok-ink)} .layer.run .lh{color:var(--warn-ink)}
+  .layer .lh .num{font-size:1rem; font-weight:800; margin-right:.15em}
+  .layer h4{margin:0 0 .35rem; font-size:1.02rem; color:var(--ink); letter-spacing:-.01em}
+  .layer p{margin:.3rem 0 0; font-size:.9rem; color:var(--muted); max-width:none; line-height:1.5}
+  .layer p b{color:var(--ink); font-weight:600}
+  .layer .cost{margin:.6rem 0 0; font-family:var(--mono); font-size:.64rem; letter-spacing:.03em}
+  .layer.admit .cost{color:var(--ok-ink)} .layer.run .cost{color:var(--warn-ink)}
+
   /* perimeter schematic */
   .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
   .srow{display:grid; grid-template-columns:1fr auto; gap:.7rem; align-items:center; padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px; background:var(--surface)}
@@ -246,22 +261,33 @@
       un-preemptible, run-to-completion</b> — there is no OS underneath to preempt an overrunning hook. Every
       hook borrows cycles from the <em>same</em> loop, so <b>one misjudged hook starves every flow on that
       core.</b> Poll loops are managed carefully or not at all.</p>
-    <div class="dayone"><p class="h">day one — no helpers, no verifier change</p>
-      <ul class="checks">
-        <li><b>A post-verifier budget pass — work to build.</b> After PREVAIL clears a program, a load-time pass
-          walks its now-finite CFG, takes the <b>longest-path instruction count</b> (tractable because every loop
-          already has a proven bound — PREVAIL's, reused), maps it to a conservative cycle estimate against the
-          hook's budget, and <b>rejects over-budget — fail closed</b>. A new stage in the load pipeline, run
-          out-of-band, never in TMM.</li>
-        <li><b>A runtime fuel / deadline — also work to build.</b> A fuel counter compiled into the uBPF JIT
-          (decrement-and-bail) + a watchdog — the backstop, since instruction count isn't wall-clock WCET.
-          Runtime engineering, not verifier or helper.</li>
-        <li><b>Budget by path class</b> — hot (per-packet) hooks tight; cold / error-path looser.</li>
-      </ul>
-      <p class="deferred"><b>Note:</b> all of this sits <em>around</em> the verifier — its algorithm is unchanged
-        and no helpers are involved. Time-safety is load-time policy plus a runtime backstop, exactly what the
-        base tier already allows.</p>
+    <p style="margin-top:1.4rem">The fix is <b>two layers — and only one is free.</b> Static analysis can bound
+      how <em>many</em> instructions a program runs; it cannot bound how <em>long</em> they take. So one layer
+      settles size ahead of time; a second guards time as the program runs.</p>
+    <div class="layers">
+      <div class="layer admit">
+        <p class="lh"><span class="num">①</span> at admission · static · once, off-box</p>
+        <h4>The budget pass</h4>
+        <p>Cost the worst-case path through the program's CFG (finite, loops proven-bounded), compare to the
+          hook's <b>budget</b> — tight on hot per-packet hooks, looser on cold paths — and <b>reject over-budget,
+          fail closed</b>. Bounds <b>instruction count</b>, proven before the program loads.</p>
+        <p class="cost">runtime cost: none · a build artifact</p>
+      </div>
+      <div class="layer run">
+        <p class="lh"><span class="num">②</span> at runtime · every execution</p>
+        <h4>The wall-clock deadline</h4>
+        <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything. A <b>deadline +
+          watchdog</b> on each run is what actually stops a slow execution from stalling the loop.
+          <b>Irreducible</b>, and it carries a small per-execution cost.</p>
+        <p class="cost">runtime cost: small, bounded · live machinery</p>
+      </div>
     </div>
+    <div class="callout accent"><span class="lbl">why both</span>
+      <p>① proves the program is <b>small</b> — static and provable. ② proves it's <b>fast this time</b> — only
+        knowable as it runs. <b>Size settles statically; timing does not.</b> (The instruction &ldquo;fuel&rdquo;
+        counter often reached for is <em>optional</em> here — redundant with ①; the wall-clock deadline is the one
+        you can't skip.) None of this needs helpers or a verifier change — the pass, the budget table, the cost
+        model, and the deadline are new <b>F5 build work</b>.</p></div>
     <figure class="bp">
       <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The budget pass on one program: a verified control-flow graph with a proven loop bound of 64; worst-case path is 8 plus 10 times 64 plus 4 = 652 instructions, about 800 cycles; compared to the hook's budget it loads if under and is rejected fail-closed if over.">
         <defs>
@@ -288,10 +314,10 @@
         <rect class="bp-warn" x="340" y="186" width="230" height="38" rx="7"/>
         <text class="bp-warn-t" x="455" y="210" text-anchor="middle">&gt; budget → reject (fail closed)</text>
       </svg>
-      <figcaption class="bp-cap">A program's <b>control-flow graph (CFG)</b> — its basic blocks and the branches
-        between them. Because the program is <em>verified</em>, every loop has a proven bound, so the
-        <b>worst-case path</b> is computable: cost it, compare to the hook's budget, load or reject. That is the
-        post-verifier budget pass, on one program.</figcaption>
+      <figcaption class="bp-cap"><b>Layer ①, on one program.</b> A <b>control-flow graph (CFG)</b> — the
+        program's basic blocks and the branches between them. Because it's <em>verified</em>, every loop has a
+        proven bound, so the <b>worst-case path</b> is computable: cost it, gate on the hook's budget, load or
+        reject. Layer ② (the deadline) then guards the one thing this can't see — wall-clock time.</figcaption>
     </figure>
   </section>
 

@@ -41,8 +41,10 @@ one misjudged hook starves every flow on that core. Poll loops are managed caref
 
 **Day-one mitigations — and note: no helpers, no verifier change.** Time-safety is enforced
 *around* the verifier, not inside it: PREVAIL's job is unchanged, and nothing here needs a new
-helper (helpers add capability, not time-safety — a helper call only adds cost). The work is a
-new **post-verifier step** plus a runtime backstop.
+helper (helpers add capability, not time-safety — a helper call only adds cost). The work is
+**two layers** — a static **post-verifier step** at admission (free at runtime) and a live
+**runtime guardian** (small cost) — because *how many* instructions a program runs is provable
+ahead of time, but *how long* they take is not.
 
 - **A post-verifier budget pass — work to be done.** After PREVAIL clears a program (safety +
   termination), a load-time pass — running out-of-band with verification, never in TMM — bounds
@@ -57,10 +59,13 @@ new **post-verifier step** plus a runtime backstop.
   3. Over budget → **reject, fail closed.**
   The pass, the per-hook budget table, and the cost model are **new build work** — a stage added
   to the load pipeline (`author → clang → PREVAIL → budget pass → sign → load`), F5-owned.
-- **A runtime deadline / fuel — also new work.** A static instruction count is *not* wall-clock
-  WCET (cache, memory stalls, JIT variance), so the backstop is a **fuel counter compiled into the
-  uBPF JIT** (decrement-and-bail, WASM-style) plus a per-hook watchdog — bounded-cost preemption
-  for a loop with no OS to preempt it. Runtime/JIT engineering, not verifier or helper work.
+- **A runtime wall-clock deadline — also new work, and irreducible.** A static instruction count
+  is *not* wall-clock time (cache, memory stalls, JIT variance) — bounding *how many* instructions
+  run cannot bound *how long* they take. So a per-execution **deadline + watchdog** — bounded-cost
+  preemption for a loop with no OS to preempt it — is what actually stops a slow run from stalling
+  the poll loop. This layer has a small runtime cost and **cannot be moved to admission time.** (An
+  instruction **fuel** counter is *optional* here — redundant with the admission bound; the
+  wall-clock deadline is the piece you can't skip.) Runtime/JIT engineering, not verifier or helper.
 - **Budget by path class** — hot hooks (per-packet) on a tight measured budget; cold/error-path
   hooks looser.
 - **Interpreter mode** for the most sensitive builds makes per-instruction cost predictable (and
