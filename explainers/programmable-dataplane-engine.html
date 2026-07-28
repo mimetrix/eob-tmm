@@ -417,13 +417,14 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <p class="aside-note">And the hooks map onto structures TMM <b>already defines</b> — so the surface can start
-      from what's in the code today, not a blank page. A <b>candidate catalog of USDT tracepoints</b> can be drawn
-      up alongside the engine, right where that state already lives: L3/L4 ingress and the connection table, the TLS
+    <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
+      so the surface can start from what's in the code today and grow as the code does, not a blank page. A
+      <b>candidate catalog of USDT tracepoints</b> can be drawn up alongside the engine, right where that state
+      already lives: L3/L4 ingress and the connection table, the TLS
       record layer, the L7 parsers, the plugin processes, the poll loop itself. Each hook that lands adds one more
       place to observe, one more place to act.</p>
     <div class="gist">
-      <p class="glabel">the whole proposal, in three words</p>
+      <p class="glabel">the whole proposal, in three terms</p>
       <div class="triad" aria-label="runtime, programmable, and provably safe — equal weight">
         <span class="td">runtime</span><span class="tdot">·</span>
         <span class="td">programmable</span><span class="tdot">·</span>
@@ -433,7 +434,7 @@
         <b>in-process</b>, at the data plane:</p>
       <div class="misses">
         <div class="miss"><span class="who">iRules</span>
-          <span class="gap"><b>runtime</b>, but never provably safe</span></div>
+          <span class="gap"><b>runtime</b>, but not provably safe</span></div>
         <div class="miss"><span class="who">DynaD</span>
           <span class="gap"><b>runtime</b> too — a Lua-based earlier swing at exactly this, since deprecated</span></div>
         <div class="miss"><span class="who">WASM</span>
