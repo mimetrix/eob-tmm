@@ -5,7 +5,7 @@
 **Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring)
 **Audience:** TMM core engineering, F5 SIRT / security review, architecture
 
-**↩ Back to the [engine explainer](https://claude.ai/code/artifact/a581501e-be3e-4ae2-93a4-31084b7e02c9)** — the proposal this register backs.
+**↩ Back to the <a href="https://claude.ai/code/artifact/a581501e-be3e-4ae2-93a4-31084b7e02c9" target="_blank" rel="noopener noreferrer">engine explainer</a>** — the proposal this register backs.
 
 ---
 
