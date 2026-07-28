@@ -39,13 +39,28 @@ Every hook borrows cycles from the *same* loop, so a hook that cannot be preempt
 *provably short*, and the budget is a **first-class scheduler concern**, not an afterthought:
 one misjudged hook starves every flow on that core. Poll loops are managed carefully or not at all.
 
-**Day-one mitigations (verification is necessary, not sufficient, for hot-path safety):**
+**Day-one mitigations — and note: no helpers, no verifier change.** Time-safety is enforced
+*around* the verifier, not inside it: PREVAIL's job is unchanged, and nothing here needs a new
+helper (helpers add capability, not time-safety — a helper call only adds cost). The work is a
+new **post-verifier step** plus a runtime backstop.
 
-- A **per-hook instruction-budget ceiling** enforced at load — reject bytecode whose static
-  bound exceeds the hook's budget. PREVAIL's iteration bounds can *seed* this ceiling, but treat
-  it as a floor on the real cost, not WCET.
-- A **runtime deadline / watchdog** that short-circuits or unloads a program that overruns, with
-  run-to-completion accounting the program cannot starve.
+- **A post-verifier budget pass — work to be done.** After PREVAIL clears a program (safety +
+  termination), a load-time pass — running out-of-band with verification, never in TMM — bounds
+  the program's cost and gates on the hook's budget:
+  1. The program is already verified, so its control-flow graph is finite and every loop carries a
+     proven iteration bound — which makes a **longest-path instruction count** over the CFG
+     computable (WCET-*lite*, tractable precisely because unbounded code was already rejected).
+     PREVAIL's loop bounds are *reused* here, not recomputed.
+  2. Map that count to a conservative **cycle estimate** via a per-target cost model (most eBPF
+     ops ≈ 1 cycle; loads/stores more) and compare to the hook's **budget** — a cycle allowance
+     per hook and path class, derived from the poll loop's per-packet headroom.
+  3. Over budget → **reject, fail closed.**
+  The pass, the per-hook budget table, and the cost model are **new build work** — a stage added
+  to the load pipeline (`author → clang → PREVAIL → budget pass → sign → load`), F5-owned.
+- **A runtime deadline / fuel — also new work.** A static instruction count is *not* wall-clock
+  WCET (cache, memory stalls, JIT variance), so the backstop is a **fuel counter compiled into the
+  uBPF JIT** (decrement-and-bail, WASM-style) plus a per-hook watchdog — bounded-cost preemption
+  for a loop with no OS to preempt it. Runtime/JIT engineering, not verifier or helper work.
 - **Budget by path class** — hot hooks (per-packet) on a tight measured budget; cold/error-path
   hooks looser.
 - **Interpreter mode** for the most sensitive builds makes per-instruction cost predictable (and

@@ -226,13 +226,21 @@
       un-preemptible, run-to-completion</b> — there is no OS underneath to preempt an overrunning hook. Every
       hook borrows cycles from the <em>same</em> loop, so <b>one misjudged hook starves every flow on that
       core.</b> Poll loops are managed carefully or not at all.</p>
-    <div class="dayone"><p class="h">day one</p>
+    <div class="dayone"><p class="h">day one — no helpers, no verifier change</p>
       <ul class="checks">
-        <li>A <b>per-hook instruction-budget ceiling</b>, enforced at load — reject bytecode over budget.</li>
-        <li>A <b>runtime deadline / watchdog</b> that short-circuits or unloads a hook that overruns.</li>
-        <li><b>Budget by path class</b> — hot (per-packet) hooks tight; cold / error-path hooks looser.</li>
+        <li><b>A post-verifier budget pass — work to build.</b> After PREVAIL clears a program, a load-time pass
+          walks its now-finite CFG, takes the <b>longest-path instruction count</b> (tractable because every loop
+          already has a proven bound — PREVAIL's, reused), maps it to a conservative cycle estimate against the
+          hook's budget, and <b>rejects over-budget — fail closed</b>. A new stage in the load pipeline, run
+          out-of-band, never in TMM.</li>
+        <li><b>A runtime fuel / deadline — also work to build.</b> A fuel counter compiled into the uBPF JIT
+          (decrement-and-bail) + a watchdog — the backstop, since instruction count isn't wall-clock WCET.
+          Runtime engineering, not verifier or helper.</li>
+        <li><b>Budget by path class</b> — hot (per-packet) hooks tight; cold / error-path looser.</li>
       </ul>
-      <p class="deferred"><b>Note:</b> the verifier is necessary, not sufficient, for hot-path safety.</p>
+      <p class="deferred"><b>Note:</b> all of this sits <em>around</em> the verifier — its algorithm is unchanged
+        and no helpers are involved. Time-safety is load-time policy plus a runtime backstop, exactly what the
+        base tier already allows.</p>
     </div>
   </section>
 
