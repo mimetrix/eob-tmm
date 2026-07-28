@@ -456,10 +456,13 @@
   <section class="beat reveal" id="surface" data-sec="surface">
     <p class="kicker"><span class="num">03</span> one shape · observe · act</p>
     <h2>Observe and act are the same machinery. Only the last step differs.</h2>
-    <p class="lede">A program in its <em>simplest</em> shape reads a curated context and returns a value —
-      the engine can do far more, but this base shape is all the symmetry needs. Whether that
-      value becomes <em class="sig">a recorded metric</em> or <em class="enf">a decision the host acts on</em> is
-      the host's choice — not a different mechanism.</p>
+    <p class="lede">First, what a program <em>is</em>. It isn't a process that runs on its own — it's a small
+      <b>event handler</b>, a callback the engine invokes at a hook, triggered by the very thing it's watching:
+      execution reaches that point in the code, the program fires, and it's handed a <b>curated context</b>
+      describing what's there. In its <em>simplest</em> shape it reads that context and returns a value — the
+      engine can do far more, but this base shape is all the symmetry needs. Whether that value becomes
+      <em class="sig">a recorded metric</em> or <em class="enf">a decision the host acts on</em> is the host's
+      choice — not a different mechanism.</p>
     <p>You'd author one with <b>tmmtrace</b>, a proposed front-end — <em>bpftrace for TMM</em>: from a one-liner
       to a full multi-probe script, it compiles to eBPF bytecode, clears the verifier, and — once <b>signed</b> —
       attaches at the named hooks. And it <b>spans both planes</b>: point it at a data-plane hook and it runs in
