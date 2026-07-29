@@ -93,10 +93,18 @@ consume. The verifier task is **"write the program-type descriptor"** (`ctx` lay
 regions + helper prototypes), **not "modify the verifier."** So the *no-verifier-fork* claim
 survives — but the effort estimate in the explainers does not.
 
+**Put concretely, that interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx`.
+Getting them right isn't incidental to the project; it *is* the project: the USDT set is the **ceiling on
+everything the engine can ever observe or enforce** (a hook can only act on what its `ctx` exposes), and it is the
+permanent ABI. This is where the design effort earns its keep — the difference between a toy and a platform.
+
 **Day-one vs. deferred:**
 
 - **Day-one:** a minimal, **read-only `ctx` per hook** (curated fields, no helpers) + its
-  program-type descriptor for PREVAIL. This is the base tier — and it is genuine work, not free.
+  program-type descriptor for PREVAIL. Genuine work — but **not a blank page**: TMM's code already holds the state
+  these USDTs expose (the connection table, the TLS record layer, the L7 parser state, the `bd`/plugin internals,
+  the poll-loop counters), so the first USDTs are a *curated window onto structures that already exist* and the
+  surface can begin the day the engine lands.
 - **Deferred, per use case:** every helper is a new ABI to secure, a new verifier prototype, and
   a new soundness surface. Add helpers only when a use case forces it; `ctx`-first, helpers-later.
 

@@ -415,9 +415,20 @@
       descriptor&rdquo;</em> — the <span class="inlinecode">ctx</span> layout, memory regions, helper prototypes
       — <b>not</b> &ldquo;modify the verifier.&rdquo; The no-verifier-fork claim survives; the effort estimate
       does not.</p>
+    <div class="callout accent"><span class="lbl">the interface is the USDT catalog</span>
+      <p>Put concretely, that interface <em>is</em> a <b>catalog of well-defined USDTs</b> — one per hook, each a
+        curated <span class="inlinecode">ctx</span>. Getting them right isn't incidental to the project; it is the
+        project: the USDT set is the <b>ceiling on everything the engine can ever observe or enforce</b> — a hook
+        can only act on what its <span class="inlinecode">ctx</span> exposes — and it's the permanent ABI. This is
+        exactly where the design effort earns its keep, and it's what makes the difference between a toy and a
+        platform.</p></div>
     <div class="dayone"><p class="h">day one</p>
       <ul class="checks">
         <li>Ship a <b>minimal, read-only <span class="mono">ctx</span></b> per hook + its program-type descriptor.</li>
+        <li><b>Start from what's already there — no blank page.</b> TMM's code already holds the state these USDTs
+          expose: the connection table, the TLS record layer, the L7 parser state, the <span class="mono">bd</span>/plugin
+          internals, the poll-loop counters. The first USDTs are a <b>curated window onto structures that already
+          exist</b>, so the surface can begin the day the engine lands and grow from there.</li>
       </ul>
       <p class="deferred"><b>Deferred:</b> helpers. Each one is a new ABI to secure and a new verifier prototype
         — <span class="mono">ctx</span>-first, helpers-later.</p>

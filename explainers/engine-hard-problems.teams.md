@@ -59,7 +59,9 @@ _Claim to retire:_ "the base tier is a trivial pure function of `ctx`."
 
 The good news, stated precisely: this is **"write the program-type descriptor"** the verifier consumes, **not "modify the verifier"** — the no-verifier-fork claim survives, but the effort estimate doesn't.
 
-- **Day one:** a minimal, read-only `ctx` per hook + its program-type descriptor.
+**Put concretely, the interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx`. Getting them right isn't incidental; it *is* the project: the USDT set is the **ceiling on everything the engine can ever observe or enforce** (a hook can only act on what its `ctx` exposes), and it's the permanent ABI — the difference between a toy and a platform.
+
+- **Day one:** a minimal, read-only `ctx` per hook + its program-type descriptor. Genuine work, but **not a blank page** — TMM's code already holds the state these USDTs expose (the connection table, the TLS record layer, the L7 parser state, the `bd`/plugin internals, the poll-loop counters), so the first USDTs are a curated window onto structures that already exist; the surface can begin the day the engine lands.
 - **Deferred:** helpers — each is a new ABI to secure and a new verifier prototype. `ctx`-first, helpers-later.
 
 ---
