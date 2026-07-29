@@ -71,6 +71,13 @@ ahead of time, but *how long* they take is not.
 - **Interpreter mode** for the most sensitive builds makes per-instruction cost predictable (and
   see §4 — it also shrinks the native-code surface).
 
+**And the budgets are measurable, not guessed — which is the value proposition arriving mid-problem.**
+Setting a per-hook budget, and catching one at risk, is itself an *observability* task, and it's exactly what a
+few **designed-in USDTs** would expose: per-iteration poll-loop duration (`tmm:rt:poll_iter`), per-hook execution
+cost, and a stall/overrun tripwire (`tmm:rt:poll_stall`). The engine ends up **instrumenting the very loop it runs
+in** — so the same surface that makes this problem tractable *is* the observability capability the engine exists
+to provide. Describing the problem and demonstrating the payoff turn out to be one move.
+
 ## 2. The context / helper / program-type ABI is the actual project
 
 **The claim to retire:** "the base tier is a trivial pure function of `ctx`."

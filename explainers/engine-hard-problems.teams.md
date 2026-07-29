@@ -47,6 +47,8 @@ Build pipeline — where each step runs, what it emits, and what touches the hot
 ```
 Plus, once per **TMOS build**: the signed hook-point map, the ctx/BTF descriptors, the per-hook budget table, and the cost model.
 
+**And the budgets are measurable, not guessed — the value prop arriving mid-problem.** Setting a per-hook budget, and catching one at risk, is itself an observability task — exactly what a few **designed-in USDTs** would expose: per-iteration poll-loop duration (`tmm:rt:poll_iter`), per-hook execution cost, and a stall/overrun tripwire (`tmm:rt:poll_stall`). The engine ends up **instrumenting the very loop it runs in**, so the same surface that makes this problem tractable *is* the observability the engine exists to provide.
+
 ---
 
 **02 · The interface**

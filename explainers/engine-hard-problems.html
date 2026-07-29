@@ -387,6 +387,14 @@
         the config the pipeline consumes — the signed hook-point map, the ctx/BTF descriptors, the per-hook budget
         table, and the cost model.</figcaption>
     </figure>
+    <div class="callout accent"><span class="lbl">the problem is also the pitch</span>
+      <p>And the budgets shouldn't be pulled from the air. Setting a per-hook budget — and catching one at risk —
+        is itself an <b>observability</b> problem, and it's exactly what a few <b>designed-in USDTs</b> would
+        expose: per-iteration <b>poll-loop duration</b> (<span class="inlinecode">tmm:rt:poll_iter</span>), per-hook
+        <b>execution cost</b>, and a <b>stall/overrun tripwire</b> (<span class="inlinecode">tmm:rt:poll_stall</span>).
+        The engine ends up <b>instrumenting the very loop it runs in</b> — so the same surface that makes this hard
+        problem tractable <em>is</em> the observability the engine exists to provide. Describing the problem and
+        showing the payoff turn out to be one move.</p></div>
   </section>
 
   <!-- 02 THE INTERFACE -->
