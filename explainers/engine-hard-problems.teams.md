@@ -77,7 +77,7 @@ _Claim to retire:_ "maps work like they do in Linux."
 
 **04 · The trust surface**
 
-The verifier and its JIT run **inside the crown-jewel process** — the one a review will press hardest. uBPF JITs native code into TMM's address space; an unsound verifier or a buggy JIT is arbitrary execution in the data plane — sharper now that the source has been exposed (an adversary with the code can hunt soundness bugs directly).
+The verifier and its JIT run **inside the crown-jewel process** — the one a review will press hardest. uBPF JITs native code into TMM's address space; an unsound verifier or a buggy JIT is arbitrary execution in the data plane. †
 
 **The load-bearing point: the perimeter is the signing gate, not the verifier.** Only F5-signed bytecode ever reaches the verifier or JIT — attacker-controlled input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection.
 
@@ -90,6 +90,8 @@ And **verified ≠ correct**: a verified, signed program can still black-hole tr
 - **Signing gate + HSM-backed key protection** — the real perimeter.
 - **JIT hardening** (W^X, guard pages) and an **interpreter-only high-assurance build** option.
 - A **control-plane canary** that auto-unloads on a health signal — the proof bounds crashes; the canary bounds a bad-but-valid program.
+
+_† Sharper still given the source-code exposure — an adversary holding the code can hunt verifier/JIT soundness bugs directly. Which is exactly the point: secrecy was never the defense; the signing gate is — the perimeter holds whether or not the source is public._
 
 ---
 

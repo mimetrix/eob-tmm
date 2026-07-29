@@ -128,9 +128,7 @@ own state-sync fabric; the map model must defer to that fabric, not compete with
 **This is the one a security review will (correctly) fixate on.** uBPF JITs native code into
 TMM's address space — the crown-jewel process of a security appliance. An **unsound PREVAIL** or
 a **buggy JIT** is arbitrary execution inside TMM. Linux has burned through many verifier CVEs;
-embedding the mechanism relocates eBPF's single biggest risk class into the data plane. It is
-**sharper given the source-code exposure**: an adversary with the source can hunt soundness bugs
-directly.
+embedding the mechanism relocates eBPF's single biggest risk class into the data plane.[^src]
 
 **The perimeter is the signing gate, not the verifier — and the design already implies it.**
 Only **F5-signed bytecode ever reaches the verifier/JIT.** Therefore a verifier-soundness bug is
@@ -212,3 +210,7 @@ the day-one posture, but the first two are the most likely to shape the first sh
 
 > **IP note.** Novel method & claims are held in a separate invention disclosure (gitignored),
 > per policy; this document is engineering rigor only.
+
+[^src]: Sharper still given the source-code exposure — an adversary holding the code can hunt
+    verifier/JIT soundness bugs directly. Which is exactly the point: secrecy was never the
+    defense; the signing gate is. The perimeter holds whether or not the source is public.

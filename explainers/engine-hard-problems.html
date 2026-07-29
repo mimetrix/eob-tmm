@@ -78,6 +78,9 @@
   em.warn{font-style:normal; color:var(--warn-ink); font-weight:600}
   em.ok{font-style:normal; color:var(--ok-ink); font-weight:600}
   .inlinecode{font-family:var(--mono); font-size:.86em; background:var(--accent-bg); color:var(--accent-ink); padding:.05em .35em; border-radius:3px}
+  .fnref{vertical-align:super; font-size:.7em; color:var(--accent-ink); font-family:var(--mono)}
+  .fnote{margin:1.3rem 0 0; padding-top:.7rem; border-top:1px solid var(--line); font-size:.82rem; color:var(--faint); line-height:1.55; max-width:62ch}
+  .fnote sup{color:var(--accent-ink)} .fnote b{color:var(--muted); font-weight:600}
 
   /* HERO */
   .hero{min-height:100vh; display:flex; flex-direction:column; justify-content:center; max-width:var(--maxw); margin:0 auto; padding:5rem clamp(1.15rem,5vw,2rem) 3rem; position:relative}
@@ -446,8 +449,7 @@
     <h2>The verifier and its JIT run inside the crown-jewel process. This is the one a review presses hardest.</h2>
     <p class="lede">The engine JITs native code into TMM's own address space. An <b>unsound verifier</b>, or a
       <b>buggy JIT</b>, is arbitrary execution in the data plane — the single biggest risk class eBPF carries,
-      relocated into TMM. It is <em class="warn">sharper now that the source has been exposed</em>: an adversary
-      with the code can hunt soundness bugs directly.</p>
+      relocated into TMM.<sup class="fnref">†</sup></p>
     <div class="callout accent"><span class="lbl">the load-bearing point</span>
       <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
         verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
@@ -468,6 +470,9 @@
           canary bounds a bad-but-valid program.</li>
       </ul>
     </div>
+    <p class="fnote"><sup>†</sup> Sharper still given the source-code exposure — an adversary holding the code can
+      hunt verifier/JIT soundness bugs directly. Which is exactly the point: <b>secrecy was never the defense; the
+      signing gate is.</b> The perimeter holds whether or not the source is public.</p>
   </section>
 
   <!-- 05 SEQUENCING -->
