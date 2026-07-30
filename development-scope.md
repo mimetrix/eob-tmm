@@ -20,8 +20,8 @@ few lines of C). Everything else is written once or generated automatically per 
 | **PREVAIL** | the static verifier | MIT | proven in the prototype's verify-gate track |
 | **clang** | C → eBPF bytecode | — | standard toolchain |
 
-Nobody at F5 writes a VM, a verifier, or a compiler. The prototype (`prototype/minimm`) already
-demonstrates the load-and-run half of the loader with the real uBPF API.
+Nobody at F5 writes a VM, a verifier, or a compiler. The prototype ([`prototype/`](prototype/))
+already demonstrates the load-and-run half of the loader with the real uBPF API.
 
 ---
 

@@ -116,7 +116,7 @@ These are TMM-internal health signals with **no iRule / data-model surface at al
 The catalog above is raw signal. These are the **reusable patterns** that turn it into named RCA capabilities — each built from the same observe machinery, no helpers, no verifier work.
 
 ### 10.1 Flight recorder (the run-up *into* a fault)
-A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and dumped on a trigger** (an error-branch tracepoint, a watchdog, a stall). Yields the state leading *into* the failure — the blind spot a post-crash core dump can't give you. shm-backed, so it **survives** a data-plane crash for post-mortem. *Two coordinated hooks: one records, one trips.* (Worked in the prototype: `minimm-trace` + `ctl flightrec`; substrate §3.1.)
+A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and dumped on a trigger** (an error-branch tracepoint, a watchdog, a stall). Yields the state leading *into* the failure — the blind spot a post-crash core dump can't give you. shm-backed, so it **survives** a data-plane crash for post-mortem. *Two coordinated hooks: one records, one trips.* (Worked in the prototype: the observe-mode flight recorder + `ctl flightrec`; substrate §3.1.)
 
 - **Per-context ring** — recent state for the active flow, dumped on that flow's error branch.
 - **Global tripwire** — cross-cutting state (poll jitter, pool pressure), dumped on `tmm:rt:poll_stall` / `tmm:rt:watchdog`.

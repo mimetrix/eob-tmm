@@ -102,14 +102,14 @@ resource governance — lives *around* the VM (substrate §6, design §8).
 | [`development-scope.md`](development-scope.md) | **What F5 actually builds** beyond the reused OSS (uBPF/PREVAIL/clang) — in-TMM code, build-pipeline tooling, control-plane pieces, optional tiers, and the one recurring per-CVE cost (a few lines of C). Keyed to the walkthrough's step numbers |
 | [`engine-hard-problems.md`](engine-hard-problems.md) | The load-bearing problems the pitch glosses — **termination ≠ WCET**, the **ctx/helper/program-type ABI is the real 90%**, **maps under CMP + HA mirroring**, and **verifier soundness as a data-plane RCE surface** (with the signing gate as the real perimeter). Honest mitigations, day-one vs. deferred — the "what a security review will ask" register |
 | [`p4-on-tmm.md`](p4-on-tmm.md) | Exploratory design note — the **P4 → uBPF** path (p4c's uBPF backend) as a front-end for packet-granular programs on TMM, **P4 as a portable IR** across software (uBPF) and hardware offload, the budget pass as a **software-vs-silicon placement decision**, and uBPF-vs-WASM. Honestly scoped: a future front-end on the deferred helper/map tier |
-| [`prototype/`](prototype/) | **minimm** — a "mini-TMM" relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
+| [`prototype/`](prototype/) | A minimal data-plane relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
 | [`prototype/tmmtrace`](prototype/tmmtrace) | **tmmtrace** — a bpftrace-style front-end to the embedded VM: one grammar spanning observe (tracepoint) and filter (CVE shield), with compile → verify → run |
 | [`explainers/`](explainers/) | Visual explainers (HTML), one job each — each with a Teams-pasteable `.teams.md` companion. [`programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) — **the engine** (the generic verified-eBPF utility in TMM); [`cve-mitigation.html`](explainers/cve-mitigation.html) — data-plane **CVE mitigation** (the shield); [`cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) — a **worked example**: shielding a real TMM NULL-deref CVE step by step; [`engine-hard-problems.html`](explainers/engine-hard-problems.html) — the **engineering register** (the load-bearing hard problems, honestly scoped) |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
 
 ## Prototype at a glance
 
-`minimm` is a transparent TCP relay reproducing the *structural* properties the substrate
+The prototype is a transparent TCP relay reproducing the *structural* properties the substrate
 depends on (kernel-bypass-style poll loop, inline eval stage, a designed-in hook point).
 Three tracks:
 
@@ -124,14 +124,10 @@ shield, runs the verify gate, and drives the VM in observe *or* filter mode — 
 *explore → shield*. It is also the natural target for **AI-assisted authoring** (CVE → predicate →
 verify → replay); see [`explainers/`](explainers/).
 
-```bash
-cd prototype
-make -C minimm && ./demo.sh        # Track 1, no dependencies
-```
-
-See [`prototype/README.md`](prototype/README.md) for the uBPF and verify-gate tracks (and
-the Rocky Linux 8.10 container builds), and [`prototype/TOOLCHAIN.md`](prototype/TOOLCHAIN.md)
-for the end-to-end source → bytecode → verify → load → run pipeline.
+See [`prototype/README.md`](prototype/README.md) for build & run of all three tracks — Track 1
+needs no dependencies; the uBPF and verify-gate tracks include Rocky Linux 8.10 container
+builds — and [`prototype/TOOLCHAIN.md`](prototype/TOOLCHAIN.md) for the end-to-end
+source → bytecode → verify → load → run pipeline.
 
 ## Notes
 
