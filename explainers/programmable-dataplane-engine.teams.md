@@ -40,16 +40,16 @@ It's buildable because what makes kernel eBPF safe was never the kernel — it's
 Bring them inside: embed a small userspace eBPF VM (**uBPF**, ~150 KB, JIT-compiled) inside TMM's own address space, at designed-in hook points, gated by a stock verifier (**PREVAIL**). Now behavior arrives as bytecode, proven safe before it loads — a fast lane:
 
 ```
-the proposal:  author → clang → PREVAIL verify → sign → load   (hours)
+the proposal:  author → clang → PREVAIL verify → budget pass → sign → load   (hours)
 ```
 
-**And this pattern is proven, not novel.** A userspace eBPF VM running *verified* bytecode inline is already the model in maintained software: **DPDK** ships `librte_bpf` — load, verify, JIT, run on packets at a device's RX/TX, mainline since 2018 — and **eBPF-for-Windows** runs this *exact* stack, **uBPF verified by PREVAIL**, inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing an established pattern to the one high-performance data plane that hasn't had it — TMM.
+**And this pattern is proven, not novel.** A userspace eBPF VM running *verified* bytecode inline is already the model in maintained software: **DPDK** ships `librte_bpf` — its **own** in-tree VM and lightweight validator (not uBPF, and not a PREVAIL-grade proof) — load, validate, JIT, run on packets at a device's RX/TX, mainline since 2018 — and **eBPF-for-Windows** runs this *exact* stack, **uBPF verified by PREVAIL**, inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing an established pattern to the one high-performance data plane that hasn't had it — TMM.
 
 The hooks map onto structures TMM **already has — and new ones it will define** — so the surface starts from what's in the code today and grows with it. A candidate catalog of **USDT tracepoints** (userland statically-defined tracing — named probe points designed into the source) rides alongside the engine: L3/L4 ingress + the connection table, the TLS record layer, the L7 parsers, the plugin processes, the poll loop itself.
 
 Nothing else brings all three properties (runtime · programmable · provably safe) in-process:
 - **iRules** — runtime, but not provably safe
-- **DynaD** — runtime too (a Lua-based earlier swing at exactly this, since deprecated)
+- **DynaD** — runtime too (an earlier scripting-based swing at exactly this, since deprecated)
 - **WASM** — programmable, but bounded by a runtime kill, not a proof
 - **kernel eBPF** — provably safe, but in the wrong kernel (a USDT lets it *watch* TMM, not act inside it, and traps on every hit)
 
@@ -65,7 +65,7 @@ Observe and act are the same machinery; only the last step differs.
 
 **What a program is:** not a process that runs on its own — a small **event handler / callback** the engine invokes at a hook, triggered by the very thing it's watching. Execution reaches that point in the code, the program fires, and it's handed a **curated context (`ctx`)**. In its simplest shape it reads `ctx` and returns a value. What the host does with that value — **record it as a metric**, use it to **stream a window of live internal state out to userspace** (discovery, RCA, debugging), or treat it as **a decision to act on** — is the host's choice, not a different mechanism.
 
-**How you'd write one:** not by hand-assembling eBPF bytecode per probe. Use **tmmtrace**, a proposed authoring front-end (*bpftrace for TMM*): describe the probe in a small, familiar language and it does the rest — compile → verify → (once signed) attach at the named hook. It spans both planes from one grammar — a data-plane hook runs in the embedded VM, a control-plane hook rides kernel eBPF.
+**How you'd write one:** you write a few lines of C and compile with `clang -target bpf` — or, for one-line probes, **tmmtrace**, a proposed authoring front-end that emits the same bytecode (*bpftrace for TMM*): describe the probe in a small, familiar language and it does the rest — compile → verify → (once signed) attach at the named hook. It spans both planes from one grammar — a data-plane hook runs in the embedded VM, a control-plane hook rides kernel eBPF.
 
 Each probe is three parts:
 
@@ -82,7 +82,7 @@ observe:  tmm:lb:select  /args.member_load > 80/  { snapshot() }   → host reco
 act:      tmm:lb:select  /args.member_load > 80/  { steer() }      → host steers the flow to a cooler member
 ```
 
-Nothing about the VM, the verifier, or the context changed — only what the host does with the answer. That symmetry *is* the thesis: one verified surface, observation and control as equals. And read-ctx/return-value is just the floor — the hook surface is designed to grow.
+Nothing about the VM, the verifier, or the context changed — only what the host does with the answer. That symmetry *is* the thesis: one verified surface, observation and control as equals. And read-ctx/return-value is just the floor — the hook surface is designed to grow: a widening catalog of designed-in USDTs, plus every named function the build's signed hook map already exposes.
 
 ---
 
@@ -105,7 +105,7 @@ Everything above rests on one small, in-process call, gated by a static proof.
 
 **5.1 — The engine & its hook points.** A full in-process eBPF engine (a JIT VM running arbitrary *verified* bytecode), not a single-purpose gate. **Two kinds of hook, and the difference matters most for shields:**
 - **Designed-in tracepoint (USDT)** — F5 places a named, versioned point exposing a *curated* `ctx`, a stable contract in a per-build map. The planned surface: observability, and CVEs that land where one sits. But F5 can't pre-place a tracepoint for every future bug.
-- **Function-boundary probe** — attach the verified VM at the *entry/return of an existing named function* (the one that would crash, or one on its path), reading its arguments and reachable state as the `ctx`. It rides the code's existing structure, so you can hook a spot nobody instrumented ahead of time — that's how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its args, decide. No bespoke tracepoint required. (Mechanism = the kernel's own `fentry`/ftrace trampoline model, applied to TMM's own functions.)
+- **Function-boundary probe** — attach the verified VM at the *entry/return of an existing named function* (the one that would crash, or one on its path), reading its arguments and reachable state as the `ctx`. It rides the code's existing structure, so you can hook a spot nobody instrumented ahead of time — that's how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its args, decide. No bespoke tracepoint required. (Mechanism = the kernel's own `fentry`/ftrace trampoline model, applied to TMM's own functions. See the worked example — `cve-shield-walkthrough` — shielding a real TMM CVE.)
 
 Both stay **designed-in, not injected**: F5 owns the source and symbol table, compiles the hook capability in (patchable function entries), and attaches at a *named symbol* — never fragile offsets guessed at in a foreign process. Dark until lit. The honest trade is **stability**: a tracepoint's `ctx` is a curated, versioned contract; a function-boundary probe's is *build-specific* (function X's signature at build Y) — more reach, looser contract, re-validated per build. Either way: verified, signed, budgeted before it runs.
 
@@ -135,7 +135,7 @@ Honest boundary: a flow handled entirely in silicon never enters TMM software, s
 **5.4 — Why it's safe to run inline.** Every claim leans on the verifier being right; three reasons that's a strong bet:
 - **Provenance** — PREVAIL is Microsoft's eBPF-for-Windows verifier: abstract interpretation (a formal method), publicly maintained, hardened in production.
 - **Narrow envelope** — used at its best-proven case: a bounded predicate over a small typed struct, no helpers, no maps.
-- **Depth (the load-bearing point)** — the verifier and its JIT run *inside* TMM, so an unsound verifier would mean arbitrary code in the data plane. **But only F5-signed bytecode ever reaches the verifier or JIT** — attacker input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection.
+- **Depth (the load-bearing point)** — the JIT emits native code inside TMM, and the verifier gates what reaches it — PREVAIL itself runs off-box at build/control-plane time — so an unsound verifier would still mean arbitrary code in the data plane. **But only F5-signed bytecode ever reaches the verifier or JIT** — attacker input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection. (The load-bearing problems are catalogued in the engineering register — `engine-hard-problems`.)
 
 **Verified ≠ secure, and verified ≠ correct.** The governance around the VM:
 - **Proven before load** — bounded memory + termination, or rejected (fail closed).
@@ -149,13 +149,13 @@ Honest boundary: a flow handled entirely in silicon never enters TMM software, s
 **5.5 — Lifecycle: nothing outlives its purpose.**
 
 ```
-author → clang → PREVAIL verify → sign → load / run → auto-retire
+author → clang → PREVAIL verify → budget pass → sign → load / run → auto-retire
 ```
 
 Every program can carry an expiry (a diagnostic probe when its window closes; a temporary control when it's no longer needed). No zombies.
 
 **5.6 — The surface is built to grow.**
-- **More hooks — for free.** Each release adds USDTs (define a `ctx`, place a hook, publish it in the signed map) with no VM/verifier/helper work. Every new field widens what can be observed *and* acted on.
+- **More hooks, cheaply.** Each release adds USDTs (define a `ctx`, place a hook, publish it in the signed map — each rides a build), and function-boundary hooks come with the compiler flag — no VM, verifier, or helper work either way. Every new field widens what can be observed *and* acted on.
 - **Helpers — if and when needed.** Richer, stateful programs (host-map access, cross-flow state) via an *optional* helper tier later. The honest trade: helpers reintroduce an ABI to secure and verifier surface to manage — which is why the base ships without them, on stock PREVAIL.
 
 ---

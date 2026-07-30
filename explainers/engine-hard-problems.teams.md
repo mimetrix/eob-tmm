@@ -1,7 +1,7 @@
 **ENGINE HARD PROBLEMS — an engineering register**
 _A design proposal. (Teams-pasteable companion to the visual explainer; same content, no HTML.)_
 
-The load-bearing problems building the engine actually raises — **real-time, interface & scope, distributed state, security, certification, operations.** Engineering as much as security. **None is a show-stopper**; each has a known mitigation and a clear day-one path.
+The load-bearing problems building the engine actually raises — **time · the interface · shared state · the trust surface** — plus smaller concerns and sequencing. Engineering as much as security. **None is a show-stopper**; each has a known mitigation and a clear day-one path.
 
 ---
 
@@ -59,7 +59,7 @@ _Claim to retire:_ "the base tier is a trivial pure function of `ctx`."
 
 The good news, stated precisely: this is **"write the program-type descriptor"** the verifier consumes, **not "modify the verifier"** — the no-verifier-fork claim survives, but the effort estimate doesn't.
 
-**Put concretely, the interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx`. Getting them right isn't incidental; it *is* the project: the USDT set is the **ceiling on everything the engine can ever observe or enforce** (a hook can only act on what its `ctx` exposes), and it's the permanent ABI — the difference between a toy and a platform.
+**Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes** read. Getting them right isn't incidental; it *is* the project: together they are the **ceiling on what the engine can observe or enforce** — the catalog bounds the *anticipated* surface; function-boundary probes reach any named function whose arguments expose the fault — and it's the permanent ABI — the difference between a toy and a platform.
 
 - **Day one:** a minimal, read-only `ctx` per hook + its program-type descriptor. Genuine work, but **not a blank page** — TMM's code already holds the state these USDTs expose (the connection table, the TLS record layer, the L7 parser state, the `bd`/plugin internals, the poll-loop counters), so the first USDTs are a curated window onto structures that already exist; the surface can begin the day the engine lands.
 - **Deferred:** helpers — each is a new ABI to secure and a new verifier prototype. `ctx`-first, helpers-later.
@@ -79,7 +79,7 @@ _Claim to retire:_ "maps work like they do in Linux."
 
 **04 · The trust surface**
 
-The verifier and its JIT run **inside the crown-jewel process** — the one a review will press hardest. uBPF JITs native code into TMM's address space; an unsound verifier or a buggy JIT is arbitrary execution in the data plane. †
+The JIT emits native code into **the crown-jewel process**, and the verifier decides what reaches it — PREVAIL itself runs off-box, at build/control-plane time (§05) — so an unsound verifier or a buggy JIT still means arbitrary native code in the data plane. This is the one a review will press hardest. †
 
 **The load-bearing point: the perimeter is the signing gate, not the verifier.** Only F5-signed bytecode ever reaches the verifier or JIT — attacker-controlled input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection.
 
@@ -101,6 +101,7 @@ _† Sharper still given the source-code exposure — an adversary holding the c
 
 - **Certification (FIPS / Common Criteria)** — a certified appliance that loads code into its data plane at runtime is a certification problem; may force a **dynamic-load-disabled certified mode**. Likely the biggest productization gate — raise it early.
 - **Keep the verifier out of TMM** — PREVAIL (heavy C++/Boost) verifies at build/control-plane time; only the small runtime + a signature check live in TMM's address space. Shrinks the §04 surface.
+- **Boundary-probe ctx is build-specific.** A function-boundary probe's contract (function X's typed args at build Y) is regenerated and re-validated every build — more reach than a versioned USDT ctx, looser contract; the signed hook map and the binding's build range are what keep it honest.
 - **uBPF JIT maturity** — §04 is really "the verifier *and this JIT*." uBPF's JIT is far less battle-tested than the kernel's — audit / harden / fork it, or default to the interpreter on high-assurance builds.
 - **Multi-tenancy (partitions, route domains, vCMP)** — BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's scope, authorization, and blast radius must be tenant-aware from day one.
 - **ISSU + failover** — zero-downtime upgrades and HA failover need defined behavior: loaded programs re-verify and reload on the new TMM, with explicit map-state handling.

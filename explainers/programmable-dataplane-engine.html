@@ -415,12 +415,13 @@
         <span class="k">change today</span><span class="flow">C source → rebuild → re-qualify → release train</span><span class="cost">weeks–quarters</span>
       </div>
       <div class="srow fast">
-        <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → sign → load</span><span class="cost">hours</span>
+        <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
     <div class="callout sig"><p><b>And this pattern is proven, not novel.</b> A userspace eBPF VM running
       <em>verified</em> bytecode inline is already the model in <b>maintained</b> software: <b>DPDK</b> ships
-      <span class="inlinecode">librte_bpf</span> — load, verify, JIT, run on packets at a device's RX/TX, mainline
+      <span class="inlinecode">librte_bpf</span> — its <b>own</b> in-tree VM and lightweight validator (not uBPF,
+      and not a PREVAIL-grade proof) — load, validate, JIT, run on packets at a device's RX/TX, mainline
       since 2018 — and <b>eBPF-for-Windows</b> runs this <em>exact</em> stack, <b>uBPF verified by PREVAIL</b>,
       inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing
       an established pattern to the one high-performance data plane that hasn't had it — TMM.</p></div>
@@ -444,7 +445,7 @@
         <div class="miss"><span class="who">iRules</span>
           <span class="gap"><b>runtime</b>, but not provably safe</span></div>
         <div class="miss"><span class="who">DynaD</span>
-          <span class="gap"><b>runtime</b> too — a Lua-based earlier swing at exactly this, since deprecated</span></div>
+          <span class="gap"><b>runtime</b> too — an earlier scripting-based swing at exactly this, since deprecated</span></div>
         <div class="miss"><span class="who">WASM</span>
           <span class="gap"><b>programmable</b>, but bounded by a runtime kill — not a proof</span></div>
         <div class="miss"><span class="who">kernel eBPF</span>
@@ -471,9 +472,9 @@
       <em class="sig">records that value as a metric</em>, uses it to <em class="sig">stream a window of live
       internal state out to userspace</em> — for discovery, root-cause analysis, debugging, and uses still to
       come — or treats it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
-    <p><b>So how would you write one?</b> Not by hand-assembling eBPF bytecode for every probe — that's a
-      compiler project each time, and it puts raw bytecode in front of the verifier with no ergonomics in
-      between. You'd use <b>tmmtrace</b>, a proposed authoring front-end: <em>bpftrace for TMM</em>. You describe
+    <p><b>So how would you write one?</b> You write a few lines of C and compile with
+      <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>tmmtrace</b>, a proposed
+      authoring front-end that emits the same bytecode: <em>bpftrace for TMM</em>. You describe
       the probe in a small, familiar language and it does the rest — <b>compile</b> to eBPF bytecode,
       <b>verify</b>, and, once <b>signed</b>, <b>attach</b> at the named hook. One line or a full multi-probe
       script, same path.</p>
@@ -524,7 +525,8 @@
       host does with the answer. That symmetry <em class="sig">is</em> the thesis: one verified surface,
       serving observation and control as equals.</p>
     <div class="callout sig" style="margin-top:1.5rem"><p>And read-a-context, return-a-value is just the
-      <b>floor</b>. The hook surface is designed to grow — a widening catalog of designed-in USDTs, each new
+      <b>floor</b>. The hook surface is designed to grow — a widening catalog of designed-in USDTs, plus every
+      named function the build's signed hook map already exposes, each new
       context field opening more of the data plane to both observation and control, with room to give programs
       more power over time.</p></div>
   </section>
@@ -582,7 +584,9 @@
       structure</b> (functions and their signatures), so you can hook a spot <em>nobody instrumented ahead of
       time</em>. That is how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its
       args, decide — <b>no bespoke tracepoint required.</b> (The mechanism is the kernel's own
-      <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions.)</p>
+      <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions. See the
+      worked example: <a href="cve-shield-walkthrough.html" style="color:var(--signal-ink)">shielding a real
+      TMM CVE</a>.)</p>
     <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
       capability in (patchable function entries), and attaches at a <em>named symbol</em> — never fragile offsets
       an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
@@ -652,12 +656,14 @@
       ships in eBPF-for-Windows: built on abstract interpretation, a formal method rather than hand-grown
       heuristics, publicly maintained and hardened in production. <b>Narrow envelope</b> — this design uses it at
       its best-proven case: a bounded predicate over a small typed struct, no helpers, no maps. <b>Depth</b> —
-      and this is the load-bearing point. The verifier and the JIT it feeds run <em>inside</em> TMM, so an
-      unsound verifier would mean arbitrary code in the data plane — the risk a security review will press
+      and this is the load-bearing point. The JIT emits native code inside TMM, and the verifier gates what
+      reaches it — PREVAIL itself runs off-box at build/control-plane time — so an unsound verifier would
+      still mean arbitrary code in the data plane — the risk a security review will press
       hardest. But <b>only F5-signed bytecode ever reaches the verifier or JIT</b>; attacker-controlled input
       never touches them, so a soundness bug is not a traffic-borne RCE — it's a supply-chain concern, gated by
       signing-key protection. A per-hook watchdog stands behind all of it. Trust the proof; don't depend on it
-      alone.</p>
+      alone. (The load-bearing problems are catalogued in
+      <a href="engine-hard-problems.html" style="color:var(--signal-ink)">the engineering register</a>.)</p>
     <p>The second principle is just as blunt: <b>verified ≠ secure, and verified ≠ correct</b>. PREVAIL proves a
       program is memory-safe and terminates — <em>not</em> that it fits the per-packet time budget, and nothing
       about intent. Time-safety and security both live in the governance <em>around</em> the VM:</p>
@@ -693,6 +699,7 @@
       <span class="step"><b>author</b> (human or AI-assisted)</span><span class="arr">→</span>
       <span class="step"><b>clang</b> → bytecode</span><span class="arr">→</span>
       <span class="step"><b>PREVAIL</b> verify</span><span class="arr">→</span>
+      <span class="step"><b>budget pass</b></span><span class="arr">→</span>
       <span class="step"><b>sign</b></span><span class="arr">→</span>
       <span class="step"><b>load</b> → run</span><span class="arr">→</span>
       <span class="step retire"><b>auto-retire</b></span>
@@ -704,8 +711,9 @@
     <p>Read-a-context, return-a-value is the <b>floor</b> — chosen for maximal safety, not the limit of the VM.
       Two growth paths, deliberately different in cost:</p>
     <ul class="unlocks" style="margin-top:1rem">
-      <li><b>More hooks — for free.</b> Each release can add USDTs (define a <span class="inlinecode">ctx</span>,
-        place a hook, publish it in the signed map) with <b>no VM, verifier, or helper work</b>. Every new field
+      <li><b>More hooks, cheaply.</b> Each release can add USDTs (define a <span class="inlinecode">ctx</span>,
+        place a hook, publish it in the signed map — each rides a build), and function-boundary hooks come with
+        the compiler flag — <b>no VM, verifier, or helper work</b> either way. Every new field
         widens what can be observed <em>and</em> acted on, so the instrumentation surface compounds over time.</li>
       <li class="prf"><b>Helpers — if and when needed.</b> Richer, stateful programs (direct host-map access,
         cross-flow state) can be enabled later through an <em>optional</em> helper tier. The honest trade: helpers

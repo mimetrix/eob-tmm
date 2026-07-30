@@ -1,4 +1,4 @@
-<title>Engine hard problems — a security-review register</title>
+<title>Engine hard problems — an engineering register</title>
 <style>
   :root{
     --paper:#eef1f4; --surface:#ffffff; --surface-2:#f5f8fa;
@@ -14,7 +14,7 @@
   @media (prefers-color-scheme:dark){:root{
     --paper:#080b11; --surface:#0f151d; --surface-2:#0c1117;
     --ink:#e7eef4; --muted:#93a2b0; --faint:#6b7a89;
-    --line:#1e2ا; --line:#1e2a34; --line-2:#32414f;
+    --line:#1e2a34; --line-2:#32414f;
     --accent:#8fabd4; --accent-bg:#131d2c; --accent-ink:#adc5e7;
     --warn:#e0a24d; --warn-bg:#2a2011; --warn-ink:#f0c98a;
     --ok:#4fb47d; --ok-bg:#11241a; --ok-ink:#7bd3a3;
@@ -223,7 +223,7 @@
   @media print {
     :root, :root[data-theme="dark"]{
       --paper:#fff; --surface:#fff; --surface-2:#f6f8fa; --ink:#0f1720; --muted:#3f4c58; --faint:#67757f;
-      --line:#c9d2da; --line-2:#b3bfc9; --accent:#31527a; --accent-bg:#eef3f9; --accent-ink:#264straight;
+      --line:#c9d2da; --line-2:#b3bfc9; --accent:#31527a; --accent-bg:#eef3f9;
       --accent-ink:#26436a; --warn:#8f560a; --warn-bg:#f7efe1; --warn-ink:#6b3f08; --ok:#256a45; --ok-bg:#eaf3ee; --ok-ink:#1f5d3c;
     }
     @page{ size:letter portrait; margin:0.5in }
@@ -285,7 +285,7 @@
     <p style="margin-top:1.4rem">And the resource is unforgiving. TMM's poll loop is <b>single-threaded,
       un-preemptible, run-to-completion</b> — there is no OS underneath to preempt an overrunning hook. Every
       hook borrows cycles from the <em>same</em> loop, so <b>one misjudged hook starves every flow on that
-      core.</b> Poll loops are managed carefully or not at all.</p>
+      core.</b></p>
     <p style="margin-top:1.4rem">The fix is <b>two layers — and only one is free.</b> Static analysis can bound
       how <em>many</em> instructions a program runs; it cannot bound how <em>long</em> they take. So one layer
       settles size ahead of time; a second guards time as the program runs.</p>
@@ -416,10 +416,12 @@
       — <b>not</b> &ldquo;modify the verifier.&rdquo; The no-verifier-fork claim survives; the effort estimate
       does not.</p>
     <div class="callout accent"><span class="lbl">the interface is the USDT catalog</span>
-      <p>Put concretely, that interface <em>is</em> a <b>catalog of well-defined USDTs</b> — one per hook, each a
-        curated <span class="inlinecode">ctx</span>. Getting them right isn't incidental to the project; it is the
-        project: the USDT set is the <b>ceiling on everything the engine can ever observe or enforce</b> — a hook
-        can only act on what its <span class="inlinecode">ctx</span> exposes — and it's the permanent ABI. This is
+      <p>Put concretely, the designed-in half of that interface <em>is</em> a <b>catalog of well-defined
+        USDTs</b> — one per hook, each a curated <span class="inlinecode">ctx</span> — and the other half is the
+        per-build typed-argument map that <b>function-boundary probes</b> read. Getting them right isn't
+        incidental to the project; it is the project: together they are the <b>ceiling on what the engine can
+        observe or enforce</b> — the catalog bounds the <em>anticipated</em> surface; function-boundary probes
+        reach any named function whose arguments expose the fault — and it's the permanent ABI. This is
         exactly where the design effort earns its keep, and it's what makes the difference between a toy and a
         platform.</p></div>
     <div class="dayone"><p class="h">day one</p>
@@ -457,10 +459,10 @@
   <!-- 04 THE TRUST SURFACE -->
   <section class="beat reveal" id="trust" data-sec="trust">
     <p class="kicker"><span class="num">04</span> the trust surface</p>
-    <h2>The verifier and its JIT run inside the crown-jewel process. This is the one a review presses hardest.</h2>
-    <p class="lede">The engine JITs native code into TMM's own address space. An <b>unsound verifier</b>, or a
-      <b>buggy JIT</b>, is arbitrary execution in the data plane — the single biggest risk class eBPF carries,
-      relocated into TMM.<sup class="fnref">†</sup></p>
+    <h2>The JIT emits native code into the crown-jewel process, and the verifier decides what reaches it. This is the one a review presses hardest.</h2>
+    <p class="lede">PREVAIL itself runs off-box, at build/control-plane time (§05) — so an <b>unsound
+      verifier</b>, or a <b>buggy JIT</b>, still means arbitrary native code in the data plane — the single
+      biggest risk class eBPF carries, relocated into TMM.<sup class="fnref">†</sup></p>
     <div class="callout accent"><span class="lbl">the load-bearing point</span>
       <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
         verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
@@ -486,16 +488,16 @@
       signing gate is.</b> The perimeter holds whether or not the source is public.</p>
   </section>
 
-  <!-- 05 SEQUENCING -->
   <!-- 05 FURTHER CONCERNS -->
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
-    <h2>Six more to get ahead of — smaller, but real.</h2>
+    <h2>Seven more to get ahead of — smaller, but real.</h2>
     <p class="lede">The four above are load-bearing. These are the next tier: each has a stance, none changes the
       day-one posture — and the first two are the most likely to shape what the first shippable form looks like.</p>
     <div class="concerns">
       <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>A certified appliance that loads code into its data plane at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate; raise it early.</p></div>
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) should verify at <b>build / control-plane time</b> — only the small runtime and a signature check live in TMM's address space. This <em>shrinks</em> the §04 surface.</p></div>
+      <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated and re-validated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range are what keep it honest.</p></div>
       <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter on high-assurance builds.</p></div>
       <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
       <div class="concern"><span class="cl">ISSU + failover</span><p>Zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
@@ -513,7 +515,7 @@
       <thead><tr><th>Concern</th><th class="d1">Day one</th><th class="df">Deferred / governed</th></tr></thead>
       <tbody>
         <tr><td>Time safety</td><td class="d1">instruction-budget ceiling + watchdog</td><td class="df">tuned per-hook budgets from field data</td></tr>
-        <tr><td>Interface</td><td class="d1">read-only <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, rewrite, lookup)</td></tr>
+        <tr><td>Interface</td><td class="d1">read-only <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, lookup)</td></tr>
         <tr><td>State</td><td class="d1">per-CPU maps; failover via existing mirroring</td><td class="df">shared writable cross-TMM maps</td></tr>
         <tr><td>Execution</td><td class="d1">interpreter or hardened JIT; W^X</td><td class="df">&mdash;</td></tr>
         <tr><td>Trust perimeter</td><td class="d1">signing gate + HSM key protection</td><td class="df">&mdash;</td></tr>
@@ -522,7 +524,7 @@
     </table></div>
   </section>
 
-  <!-- 06 THE REVIEW -->
+  <!-- 07 THE REALITY -->
   <section class="close reveal" id="close" data-sec="close">
     <p class="kicker"><span class="num">07</span> the reality</p>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
