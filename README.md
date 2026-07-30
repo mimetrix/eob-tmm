@@ -1,8 +1,10 @@
 # eob-tmm — the embedded eBPF substrate in TMM
 
 A **verified, dynamic, in-data-plane programmability surface** for F5 BIG-IP: embed a
-userspace eBPF VM ([uBPF](https://github.com/iovisor/ubpf)) inside TMM, expose a curated
-set of designed-in **hook points**, and run small programs that either **observe**
+userspace eBPF VM ([uBPF](https://github.com/iovisor/ubpf)) inside TMM and attach small
+programs at **two kinds of hook** — a curated set of designed-in **hook points**, and
+**function-boundary probes** at any named function (patchable-entry pad → F5 trampoline),
+so an unforeseen CVE needs no pre-placed hook and no recompile. Programs either **observe**
 internal state (a tracepoint) or **act** on a verdict the host applies (a datapath
 control) — each one **statically proven safe before it loads**.
 
@@ -20,11 +22,12 @@ eBPF is the *continuation* of it, reaching a layer the others cannot:
 |---|---|---|---|
 | **iRules** | traffic logic at proxy events | connection / L7 decisions | TCL, runtime-bounded; can misbehave / be costly |
 | **WASM** | rich extensions | complex custom logic, transforms | sandbox isolation; can hang (fuel-killed) |
-| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, controls, deep telemetry | **statically verified before load** — provably bounded + terminating |
+| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, controls, deep telemetry | **statically verified before load** (memory-safe + terminating); execution *time* bounded by an admission budget pass + runtime watchdog |
 
 eBPF is the only surface that is **dynamically loadable *and* statically proven safe** —
 which is what makes it trustworthy on the most sensitive paths (the data-plane hot path,
-inline security controls), exactly where dynamic change is otherwise hardest to allow.
+inline security controls), exactly where dynamic change is otherwise hardest to allow — with
+the signing gate as the security perimeter and the budget pass + watchdog as the time perimeter.
 
 > The value prop is not "we added eBPF." It is: *TMM's power is dynamic programmability;
 > eBPF extends that power to the code/instrumentation layer, and is the one surface whose
@@ -32,7 +35,8 @@ inline security controls), exactly where dynamic change is otherwise hardest to 
 
 ## What the substrate enables
 
-A verified VM at designed-in hook points opens several use-case families (substrate §3–§4),
+A verified VM at designed-in hook points — and, via function-boundary probes, at any named
+function in the build's hook map — opens several use-case families (substrate §3–§4),
 of which CVE shielding is only one:
 
 - **Observability, on-demand** — *bpftrace-for-TMM*: deep telemetry for a specific
@@ -48,7 +52,8 @@ of which CVE shielding is only one:
 - **Self-tuning / performance** — read internal load and nudge a knob; live hot-path profiling.
 - **Live Shield (CVE mitigation)** — the flagship first instance; see below.
 
-The differentiated asset is **where** in TMM a hook earns its keep — the hook-point
+The differentiated asset is the compiled-in **attach capability** (patchable entries +
+trampoline) plus **where** in TMM a hook earns its keep — the hook-point
 catalog spanning L3/L4, the TLS record layer, L7 parse, the enforcement plugins, LB /
 persistence, and cross-cutting runtime (poll loop, memory, scheduler). Most are read-only
 tracepoints that can graduate to active controls once the signal is trusted.
@@ -56,7 +61,9 @@ tracepoints that can graduate to active controls once the signal is trusted.
 ## Live Shield — the first instance
 
 The motivating application: **surgical, reversible, vendor-signed mitigations that block a
-specific exploit path between maintenance windows**, until the patched build ships.
+specific exploit path between maintenance windows**, until the patched build ships. A shield
+is a **crash mitigation, not a hot-patch**: the host takes a safe outcome (e.g. skip the
+vulnerable function's body); the corrected behaviour returns with the patch.
 Cisco's Live Protect embeds eBPF shields in NX-OS's Linux kernel — which covers BIG-IP's
 **control plane** but is structurally **blind to TMM**, F5's data-plane microkernel that
 bypasses the Linux kernel entirely. The most damaging data-plane CVEs (malformed-input
@@ -83,7 +90,8 @@ under one signed catalog and lifecycle (design §5):
   **statically verified before load** by [PREVAIL](https://github.com/vbpf/ebpf-verifier) (the
   verifier from eBPF-for-Windows), failing closed on any nonzero verdict.
 
-In both engines the host owns an enumerated set of outcomes (pass / observe / enforce-drop);
+In both engines the host owns an enumerated set of outcomes (pass / observe / safe-return —
+skip the hooked function's body / drop / reset);
 the signed program only chooses among them — it cannot invent control flow.
 
 Verification — the kernel's built-in verifier or PREVAIL — is a **safety** gate (memory-safe +
@@ -115,7 +123,7 @@ Three tracks:
 
 1. **Reference** — shield logic compiled into the host (plain C); proves the lifecycle.
 2. **uBPF** — the program as eBPF bytecode run by the embedded VM, in both **enforce** and
-   **observe** (tracepoint) modes; enforce holds, monitor crashes.
+   **monitor** (observe-only) modes; enforce holds, monitor crashes.
 3. **PREVAIL gate** — the good program verifies and loads; a deliberately-unsafe one is
    rejected before load.
 

@@ -2,7 +2,7 @@
 
 ### The load-bearing problems the explainers gloss — real-time, interface & scope, distributed state, security, certification, operations. What building this actually entails, surfaced up front: what's day-one vs. deferred, and the honest mitigations
 
-**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring)
+**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), [`development-scope.md`](development-scope.md) (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
 **Audience:** TMM core engineering, architecture, F5 SIRT / security review, product & certification
 
 ---
@@ -84,24 +84,30 @@ to provide. Describing the problem and demonstrating the payoff turn out to be o
 
 The VM is the easy ~10%. The 90% is **interface design**: TMM's **`ctx`** (what a program sees —
 which fields of the flow, the buffer, the profile), the **verified helper surface** (map access,
-connection-table lookup, pool select, header rewrite), and the **map model**. That `ctx` is a
-*permanent, versioned* interface — ship it in the per-build hook-point map + BTF and you carry it
-forever; getting it wrong is expensive. Even the base-tier read-only `ctx` is real design work.
+connection-table lookup, pool select, header rewrite), and the **map model**. For a designed-in
+USDT, that `ctx` is a *permanent, versioned* interface — ship it in the per-build hook-point map
++ BTF and you carry it forever. For a function-boundary probe, the `ctx` is the function's typed
+arguments — **build-specific, regenerated and re-validated every build** from the signed hook
+map; more reach, a looser contract. Getting either wrong is expensive. Even the base-tier
+read-only `ctx` is real design work.
 
 **The good news, stated precisely:** this work is exactly the input PREVAIL is designed to
 consume. The verifier task is **"write the program-type descriptor"** (`ctx` layout + memory
 regions + helper prototypes), **not "modify the verifier."** So the *no-verifier-fork* claim
 survives — but the effort estimate in the explainers does not.
 
-**Put concretely, that interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx`.
-Getting them right isn't incidental to the project; it *is* the project: the USDT set is the **ceiling on
-everything the engine can ever observe or enforce** (a hook can only act on what its `ctx` exposes), and it is the
-permanent ABI. This is where the design effort earns its keep — the difference between a toy and a platform.
+**Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook,
+each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes**
+read. Together they are the ceiling on what the engine can observe or enforce: the USDT catalog bounds the
+*anticipated* surface; function-boundary probes extend reach to any named function whose arguments expose the
+fault. Getting both right isn't incidental to the project; it *is* the project. This is where the design effort
+earns its keep — the difference between a toy and a platform.
 
 **Day-one vs. deferred:**
 
 - **Day-one:** a minimal, **read-only `ctx` per hook** (curated fields, no helpers) + its
-  program-type descriptor for PREVAIL. Genuine work — but **not a blank page**: TMM's code already holds the state
+  program-type descriptor for PREVAIL, plus the auto-generated typed-arg `ctx` for
+  function-boundary probes (from the signed per-build hook map). Genuine work — but **not a blank page**: TMM's code already holds the state
   these USDTs expose (the connection table, the TLS record layer, the L7 parser state, the `bd`/plugin internals,
   the poll-loop counters), so the first USDTs are a *curated window onto structures that already exist* and the
   surface can begin the day the engine lands.
@@ -119,8 +125,9 @@ case, not an easier one.
 
 **Day-one vs. deferred:**
 
-- **Day-one: per-CPU maps only**, no cross-TMM sharing. This matches TMM's core-pinned model —
-  no locking — and aligns with the SPSC-per-core egress rings already specified in
+- **With the helper tier (deferred): per-CPU maps only**, no cross-TMM sharing — the base tier
+  has no map access at all. Per-CPU matches TMM's core-pinned model — no locking — and aligns
+  with the SPSC-per-core egress rings already specified in
   [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).
 - **Failover state rides TMM's existing mirroring channel**, not a bolted-on eBPF-map sync.
   Do not reinvent HA state replication inside the map layer.
@@ -139,12 +146,13 @@ a **buggy JIT** is arbitrary execution inside TMM. Linux has burned through many
 embedding the mechanism relocates eBPF's single biggest risk class into the data plane.[^src]
 
 **The perimeter is the signing gate, not the verifier — and the design already implies it.**
-Only **F5-signed bytecode ever reaches the verifier/JIT.** Therefore a verifier-soundness bug is
+Only **F5-signed bytecode ever reaches the in-TMM JIT** — PREVAIL runs earlier, inside F5's
+admission pipeline, never on attacker-supplied input. Therefore a verifier-soundness bug is
 **not remotely triggerable by traffic** — exploiting it *also* requires compromising the signing
 key. That collapses the risk from **traffic-borne RCE** to **supply-chain / insider**, a
 different and much smaller tier. This is the strongest argument in the whole design and it must
-be made explicitly: *the signing gate keeps attacker-controlled input away from the verifier and
-JIT entirely.*
+be made explicitly: *the signing gate keeps attacker-controlled input away from the JIT
+entirely, and the verifier never runs on-box at all.*
 
 **Defense-in-depth residual (because the signing gate is now load-bearing):**
 
@@ -184,6 +192,13 @@ the day-one posture, but the first two are the most likely to shape the first sh
 - **uBPF JIT maturity.** §4 is really "the verifier *and this JIT*." uBPF's arm64/x86-64 JIT is
   far less battle-tested than the kernel's, and here a JIT bug is the RCE. Plan to
   **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
+- **Patching live text, and safe-return correctness.** The function-boundary mechanism arms by
+  atomically overwriting a compiler-reserved nop pad in live text (the ftrace discipline: atomic
+  patch + i-cache flush) — proven in kernels, but new inside TMM and per-CPU-architecture work
+  that must be exactly right. And a safe-return skips the hooked function's *whole body*:
+  deciding what a skipped body may safely not do (and what it must hand back) is a per-function
+  judgment recorded in the signed safe-return policy — the reason a sane v1 restricts
+  enforce-capable boundaries to functions with trivial returns.
 - **Multi-tenancy — partitions, route domains, vCMP.** BIG-IP is deeply multi-tenant, and vCMP
   guests each run their own TMM. A program's **scope** (global vs. per-virtual-server /
   per-partition), its **authorization**, and its **blast radius** must be tenant-aware from day
@@ -199,9 +214,9 @@ the day-one posture, but the first two are the most likely to shape the first sh
 
 | Concern | Day-one | Deferred / governed |
 |---|---|---|
-| **Time safety** | instruction-budget ceiling + runtime deadline/watchdog | tuned per-hook budgets from field data |
+| **Time safety** | instruction-budget ceiling; runtime deadline/watchdog gates hot-path hooks (may trail for cold-path-only) | tuned per-hook budgets from field data |
 | **Interface** | read-only `ctx` per hook + program-type descriptor | helper tier (map access, rewrite, lookup) |
-| **State** | per-CPU maps; failover via TMM's existing mirroring | shared writable cross-TMM maps |
+| **State** | no maps (base tier); when helpers land: per-CPU maps, failover via TMM's existing mirroring | shared writable cross-TMM maps |
 | **Execution** | interpreter or hardened JIT; W^X | — |
 | **Trust perimeter** | signing gate + HSM key protection | — |
 | **Blast radius** | canary/watchdog auto-unload + kill-switch + revocation | automated health-driven rollback policies |
@@ -210,8 +225,8 @@ the day-one posture, but the first two are the most likely to shape the first sh
 
 > The verifier gives you memory-safety and termination — **not** WCET, **not** correctness, and
 > **not** immunity from its own bugs. The engine is defensible because the **signing gate** keeps
-> attacker input away from the verifier and JIT, a **budget + watchdog** bounds execution time,
-> and a **canary** bounds the blast radius of a valid-but-bad program. Verification is one layer
+> attacker input away from the JIT (the verifier never runs on-box), a **budget + watchdog**
+> bounds execution time, and a **canary** bounds the blast radius of a valid-but-bad program. Verification is one layer
 > of several — the floor, not the whole building.
 
 ---

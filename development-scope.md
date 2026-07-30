@@ -36,7 +36,7 @@ The genuinely delicate systems work: small, but must be exactly right.
 2. **Arm/disarm routine** *(step 2)* — atomic nop-pad patch + instruction-cache flush,
    coordinated across cores at the safe point. Same discipline the kernel's ftrace has used on
    live text for years — proven pattern, not research.
-3. **The safe-point loader handler** *(steps 4, 10)* — processes `shield_msg`
+3. **The safe-point loader handler** *(steps 4, 10, 13)* — processes `shield_msg`
    (`LOAD · SET_MODE · STATUS · REVOKE`): signature check → `ubpf_create/load/compile` →
    hook-map lookup → arm. Plus the unglamorous rest that is real work: **all error paths
    fail-dark** (no partial arm), expiry enforcement (auto-retire on build match), per-shield
@@ -53,12 +53,17 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    entry address + typed argument layout. Output is signed and shipped with the build.
 6. **ctx-descriptor emission for PREVAIL** *(steps 3, 7)* — turning those typed layouts into the
    program-type descriptor stock PREVAIL verifies against. **Flagged honestly: this is
-   hard-problems §2 — "the ctx/helper/program-type ABI is the real 90%."** Mechanically simple
-   per hook; the discipline and versioning around it is the substrate's biggest ongoing
-   engineering surface.
+   hard-problems §2 — the ctx/helper/program-type ABI is the real 90% of the work.**
+   Mechanically simple per hook; the discipline and versioning around it is the substrate's
+   biggest ongoing engineering surface.
 7. **Safe-return policy table** *(steps 3, 12)* — per hookable function: what a skipped body
    hands back. Partly tooling, partly one-time human annotation — which is why a sane v1 scopes
    enforce-capable hooks to functions with trivial (`void`/benign) returns.
+
+*Also in this section's scope over time:* the **designed-in USDT tracepoint catalog** — hook
+kind (1), proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md): per-stage placement
+and a stable, versioned `ctx` ABI. Per-catalog-entry annotation work, distinct from the
+auto-generated function-boundary hook map above.
 
 *(The `-fpatchable-function-entry` flag itself is build-system configuration, not code.)*
 
@@ -75,7 +80,7 @@ Conventional engineering — no novel machinery.
 10. **Loader daemon side** *(steps 4, 10)* — pushing `shield_msg` over the **existing**
     control-plane config channel (the path profiles/iRules already ride), per-core fan-out,
     status/counter collection.
-11. **Operator front-end** *(steps 10, 12)* — a thin `tmsh` subcommand / iControl endpoint on
+11. **Operator front-end** *(steps 10, 11, 12)* — a thin `tmsh` subcommand / iControl endpoint on
     the existing management surface (illustrated as `shieldctl` in the walkthrough — **not** a
     new standalone tool). Fills the struct; reads the counters.
 12. **Audit trail** *(step 4)* — every op logged: who loaded/flipped/revoked what, when.
