@@ -418,13 +418,12 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <div class="callout sig"><p><b>And this pattern is proven, not novel.</b> A userspace eBPF VM running verified
-      bytecode <em>inline on packets</em> is how the canonical software data planes already work: <b>DPDK</b>
-      ships <span class="inlinecode">librte_bpf</span> — load bytecode, verify, JIT, run it at a device's RX/TX with
-      the packet as context, since 2018 — and <b>Open vSwitch</b> has been extended with <b>uBPF itself</b>
-      (Oko, P4rt-OVS) to run runtime-loaded programs as stateful data-plane actions, choosing uBPF partly for its
-      Apache-2.0 licence. We're bringing an established pattern to the one high-performance data plane that hasn't
-      had it yet — TMM.</p></div>
+    <div class="callout sig"><p><b>And this pattern is proven, not novel.</b> A userspace eBPF VM running
+      <em>verified</em> bytecode inline is already the model in <b>maintained</b> software: <b>DPDK</b> ships
+      <span class="inlinecode">librte_bpf</span> — load, verify, JIT, run on packets at a device's RX/TX, mainline
+      since 2018 — and <b>eBPF-for-Windows</b> runs this <em>exact</em> stack, <b>uBPF verified by PREVAIL</b>,
+      inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing
+      an established pattern to the one high-performance data plane that hasn't had it — TMM.</p></div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
       so the surface can start from what's in the code today and grow as the code does, not a blank page. A
       <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe

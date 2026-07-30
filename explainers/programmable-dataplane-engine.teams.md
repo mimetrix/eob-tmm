@@ -43,7 +43,7 @@ Bring them inside: embed a small userspace eBPF VM (**uBPF**, ~150 KB, JIT-compi
 the proposal:  author → clang → PREVAIL verify → sign → load   (hours)
 ```
 
-**And this pattern is proven, not novel.** A userspace eBPF VM running verified bytecode *inline on packets* is how the canonical software data planes already work: **DPDK** ships `librte_bpf` — load bytecode, verify, JIT, run it at a device's RX/TX with the packet as context (since 2018) — and **Open vSwitch** has been extended with **uBPF itself** (Oko, P4rt-OVS) to run runtime-loaded programs as stateful data-plane actions, choosing uBPF partly for its Apache-2.0 licence. We're bringing an established pattern to the one high-performance data plane that hasn't had it yet — TMM.
+**And this pattern is proven, not novel.** A userspace eBPF VM running *verified* bytecode inline is already the model in maintained software: **DPDK** ships `librte_bpf` — load, verify, JIT, run on packets at a device's RX/TX, mainline since 2018 — and **eBPF-for-Windows** runs this *exact* stack, **uBPF verified by PREVAIL**, inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing an established pattern to the one high-performance data plane that hasn't had it — TMM.
 
 The hooks map onto structures TMM **already has — and new ones it will define** — so the surface starts from what's in the code today and grows with it. A candidate catalog of **USDT tracepoints** (userland statically-defined tracing — named probe points designed into the source) rides alongside the engine: L3/L4 ingress + the connection table, the TLS record layer, the L7 parsers, the plugin processes, the poll loop itself.
 
