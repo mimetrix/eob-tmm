@@ -571,11 +571,25 @@
       streams captured windows of internal state out to userspace for RCA, and drives steering and self-tuning
       where the host wants to act on the return. Returning a value the host acts on is one thing the engine does —
       not the point of it.</p>
-    <p><b>Designed-in</b> is the operative word: because F5 owns the source, hooks are deliberate, named, versioned
-      insertion points published in a per-build map — <em>not</em> fragile offsets an external tool guesses at and
-      rewrites into a running process. A hook with nothing attached costs about one predictable branch
-      (<em>dark until lit</em>); attach a signed program and it runs right there, in-process — cold path, or hot
-      on a measured budget.</p>
+    <p><b>Two kinds of hook — and the difference matters most for shields.</b> The first is a <b>designed-in
+      tracepoint</b> (a USDT): F5 places a named, versioned point exposing a <em>curated</em>
+      <span class="inlinecode">ctx</span> — a stable contract, published in a per-build map. That's the planned
+      surface: ideal for observability, and for a CVE that happens to land where one sits. But <b>F5 can't
+      pre-place a tracepoint for every future bug</b> — so a shield usually needs the second kind.</p>
+    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of an
+      existing named function</em> — the one that would crash, or one on its path — reading that function's
+      arguments and reachable state as the <span class="inlinecode">ctx</span>. It rides the code's <b>existing
+      structure</b> (functions and their signatures), so you can hook a spot <em>nobody instrumented ahead of
+      time</em>. That is how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its
+      args, decide — <b>no bespoke tracepoint required.</b> (The mechanism is the kernel's own
+      <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions.)</p>
+    <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
+      capability in (patchable function entries), and attaches at a <em>named symbol</em> — never fragile offsets
+      an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
+      The honest trade is <b>stability</b>: a tracepoint's <span class="inlinecode">ctx</span> is a curated,
+      versioned contract; a function-boundary probe's is <em>build-specific</em> (function X's signature at build
+      Y) — more reach, a looser contract, <b>re-validated per build</b>. Either way it is verified, signed, and
+      budgeted before it runs.</p>
     <div class="codeblock"><span class="c">// at a hook point in TMM: pack a curated snapshot, run the VM</span>
 <span class="kw">struct</span> l7_ctx ctx = { .opcode = f-&gt;opcode, .len = f-&gt;len };
 <span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);

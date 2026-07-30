@@ -103,7 +103,11 @@ Every one of these is the same engine — a verified program at a hook — diffe
 
 Everything above rests on one small, in-process call, gated by a static proof.
 
-**5.1 — The engine & its hook points.** A full in-process eBPF engine (a JIT VM running arbitrary *verified* bytecode), not a single-purpose gate. A **hook point** is a named spot in TMM's own source where the engine runs a program over a curated view of local state. Designed-in: deliberate, named, versioned insertion points in a per-build map — not fragile offsets an external tool guesses at. Dark until lit (~one predictable branch when nothing is attached).
+**5.1 — The engine & its hook points.** A full in-process eBPF engine (a JIT VM running arbitrary *verified* bytecode), not a single-purpose gate. **Two kinds of hook, and the difference matters most for shields:**
+- **Designed-in tracepoint (USDT)** — F5 places a named, versioned point exposing a *curated* `ctx`, a stable contract in a per-build map. The planned surface: observability, and CVEs that land where one sits. But F5 can't pre-place a tracepoint for every future bug.
+- **Function-boundary probe** — attach the verified VM at the *entry/return of an existing named function* (the one that would crash, or one on its path), reading its arguments and reachable state as the `ctx`. It rides the code's existing structure, so you can hook a spot nobody instrumented ahead of time — that's how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its args, decide. No bespoke tracepoint required. (Mechanism = the kernel's own `fentry`/ftrace trampoline model, applied to TMM's own functions.)
+
+Both stay **designed-in, not injected**: F5 owns the source and symbol table, compiles the hook capability in (patchable function entries), and attaches at a *named symbol* — never fragile offsets guessed at in a foreign process. Dark until lit. The honest trade is **stability**: a tracepoint's `ctx` is a curated, versioned contract; a function-boundary probe's is *build-specific* (function X's signature at build Y) — more reach, looser contract, re-validated per build. Either way: verified, signed, budgeted before it runs.
 
 ```c
 // at a hook point: pack a curated snapshot, run the VM
