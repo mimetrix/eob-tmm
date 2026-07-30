@@ -65,7 +65,7 @@ For packet processing / P4 / hot-path, **uBPF**, clearly:
 | | uBPF (eBPF) | WASM |
 |---|---|---|
 | **P4 toolchain** | `p4c` has a **uBPF backend** — the path exists | P4 → WASM is not a real, standard path |
-| **Safety on the hot path** | **verified** — PREVAIL *proves* bounded + memory-safe → a static, WCET-adjacent bound | memory-safe, but **not** termination-proven; bounded by a **runtime fuel/gas kill** — a runtime kill, not a proof |
+| **Safety on the hot path** | **verified** — PREVAIL *proves* bounded + memory-safe → a static instruction bound the admission budget pass converts into a time budget (`engine-hard-problems.md` §1) | memory-safe, but **not** termination-proven; bounded by a **runtime fuel/gas kill** — a runtime kill, not a proof |
 | **Weight / per-packet cost** | tiny, near-native, lean JIT | heavier runtime, larger memory, higher per-call cost |
 | **Poll-loop fit** | budgetable *before load* (see `engine-hard-problems.md` §1) | only interruptible mid-run — the hard part in an un-preemptible loop |
 
@@ -85,7 +85,7 @@ P4 on TMM is a front-end **unlocked by the richer tier, not free at the base tie
 
 ## 8. Precedent
 
-- **DPDK `librte_bpf`** (mainline, maintained) — verified eBPF run inline on packets at a device's RX/TX. The living dataplane precedent.
+- **DPDK `librte_bpf`** (mainline, maintained) — DPDK's **own** in-tree eBPF VM + JIT (not uBPF; a lightweight in-tree validator, not a PREVAIL-grade proof) run inline on packets at a device's RX/TX. The living dataplane precedent.
 - **eBPF-for-Windows** (Microsoft, production) — **uBPF + PREVAIL**, the exact two libraries this proposal reuses.
 - **Oko / p4rt-OVS** (Orange Labs, ~2018–2020, now **dormant**) — `P4 → uBPF` as Open vSwitch **actions / stateful filters** with maps and a default verifier. Proves the `P4 → uBPF`-in-a-software-dataplane path end to end — but treat as **research prototype, not production**.
 

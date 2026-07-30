@@ -63,7 +63,7 @@ TMM is kernel-bypass DNA, so the **nearest idiom is DPDK**, not the kernel-eBPF 
 
 ### 5.1 Two ring classes
 
-- **Event ring — fixed-slot.** For `ctx` samples, counter/histogram feeds, small events. One fixed record size per ring, power-of-two slots, plain head/tail indices. Cheapest possible; this is what the flight recorder (tracepoint-catalog §10.1) dumps on a trigger.
+- **Event ring — fixed-slot.** For `ctx` samples, counter/histogram feeds, small events. One fixed record size per ring, power-of-two slots, plain head/tail indices. Cheapest possible; this is what the flight recorder (`tmm-usdt-tracepoints.md` §10.1) dumps on a trigger.
 - **Capture ring — variable-length.** For `tmmdump` byte-windows. Length-prefixed records in the **kernel-ringbuf byte-layout** (8-byte header: `u32 len` + BUSY/DISCARD bits, `u32` reserved/aux; 8-byte-aligned payload; pow2 data area with wraparound by mask). Optionally libbpf-drainable (§4).
 
 ### 5.2 Per-core, single-producer
@@ -75,7 +75,7 @@ One ring instance **per core, per active sink** (or per hook class). The produce
 At a hook, the trampoline runs the program and switches on its return:
 
 ```
-ret = ubpf_exec(vm, &ctx, sizeof ctx, &r);   // program: pure fn of ctx, returns a value
+ret = jit_fn(&ctx);                          // program: pure fn of ctx, JIT'd once at load
 switch (host_action(hook, r)) {               // HOST decides — not the program
   case RECORD:  host_counter_update(...);                 // scalar → metric/histogram/ring
   case CAPTURE: slot = ring_reserve(ring, win_len);        // host owns the ring
@@ -97,7 +97,7 @@ The program never sees `ring_reserve`. **What may be emitted without a helper:**
 
 ### 5.5 Backpressure = drop-and-count (explicit)
 
-Full ring → increment **per-ring `drops` and `drop_bytes`** counters and return no slot. We **keep the counter** (bpftime does not) so that a gap in captured data is *visible as a stat*, never mistaken for "nothing happened." Never block, never overwrite unconsumed data. This is the "drop, don't block" discipline of tracepoint-catalog §10.6 made concrete.
+Full ring → increment **per-ring `drops` and `drop_bytes`** counters and return no slot. We **keep the counter** (bpftime does not) so that a gap in captured data is *visible as a stat*, never mistaken for "nothing happened." Never block, never overwrite unconsumed data. This is the "drop, don't block" discipline of `tmm-usdt-tracepoints.md` §10.6 made concrete.
 
 ### 5.6 Wakeup — batched, off the hot path
 
@@ -119,7 +119,7 @@ Records use the **kernel BPF-ringbuf byte-layout** (len+bits header, 8-byte alig
 Everything here holds the **no-helpers-initially** line. These reintroduce a helper ABI + verifier surface and are explicitly deferred:
 
 - **Program-directed dynamic capture** — the program computing an arbitrary `(offset, len)` to emit (rather than a host-declared window). This is the one capture case that wants an emit helper.
-- **Program-reachable state / maps** — cross-invocation or cross-flow state the *bytecode itself* reads/writes (kernel-style `bpf_map_lookup/update`). In Phase 1 that role is played by **host-owned** structures the host updates from the return value; a program-reachable map is the optional helper tier of substrate §5.6.
+- **Program-reachable state / maps** — cross-invocation or cross-flow state the *bytecode itself* reads/writes (kernel-style `bpf_map_lookup/update`). In Phase 1 that role is played by **host-owned** structures the host updates from the return value; a program-reachable map is the deferred helper/map tier (`engine-hard-problems.md` §2).
 - **MPSC rings** — only needed if a non-poll-loop producer ever writes; would reintroduce the spinlock/CAS. Not needed while every producer is a core-pinned SPSC.
 
 ## 8. Open questions / to decide

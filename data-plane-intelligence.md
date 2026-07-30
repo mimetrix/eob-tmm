@@ -27,7 +27,7 @@ This is the most complete view of enterprise application traffic that exists any
 1. **You cannot centralize it.** Exporting decrypted, line-rate application payloads to a central analytics/training system is infeasible (bandwidth) and impermissible (privacy law, data-residency, PII/PHI/PAN/credentials cannot leave the box).
 2. **You could not compute on it in place.** TMM has been too opaque and rigid to run analytic code inline — and even if you could, unbounded code inline on decrypted traffic is exactly the crash-and-leak risk no one will accept.
 
-**The verified substrate opens both locks at once.** A verified in-process program computes on the data *where it lives* and exports **only the distilled result** — a small feature vector, a sketch, an inventory, an attestation — not the payload. The verifier proves the program can read only declared fields and emit only through a host-owned, schema-checked, one-way sink. So:
+**The verified substrate opens both locks at once.** A verified in-process program computes on the data *where it lives* and exports **only the distilled result** — a small feature vector, a sketch, an inventory, an attestation — not the payload. The verifier proves the program can read only declared fields; the host — not the program — owns the schema-checked, one-way sink it emits through. So:
 
 > **The signal leaves the box; the data never does — and that's provable, not promised.**
 
@@ -153,7 +153,7 @@ The reuse column is a permissive open-source floor — the same posture as the c
 
 ### 7.1 Reference implementations (for OSPO / engineering scoping)
 
-License + repo per candidate. **Run the §13 SBOM/license scan on pinned versions before shipping** — transitive trees drift.
+License + repo per candidate. **Run the `big-ip-live-shield-design.md` §13 SBOM/license scan on pinned versions before shipping** — transitive trees drift.
 
 **Sense**
 - **uBPF** — Apache-2.0 — `github.com/iovisor/ubpf`
@@ -180,7 +180,7 @@ License + repo per candidate. **Run the §13 SBOM/license scan on pinned version
 - **TUF** (`python-tuf`) — MIT/Apache-2.0 — `github.com/theupdateframework/python-tuf`
 - grammar-constrained generation: **Outlines** — Apache-2.0 — `github.com/dottxt-ai/outlines` · **llguidance** — MIT/Apache — `github.com/guidance-ai/llguidance`
 
-> **Licensing posture.** Every candidate above is permissive (Apache / BSD / MIT), with two footnotes for counsel: **MPL-2.0** (Vector) is *file-level* copyleft — fine when consumed as a separate binary, not statically linked; **Redpanda is BSL** (source-available, **not** OSI-approved) — excluded here. This mirrors the core substrate's posture; the same §13 SBOM scan applies.
+> **Licensing posture.** Every candidate above is permissive (Apache / BSD / MIT), with two footnotes for counsel: **MPL-2.0** (Vector) is *file-level* copyleft — fine when consumed as a separate binary, not statically linked; **Redpanda is BSL** (source-available, **not** OSI-approved) — excluded here. This mirrors the core substrate's posture; the same SBOM scan (`big-ip-live-shield-design.md` §13) applies.
 
 ## 8. Governance is the feature, not the friction
 
