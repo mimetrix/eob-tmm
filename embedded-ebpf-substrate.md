@@ -4,7 +4,7 @@
 
 **Status:** Strategy / use-case exploration
 **Audience:** TMOS architecture, F5 SIRT, BIG-IP security & observability engineering, product
-**Companion:** `big-ip-live-shield-design.md` (the detailed Live Shield mechanism — the first instance of this substrate) · `prototype/` (working proof: uBPF embedded + PREVAIL verify gate, enforce + observe demonstrated)
+**Companion:** `big-ip-live-shield-design.md` (the detailed Live Shield mechanism — the first instance of this substrate) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `prototype/` (working proof: uBPF embedded + PREVAIL verify gate, enforce + observe demonstrated)
 **Scope:** What becomes possible once a verified userspace-eBPF VM (uBPF) is embedded in TMM and instrumented with designed-in hook points
 
 ---
@@ -17,11 +17,11 @@ TMM's defining strength is **dynamic programmability** — the ability to change
 |---|---|---|---|---|
 | **iRules** | traffic logic at proxy events | connection / L7 traffic decisions | yes | TCL, runtime-bounded; can misbehave / be costly |
 | **WASM** | rich extensions | complex custom logic, transforms, real languages | yes | sandbox isolation; can hang (runtime "fuel" kills it) |
-| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — provably bounded + terminating |
+| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — memory-safe + terminating; time bounded by budget pass + watchdog |
 
 iRules made *traffic logic* dynamically configurable. WASM made *rich extensions* dynamically configurable. **Embedded eBPF makes the data plane's own code-level behavior and internal state dynamically configurable** — the parsers, plugin internals, connection state, error paths — which neither of the others can touch.
 
-And it occupies a unique slot in the *dynamic-configurability* story: **eBPF is the only surface that is dynamically loadable *and* statically proven safe.** That is what makes it trustworthy for runtime reconfiguration of the **most sensitive paths** — the data-plane hot path and inline security controls — which is exactly where dynamic change is otherwise hardest to allow. Dynamic configurability is most valuable where it is most dangerous; the verifier is what makes it permissible there.
+And it occupies a unique slot in the *dynamic-configurability* story: **eBPF is the only surface that is dynamically loadable *and* statically proven (memory-safe + terminating) before load.** That is what makes it trustworthy for runtime reconfiguration of the **most sensitive paths** — the data-plane hot path and inline security controls — which is exactly where dynamic change is otherwise hardest to allow. Dynamic configurability is most valuable where it is most dangerous; the verifier is what makes it permissible there.
 
 > **The value prop is not "we added eBPF."** It is: *TMM's power is dynamic programmability; eBPF extends that power to the code/instrumentation layer, and is the one surface that makes runtime reconfiguration of even the data-plane fast path provably safe.*
 
@@ -30,27 +30,32 @@ And it occupies a unique slot in the *dynamic-configurability* story: **eBPF is 
 Embedding a uBPF VM in TMM and exposing a curated set of designed-in **hook points** lets the host run a small, verified eBPF program at each point that either:
 
 - **observes** internal state and emits telemetry (a *tracepoint*), or
-- **acts** — returns a verdict the host applies (PASS / DROP / RESET) (a *datapath control*).
+- **acts** — returns a verdict the host applies (PASS / DROP / RESET / SAFE-RETURN — skip the hooked function's body) (a *datapath control*).
+
+Two hook kinds share the engine: the curated catalog of designed-in USDT tracepoints (stable,
+versioned `ctx`) covers the *anticipated* surface, and **function-boundary probes** at any named
+symbol — `ctx` = the function's typed arguments from the build's signed hook map, re-validated per
+build — cover the *unforeseen*.
 
 The properties that make the substrate valuable:
 
 | Property | Why it matters |
 |---|---|
 | **Dynamic** — load / swap at runtime | behavior ships in hours, decoupled from the TMOS release train; no reboot |
-| **Verified** — PREVAIL proves bounded memory + termination before load | programs **cannot hang or corrupt** the data plane; blast radius bounded *by construction* |
-| **Cheap** — JIT'd; ~tens of ns/invocation; empty hook = one branch | usable on cold *and* (under a measured budget) hot paths |
+| **Verified** — PREVAIL proves bounded memory + termination before load | programs are proven memory-safe + terminating; their *time* is bounded by the admission budget pass and runtime deadline, and blast radius by the host-owned outcome set |
+| **Cheap** — JIT'd; ~tens of ns/invocation; an empty hook = one branch at a designed-in call site — and literally nothing (a nop pad) at an unarmed function boundary | usable on cold *and* (under a measured budget) hot paths |
 | **In-process** — runs in TMM's address space | sees data-plane internals that kernel eBPF (kernel-bypass) and iRules (proxy data-model) cannot |
 | **Host-owned outcomes** | a program *chooses among* sanctioned effects; it cannot invent new control flow |
 | **Zero-helper by default** — a program is a pure function of `ctx` (read fields, return a value); the host does everything else | **no custom eBPF helpers to define/secure, and PREVAIL is used stock** — the core substrate is buildable without extending the verifier or standing up a helper ABI (see below) |
 
-This is what the `eob-patch` name has pointed at all along: **eob** (observability) and **patch** (runtime compensating controls) are two faces of one embedded-eBPF substrate.
+Observability (the engine) and runtime compensating controls (the shield) are two faces of one embedded-eBPF substrate.
 
 **The zero-helper property, stated once.** Everything the substrate does today — `filter` shields and `observe` tracepoints alike — is a program that reads its context and returns a number. It calls nothing. The host owns all state and effects: it packs facts into `ctx`, reads the return, and updates counters / maintains rings / applies the verdict *around* the call. Two things fall out, and they cut the "hard parts" dramatically:
 
 - **No helper functions.** eBPF helpers are the program's syscalls — the surface you must design, register, audit, and confine. With none, there is nothing to confine: a program that can only read `ctx` and return a value is **maximally sandboxed by construction** (§6.3).
 - **No verifier extension.** A bounded predicate over a typed `ctx` is the canonical case PREVAIL already proves. You *configure* the `ctx` layout; you do not *extend* the verifier — so **stock PREVAIL**, no fork in the trust path.
 
-Anything stateful (rates, time, cross-flow counters) is handled by the host computing it into `ctx`. Helpers — letting the program touch host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite. **Live Shield and the tracepoint/`tmmtrace` surface need neither helpers nor verifier work.** And because a new tracepoint is just "define a `ctx`, place a hook, emit it in the map," the dev team can **grow the instrumentation surface incrementally** — USDT-style — in normal releases, each hook dark-until-lit and each new `ctx` field widening what can be observed *and* shielded, all without touching the VM, the verifier, or a helper ABI.
+Anything stateful (rates, time, cross-flow counters) is handled by the host computing it into `ctx`. Helpers — letting the program touch host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite. **Live Shield and the tracepoint/`tmmtrace` surface need no helpers and no verifier *extension* — stock PREVAIL; the real (bounded) work is the `ctx`/program-type descriptor.** And because a new tracepoint is just "define a `ctx`, place a hook, emit it in the map," the dev team can **grow the instrumentation surface incrementally** — USDT-style — in normal releases, each hook dark-until-lit and each new `ctx` field widening what can be observed *and* shielded, all without touching the VM, the verifier, or a helper ABI.
 
 ## 3. Use-case families
 
@@ -65,7 +70,7 @@ Anything stateful (rates, time, cross-flow counters) is handled by the host comp
 
 The diagnostics leg is the substrate's lowest-risk, highest-leverage near-term use: both patterns below are **observe-mode, read-only, and verified**, so they run on a *live production* data plane without the "a bad shield crashes TMM" exposure of `filter` mode. They turn "ship a debug build / wait for it to recur" into "load signed bytecode for a while," and they reuse the existing security spine (§6) at a lower authorization tier — read-only, but exfiltration still governed (§6.2).
 
-**Signed support probe.** F5 support/SIRT authors a small program targeting the *exact* hook + condition behind an intermittent field issue (a sporadic reset, a latency spike, a plugin misbehaving under one traffic shape), signs it, and ships it. The operator — RBAC-gated, explicit consent — loads it in observe mode; it captures precisely the needed signal, exports to the controlled sink, then is pulled. eBPF earns this specifically because it is **verified** (cannot crash or hang a customer's production box — non-negotiable for vendor code attached inline on live traffic), cleanly **removable**, and reaches **in-TMM** state that logs and iRules cannot. Design points not otherwise specified:
+**Signed support probe.** F5 support/SIRT authors a small program targeting the *exact* hook + condition behind an intermittent field issue (a sporadic reset, a latency spike, a plugin misbehaving under one traffic shape), signs it, and ships it. The operator — RBAC-gated, explicit consent — loads it in observe mode; it captures precisely the needed signal, exports to the controlled sink, then is pulled. eBPF earns this specifically because it is **verified** (proven memory-safe + terminating — with the budget pass and runtime deadline bounding cost on a customer's production box; non-negotiable for vendor code attached inline on live traffic), cleanly **removable**, and reaches **in-TMM** state that logs and iRules cannot. Design points not otherwise specified:
 
 - **Context minimization by default** — a support probe does *not* expose TLS secrets / PII / decrypted payload unless separately justified and authorized; redact by default (§6.3).
 - **Data residency** — captures land in a **customer-controlled, audited** location; the customer decides what to share with support. Auto-phone-home to F5 is the wrong default for a security appliance.
@@ -75,7 +80,7 @@ The governance *is* the feature here: without it, "vendor loads code on my box t
 
 **Flight recorder.** A small **per-CPU ring** of recent internal state is maintained at the relevant hook(s); on a **trigger**, the ring is frozen and dumped — yielding the run-up *into* a failure rather than the wreckage after it (the core-dump's blind spot). Two flavors: a *per-context ring* (recent state for the active flow, dumped on the error branch) and a *global tripwire* (cross-cutting state — poll-loop jitter, memory-pool pressure — dumped on an emergency-mode / watchdog event). Design points:
 
-- **Steady-state cost** — this is the one observe pattern that is *not* free when nothing is wrong: writing the ring on every event is a standing tax, hence a measured-budget decision (§11). Mitigate with a small per-CPU ring (the single-threaded poll loop makes the freeze lock-free), cheap recorded fields, or **conditional arming** (record only once a leading indicator appears).
+- **Steady-state cost** — this is the one observe pattern that is *not* free when nothing is wrong: writing the ring on every event is a standing tax, hence a measured-budget decision (design §11, `big-ip-live-shield-design.md`). Mitigate with a small per-CPU ring (the single-threaded poll loop makes the freeze lock-free), cheap recorded fields, or **conditional arming** (record only once a leading indicator appears).
 - **Trigger taxonomy** — entry to a known-vulnerable function, a parser reaching an error state, an assertion, a watchdog event. The trigger is itself a hook, so a flight recorder is really *two* coordinated hooks (record + trip).
 - **Dump path off the hot path** — freeze the ring cheaply; hand serialization/export to the lifecycle engine.
 
@@ -87,16 +92,16 @@ Both patterns reuse the same machinery — signing + RBAC, context minimization,
 
 ## 4. Candidate hook points — observability & active datapath
 
-This is the differentiated engineering asset: *where* in TMM a hook earns its keep. Below are candidate points by data-path stage, in both modes. A concrete, named candidate set — with per-hook `ctx` fields and their observability/debug/RCA use — is proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md). (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per §11.)
+This is the differentiated engineering asset: *where* in TMM a hook earns its keep. Below are candidate points by data-path stage, in both modes. A concrete, named candidate set — with per-hook `ctx` fields and their observability/debug/RCA use — is proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md). (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per design §11 (`big-ip-live-shield-design.md`).)
 
 | Data-path stage | **Observe** (tracepoint) | **Active** (datapath control) | Why eBPF (what iRules / kernel eBPF miss) |
 |---|---|---|---|
 | **L3/L4 ingress + connection table** | flow/PPS rates, fragment stats, TCP-state transitions, SYN/flood signals, conn-table occupancy, malformed-L4 counts | drop/rate-limit malformed fragments, TCP-state-exhaustion mitigation, early drop of a crafted L4 pattern (L4-stack CVE) | runs **before any iRule event**; kernel-bypass hides it from kernel eBPF |
 | **Client-side TLS / record layer** | handshake outcomes, cipher/version mix, record-layer anomalies, decrypt errors, JA3/JA4-style fingerprints, renegotiation counts | block malformed ClientHello/record (TLS record-parse CVE), enforce cipher/version policy at the record layer, mitigate renegotiation abuse | record-layer parse **precedes** `CLIENTSSL_*` events — iRules can't reach it |
-| **L7 protocol parse** (HTTP/1·2·3/QUIC, DNS, SIP, MQTT, DIAMETER) | per-protocol frame/message stats, parser state, malformed-encoding counts, HTTP/2 stream/header counts, conditions preceding known crash classes | **drop/sanitize the malformed frame that terminates TMM** (the flagship CVE class), enforce protocol limits (max streams/headers) inline | malformed encodings aren't exposed as clean iRule fields; thin-event protocols have no event |
+| **L7 protocol parse** (HTTP/1·2·3/QUIC, DNS, SIP, MQTT, DIAMETER) | per-protocol frame/message stats, parser state, malformed-encoding counts, HTTP/2 stream/header counts, conditions preceding known crash classes | **drop or reset the malformed frame that terminates TMM** (the flagship CVE class), enforce protocol limits (max streams/headers) inline | malformed encodings aren't exposed as clean iRule fields; thin-event protocols have no event |
 | **Enforcement plugins** (`bd`/WAF, APM, AFM, DoS) | plugin decision latency, queue depth, per-policy hit rates, internal state before a known `bd` termination, plugin-IPC health | the `bd`-termination shield (design §14), guard the handoff into `bd`, circuit-break a degrading plugin | plugin-process internals are invisible to iRules and to the proxy data-model |
 | **LB / persistence / pool selection** | per-member selection distribution, persistence behavior, member health/latency | steer away from a member under attack, dynamic persistence override, mitigate an LB-algorithm edge case | reads internal selection/health state no iRule command exposes |
-| **Server side + response path** | server-side TLS outcomes, response codes, response-parse anomalies, OneConnect reuse stats | server-side record-parse shield (same class as client TLS), response sanitization | server-side record parse precedes `HTTP_RESPONSE`; same pre-event gap |
+| **Server side + response path** | server-side TLS outcomes, response codes, response-parse anomalies, OneConnect reuse stats | server-side record-parse shield (same class as client TLS), response blocking | server-side record parse precedes `HTTP_RESPONSE`; same pre-event gap |
 | **Cross-cutting runtime** (poll loop, memory, scheduler, IPC, iRule/TCL VM) | poll-loop jitter, per-core CPU, memory-pool pressure, scheduler stalls, plugin-IPC latency, TCL-VM execution stats | admission control / backpressure under memory or CPU pressure, emergency-mode triggers, shield a CVE in the TCL VM itself | these are TMM-internal health signals with no iRule/data-model surface at all |
 
 Three cross-cutting notes:
@@ -107,7 +112,7 @@ Three cross-cutting notes:
 ## 5. The two force-multipliers
 
 1. **Decoupled from the TMOS release train.** Mitigations, telemetry, and diagnostics ride a *fast lane* — signed bytecode in hours, not a quarterly build. During active CVE exploitation or a customer-down incident, that cadence difference is decisive.
-2. **Verified ⇒ safe to be aggressive, and to broaden the contributor set.** Because each program is proven unable to hang or scribble memory, the surface **cannot crash the box** — making it palatable to let more sources contribute (SIRT, support, eventually vetted partner logic) onto a device inline on production traffic.
+2. **Verified ⇒ safe to be aggressive, and to broaden the contributor set.** Because each program is proven unable to scribble memory or loop forever — and budget-gated, so the surface is engineered not to take the box down (verified ≠ correct: the canary/kill-switch is the backstop) — it becomes palatable to let more sources contribute (SIRT, support, eventually vetted partner logic) onto a device inline on production traffic.
 
 ## 6. Securing the substrate
 
@@ -115,7 +120,7 @@ The property that makes this powerful — execute bytecode in the data plane —
 
 ### 6.1 Verified ≠ secure
 
-PREVAIL proves a program is **memory-safe and terminating** — it will not crash or hang TMM. It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
+PREVAIL proves a program is **memory-safe and terminating** — it will not scribble memory or loop forever (not a WCET bound; the admission budget pass and runtime deadline carry the time load). It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
 
 ### 6.2 Threat model
 
@@ -129,7 +134,7 @@ PREVAIL proves a program is **memory-safe and terminating** — it will not cras
 
 ### 6.3 Layered controls
 
-1. **Provenance & authorization — default deny.** Vendor **code-signing is mandatory in production**: signature checked *before* the verifier sees bytecode; only F5-signed programs load. Signing is also the backstop if the load path is breached — no signing key, no arbitrary code. **Authorization tiers:** SIRT-signed by default; operator/partner-authored programs are a separate, off-by-default, RBAC-gated capability. **Active (filter) programs require stricter authorization than read-only observe.**
+1. **Provenance & authorization — default deny.** Vendor **code-signing is mandatory in production**: the box checks the signature over the binding (PREVAIL ran earlier, in F5's admission pipeline, before signing); only F5-signed programs load. Signing is also the backstop if the load path is breached — no signing key, no arbitrary code. **Authorization tiers:** SIRT-signed by default; operator/partner-authored programs are a separate, off-by-default, RBAC-gated capability. **Active (filter) programs require stricter authorization than read-only observe.**
 2. **Capability confinement.** For the **core substrate, this is free**: with zero helpers (see §2), a program is a pure function of `ctx` — it can only read the exposed fields and return a value, so there are no "syscalls" to confine, no I/O, no memory reach, no sockets, *by construction*. Confinement here reduces to **context minimization**: the **hook-point map declares, per hook, the allowed attach mode and exposed `ctx` fields**, and sensitive fields (TLS secrets, PII, decrypted payload) are gated and redacted by default, exposed only on explicit, separately-authorized justification — because what a program can see *is* what its `ctx` exposes. **If** an optional helper tier is later added (letting a program touch host maps directly), *those* helpers become the program's "syscalls" and must be kept **minimal and audited** (no general memory read, no arbitrary I/O, no config write, no sockets), with the map declaring **permitted helpers** per hook. That surface is opt-in; the base surface has none.
 3. **Exfiltration control.** Telemetry egress is **one-way through a controlled, logged sink** the program cannot read back or redirect; no program-initiated I/O. A malicious observe program still cannot phone home — its output goes only where the host sends it, audited.
 4. **Harden the load path.** Treat it as the highest-value target: strong authN/authZ, mTLS, RBAC, network-restricted, rate-limited, fully audited; consider an out-of-band / HSM-gated authorization decision. Signing limits the blast radius if it is ever breached.
@@ -157,10 +162,10 @@ Build the substrate once; land use cases in order (each reuses the same VM + ver
 
 ## 8.5 A further direction: AI-assisted shield authoring
 
-CVE disclosure now moves at machine speed; the verified-shield model is unusually well suited to machine-speed *authoring* in response. Because a shield is a bounded, statically-verified program that only selects among host-owned outcomes, its worst case is **provable** — so a generative model can draft one and the **verifier becomes an automatic, fail-closed acceptance gate** on that draft: safety is proven, not trusted, which is what makes machine authorship of inline data-plane code tractable at all. A pipeline reads a CVE (advisory / PoC / patch diff), emits a bounded `tmmtrace`-style predicate grounded on the signed hook-point map, compiles it, and iterates it against **three mechanical oracles** — verifier pass, exploit-replay blocks the PoC, low false-positive against a legitimate-traffic corpus — before a human signs. A **shieldability classifier** declares "not shieldable → engineering hotfix" when no safe interception point exists. Human authorization stays non-autonomous; deployment is observe-first and auto-retiring (design §7).
+CVE disclosure now moves at machine speed; the verified-shield model is unusually well suited to machine-speed *authoring* in response. Because a shield is a bounded, statically-verified program that only selects among host-owned outcomes, its worst case is **provable** — so a generative model can draft one and the **verifier becomes an automatic, fail-closed acceptance gate** on that draft: safety is proven, not trusted, which is what makes machine authorship of inline data-plane code tractable at all. A pipeline reads a CVE (advisory / PoC / patch diff), emits a bounded **C** predicate (clang → eBPF) grounded on the signed hook-point map — `tmmtrace` can emit the same one-liner form as an optional convenience — compiles it, and iterates it against **three mechanical oracles** — verifier pass, exploit-replay blocks the PoC, low false-positive against a legitimate-traffic corpus — before a human signs. A **shieldability classifier** declares "not shieldable → engineering hotfix" when no safe interception point exists. Human authorization stays non-autonomous; deployment is observe-first and auto-retiring (design §7).
 
-The prototype already runs two of the three oracles (PREVAIL verify + exploit replay via `tmmtrace`). See [`explainers/ai-shield-pipeline.html`](explainers/ai-shield-pipeline.html) (the story) and [`explainers/ai-shield-pipeline-demo.html`](explainers/ai-shield-pipeline-demo.html) (an interactive closed-loop demo). *Detailed method and claims are held in a separate invention disclosure, per IP policy.*
+The prototype already runs two of the three oracles (PREVAIL verify + exploit replay via `tmmtrace`). See [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end) and [`explainers/cve-mitigation.html`](explainers/cve-mitigation.html) (the plain-language shield explainer). *Detailed method and claims are held in a separate invention disclosure, per IP policy.*
 
 ## 9. One-line thesis
 
-**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes are provably safe. Live Shield is the first instance; the substrate, and the hook-point map, are the asset.**
+**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes carry a static proof (memory-safety + termination) — with time-safety enforced by admission budget + runtime deadline. Live Shield is the first instance; the substrate, and the hook-point map, are the asset.**

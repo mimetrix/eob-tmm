@@ -4,7 +4,7 @@
 **Status:** Draft for architecture review
 **Audience:** TMOS architecture, F5 SIRT, BIG-IP security engineering
 **Scope:** On-box, vendor-authored runtime shields for TMOS's *own* control-plane and data-plane code paths
-**Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — Live Shield is its first instance) · `prototype/` (working proof: uBPF embedded + PREVAIL verify gate)
+**Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — Live Shield is its first instance) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `prototype/` (working proof: uBPF embedded + PREVAIL verify gate)
 
 ---
 
@@ -85,7 +85,7 @@ In short: **iRules express traffic logic in the sanctioned data-model at proxy e
 | The iRule / TCL engine or rule dispatcher | — a rule cannot shield itself | a separate mechanism hooks it |
 | FastL4 / hardware-offload fast paths | (c) — flow bypasses the iRule VM | hook the *software* fast path — but flows offloaded to ePVA/FPGA bypass TMM software entirely and are out of reach (§10) |
 | Internal program state — connection-table internals, memory-pool pressure, parser state machines, inter-function latency, error-branch hit-counts | (b) — no iRule command exposes it | an `observe`-mode tracepoint (§6.1) reads it in-process |
-| Code-level virtual patch for a malformed condition not surfaced as a clean field | (b) — condition invisible in the data model | inspect the raw argument at the vulnerable function |
+| Code-level **crash mitigation** for a malformed condition not surfaced as a clean field | (b) — condition invisible in the data model | inspect the raw argument at the vulnerable function |
 
 Two consequences worth making explicit:
 
@@ -104,9 +104,9 @@ As TMM gains a **WASM** runtime for data-plane programmability, the natural ques
 | Safety model | **statically verified before run** (PREVAIL proves bounded memory + termination, §9) | sandbox *confinement* — memory-isolated, but can loop forever; bounded only by runtime "fuel"/epoch kills (a runtime kill mid-execution, not a proof) |
 | Invocation cost | ~tens of ns (direct JIT call, tiny ctx) | heavier (runtime entry, linear-memory marshaling) |
 | Footprint | ~150 KB | multi-MB runtime |
-| Shape | attach-at-a-point → read ctx → return verdict / update map | call rich logic written in a full language |
+| Shape | attach-at-a-point → read ctx → return verdict the host acts on and counts | call rich logic written in a full language |
 
-The decisive differentiator for a **shield or tracepoint running inline in the poll loop** is the verifier: eBPF gives a *static proof* that the program terminates and touches only what it should, **before** it ever runs. WASM gives isolation, but a WASM module can hang — you bound it with runtime fuel, which is a mid-execution kill, not a guarantee. For an always-must-be-safe in-data-plane control, "provably can't hang" beats "we'll kill it if it does." You cannot safely run unverified WASM on the TMM hot path the way you can a verified eBPF program.
+The decisive differentiator for a **shield or tracepoint running inline in the poll loop** is the verifier: eBPF gives a *static proof* that the program terminates and touches only what it should, **before** it ever runs. WASM gives isolation, but a WASM module can hang — you bound it with runtime fuel, which is a mid-execution kill, not a guarantee. For an always-must-be-safe in-data-plane control, "provably memory-safe and terminating" plus a budget gate beats "we'll kill it if it misbehaves" — though the runtime deadline still exists as the second layer (termination is not a time bound). You cannot safely run unverified WASM on the TMM hot path the way you can a verified eBPF program.
 
 On the hot path specifically: **WASM pays the same per-invocation tax as uBPF — in fact more** (heavier runtime entry). So WASM is not the lighter option for per-packet hooks; if anything the verified eBPF program is. The hot-path cost (§11) is intrinsic to *any* in-data-plane runtime, not a uBPF-specific objection.
 
@@ -121,7 +121,7 @@ Doing safety-critical inline shields *in* WASM would mean reinventing eBPF's ver
 
 ## 3. Why userspace eBPF (and why F5 specifically wants it)
 
-A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter plus a JIT — with no dependency on the kernel eBPF subsystem. The chosen engine is **uBPF**: a small (~150 KB), Apache-2.0, embeddable VM with x86-64 and arm64 JITs. It is the same userspace execution engine Microsoft ships in eBPF-for-Windows, and the engine inside bpftime — i.e. the proven floor of this space, consumed here as a **library**, not a framework.
+A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter plus a JIT — with no dependency on the kernel eBPF subsystem. The chosen engine is **uBPF**: a small (~150 KB), Apache-2.0, embeddable VM with x86-64 and arm64 JITs. It is the same userspace execution engine Microsoft ships in eBPF-for-Windows, and one of the VMs bpftime can use (bpftime defaults to its own LLVM-based JIT) — i.e. the proven floor of this space, consumed here as a **library**, not a framework.
 
 There are two ways to get userspace eBPF into a process, and the distinction is the crux of this design (§3.1):
 
@@ -142,7 +142,7 @@ Off-the-shelf userspace eBPF *injection* tooling (bpftime) attaches to processes
 - The build pipeline emits a **hook-point map** for every TMOS build, naming stable attach points and their signatures.
 - The uBPF VM is linked in as a designed-in component (the VM + its JIT, plus the PREVAIL verifier as the §9 load gate); shields are authored as ordinary eBPF C and compiled with the standard `clang -target bpf` toolchain. The VM is a **library call**, **not** a runtime intrusion technique.
 
-This single decision eliminates the two worst objections to userspace eBPF in this context: the no-symbols/brittle-offset problem (we emit a per-build map and call a named hook) and most of the injection-safety risk (no runtime machine-code rewriting of a poll loop). The host calls `ubpf_exec(vm, ctx, …)` like any function and acts on the return.
+This single decision eliminates the two worst objections to userspace eBPF in this context: the no-symbols/brittle-offset problem (we emit a per-build map and call a named hook) and most of the injection-safety risk (no *guessed-offset* rewriting of a foreign binary: arm/disarm touches only compiler-reserved pads at named symbols in our own build — the mechanism ftrace has used on live kernel text for years). The host calls `ubpf_exec(vm, ctx, …)` like any function and acts on the return.
 
 ## 4. Goals and non-goals
 
@@ -156,7 +156,7 @@ This single decision eliminates the two worst objections to userspace eBPF in th
 **Non-goals**
 - Replacing patches or lifecycle discipline. Shields are temporary.
 - Protecting the applications *behind* the BIG-IP — that is already covered by Advanced WAF / Distributed Cloud virtual patching. Live Shield protects the **BIG-IP's own code**.
-- Shielding TMM bugs that crash before any reachable hook point fires (see §10, residual dead zone).
+- Shielding TMM bugs where no reachable boundary exposes the condition in its arguments, or no safe outcome exists there (see §10, residual dead zone).
 
 ## 5. Architecture
 
@@ -182,6 +182,12 @@ Four layers, mechanism-agnostic above the enforcement leaf.
             +-------------------------------------------------------+
 ```
 
+Transport is reused: one message family (`LOAD · SET_MODE · STATUS · REVOKE`) on the existing
+control-plane config channel, applied at a safe point between poll-loop iterations and fanned out per
+core; every op audit-logged; `REVOKE` disarms every core. "Hit evidence -> SIEM" unpacks to: per-core
+fire counters in both modes via `STATUS`, a rate-limited log line, and optional per-event egress-ring
+records.
+
 ### 5.1 Enforcement adapters
 
 Three adapters, in increasing order of audacity. Crucially, **two distinct eBPF execution engines are in play, chosen by what the kernel can see** — **kernel-space eBPF** for the control-plane daemons (adapter 2), an **embedded userspace VM** for TMM (adapter 3) — plus a JVM probe surface for iControl REST. They share one signed catalog and lifecycle; only the enforcement leaf differs (the layers above are mechanism-agnostic, §5).
@@ -192,8 +198,8 @@ Three adapters, in increasing order of audacity. Crucially, **two distinct eBPF 
 
 ### 5.2 The embedded eBPF VM
 
-- **uBPF**, linked as a library (~150 KB, Apache-2.0): an in-process eBPF VM with x86-64/arm64 JIT. Shields are authored as ordinary eBPF C and compiled with `clang -target bpf`. On the hot path the JIT is used (a shield invocation is an indirect call into native code; the interpreter is a debug/portability fallback). uBPF is the engine in Microsoft's eBPF-for-Windows and underneath bpftime, so the execution core is proven.
-- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield **before** the VM is allowed to load it; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read/write out of bounds or loop unbounded. (PREVAIL is the verifier for *this* userspace engine; the control-plane adapter rides the kernel's own in-tree BPF verifier instead — §5.1. Two engines, two verifiers, one catalog.)
+- **uBPF**, linked as a library (~150 KB, Apache-2.0): an in-process eBPF VM with x86-64/arm64 JIT. Shields are authored as ordinary eBPF C and compiled with `clang -target bpf`. On the hot path the JIT is used (a shield invocation is an indirect call into native code; the interpreter is a debug/portability fallback). uBPF is the engine in Microsoft's eBPF-for-Windows and one of the VMs bpftime can use, so the execution core is proven.
+- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield in F5's admission pipeline, **before** it is signed — nothing unverified is ever signed, and nothing unsigned ever loads; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read/write out of bounds or loop unbounded. (PREVAIL is the verifier for *this* userspace engine; the control-plane adapter rides the kernel's own in-tree BPF verifier instead — §5.1. Two engines, two verifiers, one catalog.)
 - **No helpers, no verifier extension for the core.** Both `filter` shields and `observe` tracepoints are **pure functions of the context**: they read `ctx` and return a value (a verdict, or a telemetry sample). They call nothing. So mode, hit/enforce counters, and `observe`-mode telemetry live in host memory (per-CPU on hot paths) that the **host** reads and writes *around* the call — the lifecycle engine acts on the return value; the program never touches host state directly. Two consequences: (a) **no eBPF helper functions need to be defined, registered, or secured**, and (b) **PREVAIL is used stock** — a bounded predicate over a typed `ctx` is the canonical case any eBPF verifier already proves, so there is nothing to teach it (you *configure* the `ctx` descriptor; you do not *extend* the verifier). Anything stateful is handled by the host pre-computing it into `ctx`. Helpers — letting the program manipulate host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite for Live Shield or tracepoints.
 
 ### 5.3 Native hook-point API and build-pipeline integration
@@ -203,7 +209,7 @@ This is the make-or-break engineering item.
 - TMM and the control-plane daemons expose named, versioned hook points (function entry/exit, plus a small number of arbitrary-offset points on exceptional paths).
 - Every TMOS build emits a signed **hook-point map**: `{tmos_version, build_id, hook_points: [{name, addr/offset, arg_btf, attach_mode, path_class}]}` where `path_class ∈ {hot, warm, cold/exceptional}`, `attach_mode ∈ {observe, filter}` (§6.1), and `arg_btf` is BTF type information for the hook's argument structs.
 - A shield declares the hook-point *name* it targets; the lifecycle engine resolves name → offset using the running build's map. Shields are therefore version-bound but not offset-fragile.
-- **Argument layouts drift across builds just like addresses do.** Name→offset resolution fixes *where* a hook attaches but not the *layout of the structs it reads*. The build pipeline therefore emits **BTF for the TMM, `bd`, and control-plane-daemon argument structs** alongside the map, and shields are authored CO-RE-style so the loader relocates field accesses against the running build's BTF. A shield reading `ctx->field` stays correct across a build whose struct layout shifted, and **fails closed** — rejected at load — if a referenced field no longer exists. It never reads a stale offset silently.
+- **Argument layouts drift across builds just like addresses do.** Name→offset resolution fixes *where* a hook attaches but not the *layout of the structs it reads*. The build pipeline therefore emits **BTF for the TMM, `bd`, and control-plane-daemon argument structs** alongside the map; the argument contract is re-validated per build and the signature binds a build range (`build_min..max`) — CO-RE-style relocation is at most an authoring convenience, not the correctness story; the signed bytes are what load. A shield whose referenced field no longer exists **fails closed** — rejected at re-validation, never reading a stale offset silently.
 - CI gate: a shield cannot ship for a build whose hook-point map lacks its target point.
 
 ## 6. Shield object schema
@@ -226,7 +232,7 @@ This is the make-or-break engineering item.
   "fixed_in_version": "17.5.2",
   "perf_class": "cold",
   "deploy_posture": "enforce-on-arrival",  // monitor-first | enforce-on-arrival  (see §7.1)
-  "evidence": { "log_on_hit": true, "counter_map": "ls_hits" },
+  "evidence": { "log_on_hit": "rate-limited", "fire_counter": "per-core, host-maintained" },
   "trust": {
     "author": "F5-SIRT",
     "validated_by": ["sirt-pipeline", "redteam"],
@@ -241,10 +247,18 @@ The schema says a shield *targets* a hook point; it does not by itself say how a
 
 **Two attach modes**, declared per hook point in the hook-point map:
 
-- `observe` — the program runs at function entry/exit, may read arguments and update maps, but **cannot alter control flow**. All telemetry, monitor-only points, and evidence collection use this mode. It is always safe.
-- `filter` — the program runs at a **designed-in decision point** and its return value selects among a *fixed, enumerated set of outcomes the host code already knows how to take* (`LS_PASS`, `LS_DROP`, `LS_RESET`). A `filter` point is not an arbitrary function entry; it is a location TMOS source explicitly compiles in, immediately before the vulnerable operation, at a place where each enumerated outcome leaves TMM in a consistent state.
+- `observe` — the program runs at function entry/exit, may read arguments and **return a value the host aggregates**, but **cannot alter control flow**. All telemetry, monitor-only points, and evidence collection use this mode. It is always safe.
+- `filter` — the program runs at a **designed-in decision point** and its return value selects among a *fixed, enumerated set of outcomes the host code already knows how to take* (`LS_PASS`, `LS_DROP`, `LS_RESET`). A `filter` point is not an arbitrary function entry; it is a location TMOS source explicitly compiles in, immediately before the vulnerable operation, at a place where each enumerated outcome leaves TMM in a consistent state — either a designed-in call site, or a **patchable function entry** drawn from the build's signed hook map, where the enumerated outcome is that function's safe-return policy.
 
-**Why not arbitrary override.** Forcing an early return from an arbitrary function (kernel `bpf_override_return`-style) is explicitly **out of scope**: it synthesizes a return value the caller will consume while skipping the function body's side effects — cleanup, lock release, refcount and connection-state updates. On a poll-loop data plane that is a corruption vector, not a shield. The embedded VM does not expose it and Live Shield does not rely on it.
+**Why not arbitrary override.** Out of scope is an *unpoliced* synthesized return at a guessed offset
+in a foreign binary (the `bpf_override_return`-on-uprobes shape the kernel itself forbids): it fakes a
+return value the caller will consume while skipping the function body's side effects — cleanup, lock
+release, refcount and connection-state updates — a corruption vector on a poll-loop data plane. The
+sanctioned form is different: a compiler-reserved **function entry** from the build's signed hook map,
+whose enforce outcome is the **safe-return recorded in the per-build safe-return policy** (or an
+upstream flow-reset where no safe return exists). A safe-return skips the *whole* body, so benign work
+the body did (e.g. a log record) is lost while enforcing; a stand-in record can be synthesized
+out-of-band from egress-ring events.
 
 **The safe early-return contract.** For a `filter` hook point, the owning code path guarantees:
 
@@ -257,7 +271,7 @@ A CVE whose only viable interception point has no clean abort branch is, by this
 ## 7. Operational modes and auto-retirement
 
 - **Monitor** — the shield's detection logic runs and logs hits, but takes no enforcement action. Lets operators confirm the threat and false-positive rate before enforcing. **This soak-then-promote posture is valid only for shields whose unmitigated exploit does not itself take the system down — see §7.1 for the crash-class exception.**
-- **Enforce** — actively blocks/drops/sanitizes the exploit condition.
+- **Enforce** — actively drops, resets, or safe-returns past the exploit condition.
 - **Disable** — deactivates the shield without uninstalling it (fast rollback).
 
 **Auto-retirement.** The lifecycle engine polls the running TMOS version (iControl REST `sys/version`, corroborated by iHealth/QKView telemetry). When the running `tmos_version >= fixed_in_version`, the shield is auto-disabled and flagged for removal. A shield can never silently outlive the patch it stands in for.
@@ -293,15 +307,15 @@ The enforcement primitive is the easy part; trust is the product. Shields are **
 2. **Validate** — internal SIRT pipeline checks targeting, false-positive rate, performance class, and that a clean auto-retirement path exists.
 3. **Red-team** — independent validation that the shield actually blocks the exploit and cannot be trivially bypassed.
 4. **Sign** — F5 code-signing over the canonicalized shield object + payload.
-5. **Distribute** — existing update/advisory channels; the box verifies the signature before the verifier ever sees the bytecode.
+5. **Distribute** — existing update/advisory channels; the box verifies the signature over the binding (program hash + hook + build range + mode ceiling + expiry); PREVAIL ran earlier, at F5 — the signature attests it.
 6. **Retire** — automatic, on patched-version detection.
 
 ## 9. Safety and blast radius
 
 Unlike Cisco's kernel-isolated shields, a Live Shield in the TMM adapter runs **in TMM's address space**. A faulty shield can crash the data plane. Mitigations:
 
-- The **userspace verifier is mandatory** and runs before load; unverifiable bytecode is rejected.
-- Signature verification precedes bytecode verification (§8); only F5-signed payloads load in production.
+- The **userspace verifier is mandatory** and runs in F5's admission pipeline before signing; unverifiable bytecode is rejected.
+- On the box, signature verification over the binding gates load (§8); only F5-signed payloads load in production — the signature, not an on-box verifier run, is the security perimeter.
 - Default deploy mode is **monitor** for logic/auth-bypass shields; crash-class shields ship **enforce-on-arrival** (§7.1). Promotion to enforce — whichever the default — is always an explicit, logged action.
 - Shields default to **cold/exceptional `path_class` hook points** in TMM; **hot-path hooks are permitted under a measured perf budget + explicit sign-off** (§11), not banned.
 - Per-TMM-instance watchdog: if a TMM instance restarts within N seconds of a shield load, the lifecycle engine auto-disables that shield and raises an alert.
@@ -311,7 +325,7 @@ Unlike Cisco's kernel-isolated shields, a Live Shield in the TMM adapter runs **
 
 This is the right-hand-column residual from the §2.1 coverage map. Two things fall outside this mechanism, and both are shared by every *software* control surface (iRules, WASM) — they are not unique to it:
 
-1. **A crash before the first reachable hook.** A TMM bug that faults **before** any instrumented function runs — e.g. deep in TLS record parsing ahead of the first hook — cannot be shielded, just as an iRule (the event never fires) or kernel eBPF (TMM bypasses the kernel) cannot catch it. The hook-point map should push the earliest viable instrumentation point as close to ingress as performance allows, shrinking this zone over time.
+1. **No boundary exposes the condition, or no safe outcome exists there.** A TMM bug is unshieldable where no reachable boundary exposes the triggering condition in its arguments — e.g. a fault deep in TLS record parsing whose trigger is not visible at any earlier hook — or where the only interception point has no safe outcome (§6.1); an iRule (the event never fires) or kernel eBPF (TMM bypasses the kernel) cannot catch these either. For the flow-hook fallback, the hook-point map should push the earliest viable instrumentation point as close to ingress as performance allows, shrinking this zone over time.
 
 2. **Traffic offloaded to hardware.** On appliances with **ePVA / FPGA (TurboFlex) / crypto offload**, some flows are switched or mitigated in silicon and never enter TMM software. An embedded userspace VM runs *in TMM software*, so it cannot see an offloaded fast path — the same way iRules and kernel eBPF cannot (§2.2). This is a **hardware boundary, not a shortcoming of the mechanism**: it is exactly the FastL4/hardware-offload hole already noted for iRules. Crucially, the high-severity data-plane CVE classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute in TMM software regardless (a flow that needs L7 inspection is escalated back off the offload path), so they remain reachable. A CVE **in** the hardware fast path itself, in the offload/escalation decision, or in a pure-L4 vector that stays offloaded, needs a firmware/FPGA fix — out of scope for any software shield.
 
@@ -321,7 +335,7 @@ Live Shield narrows the window for most data-plane CVEs; it does not claim to cl
 
 ## 11. Performance
 
-Userspace eBPF is not free, but the embedded model is the cheap end of it. With the **JIT**, a shield invocation is an indirect call into native code plus the program's own handful of instructions — tens of nanoseconds, comparable to a C `if`. Crucially there is **no trampoline, no syscall, no kernel trap**: the VM is a direct in-process call, which is why this is far cheaper than injection/uprobe approaches (a kernel-uprobe sslsniff workload measured ~58% overhead vs ~12% for the equivalent userspace tool — and that userspace number still carried attach/trampoline indirection the embedded call does not). A hook point with no shield loaded costs one predictable branch.
+Userspace eBPF is not free, but the embedded model is the cheap end of it. With the **JIT**, a shield invocation is an indirect call into native code plus the program's own handful of instructions — tens of nanoseconds, comparable to a C `if`. Crucially there is no syscall and no kernel trap: a designed-in call site is a direct call, and a patched function entry costs one jump into F5's own in-process trampoline — which is why this is far cheaper than injection/uprobe approaches (a kernel-uprobe sslsniff workload measured ~58% overhead vs ~12% for the equivalent userspace tool — and that userspace number still carried attach/trampoline indirection the embedded call does not). A hook point with no shield loaded costs one predictable branch.
 
 Many CVE shields naturally target a **cold/exceptional** code path (the malformed-input handler, the crashing parser branch), so they cost ~nothing in steady state — that is the easy, default case. But it is **not** the only useful one: a CVE whose trigger appears in *ordinary* traffic, or per-flow telemetry/detection, is inherently **hot-path**, and that is legitimately valuable. Hot-path placement is therefore a **measured budget decision, not a prohibition**. Policy:
 
@@ -371,7 +385,7 @@ Per F5's February 2026 quarterly notification, CVE-2026-22548 allows an attacker
 SEC("filter/bd_request_eval_decision")
 int ls_2026_22548(struct bd_req_ctx *ctx) {
     if (matches_crash_precondition(ctx)) {   // narrow, SIRT-derived predicate
-        ls_count(&ls_hits);                   // evidence (always)
+        // the return value IS the evidence — the host counts firings per core
         if (ls_mode() == ENFORCE)
             return LS_DROP;                   // bd's sanctioned reject path, pre-crash
     }

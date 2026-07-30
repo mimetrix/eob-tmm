@@ -2,16 +2,16 @@
 
 ### A proposed set of designed-in hook points for TMM — USDT-style tracepoints plus filter-capable decision points — consumed by the embedded userspace-eBPF VM. Observability, debug & RCA are the primary lens here; CVE shields, in-situ data-intelligence, steering, and self-tuning are **peer consumers of the same hooks**. The engine is generic; the shield is one application.
 
-**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-intelligence.md`](data-plane-intelligence.md) (these `ctx` fields are also the feature inputs for in-situ data intelligence), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
+**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-intelligence.md`](data-plane-intelligence.md) (these `ctx` fields are also the feature inputs for in-situ data intelligence), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
 
 ---
 
 ## 1. What this is (and why it's cheap)
 
-This is a candidate catalog of **designed-in hook points** to build into TMM's source as the generic instrumentation-and-control surface of the embedded eBPF framework. Each is a named, versioned hook that exposes a small **typed context (`ctx`)** — a curated view of the internal state present at that point. The embedded uBPF VM runs a small **verified** program at the hook; the host owns all state and effects and applies the program's return as one of an **enumerated set of outcomes** — the program cannot invent control flow.
+This is a candidate catalog of **designed-in hook points** to build into TMM's source as the generic instrumentation-and-control surface of the embedded eBPF framework. Each is a named, versioned hook that exposes a small **typed context (`ctx`)** — a curated view of the internal state present at that point. The embedded uBPF VM runs a small **verified** program at the hook; the host owns all state and effects and applies the program's return as one of an **enumerated set of outcomes** — the program cannot invent control flow. Two hook kinds share the engine: this curated USDT catalog (stable, versioned `ctx`) for the *anticipated* surface, and **function-boundary probes** at any named symbol (`ctx` = the function's typed arguments) for the *unforeseen* — this document catalogs the first kind.
 
-Most hooks are consumed in **observe mode**: the program reads `ctx`, returns a value, and the host aggregates it (a counter, a histogram, a ring) — traffic is untouched. A subset sit at a clean decision point and also support **act mode**: the same `ctx`-in / value-out program picks among host-owned actions (pass · drop · steer · mark · sample). Observability, debug & RCA are the primary lens of this catalog — but the **same hooks** are the surface for a spectrum of applications, of which the CVE shield is only one:
+Most hooks are consumed in **observe mode**: the program reads `ctx`, returns a value, and the host aggregates it (a counter, a histogram, a ring) — traffic is untouched. A subset sit at a clean decision point and also support **act mode**: the same `ctx`-in / value-out program picks among host-owned actions (pass · drop · steer · mark · sample · safe-return). Observability, debug & RCA are the primary lens of this catalog — but the **same hooks** are the surface for a spectrum of applications, of which the CVE shield is only one:
 
 - **Observability, debug & RCA** — the focus of this catalog: bpftrace-for-TMM summaries, flight recorders, per-flow latency, in-situ field-support probes.
 - **CVE shields (Live Shield)** — a `filter`/drop program at a parser or plugin hook blocks a live exploit path between patch windows. One consumer, *not* the purpose.
@@ -21,14 +21,15 @@ Most hooks are consumed in **observe mode**: the program reads `ctx`, returns a 
 
 The engine is generic; the shield is one application on top of it. The reason a rich catalog is affordable:
 
-- **Dark until lit.** A hook with nothing attached costs ~one predictable branch. You pay only when a program is loaded onto it, on demand.
-- **No helpers, no verifier work.** A program is a pure function of `ctx` (read fields → return a value); the host owns all state and effects. So a new hook needs **no eBPF helper** and **no verifier extension** — stock PREVAIL verifies any bounded predicate over the new `ctx` (substrate §2). Adding one is just: *define its `ctx`, place the hook, publish it in the hook-point map.*
+- **Dark until lit.** A hook with nothing attached costs ~one predictable branch (a designed-in call site; an unarmed function boundary is a nop pad — free). You pay only when a program is loaded onto it, on demand.
+- **No helpers, no verifier *extension* — stock PREVAIL.** A program is a pure function of `ctx` (read fields → return a value); the host owns all state and effects. So a new hook needs **no eBPF helper** and **no verifier extension** — stock PREVAIL verifies any bounded predicate over the new `ctx` (substrate §2); the `ctx` descriptor is the real, bounded work. Adding one is just: *define its `ctx`, place the hook, publish it in the hook-point map.*
 - **Incremental.** Each subsystem owner can instrument their own code in a normal release. The surface grows over time; every new `ctx` field widens what can be **observed, enforced, steered, or distilled into signal** (a hook can only act on what its `ctx` exposes).
 
-> **Consuming a hook.** With `tmmtrace`: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
+> **Consuming a hook.** A few lines of C compiled with `clang -target bpf` — or the `tmmtrace` one-liner
+> convenience: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
 > `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** authors an
 > acting program — a `filter`/drop shield, a steer, a sampler — by swapping the action verb; observe and act
-> share the machinery (substrate §6.1).
+> share the machinery (design §6.1, `big-ip-live-shield-design.md`).
 
 **Two companion utilities.** `tmmtrace` is the *summary* consumer — bpftrace-for-TMM: counters, histograms, predicates, shields. `tmmdump` (proposed) is the *capture* consumer — tcpdump-for-TMM: it streams a bounded window of the **actual bytes** at a hook off the box, the only viable tap for a kernel-bypassed data plane (§10.6). One summarizes, one captures; both are thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
 
@@ -37,7 +38,7 @@ The engine is generic; the shield is one application on top of it. The reason a 
 - **Naming:** `tmm:<stage>:<event>` — e.g. `tmm:l4:conn_state`, `tmm:bd:request_eval`, `tmm:rt:poll_stall`.
 - **`ctx` typing:** every field is a fixed-width scalar or a small fixed byte array (BTF-described per build). No pointers out; sensitive fields (keys, PII, decrypted payload) are **withheld by default** and gated behind separate authorization (substrate §6.3).
 - **`path_class`:** `hot` (per-packet/per-flow steady state), `warm` (per-connection / per-request), `cold` (exceptional / error / malformed branch). Cold is free-in-steady-state; hot is allowed under a measured budget (design §11).
-- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support **act mode** — the program selects among host-owned actions (drop/`filter`, steer, mark, sample), of which a CVE `filter`/drop shield is one (design §6.1). This catalog marks act-capable hooks with **◆**.
+- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support **act mode** — the program selects among host-owned actions (drop/`filter`, steer, mark, sample, safe-return — skip the hooked function's body), of which a CVE `filter`/drop shield is one (design §6.1). This catalog marks act-capable hooks with **◆**.
 - **RCA columns:** *Observe* = the steady-state signal; *Debug/RCA* = what it yields when an incident is being chased (often via the flight-recorder / tripwire patterns in §10).
 
 ---
@@ -56,7 +57,7 @@ The engine is generic; the shield is one application on top of it. The reason a 
 | Tracepoint | `ctx` (typed fields) | Observe | Debug / RCA | path_class |
 |---|---|---|---|---|
 | `tmm:tls:clienthello` ◆ | `tls_ver, n_exts, sni_len, ja4[32]` | version/cipher mix, JA3/JA4 fingerprints | fingerprint an attacker population; malformed ClientHello **before** `CLIENTSSL_*` fires | warm |
-| `tmm:tls:record` ◆ | `rec_type, rec_len, ver, parse_state` | record-layer stats | record-parse anomalies ahead of the earliest iRule hook (the §10 dead-zone edge) | hot |
+| `tmm:tls:record` ◆ | `rec_type, rec_len, ver, parse_state` | record-layer stats | record-parse anomalies ahead of the earliest iRule hook (the design-§10 dead-zone edge) | hot |
 | `tmm:tls:handshake_done` | `cipher, ver, resumed, ms_elapsed` | handshake outcomes / latency | handshake failure clusters; downgrade attempts | warm |
 | `tmm:tls:reneg` ◆ | `count, since_ms` | renegotiation counts | renegotiation-abuse DoS | cold |
 | `tmm:tls:decrypt_err` | `err_code, rec_type` | decrypt error rate | crypto-path faults; corrupt-record floods | cold |
@@ -113,7 +114,7 @@ These are TMM-internal health signals with **no iRule / data-model surface at al
 
 ## 10. Turning tracepoints into RCA features
 
-The catalog above is raw signal. These are the **reusable patterns** that turn it into named RCA capabilities — each built from the same observe machinery, no helpers, no verifier work.
+The catalog above is raw signal. These are the **reusable patterns** that turn it into named RCA capabilities — each built from the same observe machinery — no helpers, no verifier *extension* (stock PREVAIL; the `ctx` descriptor is the real, bounded work).
 
 ### 10.1 Flight recorder (the run-up *into* a fault)
 A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and dumped on a trigger** (an error-branch tracepoint, a watchdog, a stall). Yields the state leading *into* the failure — the blind spot a post-crash core dump can't give you. shm-backed, so it **survives** a data-plane crash for post-mortem. *Two coordinated hooks: one records, one trips.* (Worked in the prototype: the observe-mode flight recorder + `ctl flightrec`; substrate §3.1.)
@@ -171,12 +172,12 @@ If the team lands a handful first, these give the most RCA value for the least e
 4. `tmm:tls:clienthello` — JA4 fingerprints + malformed-ClientHello detection ahead of the earliest iRule event.
 5. `tmm:l7:http2_frame` — HTTP/2 stream/frame stats covering the Rapid-Reset-style abuse family.
 
-Each is a `ctx` definition plus a call site — no VM change, no verifier work, no helper ABI. Where marked ◆ they graduate from observe to an **acting program** — a `filter`/drop shield, a steer, a sampler — once the signal is trusted, reusing the same hook and the same verify gate.
+Each is a `ctx` definition plus a call site — no VM change, no verifier *extension* (stock PREVAIL), no helper ABI; the `ctx` descriptor is the real, bounded work. Where marked ◆ they graduate from observe to an **acting program** — a `filter`/drop shield, a steer, a sampler — once the signal is trusted, reusing the same hook and the same verify gate.
 
 ---
 
 ## 12. Notes
 
-- **Producer/consumer ordering:** these hooks and their `ctx` are **TMM's**, designed in ahead of time and emitted in the signed per-build hook-point map; a probe (or shield) is always written *against* a `ctx` that already exists. The `ctx` is a curated window onto state TMM already holds — not raw memory (substrate §6.3).
+- **Producer/consumer ordering:** these hooks and their `ctx` are **TMM's**, designed in ahead of time and emitted in the signed per-build hook-point map; a probe (or shield) against a **catalog hook** is written against a `ctx` that already exists. For an unforeseen bug, the `ctx` is the vulnerable function's **own typed arguments** from the build's hook map (BTF/DWARF) — a build-specific contract re-validated per build. The `ctx` is a curated window onto state TMM already holds — not raw memory (substrate §6.3).
 - **Coverage bound:** an in-TMM tracepoint sees only what runs in TMM software; traffic offloaded to ePVA/FPGA on appliances is out of view (design §10) — as it is for iRules and kernel eBPF. **BIG-IP VE** (no offload) sees the whole data path.
 - **This is a menu, not a commitment.** Exact hook placement and `ctx` layout are set against TMM source and emitted per build (design §5.3). Field lists here are illustrative of the *kind* of state each hook would expose.

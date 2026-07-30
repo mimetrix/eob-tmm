@@ -175,8 +175,8 @@ Same compile → verify → load pipeline as [`TOOLCHAIN.md`](TOOLCHAIN.md); `tm
 front-end. Generated shields land in the gitignored `.tmmtrace/` build dir.
 
 This is also the target for an **AI-assisted authoring** pipeline (CVE → predicate → verify → replay);
-see [`../explainers/ai-shield-pipeline.html`](../explainers/ai-shield-pipeline.html) and the substrate
-doc §8.5.
+see [`../explainers/cve-shield-walkthrough.html`](../explainers/cve-shield-walkthrough.html) (the worked
+CVE example) and the substrate doc §8.5.
 
 ## What is validated where
 
