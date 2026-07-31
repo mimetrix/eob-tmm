@@ -103,6 +103,7 @@ _† Sharper still given the source-code exposure — an adversary holding the c
 
 **05 · Further concerns** (smaller, but real — each has a stance; the first two shape the first shippable form)
 
+- **Item zero — the safe point itself** — every in-TMM piece assumes "a safe point between poll-loop iterations that picks up a load request." **That does not exist in TMM today.** It means a per-instance queue and **a new check in the poll loop** (one load + branch per iteration, on the loop this org guards hardest), and the handler must be bounded — as first sketched it did an ELF parse and a **JIT compile** at the safe point, i.e. milliseconds during which the loop is not polling. Compile off the safe point; leave it publishing a pointer and patching a few bytes. **The most expensive item on the list, and it was not on the list.**
 - **Certification (FIPS / Common Criteria)** — a certified appliance that loads code into its data plane at runtime is a certification problem; may force a **dynamic-load-disabled certified mode**. Likely the biggest productization gate — raise it early.
 - **Keep the verifier out of TMM** — PREVAIL (heavy C++/Boost) verifies at build/control-plane time; only the small runtime + a signature check live in TMM's address space. Shrinks the §04 surface.
 - **Boundary-probe ctx is build-specific.** A function-boundary probe's contract (function X's typed args at build Y) is regenerated and re-validated every build — more reach than a versioned USDT ctx, looser contract; the signed hook map and the binding's build range are what keep it honest.
@@ -127,6 +128,10 @@ Most of the risk retires on day one; the rest is governed and deferred.
 ---
 
 **07 · The reality**
+
+**The honest size of it.** An earlier draft said "hundreds of lines, not subsystems." Reviewed against what each item actually requires, a defensible v1 on two CPU architectures is **50–80 senior-engineer-months — six to eight people for twelve to eighteen months**, plus TMA and certification engagement. Biggest growth: the safe point (unlisted), the trampoline (a page of assembly then six months of ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map generator, which is a **SysV/AAPCS parameter classifier over DWARF** against an optimised build.
+
+The reframe that matters: **the subsystem being added is not the VM.** It is a code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own build-pipeline toolchain and a permanent per-build ABI. Worth building — but describing it as smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine. **So the ask is a one-quarter feasibility phase, not the twelve items:** measure the always-on cost of the compiler flag (kill criterion ~1% pps), settle a `ctx` model that verifies, and arm one hook end-to-end in a lab TMM with core dumps still readable.
 
 The verifier is the **floor, not the building.** It gives you memory-safety and termination — **not** WCET, **not** correctness, and **not** immunity from its own bugs. The engine is defensible because the **signing gate** keeps attacker input away from the verifier and JIT, a **budget + watchdog** bounds execution time, and a **canary** bounds the blast radius of a valid-but-bad program. Verification is one layer of several.
 

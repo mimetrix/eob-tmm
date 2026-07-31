@@ -515,10 +515,18 @@
   <!-- 05 FURTHER CONCERNS -->
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
-    <h2>Eight more to get ahead of — smaller, but real.</h2>
+    <h2>Nine more to get ahead of — and one of them is the biggest item here.</h2>
     <p class="lede">The four above are load-bearing. These are the next tier: each has a stance, none changes the
       day-one posture — and the first two are the most likely to shape what the first shippable form looks like.</p>
     <div class="concerns">
+      <div class="concern"><span class="cl">item zero · the safe point itself</span><p>Every in-TMM piece assumes
+        &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; <b>That does not exist
+        in TMM today.</b> Building it means a per-instance message queue and <b>a new check in the poll loop</b> —
+        one load and branch per iteration, on the loop this organisation guards hardest. And the handler must be
+        bounded: as first sketched it did an ELF parse and a <b>JIT compile</b> at the safe point, which is
+        milliseconds during which the loop is not polling — a latency spike, possibly a dropped heartbeat. Compile
+        and populate pages <em>off</em> the safe point; leave it publishing a pointer and patching a few bytes.
+        <b>This is the most expensive item on the list and it was not on the list.</b></p></div>
       <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>A certified appliance that loads code into its data plane at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate; raise it early.</p></div>
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) should verify at <b>build / control-plane time</b> — only the small runtime and a signature check live in TMM's address space. This <em>shrinks</em> the §04 surface.</p></div>
       <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated and re-validated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range are what keep it honest.</p></div>
@@ -552,6 +560,20 @@
   <!-- 07 THE REALITY -->
   <section class="close reveal" id="close" data-sec="close">
     <p class="kicker"><span class="num">07</span> the reality</p>
+    <div class="callout"><span class="lbl">and the honest size of it</span>
+      <p>An earlier draft described this as &ldquo;hundreds of lines, not subsystems.&rdquo; Reviewed against what
+        each item actually requires, a defensible v1 on two CPU architectures is <b>50–80 senior-engineer-months
+        — six to eight people for twelve to eighteen months</b>, plus the TMA and certification engagement. The
+        items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then six months of
+        ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map
+        generator, which is a <b>SysV/AAPCS parameter classifier over DWARF</b> against an optimised build.</p>
+      <p style="margin-top:.7rem">The reframe that matters: <b>the subsystem being added is not the VM.</b> It is a
+        code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own
+        build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
+        smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine. <b>The ask
+        is therefore a one-quarter feasibility phase, not the twelve items:</b> measure the always-on cost of the
+        compiler flag (kill criterion, ~1% pps), settle a <span class="inlinecode">ctx</span> model that verifies,
+        and arm one hook end-to-end in a lab TMM with core dumps still readable.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
     <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, and <b>not</b>
       immunity from its own bugs. The engine is defensible because the <b>signing gate</b> keeps attacker input
