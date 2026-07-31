@@ -365,8 +365,11 @@
       scheduler — a core-pinned poll loop that never syscalls for traffic. That architecture is <b>why it's fast</b> —
       and <b>why it's opaque and rigid</b>.</p>
     <p>The industry's answer to safely changing a running system is <b>eBPF in the kernel</b>. But TMM
-      bypassed the kernel — so kernel eBPF is <em class="enf">structurally blind</em> to everything TMM does
-      with the traffic. Today, changing TMM's own code means the slow lane, every time:</p>
+      bypassed the kernel. Kernel eBPF <em>can</em> attach to TMM — a uprobe on the
+      <span class="inlinecode">tmm</span> binary works today — but it <em class="enf">can't afford to</em> (every
+      hit traps into the kernel, inside a run-to-completion loop) and it <em class="enf">can't enforce</em> (the
+      kernel forbids overriding a return from a uprobe). So it can watch, expensively, and never act. Today,
+      changing TMM's own code means the slow lane, every time:</p>
     <div class="schematic">
       <div class="srow slow">
         <span class="k">change today</span>
@@ -384,8 +387,9 @@
       <div class="plane data">
         <p class="pt">◆ data plane</p>
         <h4>TMM microkernel</h4>
-        <p>Own stack, poll loop, plugin processes — kernel-bypassed for speed.</p>
-        <p class="see"><b>nothing outside can see in ✗</b></p>
+        <p>Own stack, poll loop — kernel-bypassed for speed. (Plugin processes like
+          <span class="inlinecode">bd</span> are ordinary Linux processes: reachable by a uprobe today.)</p>
+        <p class="see"><b>reachable only at a cost it can't pay ✗</b></p>
       </div>
     </div>
     <div class="callout sig"><p><b>Say it plainly: TMM is its own kernel.</b> It plays every role Linux plays for the traffic it carries. Linux earned
@@ -452,9 +456,13 @@
         <div class="miss"><span class="who">iRules</span>
           <span class="gap"><b>runtime</b>, but not provably safe</span></div>
         <div class="miss"><span class="who">DynaD</span>
-          <span class="gap"><b>runtime</b> too — an earlier scripting-based swing at exactly this, since deprecated</span></div>
+          <span class="gap"><b>runtime</b> too — an earlier scripting-based swing at exactly this, since
+            deprecated. What's different now: an unverified script had no proof, no signing gate, and no
+            host-owned outcome set — the three things that make this one governable</span></div>
         <div class="miss"><span class="who">WASM</span>
-          <span class="gap"><b>programmable</b>, but bounded by a runtime kill — not a proof</span></div>
+          <span class="gap"><b>programmable</b>, but its bound is only a runtime kill. The difference isn't
+            that we avoid a runtime guard — we need one too (§5.4) — it's that eBPF adds a <em>static</em>
+            memory-safety and termination proof that fuel-metering can't give</span></div>
         <div class="miss"><span class="who">kernel eBPF</span>
           <span class="gap"><b>provably safe</b>, but in the wrong kernel — a USDT lets it <em>watch</em> TMM,
             not act inside it, and traps on every hit</span></div>
@@ -509,8 +517,8 @@
       </div>
       <div class="switchbody mode-obs" id="swbody">
         <div class="codeline">
-          <span class="pin">tmm:lb:select</span>
-          <span class="pred">/args.member_load&nbsp;&gt;&nbsp;80/</span>
+          <span class="pin">tmm:lb:member_select</span>
+          <span class="pred">/args.health&nbsp;&lt;&nbsp;50/</span>
           { <span class="verb obs" id="verb">snapshot()</span> }
         </div>
         <div class="pipe">
@@ -634,7 +642,7 @@
       <tbody>
         <tr><td><b>Control</b></td><td>Linux daemons — httpd, tmsh, MCPD; iControl REST on the JVM</td>
           <td>kernel eBPF / uprobe · <span class="mono">+ JVMTI</span> for Java</td></tr>
-        <tr><td><b>Data</b></td><td>TMM microkernel + plugin processes — kernel-bypassed</td>
+        <tr><td><b>Data</b></td><td>TMM microkernel — kernel-bypassed (plugin processes are ordinary Linux processes)</td>
           <td><b>embedded uBPF</b> (+ PREVAIL)</td></tr>
       </tbody>
     </table></div>

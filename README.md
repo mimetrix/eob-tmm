@@ -98,7 +98,9 @@ under one signed catalog and lifecycle (design §5):
   own verifier. This is the direct Cisco/NX-OS analog; F5 already ships kernel eBPF ("eob").
   iControl REST (`restjavad`/`icrd`) runs on the JVM, so it uses a separate JVMTI/USDT probe
   surface instead.
-- **Data plane (TMM)** — the kernel is structurally blind to TMM, so shields are **userspace
+- **Data plane (TMM)** — kernel eBPF *can* attach to TMM (a uprobe on `tmm` works today) but cannot
+  afford to (a kernel trap per hit inside a run-to-completion loop) and cannot enforce (no return
+  override on uprobes), so shields are **userspace
   eBPF** run by an embedded uBPF VM: the host **calls the VM like a library** at a designed-in
   hook and acts on the return — no kernel, no injection, no added privileges. Each program is
   **statically verified before load** by [PREVAIL](https://github.com/vbpf/ebpf-verifier) (the

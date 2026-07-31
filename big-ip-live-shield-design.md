@@ -32,7 +32,7 @@ Cisco's mechanism is kernel eBPF in NX-OS's Linux kernel. TMOS is not one OS; it
 
 The consequence is the central design constraint:
 
-> **Kernel eBPF can shield the control plane but is structurally blind to TMM.** The most damaging data-plane CVEs live exactly where kernel-based instrumentation cannot see.
+> **Kernel eBPF can shield the control plane, but cannot shield TMM.** Not for lack of reach — a uprobe on `tmm` attaches today — but because it cannot afford the per-hit kernel trap inside a run-to-completion loop, and cannot enforce (the kernel forbids overriding a return from a uprobe). The most damaging data-plane CVEs live exactly where kernel-based instrumentation can watch, expensively, and never act.
 
 ### 2.1 The data-plane coverage map
 
@@ -203,7 +203,7 @@ Three adapters, in increasing order of audacity. Crucially, **two distinct eBPF 
 
 1. **iRules / Advanced WAF / AFM** — already sanctioned, reaches traffic-shaped exploits at the proxy. This remains the **first-line** data-plane shield for anything an iRule event can observe. Deployed via AS3 / iControl REST. Lowest risk; no new runtime.
 2. **Control-plane daemon hooks** — **kernel-space eBPF** attached via uprobes at function entry/exit in the native daemons (httpd front end, tmsh, MCPD and the other C config daemons). These are ordinary Linux processes the kernel *can* see, so this is the **true Cisco analog** (NX-OS uses kernel eBPF) and it reuses the kernel's own in-built BPF verifier — no embedded VM needed here. F5 already ships kernel eBPF in BIG-IP eBPF Observability ("eob"), so the engine is in-house. Low performance risk (these are not latency-critical), high CVE coverage (most disclosed TMOS CVEs are control-plane). **Note the iControl REST stack (`restjavad`/`icrd`) runs on the JVM:** neither kernel uprobes nor native hooks reach Java methods, so its shields use a distinct JVM instrumentation surface (JVMTI / USDT-style probes the runtime exposes). The designed-in hook-point philosophy is identical; the adapter implementation is separate (see §12, Phase 2).
-3. **TMM hook points** — **embedded userspace eBPF VM** (uBPF + PREVAIL) attaching at sanctioned points inside TMM and its plugin processes (e.g. `bd`). Userspace precisely *because* TMM bypasses the kernel, so kernel eBPF is structurally blind to it (§2). The crown jewel: the only mechanism that reaches data-plane-engine internals. Highest care required (§9, §10).
+3. **TMM hook points** — **embedded userspace eBPF VM** (uBPF + PREVAIL) attaching at sanctioned points inside TMM and its plugin processes (e.g. `bd`). Userspace precisely *because* kernel eBPF, though it can attach here, cannot afford the per-hit trap and cannot enforce (§2). The crown jewel: the only mechanism that reaches data-plane-engine internals. Highest care required (§9, §10).
 
 ### 5.2 The embedded eBPF VM
 

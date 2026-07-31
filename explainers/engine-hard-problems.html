@@ -593,7 +593,7 @@
       <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.</span></div>
       <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.</span></div>
       <div class="rrow"><span class="rn">04</span><span class="rt"><b>Trust</b> — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.</span></div>
-      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — certification, verifier-placement, uBPF-JIT maturity, multi-tenancy, ISSU, jitter — each addressable; certification and tenancy shape the first shippable form.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — the safe point itself (the biggest unlisted item), certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, invocation granularity, multi-tenancy, ISSU, jitter — each addressable; the safe point and certification shape the first shippable form.</span></div>
       <div class="rrow"><span class="rn">06</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
     </div>
     <p class="foot">

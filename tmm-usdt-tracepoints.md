@@ -38,7 +38,7 @@ The engine is generic; the shield is one application on top of it. The reason a 
 - **Naming:** `tmm:<stage>:<event>` — e.g. `tmm:l4:conn_state`, `tmm:bd:request_eval`, `tmm:rt:poll_stall`.
 - **`ctx` typing:** every field is a fixed-width scalar or a small fixed byte array (BTF-described per build). No pointers out; sensitive fields (keys, PII, decrypted payload) are **withheld by default** and gated behind separate authorization (substrate §6.3).
 - **`path_class`:** `hot` (per-packet/per-flow steady state), `warm` (per-connection / per-request), `cold` (exceptional / error / malformed branch). Cold is free-in-steady-state; hot is allowed under a measured budget (design §11).
-- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support **act mode** — the program selects among host-owned actions (drop/`filter`, steer, mark, sample, safe-return — skip the hooked function's body), of which a CVE `filter`/drop shield is one (design §6.1). This catalog marks act-capable hooks with **◆**.
+- **`mode`:** every hook supports `observe`; a subset that sit at a clean decision point also support **act mode** — the program selects among the host-owned outcomes declared for that hook — the canonical set is in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §2 (`PASS · DROP · RESET · SAFE-RETURN · STEER · SAMPLE`), of which a CVE `filter`/drop shield uses only two. This catalog marks act-capable hooks with **◆**.
 - **RCA columns:** *Observe* = the steady-state signal; *Debug/RCA* = what it yields when an incident is being chased (often via the flight-recorder / tripwire patterns in §10).
 
 ---

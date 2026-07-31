@@ -17,7 +17,7 @@ In the generative-AI world, everything ships at machine speed — a config push,
 
 TMM is fast because it left the kernel behind — and that's exactly why it's hard to change. It's a kernel-bypass microkernel: its own network stack, its own memory manager, its own scheduler (a core-pinned poll loop that never syscalls for traffic). That's **why it's fast** — and **why it's opaque and rigid.**
 
-The industry's answer to safely changing a running system is eBPF *in the kernel*. But TMM bypassed the kernel, so kernel eBPF is structurally blind to everything TMM does with traffic. Changing TMM today means the slow lane:
+The industry's answer to safely changing a running system is eBPF *in the kernel*. But TMM bypassed the kernel. Kernel eBPF *can* attach to TMM — a uprobe on the `tmm` binary works today — but it **can't afford to** (every hit traps into the kernel, inside a run-to-completion loop) and it **can't enforce** (the kernel forbids overriding a return from a uprobe). So it can watch, expensively, and never act. Changing TMM today means the slow lane:
 
 ```
 change today:  C source → rebuild → re-qualify → release train   (weeks–quarters)
@@ -25,7 +25,7 @@ change today:  C source → rebuild → re-qualify → release train   (weeks–
 
 Two planes:
 - **Control plane** — Linux daemons (httpd, tmsh, MCPD, iControl REST). Kernel eBPF reaches this. ✓
-- **Data plane** — the TMM microkernel: own stack, poll loop, plugin processes, kernel-bypassed. Nothing outside can see in. ✗
+- **Data plane** — the TMM microkernel: own stack, poll loop, kernel-bypassed. Reachable only at a cost it can't pay. ✗ (Plugin processes like `bd` are ordinary Linux processes — uprobe-able today.)
 
 **Say it plainly: TMM is its own kernel.** It plays every role Linux plays for the traffic it carries. Linux earned an eBPF VM inside it for exactly this job — a kernel of TMM's standing and maturity deserves its own eBPF hosting VM.
 
@@ -51,8 +51,8 @@ The hooks map onto structures TMM **already has — and new ones it will define*
 
 Nothing else brings all three properties (runtime · programmable · provably safe) in-process:
 - **iRules** — runtime, but not provably safe
-- **DynaD** — runtime too (an earlier scripting-based swing at exactly this, since deprecated)
-- **WASM** — programmable, but bounded by a runtime kill, not a proof
+- **DynaD** — runtime too (an earlier scripting-based swing at exactly this, since deprecated). What's different now: an unverified script had no proof, no signing gate, and no host-owned outcome set — the three things that make this one governable
+- **WASM** — programmable, but its bound is only a runtime kill. The difference isn't that we avoid a runtime guard (we need one too, §5.4) — it's that eBPF adds a *static* memory-safety and termination proof that fuel-metering can't give
 - **kernel eBPF** — provably safe, but in the wrong kernel (a USDT lets it *watch* TMM, not act inside it, and traps on every hit)
 
 **An embedded eBPF engine is the only surface that is all three, in-process** — reaching the data plane's own code and state.
@@ -80,8 +80,8 @@ tmm:<stage>:<event>      /predicate/        { action }
 The **action** is the only part that decides observe vs. act. Same hook, same predicate — flip the verb:
 
 ```
-observe:  tmm:lb:select  /args.member_load > 80/  { snapshot() }   → host records a sample
-act:      tmm:lb:select  /args.member_load > 80/  { steer() }      → host steers the flow to a cooler member
+observe:  tmm:lb:member_select  /args.health < 50/  { snapshot() }   → host records a sample
+act:      tmm:lb:member_select  /args.health < 50/  { steer() }      → host steers the flow to a healthier member
 ```
 
 Nothing about the VM, the verifier, or the context changed — only what the host does with the answer. That symmetry *is* the thesis: one verified surface, observation and control as equals. And read-ctx/return-value is just the floor — the hook surface is designed to grow: a widening catalog of designed-in USDTs, plus every named function the build's signed hook map already exposes.

@@ -49,7 +49,20 @@ Stated as one line: **we need vendor-deliverable change under proof, and a proof
 Embedding a uBPF VM in TMM and exposing a curated set of designed-in **hook points** lets the host run a small, verified eBPF program at each point that either:
 
 - **observes** internal state and emits telemetry (a *tracepoint*), or
-- **acts** — returns a verdict the host applies (PASS / DROP / RESET / SAFE-RETURN — skip the hooked function's body) (a *datapath control*).
+- **acts** — returns a verdict the host applies (a *datapath control*).
+
+**The outcome set, canonically — this is the one list; everything else references it.** A program never performs an action; it selects one the host already owns at that hook, and the hook's entry in the signed map declares which of these are available there:
+
+| Outcome | Meaning | Available where |
+|---|---|---|
+| `PASS` | proceed unchanged — the default, and what a non-matching program always yields | every hook |
+| `DROP` | discard this frame/request; the connection survives | hooks the host can drop at |
+| `RESET` | tear down the connection | hooks with a reject path |
+| `SAFE-RETURN` | skip the hooked function's body, returning the value its safe-return policy declares | function-boundary hooks whose body is provably skippable |
+| `STEER` | choose among host-enumerated targets (pool member, mirror, queue) | selection points only |
+| `SAMPLE` | mark this flow for capture/telemetry; traffic unaffected | every hook |
+
+`observe` mode is not a seventh outcome — it is the host declining to apply whichever outcome the program selected, while still counting it. That is what makes monitor-before-enforce the same program, unchanged.
 
 Two hook kinds share the engine: the curated catalog of designed-in USDT tracepoints (stable,
 versioned `ctx`) covers the *anticipated* surface, and **function-boundary probes** at any named

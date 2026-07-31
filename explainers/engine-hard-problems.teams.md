@@ -142,7 +142,7 @@ The whole register, one line per problem:
 - **02 Interface** — the `ctx`/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.
 - **03 State** — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.
 - **04 Trust** — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.
-- **05 Further** — certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, invocation granularity, multi-tenancy, ISSU, jitter — each addressable.
+- **05 Further** — the safe point itself (the biggest unlisted item), certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, invocation granularity, multi-tenancy, ISSU, jitter — each addressable; the safe point and certification shape the first shippable form.
 - **06 Sequencing** — the conservative half ships first; the powerful half is deferred and governed.
 
 _A design proposal — the engineering register behind the engine explainer. Detailed method & claims are held in a separate invention disclosure._
