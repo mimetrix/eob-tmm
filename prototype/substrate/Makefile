@@ -10,9 +10,9 @@
 CC     ?= cc
 PYTHON ?= python3
 
-.PHONY: check check-header check-schema check-offsets clean
+.PHONY: check check-header check-schema check-offsets check-budget clean
 
-check: check-header check-schema check-offsets
+check: check-header check-schema check-offsets check-budget
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -32,6 +32,12 @@ check-schema:
 # this repo that this catches.
 check-offsets:
 	@$(PYTHON) ./check_offsets.py
+
+# The budget pass, run for real against the repo's own shield objects. It parses
+# the ELF, decodes the instruction stream (including lddw's 16-byte form), builds
+# the CFG and prices the longest path. Refuses anything with an unproven loop.
+check-budget:
+	@$(PYTHON) ./budget_pass.py
 
 clean:
 	@rm -f .guard.c .guard.out tmp*.c

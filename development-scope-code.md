@@ -856,7 +856,30 @@ def gate(prog_path, hook, hook_map):
 # — comfortably inside a cold hook's budget, nowhere near a hot one's.
 ```
 
-**Real:** eBPF's fixed 8-byte encoding (the decoder is genuine), and the CFG-longest-path approach.
+**This one is now real code, not a sketch.** [`prototype/substrate/budget_pass.py`](prototype/substrate/budget_pass.py)
+parses a genuine eBPF ELF, decodes the stream, builds the CFG and prices the longest path — no
+dependencies — and `make -C prototype/substrate check` runs it against the repo's own shield objects:
+
+```
+ok      ls_shield_bad.bpf.o          3 insn ·  1 blocks · longest path ~   6 cycles  (budget 800)
+ok      ls_shield_ubpf.bpf.o         9 insn ·  4 blocks · longest path ~  17 cycles  (budget 800)
+ok      ls_trace_ubpf.bpf.o          8 insn ·  3 blocks · longest path ~  12 cycles  (budget 800)
+```
+
+Writing it for real fixed three bugs that were in the sketch above: it read the whole ELF *file* as
+instructions (the first eight bytes are `\x7fELF`); it strided 8 bytes blindly, so `lddw` — a
+**16-byte** pseudo-instruction — had its second half decoded as a phantom instruction, corrupting
+every branch target after it; and it never treated `exit` as a block terminator, so blocks ran past
+returns. It also refuses, rather than guesses, when it finds a loop back-edge: PREVAIL reports one
+*aggregate* `max_loop_count`, not a per-loop trip count, so there is nothing sound to price a loop
+with.
+
+**And the numbers make a point worth carrying into the design.** These predicates cost **6–17
+cycles**. That is far below any plausible hook budget — which means for programs of this shape the
+budget pass is not the binding constraint; **the trampoline's register save/restore is.** The thing to
+measure first is invocation overhead, not program cost.
+
+**Real:** eBPF's fixed 8-byte encoding, the CFG-longest-path approach, and now the implementation.
 **Stubbed:** `cls`, `topo`, `collapse_loops`, `block_cost`, `prevail_loop_bounds`, `ok`/`fail`.
 **TODO(f5):** per-microarchitecture cycle calibration — and publishing the calibration, because an
 uncalibrated table makes this gate theatre; extracting loop trip counts from PREVAIL's own invariants
