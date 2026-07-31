@@ -554,6 +554,11 @@
         computed right at the hook, inline, with no round-trip out of the data path.</li>
       <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
         no debug build, no core-dump archaeology.</li>
+      <li><b>Runtime CVE mitigation.</b> Recognize a bug's precondition and take a host-owned safe outcome, between
+        patch windows — the one application worked end-to-end, with its limits, in
+        <a href="cve-shield-walkthrough.html" style="color:var(--signal-ink)">the CVE walkthrough</a>. It is
+        <em>one</em> use of the engine, and the narrowest: it needs the same hooks, the same verifier and the same
+        signing gate as everything above it.</li>
       <li class="prf"><b>AI-authored programs.</b> Because safety is a <em class="prf">proof, not trust</em>, a model
         can draft one and the verifier is a <b>fail-closed acceptance gate</b> — blast radius bounded before a
         human signs.</li>
@@ -580,20 +585,22 @@
       streams captured windows of internal state out to userspace for RCA, and drives steering and self-tuning
       where the host wants to act on the return. Returning a value the host acts on is one thing the engine does —
       not the point of it.</p>
-    <p><b>Two kinds of hook — and the difference matters most for shields.</b> The first is a <b>designed-in
+    <p><b>Two kinds of hook — the anticipated and the unanticipated.</b> The first is a <b>designed-in
       tracepoint</b> (a USDT): F5 places a named, versioned point exposing a <em>curated</em>
-      <span class="inlinecode">ctx</span> — a stable contract, published in a per-build map. That's the planned
-      surface: ideal for observability, and for a CVE that happens to land where one sits. But <b>F5 can't
-      pre-place a tracepoint for every future bug</b> — so a shield usually needs the second kind.</p>
-    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of an
-      existing named function</em> — the one that would crash, or one on its path — reading that function's
-      arguments and reachable state as the <span class="inlinecode">ctx</span>. It rides the code's <b>existing
-      structure</b> (functions and their signatures), so you can hook a spot <em>nobody instrumented ahead of
-      time</em>. That is how you shield an unforeseen CVE: hook the vulnerable function, read the pointer from its
-      args, decide — <b>no bespoke tracepoint required.</b> (The mechanism is the kernel's own
-      <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions. See the
-      worked example: <a href="cve-shield-walkthrough.html" style="color:var(--signal-ink)">shielding a real
-      TMM CVE</a>.)</p>
+      <span class="inlinecode">ctx</span> — a stable contract, published in a per-build map. That is the
+      <em>planned</em> surface, and it is where the standing value lives: the metrics, histograms and latency
+      breakdowns you want on every box, whose meaning holds across releases. But no catalog anticipates every
+      question. <b>F5 cannot pre-place a tracepoint for every question someone will need to ask three years from
+      now</b> — which is what the second kind is for.</p>
+    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of any
+      existing named function</em>, reading that function's arguments and reachable state as the
+      <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
+      signatures — so you can instrument a spot <em>nobody thought to instrument ahead of time</em>, with no new
+      build. That is what makes the engine answer questions it was never designed for: <b>why is this one
+      customer's TLS renegotiation path slow</b>, <b>what state does the parser hold when this rare error branch
+      fires</b>, <b>which flows are reaching a code path we thought was unreachable</b> — and, as one case among
+      those, <b>recognising the precondition of a bug nobody foresaw</b>. (The mechanism is the kernel's own
+      <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions.)</p>
     <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
       capability in (patchable function entries), and attaches at a <em>named symbol</em> — never fragile offsets
       an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
