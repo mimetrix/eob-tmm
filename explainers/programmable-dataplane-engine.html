@@ -429,9 +429,8 @@
     <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> <b>eBPF-for-Windows</b> runs this
       <em>exact</em> stack in production — <b>uBPF verified by PREVAIL</b> — inside a shipping OS. A userspace VM
       running verified bytecode at a designed-in hook is an established pattern with a maintained implementation
-      behind it; what's new here is bringing it to a proxy data plane that hasn't had it. (Research prototypes
-      carried uBPF into Open vSwitch as well — Oko, P4rt-OVS.) The parts we'd build are the parts that are ours
-      anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
+      behind it; what's new here is bringing it to a proxy data plane that hasn't had it. The parts we'd build are
+      the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
       so the surface can start from what's in the code today and grow as the code does, not a blank page. A
       <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe

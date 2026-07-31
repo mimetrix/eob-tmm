@@ -45,7 +45,7 @@ Bring them inside: embed a small userspace eBPF VM (**uBPF**, ~150 KB, JIT-compi
 the proposal:  author → clang → PREVAIL verify → budget pass → sign → load   (hours)
 ```
 
-**And the mechanism isn't hypothetical.** **eBPF-for-Windows** runs this *exact* stack in production — **uBPF verified by PREVAIL** — inside a shipping OS. A userspace VM running verified bytecode at a designed-in hook is an established pattern with a maintained implementation behind it; what's new here is bringing it to a proxy data plane that hasn't had it. (Research prototypes carried uBPF into Open vSwitch as well — Oko, P4rt-OVS.) The parts we'd build are the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.
+**And the mechanism isn't hypothetical.** **eBPF-for-Windows** runs this *exact* stack in production — **uBPF verified by PREVAIL** — inside a shipping OS. A userspace VM running verified bytecode at a designed-in hook is an established pattern with a maintained implementation behind it; what's new here is bringing it to a proxy data plane that hasn't had it. The parts we'd build are the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.
 
 The hooks map onto structures TMM **already has — and new ones it will define** — so the surface starts from what's in the code today and grows with it. A candidate catalog of **USDT tracepoints** (userland statically-defined tracing — named probe points designed into the source) rides alongside the engine: L3/L4 ingress + the connection table, the TLS record layer, the L7 parsers, the plugin processes, the poll loop itself.
 

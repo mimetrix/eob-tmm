@@ -68,6 +68,14 @@ ahead of time, but *how long* they take is not.
   wall-clock deadline is the piece you can't skip.) Runtime/JIT engineering, not verifier or helper.
 - **Budget by path class** — hot hooks (per-packet) on a tight measured budget; cold/error-path
   hooks looser.
+- **The budget pass is also a placement decision, not just a gate.** Once a program's cost is
+  estimated at admission, "over budget" need not mean "rejected outright" — it can mean *not here*.
+  The same analysis that protects the poll loop can **route**: a program that fits runs inline at
+  the hot hook it asked for; one that doesn't can be admitted at a looser cold/warm hook, admitted
+  only where there is headroom (a VE deployment rather than a loaded appliance), or declined in
+  favour of doing that work somewhere else entirely — including capable hardware, where an
+  offload path exists. Worth building the pass with that in mind: a reject/accept boolean is a
+  smaller idea than a cost estimate that tells you *where* a given program belongs.
 - **Interpreter mode** for the most sensitive builds makes per-instruction cost predictable (and
   see §4 — it also shrinks the native-code surface).
 
