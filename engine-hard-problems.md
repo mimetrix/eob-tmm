@@ -229,6 +229,20 @@ the day-one posture, but the first two are the most likely to shape the first sh
 - **uBPF JIT maturity.** §4 is really "the verifier *and this JIT*." uBPF's arm64/x86-64 JIT is
   far less battle-tested than the kernel's, and here a JIT bug is the RCE. Plan to
   **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
+- **The optimiser decides the hookable set, not us.** `-fpatchable-function-entry` pads the entries of
+  functions the build actually emits out-of-line. At `-O2` that is a *subset* of the source: an
+  inlined function has no entry of its own; `-fipa-icf` **folds identical functions**, so one pad may
+  serve two source names and arming "A" also arms "B"; and `ipa-cp`/`ipa-sra` emit **clones**
+  (`foo.constprop.0`, `foo.isra.0`) whose symbol name *and argument list* differ from the source, so a
+  `ctx` derived from the source signature would be wrong. Three consequences worth stating before
+  anyone promises reach: the hook map must be generated from the **emitted** symbols and must reject
+  or disambiguate folded ones (the generator's `DW_AT_low_pc` test silently drops inlined statics —
+  see `development-scope-code.md` item 5); the hookable set is knowable **per build** but is not the
+  set of functions an engineer can name from reading the code; and guaranteeing a *specific* function
+  stays hookable across releases means marking it `noinline`, which is a **source change** with a
+  perf cost — so "no source modification" holds for the mechanism, not for a guarantee about any
+  particular target. Day one: publish the hookable set as a build artifact and treat it as the
+  contract, rather than implying every named function qualifies.
 - **Invocation granularity — per-packet bytecode on a partly batched data plane.** eBPF's calling
   convention takes **one `ctx`, once**: it cannot express "here is a vector of 256 packets." A data
   plane whose performance comes from a stage seeing an entire batch at once — so it can loop and

@@ -600,9 +600,9 @@
       breakdowns you want on every box, whose meaning holds across releases. But no catalog anticipates every
       question. <b>F5 cannot pre-place a tracepoint for every question someone will need to ask three years from
       now</b> — which is what the second kind is for.</p>
-    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of any
-      existing named function</em>, reading that function's arguments and reachable state as the
-      <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
+    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of an
+      existing named function</em> — any function that survived the build as its own out-of-line body — reading
+      that function's arguments and reachable state as the <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
       signatures — so you can instrument a spot <em>nobody thought to instrument ahead of time</em>, with no new
       build. That is what makes the engine answer questions it was never designed for: <b>why is this one
       customer's TLS renegotiation path slow</b>, <b>what state does the parser hold when this rare error branch
@@ -612,7 +612,14 @@
     <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
       capability in (patchable function entries), and attaches at a <em>named symbol</em> — never fragile offsets
       an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
-      The honest trade is <b>stability</b>: a tracepoint's <span class="inlinecode">ctx</span> is a curated,
+      And the honest bound on reach: <b>which functions are hookable is decided by the optimiser, not by us.</b>
+      At <span class="inlinecode">-O2</span> an inlined or identical-code-folded function has no entry pad of its
+      own, and a cloned one (<span class="inlinecode">.constprop</span>,
+      <span class="inlinecode">.isra</span>) changes both its symbol name and its argument list. So the hookable
+      set is whatever the build's signed hook map <em>says</em> it is — which is knowable per build, but is a
+      subset of the source, and pinning a specific function into it means marking it
+      <span class="inlinecode">noinline</span>: a source change, with its own cost.</p>
+    <p>The honest trade is <b>stability</b>: a tracepoint's <span class="inlinecode">ctx</span> is a curated,
       versioned contract; a function-boundary probe's is <em>build-specific</em> (function X's signature at build
       Y) — more reach, a looser contract, <b>re-validated per build</b>. Either way it is verified, signed, and
       budgeted before it runs.</p>

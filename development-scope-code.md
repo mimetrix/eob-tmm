@@ -582,6 +582,16 @@ if __name__ == "__main__":
 **TODO(f5):** the allowlist's source of truth (a per-subsystem annotation in the build, not a file
 maintained by hand off to the side); reading the actual pad size the compiler reserved; deciding
 whether to key on DWARF or BTF if TMM's build produces both.
+**The bug in `hookable()` above, stated plainly:** testing for `DW_AT_low_pc` accepts only functions
+the build emitted out-of-line — which is correct, and is also why the generator **silently drops
+every inlined static**, exactly the small leaf functions that hold the interesting state. Worse, it
+says nothing about `-fipa-icf` **folds** (two source names, one pad — arming one arms both) or about
+`ipa-cp`/`ipa-sra` **clones** (`foo.constprop.0`, whose argument list differs from the source, so a
+`ctx` derived from the source signature is wrong). A real generator must therefore: reject or
+explicitly disambiguate folded symbols; emit clones under their *emitted* name with their *emitted*
+signature, or omit them; and **publish the resulting hookable set as a build artifact**, because it
+is a subset of the source and nobody can predict it by reading code. See
+[`engine-hard-problems.md`](engine-hard-problems.md) §5.
 **The design decision hiding in here:** `attach_mode` is derived, not declared — a hook whose
 arguments cannot be fully typed becomes **observe-only automatically**. That is the mechanism that
 keeps "we couldn't prove this one" from silently becoming an enforce-capable surface.
