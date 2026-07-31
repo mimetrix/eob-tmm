@@ -279,7 +279,7 @@
     <h2>A proof that a program <em>terminates</em> is not a promise it fits the budget.</h2>
     <p class="lede">The verifier proves every program halts — it bounds loop iterations, so nothing runs forever.
       That is <b>not</b> a <b>worst-case execution time (WCET)</b>: the longest it can actually take on the
-      hardware. Halting says nothing about fitting TMM's per-packet budget.</p>
+      hardware. Halting says nothing about fitting the budget at the hook it runs on.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
       <p>&ldquo;It's verified as bounded, so it can't hang the poll loop.&rdquo;</p></div>
     <p style="margin-top:1.4rem">And the resource is unforgiving. TMM's poll loop is <b>single-threaded,
@@ -294,7 +294,11 @@
         <p class="lh"><span class="num">①</span> at admission · static · once, off-box</p>
         <h4>The budget pass</h4>
         <p>Cost the worst-case path through the program's CFG (finite, loops proven-bounded), compare to the
-          hook's <b>budget</b> — tight on hot per-packet hooks, looser on cold paths — and <b>reject over-budget,
+          hook's <b>budget</b> — and the budget is per <em>invocation</em>, gated by the hook's
+          <b>rate</b>: <span class="inlinecode">path_class</span> <em>is</em> that rate class, so
+          <b>hot</b> fires per packet, <b>warm</b> per connection or request, <b>cold</b> per exceptional event.
+          The same 100&nbsp;ns program is noise on a request the proxy spends 50&nbsp;µs on and a problem on a
+          packet forwarded in 200&nbsp;ns — and <b>reject over-budget,
           fail closed</b>. Bounds <b>instruction count</b>, proven before the program loads.</p>
         <p class="cost">runtime cost: none · a build artifact</p>
       </div>

@@ -23,7 +23,7 @@ The resource is unforgiving: TMM's poll loop is **single-threaded, un-preemptibl
 
 The fix is **two layers — and only one is free** (static analysis can bound how *many* instructions run, not how *long* they take):
 
-- **① at admission · static · once, off-box — the budget pass.** Cost the worst-case path through the program's control-flow graph (finite; loops proven-bounded), compare to the hook's budget (tight on hot per-packet hooks, looser on cold paths), reject over-budget / fail closed. Bounds **instruction count**. *Runtime cost: none — a build artifact.*
+- **① at admission · static · once, off-box — the budget pass.** Cost the worst-case path through the program's control-flow graph (finite; loops proven-bounded), compare to the hook's budget — and the budget is per **invocation**, gated by the hook's **rate**: `path_class` *is* that rate class, so `hot` fires per packet, `warm` per connection or request, `cold` per exceptional event. The same 100 ns program is noise on a request the proxy spends 50 µs on and a problem on a packet forwarded in 200 ns. Reject over-budget / fail closed. Bounds **instruction count**. *Runtime cost: none — a build artifact.*
 - **② at runtime · every execution — the wall-clock deadline.** Instruction count is not time (warm vs. cold cache). A **deadline + watchdog** on each run is what actually stops a slow execution from stalling the loop. **Irreducible**; small per-execution cost.
 
 Why both: ① proves the program is *small* (static, provable); ② proves it's *fast this time* (only knowable as it runs). **Size settles statically; timing does not.** Note what "terminating" buys alone: PREVAIL's ceiling is **100,000 loop iterations** — ~300 µs on a 3 GHz core at ~10 instr/iteration. A *proven-terminating* program can still stall the loop for a third of a millisecond; that number is the argument for ①.
@@ -44,7 +44,7 @@ Build pipeline — where each step runs, what it emits, and what touches the hot
 ```
  dev / CI     F5 build + sign  (off-box, per program)     control plane   data plane
 [compile] → [verify] → [budget pass] → [sign]        →     [load]      →   [run]
- bytecode    verified   +budget bound   signed program      on a hook       per packet
+ bytecode    verified   +budget bound   signed program      on a hook     per invocation
 |————————— amortized: once per program / per build · off the data path —————————|  |— per packet · poll loop —|
 ```
 Plus, once per **TMOS build**: the signed hook-point map, the ctx/BTF descriptors, the per-hook budget table, and the cost model.

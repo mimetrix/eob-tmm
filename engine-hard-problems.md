@@ -29,7 +29,7 @@ PREVAIL proves **halting** — it bounds loop iterations via abstract interpreta
 *handles* loops (unlike the original kernel verifier's unroll-or-reject rule) and guarantees the
 program terminates. That is safety + termination. It is **not** a **worst-case execution time
 (WCET)** — the longest wall-clock time the program can actually take on the hardware.
-"Halts in a finite number of steps" says nothing about fitting TMM's per-packet budget, and even
+"Halts in a finite number of steps" says nothing about fitting the budget at the hook it runs on, and even
 a static **instruction-count** bound is not WCET (memory stalls, JIT variance, cache effects all
 dominate).
 
@@ -55,7 +55,13 @@ ahead of time, but *how long* they take is not.
      PREVAIL's loop bounds are *reused* here, not recomputed.
   2. Map that count to a conservative **cycle estimate** via a per-target cost model (most eBPF
      ops ≈ 1 cycle; loads/stores more) and compare to the hook's **budget** — a cycle allowance
-     per hook and path class, derived from the poll loop's per-packet headroom.
+     per hook and path class. **The budget is per *invocation*, and what makes an invocation affordable is
+     its rate**: cost-per-invocation × invocations-per-unit-of-work must fit the loop's headroom for
+     that unit of work. `path_class` *is* the rate class — `hot` fires per packet, `warm` per
+     connection or per request, `cold` per exceptional event. So the same 100 ns program is noise on
+     a request the proxy spends 50 µs on, significant on a packet forwarded in 200 ns, and a problem
+     if it was budgeted per request and turns out to fire per packet. (Which is precisely the
+     adversarial case in §5: an attacker changes a hook's *rate* without touching a line of code.)
   3. Over budget → **reject, fail closed.**
   The pass, the per-hook budget table, and the cost model are **new build work** — a stage added
   to the load pipeline (`author → clang → PREVAIL → budget pass → sign → load`), F5-owned.
@@ -63,11 +69,24 @@ ahead of time, but *how long* they take is not.
   is *not* wall-clock time (cache, memory stalls, JIT variance) — bounding *how many* instructions
   run cannot bound *how long* they take. So a per-execution **deadline + watchdog** — bounded-cost
   preemption for a loop with no OS to preempt it — is what actually stops a slow run from stalling
-  the poll loop. This layer has a small runtime cost and **cannot be moved to admission time.** (An
-  instruction **fuel** counter is *optional* here — redundant with the admission bound; the
-  wall-clock deadline is the piece you can't skip.) Runtime/JIT engineering, not verifier or helper.
-- **Budget by path class** — hot hooks (per-packet) on a tight measured budget; cold/error-path
-  hooks looser.
+  the poll loop. This layer has a small runtime cost and **cannot be moved to admission time.**
+  Runtime/JIT engineering, not verifier or helper.
+- **And the trilemma — the hardest open question in this register.** With **no preemption**, three
+  mechanisms could enforce a time bound, and each costs something claimed elsewhere. **Fuel** (a
+  counter at loop back-edges) is cheap and deterministic — but uBPF's own API states it *"has no
+  effect on JIT'd programs,"* so fuel means **patching uBPF's JIT**, which costs the
+  "reused as-is" claim on one of the three reused components. **Wall-clock** reads a clock at
+  back-edges — but on aarch64 the counter ticks at tens of MHz (10–40 ns granularity) against a hot
+  hook's budget of tens of nanoseconds, so it is **not measurable at the granularity that matters**
+  on half the platforms. **Signals/timers** cost a syscall per invocation plus delivery jitter — a
+  non-starter in this loop. So the honest position is that **fuel is the mechanism, not the optional
+  extra**, and the wall-clock deadline is better understood as *reporting* than enforcement (earlier
+  drafts of this register had that backwards). Decide in the room, not in month nine: which do we
+  give up — the run-to-completion loop, the unmodified uBPF, or enforce on hot hooks? The available
+  good answer is to fork uBPF's JIT for back-edge fuel, own it, and upstream it.
+- **Budget by rate class** — a `hot` (per-packet) hook gets a tight, *measured* budget; `warm`
+  (per-connection/per-request) hooks get the proxy's much larger per-unit headroom; `cold`
+  (exceptional-branch) hooks are looser still. Read §5's adversarial note before trusting `cold`.
 - **The budget pass is also a placement decision, not just a gate.** Once a program's cost is
   estimated at admission, "over budget" need not mean "rejected outright" — it can mean *not here*.
   The same analysis that protects the poll loop can **route**: a program that fits runs inline at

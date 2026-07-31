@@ -686,7 +686,7 @@
       <li><b>Bounded in time, not just in steps</b> — a proof that a program <em>terminates</em> is not a
         <b>worst-case execution time (WCET)</b>: the longest it can actually take on the hardware. So each hook
         adds an <b>instruction-budget ceiling</b> at load and a <b>runtime deadline</b> — a provably-terminating
-        program still can't overrun the poll loop's per-packet budget.</li>
+        program still can't overrun its hook's budget — which is set per <em>invocation</em> and gated by the hook's rate (per packet, per connection, per request), not by one global number.</li>
       <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; a program that
         <em>acts</em> needs stricter authz than one that only observes; RBAC-gated.</li>
       <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
