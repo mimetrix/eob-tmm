@@ -483,6 +483,13 @@
           canary bounds a bad-but-valid program.</li>
       </ul>
     </div>
+    <div class="callout"><span class="lbl">we're not alone on this — and that's new information</span>
+      <p>DPDK's <span class="inlinecode">librte_bpf</span> recently added a <b>validation debugging API</b> built to
+        unit-test its verifier by stepping through <b>the abstract interpretation</b> — independently converging on
+        PREVAIL's technique inside a userspace data plane. Two things follow: userspace dataplane bytecode is
+        clearly not a dead end (someone is investing in a verifier for it <em>now</em>), and <b>step-through
+        tooling is what makes a verifier auditable</b> — which is the only real answer to &ldquo;how do you know
+        it's sound?&rdquo; Worth tracking as prior art for evidencing PREVAIL's soundness to a TMA.</p></div>
     <p class="fnote"><sup>†</sup> Sharper still given the source-code exposure — an adversary holding the code can
       hunt verifier/JIT soundness bugs directly. Which is exactly the point: <b>secrecy was never the defense; the
       signing gate is.</b> The perimeter holds whether or not the source is public.</p>
@@ -491,7 +498,7 @@
   <!-- 05 FURTHER CONCERNS -->
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
-    <h2>Seven more to get ahead of — smaller, but real.</h2>
+    <h2>Eight more to get ahead of — smaller, but real.</h2>
     <p class="lede">The four above are load-bearing. These are the next tier: each has a stance, none changes the
       day-one posture — and the first two are the most likely to shape what the first shippable form looks like.</p>
     <div class="concerns">
@@ -499,6 +506,7 @@
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) should verify at <b>build / control-plane time</b> — only the small runtime and a signature check live in TMM's address space. This <em>shrinks</em> the §04 surface.</p></div>
       <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated and re-validated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range are what keep it honest.</p></div>
       <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter on high-assurance builds.</p></div>
+      <div class="concern"><span class="cl">invocation granularity · per-packet vs. batched</span><p>eBPF's calling convention takes <b>one <span class="inlinecode">ctx</span>, once</b> — it cannot express &ldquo;here is a vector of 256 packets.&rdquo; That is the structural reason bytecode never displaced native plugins in <b>VPP</b>, whose whole premise is a node seeing the entire vector. <b>TMM is the favorable case</b>: run-to-completion and core-pinned, per-flow rather than per-vector. What remains is per-invocation overhead on hot hooks — DPDK's <span class="inlinecode">rte_bpf_exec_burst()</span> is the precedent to copy, with §01's budget pass reasoning <b>per burst</b>.</p></div>
       <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
       <div class="concern"><span class="cl">ISSU + failover</span><p>Zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
       <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and the like won't tolerate <em>any</em> added per-packet jitter, even budgeted — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>

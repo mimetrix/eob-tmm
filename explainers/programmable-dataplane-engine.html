@@ -418,13 +418,17 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <div class="callout sig"><p><b>And this pattern is proven, not novel.</b> A userspace eBPF VM running
-      <em>verified</em> bytecode inline is already the model in <b>maintained</b> software: <b>DPDK</b> ships
-      <span class="inlinecode">librte_bpf</span> — its <b>own</b> in-tree VM and lightweight validator (not uBPF,
-      and not a PREVAIL-grade proof) — load, validate, JIT, run on packets at a device's RX/TX, mainline
-      since 2018 — and <b>eBPF-for-Windows</b> runs this <em>exact</em> stack, <b>uBPF verified by PREVAIL</b>,
-      inside a production OS. (Research prototypes carried it into Open vSwitch too — Oko, P4rt-OVS.) We're bringing
-      an established pattern to the one high-performance data plane that hasn't had it — TMM.</p></div>
+    <div class="callout sig"><p><b>The mechanism exists; what's missing is the proof.</b> Every mature userspace
+      data plane hit this same need and answered it with <b>native-code plugins</b> — VPP's graph nodes, DPDK
+      applications — accepting the cost that a bad plugin takes the process down with it. That is the trade we're
+      proposing to change, and <b>eBPF-for-Windows</b> shows the exact stack working in production:
+      <b>uBPF verified by PREVAIL</b>, inside a shipping OS. <b>DPDK</b> also carries a userspace eBPF VM in
+      mainline — <span class="inlinecode">librte_bpf</span>, its <em>own</em> in-tree VM and validator, since
+      2018 — though honestly: still an <b>experimental API</b>, attachable only via software RX/TX callbacks, and
+      never DPDK's headline programmability story. <em>The interesting part is where it's going</em> — it recently
+      gained a debuggable <b>abstract-interpretation</b> validator, independently converging on PREVAIL's
+      technique. The direction of travel in userspace data planes is toward verified bytecode, not away from
+      it.</p></div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
       so the surface can start from what's in the code today and grow as the code does, not a blank page. A
       <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe

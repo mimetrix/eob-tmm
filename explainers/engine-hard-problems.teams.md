@@ -83,6 +83,8 @@ The JIT emits native code into **the crown-jewel process**, and the verifier dec
 
 **The load-bearing point: the perimeter is the signing gate, not the verifier.** Only F5-signed bytecode ever reaches the verifier or JIT — attacker-controlled input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection.
 
+_We're not alone on this — and that's new information._ DPDK's `librte_bpf` recently added a **validation debugging API** built to unit-test its verifier by stepping through **the abstract interpretation** — independently converging on PREVAIL's technique inside a userspace data plane. Two things follow: userspace dataplane bytecode is clearly not a dead end (someone is investing in a verifier for it *now*), and **step-through tooling is what makes a verifier auditable** — the only real answer to "how do you know it's sound?" Worth tracking as prior art for evidencing PREVAIL's soundness to a TMA.
+
 ```
 attacker-controlled bytecode → signing gate            → ✗ rejected
 F5-signed bytecode           → verify → JIT            → ✓ runs
@@ -105,6 +107,7 @@ _† Sharper still given the source-code exposure — an adversary holding the c
 - **uBPF JIT maturity** — §04 is really "the verifier *and this JIT*." uBPF's JIT is far less battle-tested than the kernel's — audit / harden / fork it, or default to the interpreter on high-assurance builds.
 - **Multi-tenancy (partitions, route domains, vCMP)** — BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's scope, authorization, and blast radius must be tenant-aware from day one.
 - **ISSU + failover** — zero-downtime upgrades and HA failover need defined behavior: loaded programs re-verify and reload on the new TMM, with explicit map-state handling.
+- **Invocation granularity — per-packet vs. batched** — eBPF's calling convention takes **one `ctx`, once**; it cannot express "here is a vector of 256 packets." That is the structural reason bytecode never displaced native plugins in **VPP**, whose whole premise is a graph node seeing the entire vector. **TMM is the favorable case**: run-to-completion and core-pinned, per-flow rather than per-vector, so the mismatch that blocks VPP largely doesn't apply. What remains is per-invocation overhead on hot hooks — DPDK's `rte_bpf_exec_burst()` is the precedent to copy, with §01's budget pass reasoning **per burst**.
 - **Jitter-sensitive deployments** — trading, 5G UPF and the like won't tolerate *any* added per-packet jitter, even budgeted — expect a per-hook / per-deployment opt-out.
 
 ---
@@ -132,7 +135,7 @@ The whole register, one line per problem:
 - **02 Interface** — the `ctx`/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.
 - **03 State** — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.
 - **04 Trust** — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.
-- **05 Further** — certification, verifier-placement, uBPF-JIT maturity, multi-tenancy, ISSU, jitter — each addressable.
+- **05 Further** — certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, invocation granularity, multi-tenancy, ISSU, jitter — each addressable.
 - **06 Sequencing** — the conservative half ships first; the powerful half is deferred and governed.
 
 _A design proposal — the engineering register behind the engine explainer. Detailed method & claims are held in a separate invention disclosure._

@@ -85,7 +85,7 @@ P4 on TMM is a front-end **unlocked by the richer tier, not free at the base tie
 
 ## 8. Precedent
 
-- **DPDK `librte_bpf`** (mainline, maintained) — DPDK's **own** in-tree eBPF VM + JIT (not uBPF; a lightweight in-tree validator, not a PREVAIL-grade proof) run inline on packets at a device's RX/TX. The living dataplane precedent.
+- **DPDK `librte_bpf`** (mainline since 18.05) — DPDK's **own** in-tree eBPF VM + JIT (not uBPF) run inline on packets at a device's RX/TX. Scope it honestly: still an **experimental API**, attachable only via software RX/TX callbacks, and never DPDK's headline programmability story — but it recently gained a debuggable **abstract-interpretation** validator, independently converging on PREVAIL's technique. It also ships `rte_bpf_exec_burst()`, which is the precedent to copy for hot-path invocation granularity (see [`engine-hard-problems.md`](engine-hard-problems.md) §5).
 - **eBPF-for-Windows** (Microsoft, production) — **uBPF + PREVAIL**, the exact two libraries this proposal reuses.
 - **Oko / p4rt-OVS** (Orange Labs, ~2018–2020, now **dormant**) — `P4 → uBPF` as Open vSwitch **actions / stateful filters** with maps and a default verifier. Proves the `P4 → uBPF`-in-a-software-dataplane path end to end — but treat as **research prototype, not production**.
 
