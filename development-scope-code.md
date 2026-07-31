@@ -1698,7 +1698,7 @@ compiler — that reuse is real, and narrow. What is being built instead is a **
 live-text, dynamic-code-loading facility inside the crown-jewel process**, carrying a build-pipeline
 toolchain and a permanent per-build ABI, and needing a fork of one of the three reused components to
 get time safety at all (item 15). Sized honestly that is **50–80 senior-engineer-months** for a
-defensible v1 on two architectures — five to six people over ten to fourteen months, plus the TMA and
+defensible v1 on two architectures — months, plus the TMA and
 certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item list in
 these two documents is right; the size classes are shape, not effort, and reviewed against what each
 item actually requires they are low by roughly 3–10×.

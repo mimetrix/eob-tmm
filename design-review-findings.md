@@ -10,12 +10,12 @@
 
 ## The verdict, stated first
 
-All three reviewers would **fund a feasibility phase**. None would fund the twelve-item build as scoped. Their shared reasoning:
+All three reviewers would **back answering three questions first** (§8). None would back the twelve-item build as scoped. Their shared reasoning:
 
 - **The mechanism is the right shape** — patchable entry pad, trampoline, signed per-build hook map, monitor-before-enforce, signing gate as the perimeter.
 - **The `ctx` model as written does not work**, and that is provable from PREVAIL's own source, not a matter of taste.
 - **The effort estimate was low by a large multiple** — stated without a multiplier, because the scope docs' original sizings were *size classes* ("small", "40 lines", "≈ a page per arch", "hundreds of lines"), and size classes do not convert to months, so there is no honest baseline to multiply. What §5 can say is item-by-item: the realistic figures run **3–10×** the class each item was given, and the aggregate is **50–80 SEM** where the scope doc originally carried no aggregate at all (it now carries this one). And the two items most likely to sink a TMM design review were not on the list.
-- The reframe that matters: *"the subsystem you are adding is not the VM — it is a code-patching, live-text, dynamic-code-loading facility in the crown-jewel process, with its own build-pipeline toolchain and a permanent per-build ABI."* That is a subsystem, it is worth building, and describing it as smaller than it is doesn't make it easier to fund — it makes the funding collapse in month nine.
+- The reframe that matters: *"the subsystem you are adding is not the VM — it is a code-patching, live-text, dynamic-code-loading facility in the crown-jewel process, with its own build-pipeline toolchain and a permanent per-build ABI."* That is a subsystem, it is worth building, and describing it as smaller than it is doesn't make it easier to say yes to — it makes the yes collapse in month nine.
 
 ---
 
@@ -141,7 +141,7 @@ Senior-engineer-months, assuming people who have shipped in TMM:
 | 15 · back-edge fuel | "optional, staged" | **3–6, and it must be day one** | O6 + §3's `path_class` finding. The number is the uBPF JIT patch on **both** backends, the interpreter path that already works, the per-hook fuel budget plumbing, and carrying the fork (rebase per uBPF release until upstreamed). Wall-clock reporting is inside this figure; it is not the enforcement half. |
 | — | *not listed* | **2–4** | Core dumps / qkview / debuggability. |
 
-**Total for a defensible v1 on two architectures: 50–80 SEM, staffed as five to six people over ten to fourteen months**, plus TMA and certification engagement. (That is `engine-hard-problems.md` §6.1's staffing, adopted verbatim so every document in the package multiplies out the same way: 5×10 = 50 to 6×14 = 84.)
+**Total for a defensible v1 on two architectures: 50–80 SEM**, plus TMA and certification engagement. (That is `engine-hard-problems.md` §6.1's staffing, adopted verbatim so every document in the package multiplies out the same way: 5×10 = 50 to 6×14 = 84.)
 
 **How that reconciles with the column.** Taking each row's own low and high, and counting the trampoline **twice** for two architectures, the table sums to **52–97 SEM** — not 50–80. The two are not the same number, and the difference should be stated rather than smoothed: 50–80 is the column's floor through roughly its midpoint, i.e. the planning range. **97** is the answer to "what does the tail look like if every row lands at its own worst case" — a real possibility, but not a plan, because the rows are not independent worst cases (most of the tail is items 2, 5 and 6, and item 2's tail is a memory-manager change that §4's measurement would surface early). The floor is 52, so the headline's "50" is a rounding, not a computation.
 
@@ -179,7 +179,7 @@ Ranked by how much it would help to move it forward.
 ## 7 · The three questions to answer before anything else
 
 1. **Measure the flag** (§4). Two weeks. Kill criterion >1% pps.
-2. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A couple of weeks of SIRT-plus-engineering, and it either makes the program obviously fundable or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
+2. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A couple of weeks of SIRT-plus-engineering, and it either makes the case obvious or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
 3. **The trilemma — pick one, in the room, not in month nine.** With no preemption, enforcing a time bound needs fuel; fuel has no effect under uBPF's JIT; wall-clock is unmeasurable at hot-hook granularity on aarch64. **Which do you give up: the run-to-completion loop, the unmodified uBPF, or enforce mode?** The available good answer — fork uBPF's JIT for back-edge fuel, own it, upstream it — costs "reused as-is" on one of the three reused components.
 
 **And the question with no answer in any document:** who owns the safe-return policy for every hookable TMM function, *in perpetuity*, and what mechanical gate catches it when someone edits one of those functions two releases from now? Skipping a body is a per-function proof obligation over buffer ownership, refcounts, locks held on entry, flow-state advancement, and divergence from the mirrored connflow. There is no test for the absence of an obligation you didn't think of. The failure mode: a shield blocks the CVE, passes red team, ships, and leaks a packet buffer at 40k conn/sec on one customer's traffic mix three weeks later — presenting as a memory-pressure TMM restart with no attribution back to the shield.
@@ -190,13 +190,15 @@ Ranked by how much it would help to move it forward.
 
 ## 8 · The recommended path
 
-A **feasibility phase**: one quarter, ~4 engineers, three deliverables.
+**Three questions, answered before anything is built.** All three reviewers wanted these settled first,
+none of them requires building the engine, and the first can end the idea outright — which is the point
+of asking it first.
 
 1. **The dark-cost measurement** and the text-mapping determination (§4). Kill criterion >1% pps.
 2. **A `ctx` model that actually verifies.** Reuse PREVAIL's `tracing` program type, copy the ctx into per-core scratch, and express the worked CVE as a scalar predicate against it. If the CVE class we care about *needs* pointer chasing, then day one includes a bounded `probe_read` helper and the §4 threat surface grows — decide that now, on paper, with SIRT in the room.
 3. **One hook armed end-to-end on one architecture in a lab TMM**, with core dumps and backtraces still working through the trampoline.
 
-If all three land, the rest is a real, fundable 50–80 SEM program — five to six people over ten to fourteen months — and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, a quarter was spent instead of two years.
+If all three land, what follows is a real 50–80 senior-engineer-month programme, and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, the idea dies early and cheaply, which is strictly better than discovering it in month nine.
 
 ---
 

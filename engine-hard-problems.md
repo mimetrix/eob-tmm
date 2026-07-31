@@ -328,8 +328,7 @@ the day-one posture, but the safe point and certification are the most likely to
 
 An earlier draft of the scope described this as "hundreds of lines, not subsystems." Reviewed against
 what each item actually requires, a defensible v1 on two CPU architectures is **50–80
-senior-engineer-months**, staffed as five to six people over ten to fourteen months, plus the TMA and
-certification engagement. The items that grew most: the safe point (§5, previously unlisted), the
+senior-engineer-months**, plus the TMA and certification engagement. The items that grew most: the safe point (§5, previously unlisted), the
 trampoline (a page of assembly, then months of ABI edge cases), arm/disarm (live-text patching,
 possibly a memory-manager change), and the hook-map generator — a parameter classifier over DWARF
 implementing the platform calling conventions, against an optimised build.
@@ -337,10 +336,14 @@ implementing the platform calling conventions, against an optimised build.
 The reframe that matters: **the subsystem being added is not the VM.** It is a code-patching,
 live-text, dynamic-code-loading facility inside the crown-jewel process, with its own build-pipeline
 toolchain and a permanent per-build ABI. That is worth building — but describing it as smaller than it
-is doesn't make it easier to fund, it makes the funding collapse in month nine. Hence the ask: a
-**one-quarter feasibility phase**, not the whole register — measure the always-on cost of the padding
-flag (kill criterion ~1% pps), settle a `ctx` model that verifies, and arm one hook end-to-end in a
-lab TMM with core dumps still readable.
+is doesn't make it easier to say yes to; it makes the yes collapse in month nine.
+
+Which is why this register argues for a **sequencing**, not a commitment. **Three questions decide
+whether any of the rest is worth designing**, and none of them requires building the thing: measure the
+always-on cost of the padding flag (**kill criterion ~1% pps** — this one can end the idea outright),
+settle a `ctx` model that actually verifies against real TMM debug info, and arm one hook end-to-end in
+a lab TMM with core dumps still readable. Answer those three and the argument is either real or dead,
+for a small fraction of what the programme would cost.
 
 ## 7. The honest one-liner
 

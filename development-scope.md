@@ -13,7 +13,7 @@ The organizing fact: **nothing on this list recurs per CVE except the shield pro
 few lines of C). Everything else is written once or generated automatically per build.
 
 **The honest size, up front.** A defensible v1 on two CPU architectures is **50–80
-senior-engineer-months** — five to six people over ten to fourteen months, plus the TMA and the
+senior-engineer-months**, plus the TMA and the
 certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item
 *list* below is right; the size classes in §6 are shape, not effort, and reviewed against what each
 item actually requires they are low by roughly 3–10×. Earlier drafts of this doc described the whole
@@ -190,7 +190,7 @@ What the reuse buys is real and narrow: nobody at F5 writes a VM, a verifier or 
 scale of 'write a VM or a verifier'" — **retired**, because the subsystem being added is a
 code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, carrying its
 own build-pipeline toolchain and a permanent per-build ABI. That is worth building; describing it as
-smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine.
+smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine.
 **50–80 senior-engineer-months for a defensible v1 on two architectures**
 ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1).
 

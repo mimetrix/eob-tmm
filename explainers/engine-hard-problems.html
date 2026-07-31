@@ -575,16 +575,18 @@
     <div class="callout"><span class="lbl">and the honest size of it</span>
       <p>An earlier draft described this as &ldquo;hundreds of lines, not subsystems.&rdquo; Reviewed against what
         each item actually requires, a defensible v1 on two CPU architectures is <b>50–80 senior-engineer-months,
-        staffed as five to six people over ten to fourteen months</b>, plus the TMA and certification engagement. The
+        </b>, plus the TMA and certification engagement. The
         items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then six months of
         ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map
         generator, which is a <b>parameter classifier over DWARF</b> (the compiler's debug-info format) implementing the platform calling conventions (SysV on x86-64, AAPCS64 on arm64), against an optimised build.</p>
       <p style="margin-top:.7rem">The reframe that matters: <b>the subsystem being added is not the VM.</b> It is a
         code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own
         build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
-        smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine. <b>The ask
-        is therefore a one-quarter feasibility phase, not the whole register:</b> measure the always-on cost of the
-        compiler flag (kill criterion, ~1% pps), settle a <span class="inlinecode">ctx</span> model that verifies,
+        smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine. <b>So this
+        register argues for a sequencing, not a commitment: three questions decide whether any of the rest is
+        worth designing, and none of them requires building the engine.</b> Measure the always-on cost of the
+        compiler flag (<b>kill criterion, ~1% pps</b> — this one can end the idea outright), settle a
+        <span class="inlinecode">ctx</span> model that actually verifies against real TMM debug info,
         and arm one hook end-to-end in a lab TMM with core dumps still readable.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
     <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, and <b>not</b>

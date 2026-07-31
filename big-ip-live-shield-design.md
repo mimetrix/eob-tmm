@@ -357,7 +357,7 @@ signing → distribute → monitor → enforce is a multi-day pipeline dominated
 against a patched-build cycle measured in weeks that is still the whole value. Anyone promising
 same-day mitigation is describing a different process than this one.
 
-**So the specific ask attached to this design is a pre-authorised shield-signing path** — a standing
+**So the one process change that would matter most here is a pre-authorised shield-signing path** — a standing
 approval for a bounded artifact class (verified, budget-passed, hook-bound, expiring bytecode) so that
 signing is hours rather than days. That single process change is what converts "days, not hours" into
 "hours," and it is worth more than any engineering optimisation available here.
@@ -410,16 +410,18 @@ Generalize hook points across the resident native daemons (httpd, MCPD, and the 
 Sanctioned hook points inside TMM proper for the data-plane CVE classes nothing else can reach. Default `cold`/`warm`; a `hot` hook is permitted under a measured per-invocation budget with explicit sign-off (§9, §11) rather than banned outright. Gated on Phase 1/2 proving the spine: the safe point, signing, the fuel guard, and the crash-loop watchdog.
 
 **Effort, so the phases are not read as "a quarter each."** A defensible v1 across both supported
-architectures is **50–80 senior-engineer-months** — five to six people over ten to fourteen months, which is the staffing `engine-hard-problems.md` §6.1 states and the one that actually multiplies out to that range — plus the TMA and
+architectures is **50–80 senior-engineer-months** (`engine-hard-problems.md` §6.1), plus the TMA and
 certification work, which are gating prerequisites rather than paperwork. The per-item breakdown is in
 [`engine-hard-problems.md`](engine-hard-problems.md) §6.1.
 
-**What is actually being asked for now is much smaller: a one-quarter feasibility phase**, roughly
-four engineers, whose first deliverable is a *measurement* rather than a feature — the dark cost of
+**None of which has to be committed to in order to evaluate this.** Three questions decide whether the
+rest is worth designing, and the first is a *measurement* rather than a feature: the dark cost of
 building TMM with `-fpatchable-function-entry` (throughput, latency distribution, text size, i-cache
 behaviour). **Kill criterion, stated up front: if the padding flag costs more than ~1% of pps, the
-function-boundary half of this proposal is dead** and only designed-in call sites survive. Naming the
-number that stops the programme is what makes the rest of it fundable.
+function-boundary half of this proposal is dead** and only designed-in call sites survive. The other
+two are a `ctx` model that actually verifies against real TMM debug info, and one hook armed end-to-end
+in a lab TMM with core dumps still readable. Naming the number that would kill this is what makes the
+rest of it worth taking seriously.
 
 ## 13. Risks and open questions
 

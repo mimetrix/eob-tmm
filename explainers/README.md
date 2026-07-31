@@ -36,5 +36,5 @@ these is the thing that's wrong.
 ## Open
 
 No performance numbers exist yet. Every cost claim — "free when dark," "tens of nanoseconds is
-noise" — is an estimate, which is why the ask is a feasibility phase with a measurement as its first
-deliverable.
+noise" — is an estimate, which is why the first thing to settle is a
+measurement.
