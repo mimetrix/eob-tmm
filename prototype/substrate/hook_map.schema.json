@@ -95,7 +95,7 @@
         "safe_return": {
           "$ref": "#/$defs/safe_return",
           "$comment": "required in product when attach_mode is filter",
-          "description": "What a skipped body hands back (item 7). A v1 only arms enforce-capable boundaries whose kind is void or zero."
+          "description": "What a skipped body hands back (item 7), gated on skippability FIRST. A hook is enforce-capable only when skippable is yes AND kind is not none — never on the return type alone."
         },
         "budget_cycles": {
           "type": "integer",
@@ -151,12 +151,17 @@
     },
     "safe_return": {
       "type": "object",
-      "required": ["kind"],
+      "required": ["skippable", "kind"],
       "additionalProperties": false,
       "properties": {
+        "skippable": {
+          "enum": ["unanalysed", "no", "yes"],
+          "description": "GATE 1, and the one that decides enforce-capability. Does not running the body leave TMM consistent? Considers locks held across it, refcount movement, flow-state advance, input consumed, out-params the caller reads, and allocation. Default and absent-value semantics are 'unanalysed', which means observe-only: a body nobody has analysed is not safe-returnable, and 'we could not find a problem' is not 'there is none'. Mirrors enum shield_skippable in shield_abi.h.",
+          "default": "unanalysed"
+        },
         "kind": {
           "enum": ["none", "void", "zero", "const"],
-          "description": "none = not enforce-capable (observe only); void = nothing to synthesize; zero = 0/NULL is the benign no-op; const = return the enumerated benign value below. Mirrors enum shield_sr_kind in shield_abi.h."
+          "description": "GATE 2, reached only after skippable is yes. none = gate 2 not reached; void = no value to synthesize, which says NOTHING about gate 1 (a void function is called entirely for its side effects, so void is the HARDEST case, not the trivial one); zero = 0/NULL is the benign no-op; const = return the enumerated benign value below. Mirrors enum shield_sr_kind in shield_abi.h."
         },
         "value": {
           "type": "integer",
@@ -164,7 +169,7 @@
         },
         "rationale": {
           "type": "string",
-          "description": "Why skipping this body is safe, and what benign work is lost while enforcing. A per-function human judgement, not a generated field."
+          "description": "Why skipping this body is safe — specifically, the gate-1 evidence: which locks, refcounts, state advances, consumed buffers, out-params and allocations were checked and found absent. Also what benign work is lost while enforcing. A per-function human judgement, not a generated field, and required in product whenever skippable is yes."
         }
       }
     },

@@ -25,3 +25,7 @@ disclosure-figures/
 
 # macOS
 .DS_Store
+
+# python bytecode
+__pycache__/
+*.pyc

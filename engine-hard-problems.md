@@ -134,7 +134,7 @@ survives — but the effort estimate in the explainers does not.
 **Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook,
 each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes**
 read. Together they are the ceiling on what the engine can observe or enforce: the USDT catalog bounds the
-*anticipated* surface; function-boundary probes extend reach to any named function whose arguments expose the
+*anticipated* surface; function-boundary probes extend reach to any function that survived the build as its own out-of-line body and whose arguments expose the
 fault. Getting both right isn't incidental to the project; it *is* the project. This is where the design effort
 earns its keep — the difference between a toy and a platform.
 

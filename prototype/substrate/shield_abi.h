@@ -96,42 +96,113 @@ struct shield_binding {
     uint32_t expires_with;                     /* encoded build id -> auto-retire  */
 };
 
-/* The loader message — one struct carries the whole contract.
- * Field order, types and comments are the walkthrough's canon, verbatim.
- * NOTE: `mode` leaves 3 bytes of implicit padding before `expires_with`. Kept
- * as-is for canon fidelity; a real wire format would either declare that pad
- * explicitly or serialize field-by-field. The asserts below pin the layout. */
+/* The loader message.
+ *
+ * An earlier draft of this struct reproduced the walkthrough's field list
+ * verbatim — op, hook, mode, expires_with, prog_len, sig, prog — and a review
+ * caught that it therefore could not carry what its own comment said the
+ * signature covered. `sig` was documented as committing to "prog + its binding"
+ * (program hash + hook + build range + mode ceiling + expiry), but three of those
+ * five fields were nowhere in the message, so the accessor the loader skeleton
+ * called — `shield_binding_of()` — could not be written at all. Three
+ * consequences make this a correctness fix rather than a tidy:
+ *
+ *   1. The binding is now embedded, so the signature has something to commit to
+ *      and every field it covers is present to be checked.
+ *   2. `hook` and `expires_with` are deliberately NOT duplicated at the top
+ *      level. Carrying a field both inside and outside the signed binding raises
+ *      "which one wins?", and the answer is always the signed one — so the
+ *      unsigned copy is a liability with no use.
+ *   3. `epoch` is new, and it is the replay guard. Without it a captured LOAD can
+ *      be replayed after a REVOKE, which defeats the kill switch outright. The
+ *      signature covers `op`, `mode` and `epoch` so SET_MODE, STATUS and REVOKE
+ *      are authenticated too; the earlier shape authenticated only LOAD, leaving
+ *      three unauthenticated control operations.
+ *
+ * `prog_len` is attacker-influenced until the signature checks out, so the
+ * receiver's FIRST statement must validate it against the actual received
+ * datagram length — before hashing `prog`, not as part of doing so. */
 struct shield_msg {
-    uint32_t op;            /* LOAD · SET_MODE · STATUS · REVOKE */
-    char     hook[64];      /* named symbol to attach at */
-    uint8_t  mode;          /* MONITOR · ENFORCE */
-    uint32_t expires_with;  /* encoded build id (17.5.2 at the CLI) → auto-retire */
-    uint32_t prog_len;
-    uint8_t  sig[64];       /* F5 signature — covers prog + its binding (step 9) */
-    uint8_t  prog[];        /* the verified bytecode */
+    uint32_t op;                    /* LOAD · SET_MODE · STATUS · REVOKE        */
+    uint32_t epoch;                 /* monotonic per box; replay guard          */
+    uint8_t  mode;                  /* requested mode: MONITOR · ENFORCE        */
+    uint8_t  _pad[3];               /* declared, not implicit                   */
+    uint32_t prog_len;              /* UNTRUSTED until sig_verify succeeds      */
+    struct shield_binding binding;  /* what the signature commits to (step 9)   */
+    uint8_t  sig[SHIELD_SIG_MAX];   /* over op, epoch, mode, prog_len, binding, prog */
+    uint8_t  prog[];                /* the verified bytecode                    */
 };
 
-_Static_assert(offsetof(struct shield_msg, op)           ==   0, "shield_msg layout");
-_Static_assert(offsetof(struct shield_msg, hook)         ==   4, "shield_msg layout");
-_Static_assert(offsetof(struct shield_msg, mode)         ==  68, "shield_msg layout");
-_Static_assert(offsetof(struct shield_msg, expires_with) ==  72, "shield_msg pad");
-_Static_assert(offsetof(struct shield_msg, prog_len)     ==  76, "shield_msg layout");
-_Static_assert(offsetof(struct shield_msg, sig)          ==  80, "shield_msg layout");
-_Static_assert(sizeof(struct shield_msg)                 == 144, "shield_msg header size");
+_Static_assert(offsetof(struct shield_binding, prog_sha256)  ==   0, "binding layout");
+_Static_assert(offsetof(struct shield_binding, hook)         ==  32, "binding layout");
+_Static_assert(offsetof(struct shield_binding, build_min)    ==  96, "binding layout");
+_Static_assert(offsetof(struct shield_binding, build_max)    == 100, "binding layout");
+_Static_assert(offsetof(struct shield_binding, mode_ceiling) == 104, "binding layout");
+_Static_assert(offsetof(struct shield_binding, expires_with) == 108, "binding pad");
+_Static_assert(sizeof(struct shield_binding)                 == 112, "binding size");
 
-/* Per-hookable-function: what a skipped body hands back (item 7, step 3). A v1
- * only arms enforce-capable boundaries whose kind is VOID or ZERO. */
+_Static_assert(offsetof(struct shield_msg, op)       ==   0, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, epoch)    ==   4, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, mode)     ==   8, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, prog_len) ==  12, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, binding)  ==  16, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, sig)      == 128, "shield_msg layout");
+_Static_assert(offsetof(struct shield_msg, prog)     == 192, "shield_msg header size");
+_Static_assert(sizeof(struct shield_msg)             == 192, "shield_msg header size");
+
+/* The accessor the loader skeleton needs. Now expressible, because the binding
+ * is in the message. Returns the SIGNED copy — there is no other. */
+static inline const struct shield_binding *
+shield_binding_of(const struct shield_msg *msg)
+{
+    return &msg->binding;
+}
+
+/* Per-hookable-function: what a skipped body hands back (item 7, step 3).
+ *
+ * TWO GATES, IN THIS ORDER. An earlier draft of this enum classified a function
+ * by its return type alone, which inverted the difficulty: by that reading
+ * `void` looked trivially safe, because there is no value to fake. In fact
+ * `void` is the HARDEST case — a void function is called entirely for its side
+ * effects, so skipping it discards all of them and the signature tells you
+ * nothing about what they were. A function returning an error code is often
+ * easier, because the caller already has a path for the failure value.
+ *
+ * So `skippable` is gate 1, and it is decided independently of the return type:
+ * does not running the body leave TMM consistent? Is a lock held across it, does
+ * a refcount move, does flow state advance, is an input buffer consumed, does
+ * anything downstream read an out-param the body was to fill, is memory
+ * allocated? CLOSED BY DEFAULT — a body that has not been analysed is not
+ * safe-returnable, and "we could not find a problem" is not "there is none".
+ * Only once gate 1 passes does `kind` — gate 2, what value to synthesize —
+ * matter at all. check_sr_gates.c asserts this so it cannot silently regress. */
+enum shield_skippable {
+    SKIP_UNANALYSED = 0,    /* default: NOT enforce-capable. Observe only.         */
+    SKIP_NO         = 1,    /* analysed, and the body has effects that must run    */
+    SKIP_YES        = 2,    /* analysed: no caller-visible effect is lost          */
+};
+
 enum shield_sr_kind {
-    SR_NONE  = 0,           /* not enforce-capable: observe only                   */
-    SR_VOID  = 1,           /* void function — nothing to synthesize              */
+    SR_NONE  = 0,           /* gate 2 not reached (see enum shield_skippable)      */
+    SR_VOID  = 1,           /* void function — no value to synthesize, which says  */
+                            /*   nothing about gate 1. See the comment above.      */
     SR_ZERO  = 2,           /* return 0 / NULL is the benign no-op for this fn     */
     SR_CONST = 3,           /* return an enumerated benign constant (see .value)   */
 };
 
 struct shield_sr_policy {
-    uint8_t  kind;          /* enum shield_sr_kind                                 */
-    uint64_t value;         /* SR_CONST only: the benign value to return           */
+    uint8_t  skippable;     /* enum shield_skippable — GATE 1, checked first        */
+    uint8_t  kind;          /* enum shield_sr_kind    — GATE 2                      */
+    uint64_t value;         /* SR_CONST only: the benign value to return            */
 };
+
+/* A hook is enforce-capable only if BOTH gates passed. Expressed here so that no
+ * caller can accidentally re-derive it from the return type alone. */
+static inline int
+shield_sr_enforce_capable(const struct shield_sr_policy *sr)
+{
+    return sr->skippable == SKIP_YES && sr->kind != SR_NONE;
+}
 
 /* uBPF's compiled program. This is uBPF's real JIT signature (mem + mem_len);
  * the walkthrough's trampoline block writes jit_fn(&ctx) and elides mem_len. */

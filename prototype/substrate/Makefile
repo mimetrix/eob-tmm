@@ -10,9 +10,9 @@
 CC     ?= cc
 PYTHON ?= python3
 
-.PHONY: check check-header check-schema check-offsets check-budget clean
+.PHONY: check check-header check-schema check-offsets check-budget check-gates clean
 
-check: check-header check-schema check-offsets check-budget
+check: check-header check-schema check-offsets check-budget check-gates
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -39,5 +39,11 @@ check-offsets:
 check-budget:
 	@$(PYTHON) ./budget_pass.py
 
+# The safe-return two-gate rule, asserted rather than documented: an unanalysed
+# body must never be enforce-capable, whatever its return type. See F3 in
+# ../../design-review-findings.md for the review that caught the inverted model.
+check-gates:
+	@$(CC) -I. -o .gates.out check_sr_gates.c && ./.gates.out; rc=$$?; rm -f .gates.out; exit $$rc
+
 clean:
-	@rm -f .guard.c .guard.out tmp*.c
+	@rm -f .guard.c .guard.out .gates.out tmp*.c

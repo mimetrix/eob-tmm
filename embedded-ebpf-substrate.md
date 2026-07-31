@@ -15,9 +15,9 @@ TMM's defining strength is **dynamic programmability** — the ability to change
 
 | Surface | Layer it programs | Best at | Dynamic? | Safety of dynamic change |
 |---|---|---|---|---|
-| **iRules** | traffic logic at proxy events | connection / L7 traffic decisions | yes | TCL, runtime-bounded; can misbehave / be costly |
+| **iRules** | traffic logic at proxy events | connection / L7 traffic decisions | yes | TCL, **unbounded in practice** — a runaway rule is a documented cause of a stalled TMM and a watchdog restart |
 | **WASM** | rich extensions | complex custom logic, transforms, real languages | yes | enforced dynamically — bounds-checked at run time, time bounded by a fuel counter that aborts |
-| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — memory-safe + terminating; time bounded at admission by the budget pass, and at runtime by a fuel-metered guard |
+| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — memory-safe, and terminating where the check is enabled (§6.1); time bounded at admission by the budget pass, and at runtime by a fuel-metered guard |
 
 iRules made *traffic logic* dynamically configurable. WASM made *rich extensions* dynamically configurable. **Embedded eBPF makes the data plane's own code-level behavior and internal state dynamically configurable** — the parsers, plugin internals, connection state, error paths — which neither of the others can touch.
 
@@ -153,7 +153,7 @@ The property that makes this powerful — execute bytecode in the data plane —
 
 ### 6.1 Verified ≠ secure
 
-PREVAIL proves a program is **memory-safe and terminating** — it will not scribble memory or loop forever (not a WCET bound; the admission budget pass and a runtime fuel guard carry the time load). It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
+PREVAIL proves a program is **memory-safe**, and **terminating only when the termination check is enabled** — `--termination` is off by PREVAIL's default, and where it is on the guarantee is a ceiling of 100,000 loop iterations, roughly 300 µs, which is a bound rather than a budget (the admission budget pass and a runtime fuel guard carry the time load). It will not scribble memory *outside its context*; note that PREVAIL's context descriptor expresses no read-only region, so writes **to the context itself** are not bounded — which is why the host hands the program a per-core scratch copy and discards it on fall-through. It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
 
 ### 6.2 Threat model
 
