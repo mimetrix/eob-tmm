@@ -16,8 +16,8 @@ TMM's defining strength is **dynamic programmability** — the ability to change
 | Surface | Layer it programs | Best at | Dynamic? | Safety of dynamic change |
 |---|---|---|---|---|
 | **iRules** | traffic logic at proxy events | connection / L7 traffic decisions | yes | TCL, runtime-bounded; can misbehave / be costly |
-| **WASM** | rich extensions | complex custom logic, transforms, real languages | yes | sandbox isolation; can hang (runtime "fuel" kills it) |
-| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — memory-safe + terminating; time bounded by budget pass + watchdog |
+| **WASM** | rich extensions | complex custom logic, transforms, real languages | yes | enforced dynamically — bounds-checked at run time, time bounded by a fuel counter that aborts |
+| **Embedded eBPF** | the data plane's **own code & internal state** | verified probes, compensating controls, deep telemetry | yes | **statically verified before load** — memory-safe + terminating; time bounded at admission by the budget pass, and at runtime by a fuel-metered guard |
 
 iRules made *traffic logic* dynamically configurable. WASM made *rich extensions* dynamically configurable. **Embedded eBPF makes the data plane's own code-level behavior and internal state dynamically configurable** — the parsers, plugin internals, connection state, error paths — which neither of the others can touch.
 
@@ -29,17 +29,18 @@ And it occupies a unique slot in the *dynamic-configurability* story: **eBPF is 
 
 An embedded verified VM is not the right answer for every high-performance data plane. It is the right answer for *this* one, and it is worth being explicit about why — because these are preconditions, not preferences, and they are the reason the same idea would be a poor fit elsewhere.
 
-The first two are the load-bearing ones, and both follow from the same fact: **TMM is a proxy, not a packet-forwarding plane.**
+The first three are the load-bearing ones, and the first two follow from the same fact: **TMM is a proxy, not a packet-forwarding plane.**
 
 - **A proxy's budget makes bytecode nearly free; a forwarder's does not.** A packet-forwarding data plane's unit of work is the packet, with a per-packet budget in the low single-digit nanoseconds at line rate — a verified-bytecode invocation is a *meaningful fraction* of that, which is why bytecode struggles to earn its keep in a forwarder. TMM's unit of work is a flow, a connection, a request: it terminates TCP, negotiates TLS, parses L7 and evaluates policy, spending **microseconds where a forwarder spends nanoseconds**. A hook costing tens of nanoseconds is noise against that. Crucially, the hooks that matter most sit at **warm** per-connection/per-request boundaries, not in a per-packet fast path — so the invocation cost is amortized over work that was already expensive. The same mechanism that looks costly in a forwarder is close to free in a proxy.
 - **A proxy has internal state worth looking at, and it is where the bugs live.** A forwarder's state is thin — headers, a flow-table entry. A proxy carries deep structured state: listeners, profiles, connection-flow objects, TLS record and L7 parser state, plugin internals. That is precisely what makes a curated `ctx` valuable rather than trivial, and it is also where a proxy's CVEs concentrate: parsers and protocol state machines, not the forwarding path. Both the value of *observing* and the value of *intervening* are therefore higher here — and they land on the paths where the time budget is loosest.
 
-The remaining three are about being a shipped product rather than a component:
+- **The loop is run-to-completion and core-pinned.** TMM processes per-flow and per-packet through a stack, so a per-invocation hook **fits the existing control flow** rather than fighting it. This is the load-bearing architectural fit: eBPF's calling convention takes **one `ctx`, once** and cannot express "here is a vector of 256 packets," so a data plane whose performance comes from a stage seeing an entire batch at once would be a poor host for it. TMM is not that shape. (Where TMM *does* batch — burst receive on hot paths — the answer is a burst-capable invocation form; see [`engine-hard-problems.md`](engine-hard-problems.md) §5.)
+The remaining four are about being a shipped product rather than a component:
 
 - **F5 owns the source and the build.** Hook points can therefore be **designed in** — named, versioned, placed deliberately — and a per-build signed hook map can be emitted from the build's own debug info. Where the data plane is assembled from third-party code, none of that is available: there is no single vendor-owned build to instrument or to sign. Ownership is what makes the whole mechanism possible rather than merely desirable.
 - **It is a shipped, closed appliance, so the proof is a requirement.** Where the operator writes and runs their own extension, they own the crash risk and can rationally accept it. F5 cannot ship a customer a mitigation that *might* take the data plane down. That asymmetry is why a static verifier earns its keep here: safety is not a nicety we're adding to a scripting surface, it is the precondition for the artifact being shippable at all.
 - **A rebuild costs a maintenance window, not a `make`.** The value of dynamic change is proportional to the cost of the alternative. For software you rebuild and redeploy at will, "just recompile" is a perfectly good answer and dynamic loading buys little. For a certified appliance inside a customer's change-controlled window, the same change is weeks to quarters — which is where a loadable, provable artifact becomes worth real engineering.
-- **The loop is run-to-completion and core-pinned.** TMM processes per-flow and per-packet through a stack, so a per-invocation hook **fits the existing control flow** rather than fighting it. This is the load-bearing architectural fit: eBPF's calling convention takes **one `ctx`, once** and cannot express "here is a vector of 256 packets," so a data plane whose performance comes from a stage seeing an entire batch at once would be a poor host for it. TMM is not that shape. (Where TMM *does* batch — burst receive on hot paths — the answer is a burst-capable invocation form; see [`engine-hard-problems.md`](engine-hard-problems.md) §5.)
+
 - **The problem is vendor-delivered change, not third-party extension.** "How does someone else add functionality to this?" and "how does the vendor change the behaviour of an already-shipped closed data plane, between releases, provably safely?" are different questions. Native extension answers the first well and the second not at all.
 
 Stated as one line: **we need vendor-deliverable change under proof, and a proof is precisely what native extension cannot give us.** That is the trade this substrate exists to change.
@@ -74,7 +75,7 @@ The properties that make the substrate valuable:
 | Property | Why it matters |
 |---|---|
 | **Dynamic** — load / swap at runtime | behavior ships in hours, decoupled from the TMOS release train; no reboot |
-| **Verified** — PREVAIL proves bounded memory + termination before load | programs are proven memory-safe + terminating; their *time* is bounded by the admission budget pass and runtime deadline, and blast radius by the host-owned outcome set |
+| **Verified** — PREVAIL proves bounded memory + termination before load | programs are proven memory-safe + terminating; their *time* is bounded at admission by the budget pass and at runtime by a fuel-metered guard (register §1), and blast radius by the host-owned outcome set |
 | **Cheap** — JIT'd; ~tens of ns/invocation; an empty hook = one branch at a designed-in call site — and literally nothing (a nop pad) at an unarmed function boundary | usable on cold *and* (under a measured budget) hot paths |
 | **In-process** — runs in TMM's address space | sees data-plane internals that kernel eBPF (kernel-bypass) and iRules (proxy data-model) cannot |
 | **Host-owned outcomes** | a program *chooses among* sanctioned effects; it cannot invent new control flow |
@@ -102,7 +103,7 @@ Anything stateful (rates, time, cross-flow counters) is handled by the host comp
 
 The diagnostics leg is the substrate's lowest-risk, highest-leverage near-term use: both patterns below are **observe-mode, read-only, and verified**, so they run on a *live production* data plane without the "a bad shield crashes TMM" exposure of `filter` mode. They turn "ship a debug build / wait for it to recur" into "load signed bytecode for a while," and they reuse the existing security spine (§6) at a lower authorization tier — read-only, but exfiltration still governed (§6.2).
 
-**Signed support probe.** F5 support/SIRT authors a small program targeting the *exact* hook + condition behind an intermittent field issue (a sporadic reset, a latency spike, a plugin misbehaving under one traffic shape), signs it, and ships it. The operator — RBAC-gated, explicit consent — loads it in observe mode; it captures precisely the needed signal, exports to the controlled sink, then is pulled. eBPF earns this specifically because it is **verified** (proven memory-safe + terminating — with the budget pass and runtime deadline bounding cost on a customer's production box; non-negotiable for vendor code attached inline on live traffic), cleanly **removable**, and reaches **in-TMM** state that logs and iRules cannot. Design points not otherwise specified:
+**Signed support probe.** F5 support/SIRT authors a small program targeting the *exact* hook + condition behind an intermittent field issue (a sporadic reset, a latency spike, a plugin misbehaving under one traffic shape), signs it, and ships it. The operator — RBAC-gated, explicit consent — loads it in observe mode; it captures precisely the needed signal, exports to the controlled sink, then is pulled. eBPF earns this specifically because it is **verified** (proven memory-safe + terminating — with the budget pass and a runtime fuel guard bounding cost on a customer's production box; non-negotiable for vendor code attached inline on live traffic), cleanly **removable**, and reaches **in-TMM** state that logs and iRules cannot. Design points not otherwise specified:
 
 - **Context minimization by default** — a support probe does *not* expose TLS secrets / PII / decrypted payload unless separately justified and authorized; redact by default (§6.3).
 - **Data residency** — captures land in a **customer-controlled, audited** location; the customer decides what to share with support. Auto-phone-home to F5 is the wrong default for a security appliance.
@@ -152,7 +153,7 @@ The property that makes this powerful — execute bytecode in the data plane —
 
 ### 6.1 Verified ≠ secure
 
-PREVAIL proves a program is **memory-safe and terminating** — it will not scribble memory or loop forever (not a WCET bound; the admission budget pass and runtime deadline carry the time load). It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
+PREVAIL proves a program is **memory-safe and terminating** — it will not scribble memory or loop forever (not a WCET bound; the admission budget pass and a runtime fuel guard carry the time load). It proves **nothing** about whether the program is malicious *within the rules*: it can still read sensitive data it is permitted to touch, weaken a control, monopolize a hot path, or have been loaded by the wrong party. **The verifier is a safety gate, not a security gate.** Treating "it's verified" as "it's safe to run arbitrary bytecode" is the fatal mistake. Security is the governance *around* the VM.
 
 ### 6.2 Threat model
 
@@ -200,4 +201,4 @@ The prototype already runs two of the three oracles (PREVAIL verify + exploit re
 
 ## 9. One-line thesis
 
-**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes carry a static proof (memory-safety + termination) — with time-safety enforced by admission budget + runtime deadline. Live Shield is the first instance; the substrate, and the hook-point map, are the asset.**
+**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes carry a static proof (memory-safety + termination) — with time-safety bounded at admission by the budget pass and at runtime by a fuel-metered guard. Live Shield is the first instance; the substrate, and the hook-point map, are the asset.**

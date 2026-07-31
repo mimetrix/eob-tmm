@@ -65,11 +65,11 @@ ahead of time, but *how long* they take is not.
   3. Over budget → **reject, fail closed.**
   The pass, the per-hook budget table, and the cost model are **new build work** — a stage added
   to the load pipeline (`author → clang → PREVAIL → budget pass → sign → load`), F5-owned.
-- **A runtime wall-clock deadline — also new work, and irreducible.** A static instruction count
+- **A runtime guard — also new work, and irreducible.** A static instruction count
   is *not* wall-clock time (cache, memory stalls, JIT variance) — bounding *how many* instructions
-  run cannot bound *how long* they take. So a per-execution **deadline + watchdog** — bounded-cost
-  preemption for a loop with no OS to preempt it — is what actually stops a slow run from stalling
-  the poll loop. This layer has a small runtime cost and **cannot be moved to admission time.**
+  run cannot bound *how long* they take. So something must stop a slow run from stalling the poll
+  loop as it executes — bounded-cost preemption for a loop with no OS to preempt it. *Which* mechanism
+  is the trilemma below, not a settled matter. This layer has a small runtime cost and **cannot be moved to admission time.**
   Runtime/JIT engineering, not verifier or helper.
 - **And the trilemma — the hardest open question in this register.** With **no preemption**, three
   mechanisms could enforce a time bound, and each costs something claimed elsewhere. **Fuel** (a
@@ -83,7 +83,9 @@ ahead of time, but *how long* they take is not.
   extra**, and the wall-clock deadline is better understood as *reporting* than enforcement (earlier
   drafts of this register had that backwards). Decide in the room, not in month nine: which do we
   give up — the run-to-completion loop, the unmodified uBPF, or enforce on hot hooks? The available
-  good answer is to fork uBPF's JIT for back-edge fuel, own it, and upstream it.
+  good answer is to fork uBPF's JIT for back-edge fuel, own it, and upstream it. One known corner worth
+  keeping: uBPF's instruction limit *does* work in the **interpreter** — only the JIT ignores it — so an
+  interpreter-only high-assurance build (§4) has enforceable fuel today, with no fork.
 - **Budget by rate class** — a `hot` (per-packet) hook gets a tight, *measured* budget; `warm`
   (per-connection/per-request) hooks get the proxy's much larger per-unit headroom; `cold`
   (exceptional-branch) hooks are looser still. Read §5's adversarial note before trusting `cold`.
@@ -95,6 +97,12 @@ ahead of time, but *how long* they take is not.
   favour of doing that work somewhere else entirely — including capable hardware, where an
   offload path exists. Worth building the pass with that in mind: a reject/accept boolean is a
   smaller idea than a cost estimate that tells you *where* a given program belongs.
+- **`path_class` is an assumption an adversary can break.** A hook's rate class is a claim about code
+  structure, not about traffic. An attacker who can drive the malformed input that reaches a `cold`
+  error branch turns it into the hottest path on the box — same program, same hook, a rate class it was
+  never budgeted for. So for anything reachable from unauthenticated input, read `path_class` as
+  **structure ∧ adversarial reachability**, and treat it as `hot` regardless of where it sits in the
+  code. This is why the runtime guard is gating for attacker-reachable hooks rather than staged.
 - **Interpreter mode** for the most sensitive builds makes per-instruction cost predictable (and
   see §4 — it also shrinks the native-code surface).
 
@@ -214,8 +222,18 @@ high-assurance builds — with F5 SIRT sign-off gating implementation, not follo
 
 ## 5. Further TMM-specific concerns
 
+- **Item zero — the safe point itself.** Every in-TMM item above assumes "a safe point between
+  poll-loop iterations that dequeues and processes a load request." That does not exist in TMM today.
+  Building it means a per-instance message queue reachable from the config channel, **a new check in
+  the poll loop** (one load and branch per iteration, on the loop this organisation guards hardest),
+  and a bounded work budget for the handler — because as first sketched, `do_load` performs an ELF
+  parse and a **JIT compile** *at* the safe point, which is milliseconds during which the loop is not
+  polling: a latency spike, possibly a dropped heartbeat. Move compile and page population off the
+  safe point; leave it publishing a pointer and patching a few bytes. **This is the most expensive
+  item on the list and it was previously not on the list.**
+
 The four above are load-bearing. These are the next tier — each has a stance and none changes
-the day-one posture, but the first two are the most likely to shape the first shippable form.
+the day-one posture, but the safe point and certification are the most likely to shape the first shippable form.
 
 - **Certification (FIPS 140-2/3, Common Criteria).** A certified security appliance that can load
   code into its data plane at runtime is a certification problem — evaluators may not accept
@@ -284,6 +302,24 @@ the day-one posture, but the first two are the most likely to shape the first sh
 | **Execution** | interpreter or hardened JIT; W^X | — |
 | **Trust perimeter** | signing gate + HSM key protection | — |
 | **Blast radius** | canary/watchdog auto-unload + kill-switch + revocation | automated health-driven rollback policies |
+
+## 6.1 The honest size of it
+
+An earlier draft of the scope described this as "hundreds of lines, not subsystems." Reviewed against
+what each item actually requires, a defensible v1 on two CPU architectures is **50–80
+senior-engineer-months**, staffed as five to six people over ten to fourteen months, plus the TMA and
+certification engagement. The items that grew most: the safe point (§5, previously unlisted), the
+trampoline (a page of assembly, then months of ABI edge cases), arm/disarm (live-text patching,
+possibly a memory-manager change), and the hook-map generator — a parameter classifier over DWARF
+implementing the platform calling conventions, against an optimised build.
+
+The reframe that matters: **the subsystem being added is not the VM.** It is a code-patching,
+live-text, dynamic-code-loading facility inside the crown-jewel process, with its own build-pipeline
+toolchain and a permanent per-build ABI. That is worth building — but describing it as smaller than it
+is doesn't make it easier to fund, it makes the funding collapse in month nine. Hence the ask: a
+**one-quarter feasibility phase**, not the whole register — measure the always-on cost of the padding
+flag (kill criterion ~1% pps), settle a `ctx` model that verifies, and arm one hook end-to-end in a
+lab TMM with core dumps still readable.
 
 ## 7. The honest one-liner
 
