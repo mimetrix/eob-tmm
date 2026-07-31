@@ -194,6 +194,70 @@ case, not an easier one.
 **The trap:** treating eBPF maps as if TMM were a single Linux kernel. It is N kernels with their
 own state-sync fabric; the map model must defer to that fabric, not compete with it.
 
+## 3.1 More than one program armed at once
+
+**The claim to retire:** "a shield is a bounded predicate at one hook, so N shields are just N
+bounded predicates."
+
+Every cost and safety argument in this register is written for **one program at one hook**. The
+moment two are armed, four things appear that no single-hook analysis covers — and the first is a
+defect in the ABI as it currently stands, not just an unwritten policy.
+
+**1. One program per hook, and say so.** `struct hook_slot` holds a single `shield_jit_fn`, and
+`trampoline_arm(slot, fn, mode)` overwrites it. So a second `LOAD` naming a hook that is already
+armed does not fail — it **silently replaces a live shield**, disarming a mitigation an operator
+believes is running, with the fire counter resetting to zero as evidence. That is the wrong default
+in the wrong direction. Day one: **one program per hook, enforced**, with a distinct rejection
+(`SHIELD_ERR_BUSY`) so the operator gets "that hook is occupied by shield X" rather than a silent
+swap. Replacing a shield becomes explicit: `REVOKE` then `LOAD`.
+
+**2. If chaining is ever wanted, outcome composition is the hard part, not the plumbing.** Running
+several programs at one hook is easy; deciding what their answers *mean* together is not. Two
+programs, one selecting `PASS` and one `SAFE-RETURN` — which wins? The only defensible rule is
+**most-restrictive-wins with a declared total order over the outcome set**, because any
+"first-match" or "last-loaded" rule makes behaviour depend on load order, and load order depends on
+config-sync arrival order, which is not the same on two HA peers. That is a real specification, and
+it is deferred deliberately: v1 has no chaining, and the enumerated outcome set stays a choice made
+by exactly one program.
+
+**3. The budget is per hook; nothing bounds the sum — and the sum is not the interesting number
+anyway.** The admission budget pass (§1) gates a program against *its hook's* allowance. Arm sixty
+of them and every one passes while the loop's headroom is gone. Worse, the per-hook framing quietly
+assumes independence, and hooks on the same flow's path are the opposite of independent: **a flow's
+added cost is the sum of every armed hook it traverses**, not the maximum. So the real quantity is
+per-unit-of-work and it is not knowable at admission time, because it depends on which *other*
+hooks are armed and on the path this particular flow takes. Day one: a **global armed-cost ceiling**
+maintained by the loader — admission subtracts from a per-`path_class` allowance and refuses the
+load that would exceed it — plus the measured, reported per-flow figure from the runtime guard, since
+the static sum is an over-estimate for any flow that skips some hooks and an under-estimate for none.
+
+**4. One shield can silently mask another, and the evidence looks like safety.** This is the
+nastiest of the four. If shield A takes `SAFE-RETURN` at a function whose body *contains* hook B,
+then B never executes, its fire counter stays at zero, and zero is indistinguishable from "nothing
+matched." An operator reading `STATUS` sees a quiet hook and concludes there is no threat on that
+path, when in fact the path is no longer being reached. It is the same **false-success** shape as a
+partially-inlined function whose out-of-line counter climbs while the inlined call sites run
+unshielded — and it is worse here, because the masking is caused by our own mitigation. Day one:
+the hook map already knows the static call graph, so **flag hook pairs where one is reachable from
+the other's body and refuse to arm both in enforce mode without explicit acknowledgement**; and
+report a masked hook as `masked`, never as zero.
+
+**5. Mutual re-entrancy, not just self re-entrancy.** §3's gap list notes that a shield on a logging
+function is re-entered by the loader's own error path. Two armed hooks generalise it: hook A's
+trampoline or generated ctx-builder calls a function carrying hook B, whose builder calls something
+carrying hook A. A single per-core "in trampoline" depth guard handles both cases and is the day-one
+answer; the alternative — proving the builders' call graph is acyclic — is a per-build analysis that
+buys nothing extra.
+
+**Day-one vs. deferred:**
+
+- **Day-one:** one program per hook with an explicit busy rejection; a per-core re-entrancy depth
+  guard; a global armed-cost ceiling; masked-hook detection from the static call graph, and `masked`
+  as a distinct `STATUS` state from zero-fires.
+- **Deferred:** chaining more than one program at a hook, and with it a declared total order over
+  the outcome set. Not needed for CVE mitigation, and it is the piece that turns HA config-sync
+  arrival order into observable behaviour, so it should not be taken on casually.
+
 ## 4. Verifier soundness is a data-plane RCE surface
 
 **This is the one a security review will (correctly) fixate on.** uBPF JITs native code into

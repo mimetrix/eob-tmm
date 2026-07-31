@@ -83,6 +83,9 @@ enum shield_err {
     SHIELD_ERR_BUDGET   = -8, /* admission budget for this hook exceeded (item 8)  */
     SHIELD_ERR_NOMEM    = -9,
     SHIELD_ERR_REPLAY   = -10, /* epoch did not strictly advance — replayed op   */
+    SHIELD_ERR_BUSY     = -12, /* hook already armed — see the note on hook_slot */
+    SHIELD_ERR_MASKED   = -13, /* would be unreachable behind another armed hook */
+    SHIELD_ERR_ARMEDCOST= -14, /* global armed-cost ceiling would be exceeded    */
     SHIELD_ERR_TRUNC    = -11, /* prog_len disagrees with the received length   */
 };
 
@@ -213,7 +216,18 @@ typedef uint64_t (*shield_jit_fn)(void *mem, size_t mem_len);
 /* One armable patchable entry, resolved from this build's signed hook map.
  * `fired` is indexed by core: TMM is core-pinned, so each core increments only
  * its own slot — no atomics needed, but pad to a cache line in a real build to
- * avoid false sharing (see item 1's note in development-scope-code.md). */
+ * avoid false sharing (see item 1's note in development-scope-code.md).
+ *
+ * ONE PROGRAM PER HOOK, AND THAT IS A DECISION, NOT AN ACCIDENT OF THIS STRUCT.
+ * There is a single `fn`, so a second LOAD naming an armed hook must be REFUSED
+ * with SHIELD_ERR_BUSY. It must not overwrite: silently replacing a live shield
+ * disarms a mitigation the operator believes is running, and resets its fire
+ * counter to zero, so the evidence of the swap looks exactly like "no matches."
+ * Replacing a shield is REVOKE then LOAD, explicitly. Chaining several programs
+ * at one hook is deferred, because the hard part is not the plumbing but
+ * declaring a total order over the outcome set — without one, behaviour depends
+ * on load order, and load order depends on config-sync arrival order, which is
+ * not the same on two HA peers. See engine-hard-problems.md §3.1. */
 struct hook_slot {
     char     hook[SHIELD_HOOK_NAME_MAX];   /* named symbol (hook-map key)          */
     void    *entry;                        /* patchable-entry address from the map */
@@ -224,6 +238,16 @@ struct hook_slot {
     uint8_t  mode_ceiling;                 /* from the signed binding              */
     uint32_t expires_with;                 /* auto-retire build                    */
     struct shield_sr_policy sr;            /* what a skipped body returns          */
+    uint8_t  masked_by_armed;              /* another armed hook's SAFE-RETURN can  */
+                                           /*   skip the body containing this hook. */
+                                           /*   Report STATUS as `masked`, NEVER as */
+                                           /*   zero fires — zero reads as "nothing */
+                                           /*   matched", which is the opposite of  */
+                                           /*   the truth (§3.1).                   */
+    uint32_t budget_cycles;                /* this hook's admission allowance; the  */
+                                           /*   loader also tracks a GLOBAL armed   */
+                                           /*   cost, because a flow pays the SUM   */
+                                           /*   of the hooks it traverses (§3.1).   */
     uint64_t fired[SHIELD_MAX_CORES];      /* per-core evidence, both modes         */
 };
 
