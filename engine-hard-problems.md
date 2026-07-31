@@ -164,15 +164,15 @@ entirely, and the verifier never runs on-box at all.*
 - **Tracked CVE surface** — keep PREVAIL/uBPF current; carry both in the SBOM (ties to the OSS
   posture in the shield design §13).
 
-**We are not alone on the soundness problem — and that is new information.** DPDK's `librte_bpf`
-recently added a **validation debugging API** (`rte_bpf_validate_debug_create()`) built to unit-test
-its verifier by stepping through **the abstract interpretation** — independently converging on
-PREVAIL's technique in a userspace data plane. Two things follow. First, it undercuts the reading
-that userspace dataplane bytecode is a dead end: someone is investing in a verifier for it *now*.
-Second, and more useful to us: **step-through-the-abstraction tooling is what makes a verifier
-auditable**, and auditability is the only real answer to "how do you know the verifier is sound?"
-Worth tracking as prior art for how we'd evidence PREVAIL's soundness to a TMA — and worth asking
-whether PREVAIL has, or should have, the equivalent.
+**The open ask: make the verifier auditable, not just trusted.** "How do you know the verifier is
+sound?" has no satisfying answer of the form *"it's widely used."* The answer that does work is
+**inspectability** — tooling that steps through the abstract interpretation so a reviewer can see
+why a program was accepted, and so the verifier itself can be unit-tested against adversarial
+inputs. That is the form soundness evidence has to take for a TMA, and it is worth establishing
+early whether PREVAIL offers it, whether it can be built alongside, and what a soundness-evidence
+package would actually contain. Treat it as a deliverable of the trust story, not an afterthought:
+the signing gate bounds *who* can exploit a soundness bug, but only auditability reduces the
+chance there is one.
 
 **Verified ≠ correct.** A verified, signed program can still **black-hole all traffic** — drop
 everything, misroute, degrade — because the proof is about memory-safety and termination, not
@@ -202,20 +202,19 @@ the day-one posture, but the first two are the most likely to shape the first sh
 - **uBPF JIT maturity.** §4 is really "the verifier *and this JIT*." uBPF's arm64/x86-64 JIT is
   far less battle-tested than the kernel's, and here a JIT bug is the RCE. Plan to
   **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
-- **Invocation granularity — per-packet bytecode vs. a batched data plane.** eBPF's calling
-  convention takes **one `ctx`, once**: it cannot express "here is a vector of 256 packets." That is
-  the structural reason bytecode never displaced native plugins in **VPP**, whose entire performance
-  premise is a graph node seeing the whole vector so it can quad-loop and prefetch across it — a
-  per-packet callback inside that node forfeits the premise. (VPP's own BPF use is telling: a
-  `bpf_trace_filter` plugin that selects packets *to trace*, not dataplane logic.) **TMM is the
-  favorable case, and this is worth stating plainly:** run-to-completion and core-pinned, processing
-  per-flow/per-packet through a stack rather than as a vector through a graph — so the mismatch that
-  blocks VPP largely does not apply. What remains is per-invocation overhead on hot hooks, and there
-  is a precedent for the answer: DPDK ships **`rte_bpf_exec_burst()`**. Adopt it in spirit — a
-  burst-capable invocation form for hot-path hooks, with §1's budget pass reasoning **per burst**
-  rather than per packet. Note honestly what a burst API does *not* buy: it amortizes call overhead
-  while still running one invocation per packet with its own `ctx`; the program still cannot reason
-  across the batch.
+- **Invocation granularity — per-packet bytecode on a partly batched data plane.** eBPF's calling
+  convention takes **one `ctx`, once**: it cannot express "here is a vector of 256 packets." A data
+  plane whose performance comes from a stage seeing an entire batch at once — so it can loop and
+  prefetch across the batch — would therefore be a poor host for bytecode, because a per-packet
+  callback inside such a stage forfeits its whole premise. **TMM is the favorable case, and it is
+  worth stating plainly:** run-to-completion and core-pinned, processing per-flow/per-packet through
+  a stack rather than as a vector through a graph, so a per-invocation hook fits the existing
+  control flow. What remains is per-invocation overhead where TMM *does* batch — burst receive on
+  hot paths. The answer there is a **burst-capable invocation form**, with §1's budget pass
+  reasoning **per burst** rather than per packet. Note honestly what a burst form does *not* buy:
+  it amortizes call overhead while still running one invocation per packet with its own `ctx`; the
+  program still cannot reason across the batch. If a future hook ever needs cross-packet reasoning,
+  that is a different program model, not a tuning exercise.
 - **Patching live text, and safe-return correctness.** The function-boundary mechanism arms by
   atomically overwriting a compiler-reserved nop pad in live text (the ftrace discipline: atomic
   patch + i-cache flush) — proven in kernels, but new inside TMM and per-CPU-architecture work

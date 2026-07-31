@@ -132,16 +132,14 @@ For a customer, userspace eBPF's headline benefit would be routing around a lock
 
 The reason F5 specifically wants an *embedded userspace* VM is the one thing kernel eBPF can never do regardless of privilege: **TMM is a userspace process that bypasses the kernel, so a VM embedded in TMM is the only mechanism that can place a shield (or a tracepoint) inside TMM's own execution.** This is the architectural justification and the product differentiator. Our kernel-eBPF "eob" proves the limitation by counterexample — it is kernel-level, so it sees kernel-mediated traffic, not TMM internals.
 
-**And the vendor position is what distinguishes this from DPDK and VPP**, whose dataplane
-extensibility is native-code plugins rather than bytecode. That is right for a *toolkit*, where the
-third party's code **is** the data plane, its author owns the crash risk in their own process, and a
-rebuild is cheap. It is wrong for a *shipped appliance*: F5 owns TMM's source (so designed-in hooks
-and a signed per-build hook map exist at all), cannot ship a customer a mitigation that might take
-the data plane down (so the proof is the requirement), and cannot treat a rebuild as cheap. The
-execution model points the same way — eBPF takes one `ctx` at a time and cannot express a vector,
-which is fatal inside VPP's vector-graph node and a non-issue in TMM's run-to-completion poll loop.
-See [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §1.1 for the full argument and the
-corrected record of what each project actually did with BPF.
+**And the vendor position is what makes the proof a requirement rather than an ornament.** Where an
+operator writes and runs their own dataplane extension, they own the crash risk and can rationally
+accept it — native code, full speed, full expressiveness. F5 cannot ship a customer a mitigation
+that *might* take the data plane down, which is why static verification is the precondition for the
+artifact existing at all, not a safety feature layered on afterwards. The architectural
+preconditions that make this fit TMM specifically — vendor-owned source, shipped appliance, an
+expensive rebuild, and a run-to-completion loop rather than a vectorized pipeline — are set out in
+[`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §1.1.
 
 ### 3.1 The vendor inversion: instrument by design, do not inject
 

@@ -185,8 +185,8 @@ the body still has to run after a fall-through).
 when armed and not matching:** the stub's register save/restore plus one predicate. That is the
 number the budget pass gates on, and the number to measure first.
 **TODO(f5) — burst form for hot hooks:** `tramp_dispatch()` above is one invocation per call, which
-fits TMM's run-to-completion loop. Where a hot path processes a receive burst, the per-invocation
-overhead wants amortizing over the batch — DPDK's `rte_bpf_exec_burst()` is the precedent, and the
+fits TMM's run-to-completion loop and is nearly free at a warm per-request boundary. Where a hot path
+processes a receive burst, the per-invocation overhead wants amortizing over the batch, and the
 budget pass (item 8) would then reason per burst rather than per packet. Honest limit: a burst form
 amortizes the call, but each packet is still a separate invocation with its own `ctx` — the program
 cannot reason across the batch (`engine-hard-problems.md` §5).

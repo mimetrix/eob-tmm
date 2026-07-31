@@ -390,13 +390,14 @@
     <div class="callout sig"><p><b>Say it plainly: TMM is its own kernel.</b> It plays every role Linux plays for the traffic it carries. Linux earned
       an eBPF VM inside it for exactly this job; <b>a kernel of TMM's standing and maturity deserves its own eBPF
       hosting VM</b>. That's the move.</p></div>
-    <p class="aside-note"><b>And TMM's shape is the favorable one.</b> DPDK and VPP extend their data planes with
-      native-code plugins, which is right for a <em>toolkit</em> — the third party's code <em>is</em> the data
-      plane, its author owns the crash risk, and a rebuild is cheap. TMM is a <b>shipped appliance</b>: F5 owns the
-      source (so designed-in hooks exist at all), can't ship a mitigation that might take the data plane down (so
-      the proof is the requirement), and a rebuild costs a maintenance window. Even the execution model favors us —
-      eBPF takes one <span class="inlinecode">ctx</span> at a time and can't express a vector, which is fatal
-      inside VPP's vector-graph node and a non-issue in a <b>run-to-completion poll loop</b>.</p>
+    <p class="aside-note"><b>And a proxy is the favorable shape for this.</b> A packet-forwarding plane's unit of
+      work is the packet, with a per-packet budget in <em>single-digit nanoseconds</em> — verified bytecode is a
+      meaningful fraction of that, which is why it struggles to earn its place there. TMM's unit of work is a flow,
+      a connection, a request: terminate TCP, negotiate TLS, parse L7, evaluate policy — <b>microseconds where a
+      forwarder spends nanoseconds</b>. A hook costing tens of nanoseconds is noise against that, and the hooks
+      worth having sit at <b>warm</b> per-request boundaries, not in a per-packet fast path. A proxy also
+      <em>has state worth looking at</em> — listeners, profiles, parser state, plugin internals — which is exactly
+      where its CVEs live.</p>
   </section>
 
   <!-- 02 MOVE -->
@@ -425,17 +426,12 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <div class="callout sig"><p><b>The mechanism exists; what's missing is the proof.</b> Every mature userspace
-      data plane hit this same need and answered it with <b>native-code plugins</b> — VPP's graph nodes, DPDK
-      applications — accepting the cost that a bad plugin takes the process down with it. That is the trade we're
-      proposing to change, and <b>eBPF-for-Windows</b> shows the exact stack working in production:
-      <b>uBPF verified by PREVAIL</b>, inside a shipping OS. <b>DPDK</b> also carries a userspace eBPF VM in
-      mainline — <span class="inlinecode">librte_bpf</span>, its <em>own</em> in-tree VM and validator, since
-      2018 — though honestly: still an <b>experimental API</b>, attachable only via software RX/TX callbacks, and
-      never DPDK's headline programmability story. <em>The interesting part is where it's going</em> — it recently
-      gained a debuggable <b>abstract-interpretation</b> validator, independently converging on PREVAIL's
-      technique. The direction of travel in userspace data planes is toward verified bytecode, not away from
-      it.</p></div>
+    <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> <b>eBPF-for-Windows</b> runs this
+      <em>exact</em> stack in production — <b>uBPF verified by PREVAIL</b> — inside a shipping OS. A userspace VM
+      running verified bytecode at a designed-in hook is an established pattern with a maintained implementation
+      behind it; what's new here is bringing it to a proxy data plane that hasn't had it. (Research prototypes
+      carried uBPF into Open vSwitch as well — Oko, P4rt-OVS.) The parts we'd build are the parts that are ours
+      anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
       so the surface can start from what's in the code today and grow as the code does, not a blank page. A
       <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe

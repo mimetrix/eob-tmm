@@ -33,17 +33,19 @@ the signing gate as the security perimeter and the budget pass + watchdog as the
 > eBPF extends that power to the code/instrumentation layer, and is the one surface whose
 > runtime changes are provably safe.*
 
-**Why here and not in DPDK or VPP** — the question a reviewer will ask first. Both chose
-**native-code plugins** for dataplane extension, and for their problem that is correct: they are
-*toolkits*, so the third party's code **is** the data plane, its author accepts the crash risk in
-their own process, and "just rebuild" is cheap. TMM is a **shipped, closed appliance**: F5 owns the
-source (so designed-in hooks and a signed per-build hook map are possible), cannot ship a customer a
-mitigation that might crash the data plane (so the proof is a requirement, not overhead), and a
-rebuild costs a maintenance window rather than a `make`. Execution model matters too: eBPF takes one
-`ctx` at a time and cannot express a vector, which is fatal in VPP's vector-graph pipeline and a
-non-issue in TMM's run-to-completion loop. Full argument, including the corrected record on what
-DPDK and VPP actually did with BPF, in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md)
-§1.1.
+**Why TMM specifically.** An embedded verified VM isn't the right answer for every fast data plane;
+it's the right answer for this one, and the reason starts with **TMM being a proxy rather than a
+packet-forwarding plane**. A forwarder's unit of work is the packet, with a per-packet budget in
+single-digit nanoseconds — bytecode is a meaningful fraction of that. TMM's unit of work is a flow, a
+connection, a request: it spends **microseconds where a forwarder spends nanoseconds**, so a hook
+costing tens of nanoseconds is noise, and the hooks that matter sit at warm per-request boundaries
+rather than a per-packet fast path. A proxy also *has state worth looking at* — listeners, profiles,
+parser state, plugin internals — which is exactly where its CVEs live. Three more preconditions
+follow from being a shipped product: **F5 owns the source** (so hooks are designed in and the signed
+hook map comes out of the build), **it's a closed appliance** (so a mitigation that might crash the
+data plane is unshippable — the proof is a requirement, not overhead), and **a rebuild costs a
+maintenance window** rather than a `make`. Full argument in
+[`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §1.1.
 
 ## What the substrate enables
 

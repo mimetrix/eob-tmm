@@ -47,11 +47,12 @@ That is real per-packet work — so P4 is exactly the kind of workload that **ex
 - **A validation workload.** P4 gives the budget pass and the runtime deadline a *realistic, non-trivial* thing to
   prove themselves against — a genuine stress test, not a toy. If the time-safety machinery holds for P4-authored
   packet pipelines, it holds.
-- **Invocation granularity is the other constraint.** A P4 program is per-packet by construction, and eBPF's
-  calling convention takes one `ctx` at a time — which is precisely why bytecode never displaced native nodes in
-  VPP's vector pipeline. TMM's run-to-completion loop is the favorable case, but on burst-receive hot paths the
-  answer is a burst-capable invocation form (DPDK's `rte_bpf_exec_burst()`), with the budget reasoned per burst;
-  see [`engine-hard-problems.md`](engine-hard-problems.md) §5.
+- **Invocation granularity is the other constraint.** A P4 program is **per-packet by construction**, which is the
+  one place TMM's proxy economics stop helping: the per-request microseconds that make a hook cheap at a warm
+  boundary aren't there when the unit of work is a packet. eBPF's calling convention takes one `ctx` at a time, so
+  on burst-receive paths the answer is a **burst-capable invocation form** with the budget reasoned per burst
+  ([`engine-hard-problems.md`](engine-hard-problems.md) §5) — and a P4 front-end is precisely the workload that
+  would force that question first.
 - **The budget pass becomes a placement decision.** Because P4 programs are heavier, some will *exceed* a hot
   per-packet hook's budget. The admission-time budget pass then does more than accept/reject — it **routes**: a P4
   program that fits the software budget runs inline in uBPF; one that doesn't is steered to a looser (cold/warm)
@@ -90,7 +91,7 @@ P4 on TMM is a front-end **unlocked by the richer tier, not free at the base tie
 
 ## 8. Precedent
 
-- **DPDK `librte_bpf`** (mainline since 18.05) — DPDK's **own** in-tree eBPF VM + JIT (not uBPF) run inline on packets at a device's RX/TX. Scope it honestly: still an **experimental API**, attachable only via software RX/TX callbacks, and never DPDK's headline programmability story — but it recently gained a debuggable **abstract-interpretation** validator, independently converging on PREVAIL's technique. It also ships `rte_bpf_exec_burst()`, which is the precedent to copy for hot-path invocation granularity (see [`engine-hard-problems.md`](engine-hard-problems.md) §5).
+- **Userspace eBPF on a packet path is not novel** — in-tree userspace eBPF VMs with their own JIT and validator, invoked inline on packets, exist in maintained networking software today, including with a batched (burst) invocation form. The pattern this note depends on is established; what's specific to us is the P4 front-end and the proxy context.
 - **eBPF-for-Windows** (Microsoft, production) — **uBPF + PREVAIL**, the exact two libraries this proposal reuses.
 - **Oko / p4rt-OVS** (Orange Labs, ~2018–2020, now **dormant**) — `P4 → uBPF` as Open vSwitch **actions / stateful filters** with maps and a default verifier. Proves the `P4 → uBPF`-in-a-software-dataplane path end to end — but treat as **research prototype, not production**.
 
