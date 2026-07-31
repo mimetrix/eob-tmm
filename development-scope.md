@@ -1,7 +1,9 @@
 # Development scope — what F5 actually builds
 
-Everything the embedded-eBPF substrate needs **beyond what is reused as-is** (compile, verify,
-execute — clang, PREVAIL, uBPF). Derived from the worked example
+Everything the embedded-eBPF substrate needs **beyond what is reused** (compile, verify, execute —
+clang, PREVAIL, uBPF). One of those three is not reused *as-is*: time safety needs a back-edge-fuel
+patch to uBPF's JIT (item 15, [`engine-hard-problems.md`](engine-hard-problems.md) §1), so uBPF is
+reuse-plus-a-fork that F5 owns. Derived from the worked example
 ([`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html)); step numbers
 below refer to that walkthrough. Companion to
 [`engine-hard-problems.md`](engine-hard-problems.md), which covers *why* the flagged items are
@@ -9,6 +11,15 @@ hard — this doc covers *what gets written, where it runs, and how often*.
 
 The organizing fact: **nothing on this list recurs per CVE except the shield program itself** (a
 few lines of C). Everything else is written once or generated automatically per build.
+
+**The honest size, up front.** A defensible v1 on two CPU architectures is **50–80
+senior-engineer-months** — five to six people over ten to fourteen months, plus the TMA and the
+certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item
+*list* below is right; the size classes in §6 are shape, not effort, and reviewed against what each
+item actually requires they are low by roughly 3–10×. Earlier drafts of this doc described the whole
+thing as "hundreds of lines, not subsystems." **That framing is retired.** What is being added is
+not a VM: it is a code-patching, live-text, dynamic-code-loading facility inside the crown-jewel
+process, with its own build-pipeline toolchain and a permanent per-build ABI.
 
 **Candidate code for every day-one item** (1–12 plus the shield program) is in
 [`development-scope-code.md`](development-scope-code.md) — one skeleton per item, each with an
@@ -18,16 +29,20 @@ blocks live in [`prototype/substrate/`](prototype/substrate/) and are verified b
 
 ---
 
-## 0. Reused as-is — explicitly *not* developed
+## 0. Reused — explicitly *not* developed (with one bounded exception)
 
 | Component | Role | License | Status |
 |---|---|---|---|
-| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | proven in the prototype (`ubpf_create/load/compile/exec`) |
-| **PREVAIL** | the static verifier | MIT | proven in the prototype's verify-gate track |
+| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | proven in the prototype (`ubpf_create` / `ubpf_load_elf` / `ubpf_exec` — the **interpreter**; the prototype never calls `ubpf_compile`, so the JIT path is unexercised). Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
+| **PREVAIL** | the static verifier | MIT **+ Apache-2.0** (the clone ships both `LICENSE` files, plus `external/{CLI11,bpf_conformance,libbtf}`; the SBOM/license scan is a Phase-1 gate per `big-ip-live-shield-design.md` §13) | proven in the prototype's verify-gate track |
 | **clang** | C → eBPF bytecode | — | standard toolchain |
 
 Nobody at F5 writes a VM, a verifier, or a compiler. The prototype ([`prototype/`](prototype/))
-already demonstrates the load-and-run half of the loader with the real uBPF API.
+already demonstrates the load-and-run half of the loader with the real uBPF API — via the
+interpreter, which is also why the JIT's own properties (item 15's fuel, and its unprobed 4 KiB
+stack frame) are still open questions rather than measured ones. The one exception to "reused
+as-is" is item 15's back-edge-fuel patch to uBPF's JIT: a bounded, upstreamable change to a
+component otherwise taken whole, not a rewrite.
 
 ---
 
@@ -43,10 +58,14 @@ The genuinely delicate systems work: small, but must be exactly right.
    coordinated across cores at the safe point. Same discipline the kernel's ftrace has used on
    live text for years — proven pattern, not research.
 3. **The safe-point loader handler** *(steps 4, 10, 13)* — processes `shield_msg`
-   (`LOAD · SET_MODE · STATUS · REVOKE`): signature check → `ubpf_create/load/compile` →
-   hook-map lookup → arm. Plus the unglamorous rest that is real work: **all error paths
-   fail-dark** (no partial arm), expiry enforcement (auto-retire on build match), per-shield
-   state (per-core fire counters, mode flags, VM teardown on unload).
+   (`LOAD · SET_MODE · STATUS · REVOKE`). **Every op is authenticated, not only `LOAD`**: the
+   signature must cover the op, the requested mode and a **monotonic epoch**, or a captured `LOAD`
+   replays after a `REVOKE` and the kill switch is defeatable. Then hook-map lookup → arm.
+   `ubpf_load_elf` and the JIT compile run **off** the safe point — a full ELF parse plus a code
+   generation pass inline in the poll loop is milliseconds of not polling — leaving the safe point
+   to publish a pointer and patch a few bytes. Plus the unglamorous rest that is real work: **all
+   error paths fail-dark** (no partial arm), expiry enforcement (auto-retire on build match),
+   per-shield state (per-core fire counters, mode flags, VM teardown on unload).
 4. **Signature verification in TMM** *(steps 3, 10)* — checking the signed binding against the
    baked-in public key before any bytecode is touched. Possibly reusable from F5's existing
    signed-artifact verification; net-new integration either way.
@@ -62,9 +81,26 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    hard-problems §2 — the ctx/helper/program-type ABI is the real 90% of the work.**
    Mechanically simple per hook; the discipline and versioning around it is the substrate's
    biggest ongoing engineering surface.
-7. **Safe-return policy table** *(steps 3, 12)* — per hookable function: what a skipped body
-   hands back. Partly tooling, partly one-time human annotation — which is why a sane v1 scopes
-   enforce-capable hooks to functions with trivial (`void`/benign) returns.
+7. **Safe-return policy table** *(steps 3, 12)* — **two gates, in this order, and the order is the
+   whole point.** *Gate 1 — skippability:* may this body be skipped at all? Closed by default; any
+   lock held across it, refcount moved, flow state advanced, input consumed, out-param written or
+   allocation made disqualifies the function **whatever it returns**, and *unanalysed* means
+   observe-only, because absence of evidence is not evidence of absence. *Gate 2 — the return
+   value:* reached only for a body that already cleared gate 1. Classifying by return type is
+   backwards, and **`void` is the hardest case, not the trivial one**: a void function is called
+   entirely for its side effects, so skipping it discards all of them and the signature tells you
+   nothing about what they were. The worked CVE proves it — its vulnerable function returns nothing
+   and *still* emits a log. A v1 restriction phrased as "enforce only where returns are trivial
+   (`void`/benign)" is precisely the inversion this now blocks.
+   **This is enforced in code, not asserted in prose:** `enum shield_skippable` is gate 1 and sits
+   ahead of `kind` in `struct shield_sr_policy`, `shield_sr_enforce_capable()` requires both gates
+   ([`prototype/substrate/shield_abi.h`](prototype/substrate/shield_abi.h)),
+   [`check_sr_gates.c`](prototype/substrate/check_sr_gates.c) asserts five cases — including the
+   `void` + unanalysed case the retired model accepted — and
+   [`hook_map.schema.json`](prototype/substrate/hook_map.schema.json) requires `skippable` alongside
+   `kind`. `make -C prototype/substrate check` fails on regression. The residual work is partly
+   tooling, partly one-time human annotation; the honest v1 hand-audits a short candidate list
+   rather than trusting a tool to prove absence of side effects across TMM.
 
 *Also in this section's scope over time:* the **designed-in USDT tracepoint catalog** — hook
 kind (1), proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md): per-stage placement
@@ -78,8 +114,10 @@ auto-generated function-boundary hook map above.
 Conventional engineering — no novel machinery.
 
 8. **Budget pass** *(step 8; hard-problems §1)* — admission-time cost estimator + gate: CFG
-   longest-path over the verified bytecode → cycle bound, compared against the hook's
-   per-invocation budget. A build artifact, off the data path; fail-closed.
+   longest-path over the verified bytecode → a cycle *estimate*, compared against the hook's
+   per-invocation budget. A build artifact, off the data path; fail-closed. Real code:
+   [`prototype/substrate/budget_pass.py`](prototype/substrate/budget_pass.py). It is an estimate,
+   not a WCET bound — which is why item 15's fuel is the enforcement half and is day one.
 9. **Signing-service integration** *(step 9)* — the binding format
    (`prog hash · hook · build range · mode ceiling · expiry`) wired into F5's existing
    HSM-backed release-signing flow. New manifest, existing infrastructure.
@@ -91,16 +129,25 @@ Conventional engineering — no novel machinery.
     new standalone tool). Fills the struct; reads the counters.
 12. **Audit trail** *(step 4)* — every op logged: who loaded/flipped/revoked what, when.
 
-## 4. Optional / staged tiers — not needed for the worked example
+## 4. Staged tiers — 13, 14, 16, 17 are follow-ons; **15 is day one**
 
 13. **Rate-limited per-firing log line** in the trampoline (evidence tier 2).
 14. **Egress ring + drain agent** — per-core SPSC shared-memory ring for per-event records
     (flow tuple + timestamp), drained off the hot path; enables out-of-band synthesis of a
     suppressed log entry. Already designed:
     [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).
-15. **Runtime watchdog / wall-clock deadline** — the second time-safety layer (hard-problems
-    §1). A must-have before hot-path packet hooks; optional for cold-path sites like the worked
-    example's log function.
+15. **Back-edge fuel — a uBPF JIT patch. Day one, not optional.** The runtime half of time safety
+    (hard-problems §1), and the one item in this section that is not a follow-on. **Fuel is the
+    mechanism**: uBPF's own API states that `ubpf_set_instruction_limit` *"has no effect on JIT'd
+    programs,"* so enforcing a bound means patching uBPF's JIT — the single place the "reused
+    as-is" claim does not hold. A **wall-clock deadline is *reporting*, not enforcement**: on
+    aarch64 `CNTVCT_EL0` ticks at tens of MHz (10–40 ns granularity) against a hot hook's budget of
+    tens of nanoseconds, so it is unmeasurable at the granularity that matters. Required for any
+    hook reachable from unauthenticated input — which **includes the worked example's log site**: a
+    log function on a malformed-input path is the path an attacker drives, i.e. adversarially `hot`
+    whatever its structural `path_class` says. Known corner: the instruction limit *does* work in
+    uBPF's **interpreter**, so an interpreter-only high-assurance build has enforceable fuel today
+    with no fork.
 16. **Canary auto-unload** — health-metric-driven auto-revoke (verified ≠ correct;
     hard-problems §4).
 17. **tmmtrace** — the bpftrace-style authoring DSL. Convenience front-end only; emits the same
@@ -129,13 +176,23 @@ new mitigation. Nothing else on this list is ever written again.
 | 10 | loader daemon side | control plane | once | conventional |
 | 11 | operator front-end | control plane | once | thin |
 | 12 | audit trail | control plane | once | conventional |
-| 13–17 | optional tiers | various | staged | staged |
+| 15 | back-edge fuel (uBPF JIT patch) | TMM, per program invocation | **day one** | small patch, owned fork |
+| 13, 14, 16, 17 | staged tiers | various | staged | staged |
 | — | **shield program** | TMM, via VM | **per CVE** | **a few lines of C** |
 
-Items 1–4: delicate, small, must be exactly right. Items 5–7: tooling with one hard design
-decision (§2). Items 8–12: conventional control-plane engineering. Items 13–17: staged
-follow-ons. Nothing is a subsystem on the scale of "write a VM or a verifier" — that is
-precisely what the reuse buys.
+The **Size class** column is *shape*, not effort: it says how much code an item is, not how long it
+takes to get right. Items 1–4: delicate, small, must be exactly right. Items 5–7: tooling with one
+hard design decision (§2). Items 8–12: conventional control-plane engineering. Items 13, 14, 16, 17:
+staged follow-ons; **item 15 is day one**.
+
+What the reuse buys is real and narrow: nobody at F5 writes a VM, a verifier or a compiler. It does
+**not** make this small. An earlier draft of this doc closed with "nothing is a subsystem on the
+scale of 'write a VM or a verifier'" — **retired**, because the subsystem being added is a
+code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, carrying its
+own build-pipeline toolchain and a permanent per-build ABI. That is worth building; describing it as
+smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine.
+**50–80 senior-engineer-months for a defensible v1 on two architectures**
+([`engine-hard-problems.md`](engine-hard-problems.md) §6.1).
 
 ---
 

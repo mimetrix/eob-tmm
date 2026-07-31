@@ -82,6 +82,8 @@ enum shield_err {
     SHIELD_ERR_JIT      = -7, /* ubpf_compile failed                               */
     SHIELD_ERR_BUDGET   = -8, /* admission budget for this hook exceeded (item 8)  */
     SHIELD_ERR_NOMEM    = -9,
+    SHIELD_ERR_REPLAY   = -10, /* epoch did not strictly advance — replayed op   */
+    SHIELD_ERR_TRUNC    = -11, /* prog_len disagrees with the received length   */
 };
 
 /* What the signature covers — the binding, not just the bytecode (step 9). A
@@ -229,11 +231,19 @@ struct hook_slot {
  * Host-side entry points — declarations only; every body is a stub in this repo.
  *
  * shield_msg_handle() runs at TMM's safe point between poll-loop iterations,
- * never mid-packet, and is fan-out per TMM instance/core by the loader daemon.
+ * never mid-packet, and is fanned out per TMM instance/core by the loader daemon.
  * sig_verify() checks the whole binding, not just the program bytes.
+ *
+ * BOTH TAKE `len` — the number of bytes actually received — and that is not
+ * decoration. `msg->prog_len` is attacker-influenced until the signature checks
+ * out, so a receiver handed only a pointer has no way to validate it and the rule
+ * "check prog_len first" is unenforceable. With `len` present the first statement
+ * can be a real check, returning SHIELD_ERR_TRUNC. Likewise sig_verify() needs
+ * `len` to know how many bytes of prog[] to hash.
  */
-int  shield_msg_handle(const struct shield_msg *msg);              /* item 3      */
-int  sig_verify(const struct shield_msg *msg, const void *pubkey); /* item 4      */
+int  shield_msg_handle(const struct shield_msg *msg, size_t len);  /* item 3      */
+int  sig_verify(const struct shield_msg *msg, size_t len,
+                const void *pubkey);                               /* item 4      */
 struct hook_slot *hook_map_lookup(const char *hook);               /* item 5 out  */
 int  trampoline_arm(struct hook_slot *slot, shield_jit_fn fn, int mode); /* item 2 */
 int  trampoline_disarm(struct hook_slot *slot);                    /* item 2      */
