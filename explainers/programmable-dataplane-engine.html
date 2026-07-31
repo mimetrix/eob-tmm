@@ -347,7 +347,7 @@
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
-      reboot, no release train. <em>(The engine itself ships in one enabling build; every mitigation and probe
+      reboot, no release train. <em>(The engine ships in one enabling build; after that every mitigation — and every probe at a boundary that build exposes —
       after that is a load.)</em></p>
     <div class="herotriad" aria-label="runtime, programmable, provably safe">
       <span class="td">runtime</span><span class="tdot">·</span>
@@ -431,8 +431,9 @@
         <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">hours</span>
       </div>
     </div>
-    <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> <b>eBPF-for-Windows</b> runs this
-      <em>exact</em> stack in production — <b>uBPF verified by PREVAIL</b> — inside a shipping OS. A userspace VM
+    <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> Microsoft's <b>eBPF-for-Windows</b> ships this pair
+      — <b>uBPF</b> as the execution engine, <b>PREVAIL</b> as the verifier — in a maintained, production-used
+      component. The verifier half is the well-trodden part; the JIT is where we do our own hardening (§5.4). A userspace VM
       running verified bytecode at a designed-in hook is an established pattern with a maintained implementation
       behind it; what's new here is bringing it to a proxy data plane that hasn't had it. The parts we'd build are
       the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
@@ -460,9 +461,9 @@
             deprecated. What's different now: an unverified script had no proof, no signing gate, and no
             host-owned outcome set — the three things that make this one governable</span></div>
         <div class="miss"><span class="who">WASM</span>
-          <span class="gap"><b>programmable</b>, but its bound is only a runtime kill. The difference isn't
-            that we avoid a runtime guard — we need one too (§5.4) — it's that eBPF adds a <em>static</em>
-            memory-safety and termination proof that fuel-metering can't give</span></div>
+          <span class="gap"><b>programmable</b>, but its guarantees are enforced <em>dynamically</em> — bounds-checked as it
+            runs, time bounded by a counter that aborts. eBPF moves the same guarantees earlier: memory safety and
+            termination <b>proven before load</b>. Both still need a runtime time guard; ours is §5.4</span></div>
         <div class="miss"><span class="who">kernel eBPF</span>
           <span class="gap"><b>provably safe</b>, but in the wrong kernel — a USDT lets it <em>watch</em> TMM,
             not act inside it, and traps on every hit</span></div>
@@ -532,7 +533,7 @@
           <span class="only-obs">Same program shape; the host <b>records</b> the return. This is
             <b>observability</b> — deep telemetry from inside a black box, on demand, then off.</span>
           <span class="only-enf">Same program shape; the host <b>acts on</b> the return. This is
-            <b>control</b> — here, steering the flow the program flagged toward a cooler pool member.</span>
+            <b>control</b> — here, steering the flow the program flagged toward a healthier pool member.</span>
         </p>
       </div>
     </div>
@@ -630,7 +631,7 @@
 <span class="c">// ret is the program's result; the host decides what it means:</span>
 <span class="c">//   summarize  →  recorded as a counter, histogram, or ring</span>
 <span class="c">//   capture    →  a window of state streamed out to userspace (RCA, debug)</span>
-<span class="c">//   act        →  a decision applied — e.g. steer / rate-limit / gate</span></div>
+<span class="c">//   act        →  a decision from the host's set — e.g. steer / drop</span></div>
     <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
       <b>input</b>; what the return <em>means</em> is the host's choice — a value to record, a window to capture and stream out, or a code to act on.
       In the <b>base tier</b>, programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
@@ -654,7 +655,7 @@
       </tbody>
     </table></div>
     <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier; the data plane is the crown
-      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
+      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
       kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
       engines, one trust path. (Not one binary for both: a different engine means a different
@@ -688,25 +689,25 @@
       and this is the load-bearing point. The JIT emits native code inside TMM, and the verifier gates what
       reaches it — PREVAIL itself runs off-box at build/control-plane time — so an unsound verifier would
       still mean arbitrary code in the data plane — the risk a security review will press
-      hardest. But <b>only F5-signed bytecode ever reaches the verifier or JIT</b>; attacker-controlled input
+      hardest. But <b>only bytecode F5 authored ever reaches the verifier</b> — it runs in F5's admission pipeline, <em>before</em> signing — and <b>only F5-signed bytecode ever reaches the in-TMM JIT</b>; attacker-controlled input
       never touches them, so a soundness bug is not a traffic-borne RCE — it's a supply-chain concern, gated by
       signing-key protection. A per-hook watchdog stands behind all of it. Trust the proof; don't depend on it
       alone. (The load-bearing problems are catalogued in
       <a href="engine-hard-problems.html" style="color:var(--signal-ink)">the engineering register</a>.)</p>
     <p>The second principle is just as blunt: <b>verified ≠ secure, and verified ≠ correct</b>. PREVAIL proves a
-      program is memory-safe and terminates — <em>not</em> that it fits the per-packet time budget, and nothing
+      program is memory-safe and terminates — <em>not</em> that it fits the hook's budget, and nothing
       about intent. Time-safety and security both live in the governance <em>around</em> the VM:</p>
     <ul class="unlocks" style="margin-top:1rem">
       <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
       <li><b>Bounded in time, not just in steps</b> — a proof that a program <em>terminates</em> is not a
         <b>worst-case execution time (WCET)</b>: the longest it can actually take on the hardware. So each hook
-        adds an <b>instruction-budget ceiling</b> at load and a <b>runtime deadline</b> — a provably-terminating
-        program still can't overrun its hook's budget — which is set per <em>invocation</em> and gated by the hook's rate (per packet, per connection, per request), not by one global number.</li>
-      <li><b>Signed &amp; authorized</b> — signature checked before the verifier sees bytecode; a program that
+        adds an <b>instruction-budget ceiling</b> at load and a <b>runtime guard</b> as it runs — a provably-terminating
+        program still can't overrun its hook's budget — the guard's mechanism is the register's §01 open question — which is set per <em>invocation</em> and gated by the hook's rate (per packet, per connection, per request), not by one global number.</li>
+      <li><b>Signed &amp; authorized</b> — the box checks the signature before the JIT sees bytecode (the verifier already ran, at F5); a program that
         <em>acts</em> needs stricter authz than one that only observes; RBAC-gated.</li>
       <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
         Even at an acting hook, the return merely <em>selects among</em> outcomes the host code already owns
-        (<span class="mono">steer / rate-limit / gate</span>, for example); a program cannot invent control
+        (<span class="mono">steer / drop / sample</span>, from the canonical set); a program cannot invent control
         flow or force an arbitrary early return.</li>
       <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
       <li><b>One-way egress</b> — with no helpers a program has no I/O of its own; it returns a value to a
@@ -762,7 +763,8 @@
       <div class="rrow"><span class="rn">00</span><span class="rt">Everything ships at <b>machine speed now</b> —
         but the data plane's <b>own code</b> still waits on a release train.</span></div>
       <div class="rrow"><span class="rn">01</span><span class="rt">TMM is a <b>kernel</b> that bypassed the
-        kernel — nothing outside can reach inside it.</span></div>
+        kernel — reachable from outside only at a cost the poll loop can't pay, and never with the power to
+        act.</span></div>
       <div class="rrow"><span class="rn">02</span><span class="rt">So give it <b>its own eBPF</b>: verifier + VM,
         in-process, at designed-in hooks — complementing iRules and WASM.</span></div>
       <div class="rrow"><span class="rn">03</span><span class="rt">One program shape — read a context, return a
@@ -840,7 +842,7 @@
       enfBtn.setAttribute('aria-pressed', obs?'false':'true');
       verb.textContent = obs?'snapshot()':'steer()';
       verb.className = 'verb '+(obs?'obs':'enf');
-      outcell.innerHTML = obs ? 'records a sample<br>into a ring / metric' : 'acts on the return —<br>steers to a cooler member';
+      outcell.innerHTML = obs ? 'records a sample<br>into a ring / metric' : 'acts on the return —<br>steers to a healthier member';
     }
     obsBtn.addEventListener('click',function(){ setMode('obs'); });
     enfBtn.addEventListener('click',function(){ setMode('enf'); });

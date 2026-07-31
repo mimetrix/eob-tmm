@@ -277,7 +277,7 @@
   <section class="beat reveal" id="time" data-sec="time">
     <p class="kicker"><span class="num">01</span> time</p>
     <h2>A proof that a program <em>terminates</em> is not a promise it fits the budget.</h2>
-    <p class="lede">The verifier proves every program halts — it bounds loop iterations, so nothing runs forever.
+    <p class="lede">The verifier proves every program halts — it bounds loop iterations, so nothing runs forever. (With <span class="inlinecode">--termination</span> enabled: it is <em>not</em> PREVAIL's default, and the prototype does not yet pass it. This design requires it.)
       That is <b>not</b> a <b>worst-case execution time (WCET)</b>: the longest it can actually take on the
       hardware. Halting says nothing about fitting the budget at the hook it runs on.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
@@ -304,10 +304,10 @@
       </div>
       <div class="layer run">
         <p class="lh"><span class="num">②</span> at runtime · every execution</p>
-        <h4>The wall-clock deadline</h4>
-        <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything. A <b>deadline +
-          watchdog</b> on each run is what actually stops a slow execution from stalling the loop.
-          <b>Irreducible</b>, and it carries a small per-execution cost. And note what &ldquo;terminating&rdquo;
+        <h4>The runtime guard</h4>
+        <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything. Something must stop a slow execution from stalling the
+          loop as it runs. <b>Irreducible</b>, and it carries a small per-execution cost — but <em>which</em>
+          mechanism is the open question below, not a settled matter. And note what &ldquo;terminating&rdquo;
           buys on its own: PREVAIL's own ceiling is <b>100,000 loop iterations</b> — at ~10 instructions each that
           is ~300&nbsp;µs on a 3&nbsp;GHz core. A <em>proven-terminating</em> program can still stall the loop for
           a third of a millisecond. That number is the argument for ①.</p>
@@ -442,7 +442,7 @@
         per-build typed-argument map that <b>function-boundary probes</b> read. Getting them right isn't
         incidental to the project; it is the project: together they are the <b>ceiling on what the engine can
         observe or enforce</b> — the catalog bounds the <em>anticipated</em> surface; function-boundary probes
-        reach any named function whose arguments expose the fault — and it's the permanent ABI. This is
+        reach any named function that survived the build as its own out-of-line body, whose arguments reach the state you need — and it's the permanent ABI. This is
         exactly where the design effort earns its keep, and it's what makes the difference between a toy and a
         platform.</p></div>
     <div class="dayone"><p class="h">day one</p>
@@ -468,7 +468,7 @@
       <p>&ldquo;Maps work like they do in Linux.&rdquo;</p></div>
     <div class="dayone"><p class="h">day one</p>
       <ul class="checks">
-        <li><b>Per-CPU maps only</b> — no cross-TMM sharing. Matches the core-pinned model; no locking.</li>
+        <li><b>When the helper tier lands (deferred): per-CPU maps only</b> — no cross-TMM sharing. The base tier registers no helpers, so it has no map access at all.</li>
         <li>State that must survive failover <b>rides TMM's existing mirroring channel</b> — don't reinvent HA
           replication inside the map layer.</li>
       </ul>
@@ -481,14 +481,14 @@
   <section class="beat reveal" id="trust" data-sec="trust">
     <p class="kicker"><span class="num">04</span> the trust surface</p>
     <h2>The JIT emits native code into the crown-jewel process, and the verifier decides what reaches it. This is the one a review presses hardest.</h2>
-    <p class="lede">PREVAIL itself runs off-box, at build/control-plane time (§05) — so an <b>unsound
+    <p class="lede">PREVAIL runs outside TMM — in F5's build/admission pipeline, never in TMM's address space and never on attacker-supplied input (§05) — so an <b>unsound
       verifier</b>, or a <b>buggy JIT</b>, still means arbitrary native code in the data plane — the single
       biggest risk class eBPF carries, relocated into TMM.<sup class="fnref">†</sup></p>
     <div class="callout accent"><span class="lbl">the load-bearing point</span>
       <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
         verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
         traffic-borne RCE</b>; it's a supply-chain concern, gated by signing-key protection.</p></div>
-    <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; only F5-signed bytecode reaches the verifier and JIT.">
+    <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; the verifier runs at F5 before signing, and only F5-signed bytecode reaches the JIT and JIT.">
       <div class="srow blocked"><span class="flow">attacker-controlled bytecode → signing gate</span><span class="tag">✗ rejected</span></div>
       <div class="srow pass"><span class="flow">F5-signed bytecode → verify → JIT</span><span class="tag">✓ runs</span></div>
     </div>
@@ -559,9 +559,9 @@
     <div class="tablewrap"><table>
       <thead><tr><th>Concern</th><th class="d1">Day one</th><th class="df">Deferred / governed</th></tr></thead>
       <tbody>
-        <tr><td>Time safety</td><td class="d1">instruction-budget ceiling + watchdog</td><td class="df">tuned per-hook budgets from field data</td></tr>
+        <tr><td>Time safety</td><td class="d1">instruction-budget ceiling (static) + a runtime guard, mechanism per §01</td><td class="df">tuned per-hook budgets from field data</td></tr>
         <tr><td>Interface</td><td class="d1">read-only <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, lookup)</td></tr>
-        <tr><td>State</td><td class="d1">per-CPU maps; failover via existing mirroring</td><td class="df">shared writable cross-TMM maps</td></tr>
+        <tr><td>State</td><td class="d1">no maps (base tier); failover via existing mirroring</td><td class="df">shared writable cross-TMM maps</td></tr>
         <tr><td>Execution</td><td class="d1">interpreter or hardened JIT; W^X</td><td class="df">&mdash;</td></tr>
         <tr><td>Trust perimeter</td><td class="d1">signing gate + HSM key protection</td><td class="df">&mdash;</td></tr>
         <tr><td>Blast radius</td><td class="d1">canary auto-unload + kill-switch + revocation</td><td class="df">automated health-driven rollback</td></tr>
@@ -583,7 +583,7 @@
         code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own
         build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
         smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine. <b>The ask
-        is therefore a one-quarter feasibility phase, not the twelve items:</b> measure the always-on cost of the
+        is therefore a one-quarter feasibility phase, not the whole register:</b> measure the always-on cost of the
         compiler flag (kill criterion, ~1% pps), settle a <span class="inlinecode">ctx</span> model that verifies,
         and arm one hook end-to-end in a lab TMM with core dumps still readable.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
@@ -601,7 +601,7 @@
       <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.</span></div>
       <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.</span></div>
       <div class="rrow"><span class="rn">04</span><span class="rt"><b>Trust</b> — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.</span></div>
-      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — the safe point itself (the biggest unlisted item), certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, invocation granularity, multi-tenancy, ISSU, jitter — each addressable; the safe point and certification shape the first shippable form.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — the safe point itself (previously unlisted, and the biggest), certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, <b>the optimiser-decided hookable set</b>, invocation granularity, multi-tenancy, ISSU, jitter — each addressable; the safe point and certification shape the first shippable form.</span></div>
       <div class="rrow"><span class="rn">06</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
     </div>
     <p class="foot">
