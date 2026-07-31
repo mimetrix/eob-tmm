@@ -78,11 +78,16 @@ The motivating application: **surgical, reversible, vendor-signed mitigations th
 specific exploit path between maintenance windows**, until the patched build ships. A shield
 is a **crash mitigation, not a hot-patch**: the host takes a safe outcome (e.g. skip the
 vulnerable function's body); the corrected behaviour returns with the patch.
-Cisco's Live Protect embeds eBPF shields in NX-OS's Linux kernel — which covers BIG-IP's
-**control plane** but is structurally **blind to TMM**, F5's data-plane microkernel that
-bypasses the Linux kernel entirely. The most damaging data-plane CVEs (malformed-input
-crashes, parser bugs, traffic-borne RCE) live exactly where kernel eBPF cannot see, and
-iRules only reach part of that path. Embedding the VM *in* the data plane closes that gap.
+There is a precedent for the idea: Cisco's Live Protect ships signed eBPF shields for NX-OS,
+loaded into that platform's Linux kernel. Applied to BIG-IP, the same technique reaches the
+**control plane** — httpd, tmsh, MCPD are ordinary Linux processes — and stops there. It does
+not reach **TMM**. Not because the kernel cannot see TMM: a uprobe on the `tmm` binary attaches
+today. It is that a uprobe traps into the kernel on every hit, which a run-to-completion poll
+loop cannot afford, and that the kernel forbids overriding a return from a uprobe, so it could
+never *act* even where it can watch. Meanwhile the most damaging data-plane CVEs — malformed-input
+crashes, parser bugs, traffic-borne RCE — are exactly the ones inside TMM, and iRules reach only
+part of that path. An in-process VM is the only form that is both affordable per invocation and
+able to take an outcome.
 
 > The `bpftime` *injection* model was evaluated and rejected — its syscall interposition
 > never reliably engaged, and the kernel forbids `bpf_override_return` on uprobes
