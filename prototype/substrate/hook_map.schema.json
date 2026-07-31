@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mimetrix/eob-tmm/prototype/substrate/hook_map.schema.json",
+  "title": "Per-build hook-point map",
+  "description": "The artifact the hook-map generator emits every TMOS build (development-scope.md item 5; walkthrough build step 3): named symbol -> patchable entry + typed argument layout, signed and shipped with the image. A shield resolves its target hook by NAME against this map, and the signed binding is checked against it at load. REQUIRED here is scoped to what prototype/hook-point-map.json already carries, so that instance validates clean; the fields a real generator must add are marked '$comment: required in product'.",
+  "type": "object",
+  "required": ["tmos_version", "build_id", "hook_points"],
+  "additionalProperties": false,
+  "properties": {
+    "_comment": {
+      "type": "string",
+      "description": "Free-text note. Present in the prototype instance."
+    },
+    "tmos_version": {
+      "type": "string",
+      "description": "Human-readable build version, e.g. '17.5.2'. Consumed by tmmtrace list."
+    },
+    "build_id": {
+      "type": "string",
+      "description": "Unique build identity. The signed binding's build_min..max range is expressed in these terms."
+    },
+    "ctx_abi_version": {
+      "type": "integer",
+      "minimum": 1,
+      "$comment": "required in product",
+      "description": "Bumped whenever any hook's arg_btf changes shape. A function-boundary probe's ctx contract is build-specific; this is what makes a stale program detectable rather than silently mis-typed."
+    },
+    "generated_by": {
+      "type": "string",
+      "$comment": "required in product",
+      "description": "Generator name + version, for reproducibility (item 5)."
+    },
+    "signature": {
+      "$ref": "#/$defs/signature",
+      "$comment": "required in product",
+      "description": "Detached signature over the canonical serialization of this map. TMM carries only the public key (walkthrough build step 3)."
+    },
+    "hook_points": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/hook_point" }
+    }
+  },
+  "$defs": {
+    "hook_point": {
+      "type": "object",
+      "required": ["name", "symbol", "attach_mode", "path_class", "enumerated_outcomes", "arg_btf"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "The hook's stable name — what a shield names as its target, and what the binding's `hook` field pins. Bounded by SHIELD_HOOK_NAME_MAX (64) minus the NUL."
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The build's symbol for this hook. Kept distinct from `name` so a catalog name can outlive a symbol rename."
+        },
+        "attach_mode": {
+          "enum": ["observe", "filter"],
+          "description": "observe = return value is telemetry only; filter = return value selects an enumerated outcome. Consumed by tmmtrace (it refuses drop() unless filter)."
+        },
+        "path_class": {
+          "enum": ["hot", "warm", "cold"],
+          "description": "Cost class of the site: hot = per-packet/per-flow steady state, warm = per-connection/request, cold = exceptional/error/malformed branch. The budget pass gates against the ceiling implied here."
+        },
+        "enumerated_outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "The host-owned actions available AT THIS SITE. A program may only choose among these; it cannot invent control flow."
+        },
+        "arg_btf": {
+          "$ref": "#/$defs/arg_btf",
+          "description": "The typed argument layout = the program's ctx. Emitted from the build's DWARF/BTF; also the input the PREVAIL program-type descriptor is generated from (item 6)."
+        },
+        "abort_branch": {
+          "type": "string",
+          "description": "Prose: how the host reaches its safe outcome here and what state, if any, must unwind. Present in the prototype instance."
+        },
+        "entry_offset": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "required in product",
+          "description": "Offset of the patchable entry pad from the symbol's address. Arm/disarm patches exactly here (item 2)."
+        },
+        "patchable_pad_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "$comment": "required in product",
+          "description": "Bytes of no-op reserved at the entry by -fpatchable-function-entry. Arm overwrites this pad; disarm restores it."
+        },
+        "safe_return": {
+          "$ref": "#/$defs/safe_return",
+          "$comment": "required in product when attach_mode is filter",
+          "description": "What a skipped body hands back (item 7). A v1 only arms enforce-capable boundaries whose kind is void or zero."
+        },
+        "budget_cycles": {
+          "type": "integer",
+          "minimum": 1,
+          "$comment": "required in product",
+          "description": "Per-invocation cycle ceiling for a program at this hook. The admission budget pass compares its longest-path estimate against this and fails closed (item 8)."
+        },
+        "mode_ceiling": {
+          "enum": ["observe", "monitor", "enforce"],
+          "$comment": "required in product",
+          "description": "The highest mode a program at this hook may ever reach. Enforcing sites sit behind a stricter authorization tier than observe-only."
+        }
+      }
+    },
+    "arg_btf": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^arg[0-9]+$": {
+          "type": "object",
+          "required": ["type", "fields"],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "The C declaration of this argument, e.g. 'const struct ls_ctx *'."
+            },
+            "fields": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "Field name -> scalar type. No pointers out: every field is a fixed-width scalar or a small fixed byte array, so a predicate over it is PREVAIL's easy case.",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^(u8|u16|u32|u64|i8|i16|i32|i64|bool)(\\[[0-9]+\\])?$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "safe_return": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": ["none", "void", "zero", "const"],
+          "description": "none = not enforce-capable (observe only); void = nothing to synthesize; zero = 0/NULL is the benign no-op; const = return the enumerated benign value below. Mirrors enum shield_sr_kind in shield_abi.h."
+        },
+        "value": {
+          "type": "integer",
+          "description": "kind=const only: the benign value the trampoline returns for a skipped body."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why skipping this body is safe, and what benign work is lost while enforcing. A per-function human judgement, not a generated field."
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["alg", "key_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "alg": { "type": "string", "description": "e.g. 'ed25519', 'ecdsa-p384-sha384'." },
+        "key_id": { "type": "string", "description": "Which F5 signing key; the public half is baked into TMM." },
+        "value": { "type": "string", "description": "Base64 detached signature." }
+      }
+    }
+  }
+}

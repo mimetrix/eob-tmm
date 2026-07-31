@@ -10,6 +10,12 @@ hard — this doc covers *what gets written, where it runs, and how often*.
 The organizing fact: **nothing on this list recurs per CVE except the shield program itself** (a
 few lines of C). Everything else is written once or generated automatically per build.
 
+**Candidate code for every day-one item** (1–12 plus the shield program) is in
+[`development-scope-code.md`](development-scope-code.md) — one skeleton per item, each with an
+explicit real / stubbed / TODO breakdown. The two artifacts worth having as real files rather than
+blocks live in [`prototype/substrate/`](prototype/substrate/) and are verified by
+`make -C prototype/substrate check`.
+
 ---
 
 ## 0. Reused as-is — explicitly *not* developed
