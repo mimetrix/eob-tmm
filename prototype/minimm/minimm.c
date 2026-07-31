@@ -19,7 +19,8 @@
  * Wire framing (toy, just enough to carry an opcode): big-endian
  *   [2B opcode][2B payload_len][payload ...]
  *
- * Synthetic CVE ("CVE-2026-22548" analog): process_frame() dispatches on opcode
+ * Synthetic crash bug (deliberately not given a CVE number — no real advisory
+ * corresponds to it): process_frame() dispatches on opcode
  * through a fixed handler table WITHOUT a bounds check. A frame whose opcode is
  * outside the table indexes out of bounds and calls a wild pointer -> the relay
  * process dies (the data plane goes down). The SIRT predicate is therefore

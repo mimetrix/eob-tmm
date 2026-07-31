@@ -79,7 +79,7 @@ The properties that make the substrate valuable:
 | **Cheap** — JIT'd; ~tens of ns/invocation; an empty hook = one branch at a designed-in call site — and literally nothing (a nop pad) at an unarmed function boundary | usable on cold *and* (under a measured budget) hot paths |
 | **In-process** — runs in TMM's address space | sees data-plane internals that kernel eBPF (kernel-bypass) and iRules (proxy data-model) cannot |
 | **Host-owned outcomes** | a program *chooses among* sanctioned effects; it cannot invent new control flow |
-| **Zero-helper by default** — a program is a pure function of `ctx` (read fields, return a value); the host does everything else | **no custom eBPF helpers to define/secure, and PREVAIL is used stock** — the core substrate is buildable without extending the verifier or standing up a helper ABI (see below) |
+| **Zero-helper by default** — a program is a pure function of `ctx` (read fields, return a value); the host does everything else | **no custom eBPF helpers to define/secure, and no verifier *extension*** — the core substrate is buildable without modifying PREVAIL or standing up a helper ABI (see below). Note that "stock" hides a choice, because PREVAIL has no `--program-type` flag and deduces the type from the ELF section-name prefix: day one rides its existing `tracing` type, whereas a *named* TMM type would be a patch set with a per-release rebase cost |
 
 Observability (the engine) and runtime compensating controls (the shield) are two faces of one embedded-eBPF substrate.
 
