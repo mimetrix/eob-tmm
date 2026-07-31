@@ -303,16 +303,33 @@
         <h4>The wall-clock deadline</h4>
         <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything. A <b>deadline +
           watchdog</b> on each run is what actually stops a slow execution from stalling the loop.
-          <b>Irreducible</b>, and it carries a small per-execution cost.</p>
+          <b>Irreducible</b>, and it carries a small per-execution cost. And note what &ldquo;terminating&rdquo;
+          buys on its own: PREVAIL's own ceiling is <b>100,000 loop iterations</b> — at ~10 instructions each that
+          is ~300&nbsp;µs on a 3&nbsp;GHz core. A <em>proven-terminating</em> program can still stall the loop for
+          a third of a millisecond. That number is the argument for ①.</p>
         <p class="cost">runtime cost: small, bounded · live machinery</p>
       </div>
     </div>
     <div class="callout accent"><span class="lbl">why both</span>
       <p>① proves the program is <b>small</b> — static and provable. ② proves it's <b>fast this time</b> — only
-        knowable as it runs. <b>Size settles statically; timing does not.</b> (The instruction &ldquo;fuel&rdquo;
-        counter often reached for is <em>optional</em> here — redundant with ①; the wall-clock deadline is the one
-        you can't skip.) None of this needs helpers or a verifier change — the pass, the budget table, the cost
-        model, and the deadline are new <b>F5 build work</b>.</p></div>
+        knowable as it runs. <b>Size settles statically; timing does not.</b> None of this needs helpers or a
+        verifier change — the pass, the budget table, the cost model, and the deadline are new
+        <b>F5 build work</b>.</p></div>
+    <div class="callout"><span class="lbl">and here is the trilemma — the hardest open question in this document</span>
+      <p>Enforcing a time bound in a loop with <b>no preemption</b> leaves three mechanisms, and each costs
+        something we have claimed:</p>
+      <p style="margin-top:.7rem"><b>Fuel</b> (a counter at loop back-edges) is cheap and deterministic — but
+        uBPF's own API states it <em>&ldquo;has no effect on JIT'd programs.&rdquo;</em> So fuel means
+        <b>patching uBPF's JIT</b>, which costs the &ldquo;reused as-is&rdquo; claim on one of the three reused
+        components. <b>Wall-clock</b> reads a clock at back-edges — but on aarch64 the counter ticks at tens of
+        MHz (10–40&nbsp;ns granularity) against a hot-hook budget of tens of nanoseconds, so it is
+        <b>not measurable at the granularity that matters</b> on half our platforms. <b>Signals/timers</b> mean a
+        syscall per invocation plus delivery jitter — a non-starter in this loop.</p>
+      <p style="margin-top:.7rem">So the honest position is: <b>fuel is the mechanism, not the optional extra</b>,
+        and the wall-clock deadline is best understood as <em>reporting</em> rather than enforcement. Earlier
+        drafts of this register had that backwards. The decision to make in the room — before month nine — is
+        which of the three we give up: <b>the run-to-completion loop, the unmodified uBPF, or enforce mode on hot
+        hooks.</b> The available good answer is to fork uBPF's JIT for back-edge fuel, own it, and upstream it.</p></div>
     <figure class="bp">
       <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The budget pass on one program: a verified control-flow graph with a proven loop bound of 64; worst-case path is 8 plus 10 times 64 plus 4 = 652 instructions, about 800 cycles; compared to the hook's budget it loads if under and is rejected fail-closed if over.">
         <defs>

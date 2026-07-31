@@ -347,7 +347,8 @@
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
-      reboot, no release train.</p>
+      reboot, no release train. <em>(The engine itself ships in one enabling build; every mitigation and probe
+      after that is a load.)</em></p>
     <div class="herotriad" aria-label="runtime, programmable, provably safe">
       <span class="td">runtime</span><span class="tdot">·</span>
       <span class="td">programmable</span><span class="tdot">·</span>
@@ -634,8 +635,8 @@
       jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
       kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
-      engines, one trust path — retarget a program from a TMM parser to an httpd request path by changing only the
-      hook name.</p>
+      engines, one trust path. (Not one binary for both: a different engine means a different
+      <span class="inlinecode">ctx</span> and a different verifier, so retargeting is a re-author, not a rename.)</p>
   </div>
 
   <div class="spec reveal">
@@ -719,7 +720,9 @@
     <ul class="unlocks" style="margin-top:1rem">
       <li><b>More hooks, cheaply.</b> Each release can add USDTs (define a <span class="inlinecode">ctx</span>,
         place a hook, publish it in the signed map — each rides a build), and function-boundary hooks come with
-        the compiler flag — <b>no VM, verifier, or helper work</b> either way. Every new field
+        the compiler flag — <b>no VM, verifier, or helper work</b> either way. Honest cost: the flag pads every
+        function entry in the image, so there is a <b>one-time build-time footprint</b> (i-cache/size) paid whether
+        or not a hook is ever armed — a number to measure before committing, not to assume. Every new field
         widens what can be observed <em>and</em> acted on, so the instrumentation surface compounds over time.</li>
       <li class="prf"><b>Helpers — if and when needed.</b> Richer, stateful programs (direct host-map access,
         cross-flow state) can be enabled later through an <em>optional</em> helper tier. The honest trade: helpers

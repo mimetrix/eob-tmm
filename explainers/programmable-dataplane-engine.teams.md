@@ -9,7 +9,7 @@ The whole thing in three terms: **runtime · programmable · provably safe.**
 
 In the generative-AI world, everything ships at machine speed — a config push, a hot reload, a redeploy, a security mitigation, a new capability in minutes. The data plane already flexes at its edges (config, traffic logic), but changing its **own code and behavior** still waits on a release train.
 
-**The fix:** give TMM its own eBPF engine — a verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely. Load a program, prove it safe, run it in-process: no rebuild, no reboot, no release train.
+**The fix:** give TMM its own eBPF engine — a verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely. Load a program, prove it safe, run it in-process: no rebuild, no reboot, no release train. *(The engine itself ships in one enabling build; every mitigation and probe after that is a load.)*
 
 ---
 
@@ -126,7 +126,7 @@ Base tier: programs are **pure functions of `ctx`** (read fields, return a numbe
 **5.2 — Placement: two planes, two engines, one catalog.**
 - **Control plane** — Linux daemons (httpd, tmsh, MCPD; iControl REST on the JVM). Engine: kernel eBPF / uprobe (+ JVMTI for Java).
 - **Data plane** — TMM microkernel + plugin processes, kernel-bypassed. Engine: **embedded uBPF (+ PREVAIL)** — the only thing that can reach inside TMM's own execution.
-One front-end (**tmmtrace**) drives both; the hook namespace picks the engine (`ctl:` → kernel eBPF; `tmm:` → embedded uBPF). One DSL, two engines, one trust path.
+One front-end (**tmmtrace**) drives both; the hook namespace picks the engine (`ctl:` → kernel eBPF; `tmm:` → embedded uBPF). One DSL, two engines, one trust path. (Not one binary for both: a different engine means a different `ctx` and a different verifier, so retargeting is a re-author, not a rename.)
 
 **5.3 — Three form factors, honest coverage** (coverage scales inversely with hardware offload):
 - **BIG-IP VE** — pure software, no offload → **full** coverage; the VM sees the entire path.
