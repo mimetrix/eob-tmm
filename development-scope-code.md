@@ -664,26 +664,54 @@ automatable, and it is the substrate's largest ongoing engineering surface.
 > **steps 3, 12** · runs in the **build pipeline** · written **once + annotations** · **tool +
 > process**
 
-What a skipped body hands back. The tool triages by return type; a human decides whether skipping is
-*semantically* safe, and only the trivial cases are enforce-capable in a v1.
+What a skipped body hands back — **and, first, whether the body may be skipped at all.** Those are two
+different questions, and conflating them is the most dangerous mistake available in this whole design.
 
 ```python
 #!/usr/bin/env python3
 """
-safe_return.py — classify each hookable function's return, for the hook map.
+safe_return.py — classify each hookable function for safe-return eligibility.
+
+Two independent gates, in this order:
+  1. SIDE EFFECTS — may this body be skipped at all?   (the dangerous question)
+  2. RETURN VALUE — if so, what does the caller get?   (the easy question)
 
 Mirrors enum shield_sr_kind in prototype/substrate/shield_abi.h:
     none  = not enforce-capable (observe only)   void = nothing to synthesize
     zero  = 0/NULL is the benign no-op           const = an enumerated benign value
 """
-TRIVIAL_VOID = {"void"}
 ZERO_OK = {"int", "long", "unsigned int", "_Bool"}      # 0 = "did nothing, fine"
 
-def classify(fn):
-    """Automatic part: what CAN be returned. Conservative by construction."""
+# Side effects whose ABSENCE the caller will notice. Any one of these makes a
+# function un-skippable regardless of what it returns.
+DISQUALIFYING = (
+    "takes_or_releases_lock",     # skip -> lock leaked, or released twice
+    "adjusts_refcount",           # skip -> leak, or premature free
+    "advances_state_machine",     # skip -> caller proceeds from a state never reached
+    "consumes_input",             # skip -> buffer/cursor not advanced; caller re-reads
+    "allocates_or_frees",         # skip -> caller holds a pointer that was never set up
+    "writes_caller_visible_out",  # skip -> out-param left uninitialised
+    "signals_or_wakes",           # skip -> peer waits forever
+)
+
+def skippable(fn):
+    """Gate 1. Conservative and *closed by default*: a body is skippable only if
+    we can show it does nothing the caller depends on. `void` proves NOTHING
+    here — a void function can take a lock, advance a parser, or free a buffer.
+    That is exactly the trap: the worked CVE's own vulnerable function returns
+    nothing and still does something the system wanted (it emits a log)."""
+    for effect in DISQUALIFYING:
+        if fn.get(effect):
+            return False, effect
+    if not fn.get("side_effects_analysed"):
+        return False, "not analysed"          # absence of evidence != evidence
+    return True, None
+
+def return_kind(fn):
+    """Gate 2. Only reached for a body we already agreed may be skipped."""
     rt = fn["return_type"]
 
-    if rt in TRIVIAL_VOID:
+    if rt == "void":
         return {"kind": "void"}
 
     # A function whose caller checks for NULL already has a "nothing here" path.
@@ -699,7 +727,13 @@ def classify(fn):
         return {"kind": "const", "value": fn["annotated_benign_value"],
                 "rationale": fn["annotation_rationale"]}
 
-    return {"kind": "none"}          # default: observe-only. Fail closed.
+    return {"kind": "none"}
+
+def classify(fn):
+    ok, why = skippable(fn)
+    if not ok:
+        return {"kind": "none", "rationale": "body not skippable: %s" % why}
+    return return_kind(fn)
 
 def v1_gate(policy, path_class):
     """A sane first release: only arm enforce where the skip is unambiguous."""
@@ -710,17 +744,27 @@ def v1_gate(policy, path_class):
     return "enforce"
 ```
 
-**Real:** the classification logic and — more importantly — the two refusals: a status-code return
-where zero means success is **not** safe-returnable, and anything unannotated defaults to
-observe-only.
-**Stubbed:** the `fn` dict's provenance (`returns_pointer`, `caller_null_checked`,
-`zero_means_success` come from DWARF plus call-site analysis).
-**TODO(f5):** the annotation mechanism for `const` cases — a source attribute next to the function is
-right, a spreadsheet is not; and the call-site analysis for `caller_null_checked`, which is the only
-genuinely non-trivial static analysis in this whole item list.
-**The honest boundary:** this table is where "skip the body" stops being free. Skipping *this*
-function loses its benign work — for the worked CVE, one log record. The `rationale` field exists so
-that loss is written down per function, reviewed, and visible to whoever flips enforce.
+**Real:** the two-gate structure, and the three refusals — a body with any caller-visible side effect
+is not skippable *whatever* it returns; a status-code return where zero means success is not
+safe-returnable; anything unanalysed or unannotated defaults to observe-only.
+**Stubbed:** the `fn` dict's provenance — return type and signature come from DWARF, but every
+`DISQUALIFYING` flag and `caller_null_checked` need real analysis.
+**TODO(f5):** the side-effect analysis behind gate 1 — this is the genuinely hard static analysis in
+the whole item list, and the honest v1 answer is probably **not to automate it**: hand-audit a
+short list of candidate functions and annotate them in source, rather than trusting a tool to prove
+absence of side effects across TMM. Also: the annotation mechanism for `const` cases (a source
+attribute beside the function, not a spreadsheet).
+**Why the two gates are separate — and why this was nearly a bug.** An earlier draft of this triage
+classified by return type alone, so a `void` function went straight to *enforce-capable*. That is
+wrong and it is the most dangerous mistake available here: **`void` tells you there is no return
+value to fake, not that there are no side effects to lose.** A void function can take a lock, drop a
+refcount, advance a parser, consume input, or fill an out-param — skip it and the caller proceeds
+from a state that never happened, which is a worse failure than the crash being mitigated. The
+worked CVE proves the point on its own terms: its vulnerable function returns nothing and *still*
+does something the system wanted, which is why enforcing costs a log record. Gate 1 exists so that
+cost is discovered before enforcement, not after.
+**The honest boundary:** this table is where "skip the body" stops being free. The `rationale` field
+records what is lost, per function, reviewed, and visible to whoever flips enforce.
 
 ---
 
