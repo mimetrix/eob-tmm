@@ -1,0 +1,187 @@
+<title>A verified eBPF engine for TMM — one page</title>
+<style>
+  :root{
+    --paper:#ffffff; --surface:#f6f8fa; --ink:#0f1720; --muted:#4d5b69; --faint:#78868f;
+    --line:#d5dde4; --line-2:#bcc7d0;
+    --sig:#0b7f95; --sig-bg:#e4f2f5; --sig-ink:#075463;
+    --enf:#a4620a; --enf-bg:#f7eddf; --enf-ink:#77450a;
+    --prf:#2f7d54; --prf-bg:#e6f1ea; --prf-ink:#1f5d3c;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#0a0e13; --surface:#131a21; --ink:#e8eef4; --muted:#9aa8b4; --faint:#6d7b86;
+    --line:#222d36; --line-2:#354350;
+    --sig:#33bdd1; --sig-bg:#0d2a30; --sig-ink:#8fe1ec;
+    --enf:#e0a24d; --enf-bg:#2a2011; --enf-ink:#f0c98a;
+    --prf:#4fb47d; --prf-bg:#11241a; --prf-ink:#7bd3a3;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#0a0e13; --surface:#131a21; --ink:#e8eef4; --muted:#9aa8b4; --faint:#6d7b86;
+    --line:#222d36; --line-2:#354350;
+    --sig:#33bdd1; --sig-bg:#0d2a30; --sig-ink:#8fe1ec;
+    --enf:#e0a24d; --enf-bg:#2a2011; --enf-ink:#f0c98a;
+    --prf:#4fb47d; --prf-bg:#11241a; --prf-ink:#7bd3a3;
+  }
+  :root[data-theme="light"]{
+    --paper:#ffffff; --surface:#f6f8fa; --ink:#0f1720; --muted:#4d5b69; --faint:#78868f;
+    --line:#d5dde4; --line-2:#bcc7d0;
+    --sig:#0b7f95; --sig-bg:#e4f2f5; --sig-ink:#075463;
+    --enf:#a4620a; --enf-bg:#f7eddf; --enf-ink:#77450a;
+    --prf:#2f7d54; --prf-bg:#e6f1ea; --prf-ink:#1f5d3c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans);
+    line-height:1.45; -webkit-font-smoothing:antialiased}
+  .sheet{max-width:56rem; margin:0 auto; padding:2.2rem clamp(1.1rem,4vw,2.4rem) 3rem}
+  .toolbar{position:fixed; top:.6rem; right:.7rem; z-index:20}
+  .toolbar button{font-family:var(--mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:4px;
+    padding:.4em .7em; cursor:pointer}
+  .toolbar button:focus-visible{outline:2px solid var(--sig); outline-offset:2px}
+
+  .eyebrow{font-family:var(--mono); font-size:.6rem; letter-spacing:.19em; text-transform:uppercase;
+    color:var(--faint); margin:0 0 .5rem}
+  .eyebrow b{color:var(--sig-ink)}
+  h1{font-size:clamp(1.5rem,3.4vw,2.1rem); line-height:1.12; letter-spacing:-.022em; font-weight:700;
+    margin:0 0 .5rem; text-wrap:balance}
+  h1 em{font-style:normal; color:var(--sig-ink)}
+  .thesis{font-size:clamp(.98rem,1.5vw,1.08rem); color:var(--muted); margin:0 0 1.4rem; max-width:62ch}
+  .thesis b{color:var(--ink)}
+
+  h2{font-family:var(--mono); font-size:.62rem; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--sig-ink); margin:1.5rem 0 .55rem; padding-bottom:.3rem; border-bottom:1px solid var(--line)}
+  p{margin:0 0 .6rem; font-size:.9rem; color:var(--muted)}
+  p b{color:var(--ink); font-weight:600}
+  .mono{font-family:var(--mono)}
+
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:1.1rem}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}}
+
+  .card{border:1px solid var(--line); border-radius:8px; padding:.8rem .9rem; background:var(--surface)}
+  .card .ct{font-family:var(--mono); font-size:.56rem; letter-spacing:.12em; text-transform:uppercase;
+    margin:0 0 .3rem}
+  .card.need .ct{color:var(--enf-ink)} .card.have .ct{color:var(--prf-ink)}
+  .card h3{margin:0 0 .3rem; font-size:.92rem; color:var(--ink)}
+  .card p{margin:0; font-size:.84rem}
+
+  .chain{font-family:var(--mono); font-size:.72rem; background:var(--surface); border:1px solid var(--line);
+    border-radius:7px; padding:.7rem .8rem; overflow-x:auto; white-space:nowrap; color:var(--muted); margin:0 0 .6rem}
+  .chain b{color:var(--sig-ink)}
+
+  ul{margin:.15rem 0 .7rem; padding-left:1.15rem}
+  li{font-size:.88rem; color:var(--muted); margin-bottom:.28rem}
+  li b{color:var(--ink); font-weight:600}
+
+  .box{border-left:3px solid var(--sig); background:var(--sig-bg); border-radius:0 6px 6px 0;
+    padding:.7rem .85rem; margin:.6rem 0}
+  .box p{margin:0; font-size:.86rem; color:var(--ink)}
+  .box p b{color:var(--sig-ink)}
+  .box.limits{border-color:var(--enf); background:var(--enf-bg)} .box.limits p b{color:var(--enf-ink)}
+  .box.ask{border-color:var(--prf); background:var(--prf-bg)} .box.ask p b{color:var(--prf-ink)}
+
+  .foot{margin-top:1.6rem; padding-top:.7rem; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:.58rem; color:var(--faint); letter-spacing:.03em; line-height:1.8}
+  .foot a{color:var(--sig-ink); text-decoration:none}
+
+  @media print{
+    :root, :root[data-theme="dark"]{
+      --paper:#fff; --surface:#f7f9fa; --ink:#111; --muted:#333; --faint:#666;
+      --line:#c9d2d8; --line-2:#b3bec6; --sig:#0b6f83; --sig-bg:#eef6f8; --sig-ink:#064a58;
+      --enf:#8f560a; --enf-bg:#f9f2e8; --enf-ink:#6b3f08; --prf:#256a45; --prf-bg:#eef5f0; --prf-ink:#1f5d3c;
+    }
+    @page{ size:letter portrait; margin:0.45in }
+    .toolbar{display:none !important}
+    .sheet{max-width:none; padding:0}
+    body{font-size:9.4pt; line-height:1.34}
+    h1{font-size:16pt} .thesis{font-size:9.8pt; margin-bottom:.5rem}
+    h2{margin:.7rem 0 .3rem; font-size:6.6pt}
+    p,li{font-size:8.7pt; margin-bottom:.2rem}
+    .card p{font-size:8.2pt} .chain{font-size:7.4pt}
+    .card,.box,.chain{break-inside:avoid} h2{break-after:avoid}
+  }
+</style>
+
+<div class="toolbar"><button id="themeBtn" type="button" aria-label="Toggle light or dark theme">◐ theme</button></div>
+
+<div class="sheet">
+  <p class="eyebrow">F5 · TMM · <b>design proposal</b> · one page</p>
+  <h1>Give TMM its own <em>verified</em> eBPF engine.</h1>
+  <p class="thesis">Everything else at F5 now ships at machine speed. <b>TMM's own code and behaviour still wait
+    on a release train</b> — so a new metric, a diagnostic probe, or a mitigation for a live CVE all cost the same
+    thing: a build. Embedding a small userspace eBPF VM at designed-in hook points changes the unit of change from
+    <b>a release</b> to <b>a signed artifact</b> — and a static verifier is what makes that safe enough to allow on
+    the data-plane path.</p>
+
+  <h2>Why TMM is the right host — and why this isn't a general answer</h2>
+  <div class="cols">
+    <div class="card have"><p class="ct">◆ a proxy, not a forwarder</p><h3>The budget is there</h3>
+      <p>A forwarder's unit of work is a packet — single-digit nanoseconds, where bytecode is a meaningful
+        fraction. TMM's unit is a flow, a connection, a request: <b>microseconds</b>. A hook costing tens of
+        nanoseconds is noise, and the hooks worth having sit at warm per-request boundaries.</p></div>
+    <div class="card have"><p class="ct">◆ vendor-owned, shipped, closed</p><h3>The proof is required</h3>
+      <p>F5 owns the source, so hooks are <b>designed in</b> and the hook map comes out of the build. And F5
+        can't ship a customer a mitigation that <em>might</em> crash the data plane — which is why a verifier is
+        the precondition for the artifact existing, not a feature bolted on.</p></div>
+  </div>
+
+  <h2>The mechanism, end to end</h2>
+  <div class="chain">author (a few lines of C) → <b>clang -target bpf</b> → <b>PREVAIL verify</b> → budget pass →
+    <b>sign the binding</b> → load at a named hook → monitor → enforce → auto-retire</div>
+  <p>Two hook kinds cover the <b>anticipated</b> and the <b>unanticipated</b>: designed-in USDT tracepoints with a
+    curated, versioned context, and <b>function-boundary probes</b> at any named function in the build's signed
+    hook map — so a question nobody planned for needs no new build. A program is a pure function of its context: it
+    reads scalars and returns a verdict. <b>The host owns every outcome</b> (<span class="mono">pass · drop ·
+    reset · safe-return · steer · sample</span>) and applies whichever the hook allows; the program cannot invent
+    control flow, inject a value, or reach memory it wasn't handed.</p>
+
+  <div class="box"><p><b>The security perimeter is the signature, not the verifier.</b> Only F5-signed bytecode
+    ever reaches the engine, and verification happens earlier — in F5's pipeline, never on anything an attacker
+    supplied. So even a verifier bug is <b>not remotely triggerable</b>: exploiting it would also require
+    compromising the HSM-held signing key. That collapses the risk from traffic-borne RCE to supply-chain/insider.
+    What's signed is the whole binding — program hash, the one hook it may attach to, build range, mode ceiling,
+    expiry — so a shield can't be replayed elsewhere or escalated to enforce.</p></div>
+
+  <h2>What it unlocks</h2>
+  <ul>
+    <li><b>Deep observability into a black box</b> — counters, latency across internal stages, a flight recorder
+      that survives a data-plane crash. <em>bpftrace</em> and <em>tcpdump</em>, for TMM.</li>
+    <li><b>Field diagnostics</b> — ship a customer a signed probe, characterise the issue in situ, pull it. No
+      debug build, no core-dump archaeology.</li>
+    <li><b>Adaptive control</b> — steer, sample, gate or shed on an internal signal, decided at the hook.</li>
+    <li><b>Runtime CVE mitigation</b> — recognise a bug's precondition and take a safe outcome between patch
+      windows. One application, and the narrowest: it needs the same hooks, verifier and signing gate as
+      everything above it.</li>
+  </ul>
+
+  <h2>What it is not, stated plainly</h2>
+  <div class="box limits"><p><b>Not a hot-patch</b> — a shield stops a crash; it cannot reproduce the fix's
+    corrected behaviour, so enforcing costs whatever the skipped work did. <b>Not customer-facing
+    programmability</b> — the ABI is internal; F5 authors, F5 signs. <b>Not free</b> — the engine itself ships in
+    one enabling TMOS release, and coverage follows software: flows handled by hardware offload never enter TMM's
+    software path. <b>Not measured yet</b> — the always-on cost of compiling TMM with patchable function entries
+    is the number that decides everything, and nobody has it.</p></div>
+
+  <div class="box ask"><p><b>The ask is a one-quarter feasibility phase, not a build.</b> Three deliverables:
+    <b>(1)</b> measure the dark cost of the compiler flag — kill criterion ~1% pps; <b>(2)</b> settle a context
+    model that verifies, against real TMM debug info; <b>(3)</b> arm one hook end-to-end in a lab TMM with core
+    dumps still readable. If all three land, the rest is a real 12–18-month programme for 6–8 engineers. If any
+    fails, a quarter was spent instead of two years.</p></div>
+
+  <p class="foot">
+    A design proposal — not a commitment to an implementation. Prototype, design docs and a self-review register
+    accompany this page: start with <a href="README.md">the reading map</a>.<br>
+    Detailed method &amp; claims are held in a separate invention disclosure.
+  </p>
+</div>
+
+<script>
+  (function(){
+    var root=document.documentElement;
+    document.getElementById('themeBtn').addEventListener('click',function(){
+      var cur=root.getAttribute('data-theme');
+      if(!cur){ cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'; }
+      root.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+  })();
+</script>
