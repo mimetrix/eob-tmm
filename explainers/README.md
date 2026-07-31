@@ -1,7 +1,5 @@
 # Explainers — index
 
-Each HTML page has a `.teams.md` twin with the same content as pasteable text.
-
 | Page | What it covers | Read |
 |---|---|---|
 | [`one-pager.html`](one-pager.html) | The whole proposal, one printable sheet, ending on the ask | 3 min |

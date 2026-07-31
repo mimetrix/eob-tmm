@@ -42,16 +42,7 @@ helps. Current set: the programmable-data-plane **engine**, **CVE mitigation** (
 (`engine-hard-problems.md`, `data-plane-egress-primitives.md`, `embedded-ebpf-substrate.md`,
 `big-ip-live-shield-design.md`, `tmm-usdt-tracepoints.md`).
 
-**Always ship a Teams-pasteable companion.** Teams handles HTML poorly, so **every explainer gets
-an equivalent Markdown version** (`explainers/<name>.teams.md`) carrying the same content in a form
-that cut-and-pastes cleanly into Teams — generated *alongside* the HTML, every time. Tune it for
-Teams' markdown subset:
-- Bold for emphasis and section labels; bullet/numbered lists; short sections. Headings render
-  unreliably, so don't depend on `#`.
-- **No markdown tables** (Teams won't render them) — flatten to labelled lines or lists.
-- Diagrams don't paste, so render each as **ASCII inside a code fence** (monospace preserves it) or
-  describe it in bullets.
-- Keep it self-contained plain-ish text: it must read fine even if nothing renders.
+
 
 ## 4. IP / disclosures
 
