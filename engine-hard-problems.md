@@ -131,6 +131,27 @@ consume. The verifier task is **"write the program-type descriptor"** (`ctx` lay
 regions + helper prototypes), **not "modify the verifier."** So the *no-verifier-fork* claim
 survives — but the effort estimate in the explainers does not.
 
+**With one correction to how "write the descriptor" is usually pictured, and it is not cosmetic.**
+PREVAIL's context descriptor is four integers — `size`, `data`, `end`, `meta` — and there is no field
+in it for *this region is read-only*. The verifier's own source is explicit that it rejects only
+context writes that might overlap a pointer slot, and that "real programs do write" the scalar fields.
+Our `ctx` has no pointer slots, so the consequence is blunt: **a verified program can write every byte
+of its `ctx`.** If the `ctx` handed to it were the live argument frame, then a signed, verified,
+nominally read-only observe-mode program would be an **argument-injection primitive into live TMM code
+paths — delivered by the safety mechanism.** That is the worst shape a finding can take, so the rule
+is absolute and belongs in the ABI rather than in a reviewer's memory:
+
+> The host builds the `ctx` as a **per-core scratch copy**, hands the program the copy, and
+> **discards it on fall-through**. Never a live view of TMM state. The copy is the cost, and the copy
+> is the thing to measure.
+
+There is also no `--program-type` flag to point at a descriptor with: PREVAIL deduces the type from
+the ELF **section-name prefix** against a compiled-in table, falling back to `socket_filter`. So "no
+verifier fork" is true under one specific choice — ride the existing **`tracing`** type and emit into
+a matching section — and false under the other, where registering a named TMM type is a patch set with
+a per-release rebase cost. Day one takes the first. Say which one is meant, because the two have very
+different maintenance stories and the phrase "stock PREVAIL" hides the difference.
+
 **Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook,
 each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes**
 read. Together they are the ceiling on what the engine can observe or enforce: the USDT catalog bounds the

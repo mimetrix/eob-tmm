@@ -381,7 +381,7 @@
       <div class="plane ctrl">
         <p class="pt">◇ control plane</p>
         <h4>Linux daemons</h4>
-        <p>httpd, tmsh, MCPD, iControl REST — ordinary processes the kernel can see.</p>
+        <p>httpd, MCPD and the other resident C daemons — ordinary processes the kernel can see. (Not <span class="inlinecode">tmsh</span>: it is a shell that runs per command and exits, so an entry probe on it shields nothing. And iControl REST runs on the <b>JVM</b> while iControl LX runs on <b>Node</b> — three runtimes, so three adapter implementations.)</p>
         <p class="see">kernel eBPF reaches this ✓</p>
       </div>
       <div class="plane data">
@@ -648,8 +648,8 @@
     <div class="tablewrap"><table>
       <thead><tr><th>Plane</th><th>What runs there</th><th>Engine</th></tr></thead>
       <tbody>
-        <tr><td><b>Control</b></td><td>Linux daemons — httpd, tmsh, MCPD; iControl REST on the JVM</td>
-          <td>kernel eBPF / uprobe · <span class="mono">+ JVMTI</span> for Java</td></tr>
+        <tr><td><b>Control</b></td><td>Linux daemons — httpd, MCPD; iControl REST on the JVM; iControl LX on Node</td>
+          <td>kernel eBPF / uprobe · <span class="mono">+ JVMTI</span> · <span class="mono">+ V8</span></td></tr>
         <tr><td><b>Data</b></td><td>TMM microkernel — kernel-bypassed (plugin processes are ordinary Linux processes)</td>
           <td><b>embedded uBPF</b> (+ PREVAIL)</td></tr>
       </tbody>
