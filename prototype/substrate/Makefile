@@ -10,9 +10,9 @@
 CC     ?= cc
 PYTHON ?= python3
 
-.PHONY: check check-header check-schema clean
+.PHONY: check check-header check-schema check-offsets clean
 
-check: check-header check-schema
+check: check-header check-schema check-offsets
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -26,5 +26,12 @@ check-schema:
 	@$(PYTHON) -m json.tool hook_map.schema.json > /dev/null && echo "ok    hook_map.schema.json  (valid JSON)"
 	@$(PYTHON) ./check_hook_map.py
 
+# The check a real hook-map generator must have: compile the map's declared ctx
+# offsets against the actual header and fail on mismatch. Offsets are verified,
+# not trusted — see the note at the top of check_offsets.py for the live bug in
+# this repo that this catches.
+check-offsets:
+	@$(PYTHON) ./check_offsets.py
+
 clean:
-	@rm -f .guard.c .guard.out
+	@rm -f .guard.c .guard.out tmp*.c

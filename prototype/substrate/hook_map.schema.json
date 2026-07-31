@@ -124,6 +124,18 @@
               "type": "string",
               "description": "The C declaration of this argument, e.g. 'const struct ls_ctx *'."
             },
+            "ctx_size": {
+              "type": "integer",
+              "minimum": 1,
+              "$comment": "required in product",
+              "description": "sizeof the argument struct. This is the ONLY bound the verifier enforces — PREVAIL checks that an access lies in [0, size), not that it lands on a declared field. So ctx_size decides what a program can reach; the field list is documentation on top of it."
+            },
+            "field_offsets": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 },
+              "$comment": "required in product",
+              "description": "Authoritative byte offsets, emitted from the build's debug info (DW_AT_data_member_location) — NEVER re-derived by packing the field list. Re-packing is unsound: one omitted or untypeable field shifts every later offset, silently. Verified by check-offsets against the real header."
+            },
             "fields": {
               "type": "object",
               "minProperties": 1,
