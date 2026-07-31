@@ -61,7 +61,7 @@ _Claim to retire:_ "the base tier is a trivial pure function of `ctx`."
 
 The good news, stated precisely: this is **"write the program-type descriptor"** the verifier consumes, **not "modify the verifier"** — the no-verifier-fork claim survives, but the effort estimate doesn't.
 
-**Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook, each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes** read. Getting them right isn't incidental; it *is* the project: together they are the **ceiling on what the engine can observe or enforce** — the catalog bounds the *anticipated* surface; function-boundary probes reach any named function whose arguments expose the fault — and it's the permanent ABI — the difference between a toy and a platform.
+**Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** (*userland statically-defined tracing* — named probe points designed into the source) — one per hook, each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes** read. Getting them right isn't incidental; it *is* the project: together they are the **ceiling on what the engine can observe or enforce** — the catalog bounds the *anticipated* surface; function-boundary probes reach any named function whose arguments expose the fault — and it's the permanent ABI — the difference between a toy and a platform.
 
 - **Day one:** a minimal, read-only `ctx` per hook + its program-type descriptor. Genuine work, but **not a blank page** — TMM's code already holds the state these USDTs expose (the connection table, the TLS record layer, the L7 parser state, the `bd`/plugin internals, the poll-loop counters), so the first USDTs are a curated window onto structures that already exist; the surface can begin the day the engine lands.
 - **Deferred:** helpers — each is a new ABI to secure and a new verifier prototype. `ctx`-first, helpers-later.
@@ -70,7 +70,7 @@ The good news, stated precisely: this is **"write the program-type descriptor"**
 
 **03 · Shared state**
 
-TMM is not one kernel — it's **N core-pinned kernels with their own state fabric.** Multiple TMM instances per box (**CMP**) plus connection **mirroring** to an HA peer make map/state semantics *harder* than Linux's single-kernel case.
+TMM is not one kernel — it's **N core-pinned kernels with their own state fabric.** Multiple TMM instances per box (**CMP** — clustered multiprocessing, one TMM pinned per core) plus connection **mirroring** to an HA peer make map/state semantics *harder* than Linux's single-kernel case.
 
 _Claim to retire:_ "maps work like they do in Linux."
 
@@ -85,7 +85,7 @@ The JIT emits native code into **the crown-jewel process**, and the verifier dec
 
 **The load-bearing point: the perimeter is the signing gate, not the verifier.** Only F5-signed bytecode ever reaches the verifier or JIT — attacker-controlled input never touches them — so a soundness bug is **not a traffic-borne RCE**; it's a supply-chain concern, gated by signing-key protection.
 
-_The open ask: make the verifier auditable, not just trusted._ "How do you know the verifier is sound?" has no satisfying answer of the form *it's widely used*. The answer that works is **inspectability** — tooling that steps through the abstract interpretation so a reviewer can see *why* a program was accepted, and so the verifier can be unit-tested against adversarial input. That's the form soundness evidence has to take for a TMA. Establish early whether PREVAIL offers it and what a soundness-evidence package contains: the signing gate bounds *who* could exploit a soundness bug, but only auditability reduces the chance there is one.
+_The open ask: make the verifier auditable, not just trusted._ "How do you know the verifier is sound?" has no satisfying answer of the form *it's widely used*. The answer that works is **inspectability** — tooling that steps through the abstract interpretation so a reviewer can see *why* a program was accepted, and so the verifier can be unit-tested against adversarial input. That's the form soundness evidence has to take for a **TMA** (Threat Model Analysis — F5's formal security review, a gating prerequisite here). Establish early whether PREVAIL offers it and what a soundness-evidence package contains: the signing gate bounds *who* could exploit a soundness bug, but only auditability reduces the chance there is one.
 
 ```
 attacker-controlled bytecode → signing gate            → ✗ rejected
@@ -109,7 +109,7 @@ _† Sharper still given the source-code exposure — an adversary holding the c
 - **Boundary-probe ctx is build-specific.** A function-boundary probe's contract (function X's typed args at build Y) is regenerated and re-validated every build — more reach than a versioned USDT ctx, looser contract; the signed hook map and the binding's build range are what keep it honest.
 - **uBPF JIT maturity** — §04 is really "the verifier *and this JIT*." uBPF's JIT is far less battle-tested than the kernel's — audit / harden / fork it, or default to the interpreter on high-assurance builds.
 - **Multi-tenancy (partitions, route domains, vCMP)** — BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's scope, authorization, and blast radius must be tenant-aware from day one.
-- **ISSU + failover** — zero-downtime upgrades and HA failover need defined behavior: loaded programs re-verify and reload on the new TMM, with explicit map-state handling.
+- **ISSU (in-service software upgrade) + failover** — zero-downtime upgrades and HA failover need defined behavior: loaded programs re-verify and reload on the new TMM, with explicit map-state handling.
 - **Invocation granularity — per-packet vs. batched** — eBPF's calling convention takes **one `ctx`, once**; it cannot express "here is a vector of 256 packets," so a data plane whose speed comes from a stage seeing a whole batch is a poor host for bytecode. **TMM is the favorable case**: a proxy, run-to-completion and core-pinned, per-flow rather than per-vector — and spending microseconds per request where a forwarder spends nanoseconds per packet. What remains is per-invocation overhead where TMM *does* batch (burst receive): the answer is a **burst-capable invocation form**, with §01's budget pass reasoning **per burst**.
 - **Jitter-sensitive deployments** — trading, 5G UPF and the like won't tolerate *any* added per-packet jitter, even budgeted — expect a per-hook / per-deployment opt-out.
 
@@ -129,7 +129,7 @@ Most of the risk retires on day one; the rest is governed and deferred.
 
 **07 · The reality**
 
-**The honest size of it.** An earlier draft said "hundreds of lines, not subsystems." Reviewed against what each item actually requires, a defensible v1 on two CPU architectures is **50–80 senior-engineer-months — six to eight people for twelve to eighteen months**, plus TMA and certification engagement. Biggest growth: the safe point (unlisted), the trampoline (a page of assembly then six months of ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map generator, which is a **SysV/AAPCS parameter classifier over DWARF** against an optimised build.
+**The honest size of it.** An earlier draft said "hundreds of lines, not subsystems." Reviewed against what each item actually requires, a defensible v1 on two CPU architectures is **50–80 senior-engineer-months — six to eight people for twelve to eighteen months**, plus TMA and certification engagement. Biggest growth: the safe point (unlisted), the trampoline (a page of assembly then six months of ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map generator, which is a **parameter classifier over DWARF** (the compiler's debug-info format) implementing the platform calling conventions (SysV on x86-64, AAPCS64 on arm64) against an optimised build.
 
 The reframe that matters: **the subsystem being added is not the VM.** It is a code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own build-pipeline toolchain and a permanent per-build ABI. Worth building — but describing it as smaller than it is doesn't make it easier to fund, it makes the funding collapse in month nine. **So the ask is a one-quarter feasibility phase, not the twelve items:** measure the always-on cost of the compiler flag (kill criterion ~1% pps), settle a `ctx` model that verifies, and arm one hook end-to-end in a lab TMM with core dumps still readable.
 

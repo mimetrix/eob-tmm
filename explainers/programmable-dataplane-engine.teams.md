@@ -131,7 +131,7 @@ One front-end (**tmmtrace**) drives both; the hook namespace picks the engine (`
 
 **5.3 — Three form factors, honest coverage** (coverage scales inversely with hardware offload):
 - **BIG-IP VE** — pure software, no offload → **full** coverage; the VM sees the entire path.
-- **Appliance** — ePVA / FPGA / TurboFlex offload → software path only; offloaded flows are a hardware boundary.
+- **Appliance** — hardware offload (ePVA, FPGA/TurboFlex) → software path only; offloaded flows are a hardware boundary.
 - **BIG-IP Next (BNK)** — containerized TMM, DPU-dependent → depends on how much the DPU steers vs. lands in TMM.
 Honest boundary: a flow handled entirely in silicon never enters TMM software, so an in-TMM hook can't see it (the same limit iRules and kernel eBPF already have). The L7/parser stages and plugin internals worth reaching run in software regardless.
 

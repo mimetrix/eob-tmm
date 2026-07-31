@@ -438,7 +438,7 @@
       does not.</p>
     <div class="callout accent"><span class="lbl">the interface is the USDT catalog</span>
       <p>Put concretely, the designed-in half of that interface <em>is</em> a <b>catalog of well-defined
-        USDTs</b> — one per hook, each a curated <span class="inlinecode">ctx</span> — and the other half is the
+        USDTs</b> (<em>userland statically-defined tracing</em> — named probe points designed into the source) — one per hook, each a curated <span class="inlinecode">ctx</span> — and the other half is the
         per-build typed-argument map that <b>function-boundary probes</b> read. Getting them right isn't
         incidental to the project; it is the project: together they are the <b>ceiling on what the engine can
         observe or enforce</b> — the catalog bounds the <em>anticipated</em> surface; function-boundary probes
@@ -462,7 +462,7 @@
   <section class="beat reveal" id="state" data-sec="state">
     <p class="kicker"><span class="num">03</span> shared state</p>
     <h2>TMM is not one kernel. It's N core-pinned kernels with their own state fabric.</h2>
-    <p class="lede">Multiple TMM instances per box (<b>CMP</b>), plus <b>connection mirroring</b> to an HA peer,
+    <p class="lede">Multiple TMM instances per box (<b>CMP</b> — clustered multiprocessing, one TMM pinned per core), plus <b>connection mirroring</b> to an HA peer,
       make map and state semantics <em>harder</em> than Linux's single-kernel case — not easier.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
       <p>&ldquo;Maps work like they do in Linux.&rdquo;</p></div>
@@ -508,7 +508,7 @@
       <p>&ldquo;How do you know the verifier is sound?&rdquo; has no satisfying answer of the form <em>it's widely
         used</em>. The answer that works is <b>inspectability</b> — tooling that steps through the abstract
         interpretation so a reviewer can see <em>why</em> a program was accepted, and so the verifier can be
-        unit-tested against adversarial input. That is the form soundness evidence has to take for a TMA. Establish
+        unit-tested against adversarial input. That is the form soundness evidence has to take for a <b>TMA</b> (Threat Model Analysis — F5's formal security review, a gating prerequisite here). Establish
         early whether PREVAIL offers it and what a soundness-evidence package contains: the signing gate bounds
         <em>who</em> could exploit a soundness bug, but only auditability reduces the chance there is one.</p></div>
     <p class="fnote"><sup>†</sup> Sharper still given the source-code exposure — an adversary holding the code can
@@ -537,7 +537,7 @@
       <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter on high-assurance builds.</p></div>
       <div class="concern"><span class="cl">invocation granularity · per-packet vs. batched</span><p>eBPF's calling convention takes <b>one <span class="inlinecode">ctx</span>, once</b> — it cannot express &ldquo;here is a vector of 256 packets,&rdquo; so a data plane whose speed comes from a stage seeing a whole batch is a poor host for bytecode. <b>TMM is the favorable case</b>: a proxy, run-to-completion and core-pinned, per-flow rather than per-vector — and spending microseconds per request where a forwarder spends nanoseconds per packet. What remains is per-invocation overhead where TMM <em>does</em> batch (burst receive): the answer is a <b>burst-capable invocation form</b>, with §01's budget pass reasoning <b>per burst</b>.</p></div>
       <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
-      <div class="concern"><span class="cl">ISSU + failover</span><p>Zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
+      <div class="concern"><span class="cl">ISSU + failover</span><p><b>ISSU</b> (in-service software upgrade) — zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
       <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and the like won't tolerate <em>any</em> added per-packet jitter, even budgeted — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>
     </div>
   </section>
@@ -570,7 +570,7 @@
         — six to eight people for twelve to eighteen months</b>, plus the TMA and certification engagement. The
         items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then six months of
         ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map
-        generator, which is a <b>SysV/AAPCS parameter classifier over DWARF</b> against an optimised build.</p>
+        generator, which is a <b>parameter classifier over DWARF</b> (the compiler's debug-info format) implementing the platform calling conventions (SysV on x86-64, AAPCS64 on arm64), against an optimised build.</p>
       <p style="margin-top:.7rem">The reframe that matters: <b>the subsystem being added is not the VM.</b> It is a
         code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own
         build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
