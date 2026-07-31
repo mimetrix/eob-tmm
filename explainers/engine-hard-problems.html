@@ -574,9 +574,10 @@
     <p class="kicker"><span class="num">07</span> the reality</p>
     <div class="callout"><span class="lbl">and the honest size of it</span>
       <p>An earlier draft described this as &ldquo;hundreds of lines, not subsystems.&rdquo; Reviewed against what
-        each item actually requires, a defensible v1 on two CPU architectures is <b>50–80 senior-engineer-months,
-        </b>, plus the TMA and certification engagement. The
-        items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then six months of
+        each item actually requires, a defensible v1 on two CPU architectures is <b>subsystem-scale
+        work, not a feature</b> — plus the TMA and certification engagement. No month or headcount figure is
+        offered here on purpose: this is a proposal, not a plan, and sizing belongs to whoever picks it up. The
+        items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then a long tail of
         ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map
         generator, which is a <b>parameter classifier over DWARF</b> (the compiler's debug-info format) implementing the platform calling conventions (SysV on x86-64, AAPCS64 on arm64), against an optimised build.</p>
       <p style="margin-top:.7rem">The reframe that matters: <b>the subsystem being added is not the VM.</b> It is a

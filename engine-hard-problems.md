@@ -327,9 +327,10 @@ the day-one posture, but the safe point and certification are the most likely to
 ## 6.1 The honest size of it
 
 An earlier draft of the scope described this as "hundreds of lines, not subsystems." Reviewed against
-what each item actually requires, a defensible v1 on two CPU architectures is **50–80
-senior-engineer-months**, plus the TMA and certification engagement. The items that grew most: the safe point (§5, previously unlisted), the
-trampoline (a page of assembly, then months of ABI edge cases), arm/disarm (live-text patching,
+what each item actually requires, a defensible v1 on two CPU architectures is **subsystem-scale work,
+not a feature**, plus the TMA and certification engagement — and no month figure is offered here,
+because this is a design proposal rather than a plan and sizing belongs to whoever picks it up. The items that grew most: the safe point (§5, previously unlisted), the
+trampoline (a page of assembly, then a long tail of ABI edge cases), arm/disarm (live-text patching,
 possibly a memory-manager change), and the hook-map generator — a parameter classifier over DWARF
 implementing the platform calling conventions, against an optimised build.
 

@@ -14,7 +14,7 @@ All three reviewers would **back answering three questions first** (§8). None w
 
 - **The mechanism is the right shape** — patchable entry pad, trampoline, signed per-build hook map, monitor-before-enforce, signing gate as the perimeter.
 - **The `ctx` model as written does not work**, and that is provable from PREVAIL's own source, not a matter of taste.
-- **The effort estimate was low by a large multiple** — stated without a multiplier, because the scope docs' original sizings were *size classes* ("small", "40 lines", "≈ a page per arch", "hundreds of lines"), and size classes do not convert to months, so there is no honest baseline to multiply. What §5 can say is item-by-item: the realistic figures run **3–10×** the class each item was given, and the aggregate is **50–80 SEM** where the scope doc originally carried no aggregate at all (it now carries this one). And the two items most likely to sink a TMM design review were not on the list.
+- **The scope was understated, item by item** — and deliberately not restated as a multiple, because the scope docs' original sizings were *size classes* ("small", "40 lines", "≈ a page per arch", "hundreds of lines") and there is no honest baseline to multiply. What §5 says instead is which items are badly understated and why, ranked. **The two items most likely to sink a TMM design review were not on the list at all** — the safe point, and debuggability through the trampoline — which is the finding that matters more than any number.
 - The reframe that matters: *"the subsystem you are adding is not the VM — it is a code-patching, live-text, dynamic-code-loading facility in the crown-jewel process, with its own build-pipeline toolchain and a permanent per-build ABI."* That is a subsystem, it is worth building, and describing it as smaller than it is doesn't make it easier to say yes to — it makes the yes collapse in month nine.
 
 ---
@@ -121,35 +121,45 @@ Why it gates: every affordability claim in the package — "free when dark," "on
 
 ---
 
-## 5 · Effort, restated honestly
+## 5 · Scope, restated honestly
 
-Senior-engineer-months, assuming people who have shipped in TMM:
+**No effort figure is offered here, deliberately.** This is a design proposal, not a plan, and
+converting these items into months or people is the job of whoever picks the work up — with their own
+team, their own build system, and their own idea of "done". What this section *does* establish is the
+**shape** of the work, because that is where the scope document was wrong in a way that matters: it
+reads as a list of tools and small components, and item by item it is a subsystem.
 
-| Item | As scoped | Realistic | Why |
+The column that matters is the third one. "As scoped" is what `development-scope.md` claimed; the
+verdict is how far off that reading is.
+
+| Item | As scoped | Verdict | Why |
 |---|---|---|---|
-| **0 · safe point** | *not listed* | **4–8** | New poll-loop check, per-instance queue, moving JIT off the safe point. Needs the most senior person and the most political capital. |
-| **0b · the flag** | *"build-system configuration, not code"* | **1 experiment + 2–4 fallout** | §4. Whole-image rebuild, ICF, asm/third-party TUs, regression review. |
-| 1 · trampoline | "≈ a page per arch" | **3–5 per arch** | Full clobber set incl. FP/SIMD, IBT/BTI, varargs/`x8`, CFI so dumps survive, ctx copy, re-entrancy guard, burst form, test matrix. |
-| 2 · arm/disarm | "small" | **4–8 + TMA** | W^X relaxation in TMM's memory manager, shared-vs-private text, hugepage COW, code-integrity interaction, per-arch `text_poke`-grade patching. If the memory manager changes, two quarters. |
-| 3 · loader handler | "hundreds of lines" | **4–6** (1.5–3k lines) | Missing epoch/quiescence, re-entrancy, memory accounting, `do_set_mode`, ISSU. |
-| 4 · signature verification | *"possibly reusable"* | **2–4** | Was missing from this table. On-box verify of the signed binding against a baked-in key, the binding serialiser on both sides (and differential fuzzing of the two implementations), `prog_len` validated against the datagram before anything else is read, and a monotonic epoch so a captured `LOAD` cannot replay past a `REVOKE` — O8. Reuse of F5's existing signed-artifact verification cuts the crypto, not the integration or the pre-auth parser. |
-| 5 · hook-map generator | "tool" | **6–12** | The sleeper. A **SysV/AAPCS parameter classifier** from DWARF (struct-by-value splitting, HFA/HVA, stack spill, unions) against an LTO'd `-O2` build with clones, ICF folds and inlined statics. Permanent maintenance tail. |
-| 6 · ctx descriptors | "40 lines" | **tool 2–4 + PREVAIL 3–6 + forever** | O1/O2, DWARF-true offsets, a C++ platform-table entry. The doc is right that it's the largest *ongoing* surface and 10× low on the *initial*. |
-| 7 · safe-return table | "tool + process" | **3–6** | `caller_null_checked` is whole-program call-site analysis; plus typedef/enum resolution; plus the human review process. |
-| 8 · budget pass | "conventional… tool" | **4–8** | O9 is done and O10 is closed by refusing loops rather than bounding them (§1.1), so what remains is O11's framing plus the expensive part: **per-µarch calibration on ≥2 ISAs**, which is where the estimate lives. Still the item most likely to be quietly replaced by a constant. |
-| 9–12 | "conventional" | **6–10 total** — fair | Genuinely the easy part. |
-| 15 · back-edge fuel | "optional, staged" | **3–6, and it must be day one** | O6 + §3's `path_class` finding. The number is the uBPF JIT patch on **both** backends, the interpreter path that already works, the per-hook fuel budget plumbing, and carrying the fork (rebase per uBPF release until upstreamed). Wall-clock reporting is inside this figure; it is not the enforcement half. |
-| — | *not listed* | **2–4** | Core dumps / qkview / debuggability. |
+| **0 · safe point** | *not listed at all* | **Missing, and among the largest** | New poll-loop check, per-instance queue, moving the JIT off the safe point. Needs the most senior person available and is the most politically expensive change in the programme. |
+| **0b · the flag** | *"build-system configuration, not code"* | **Badly understated** | §4. A whole-image rebuild, ICF interactions, hand-written asm and third-party translation units, and a full regression review. It is an experiment plus its fallout, not a configuration line. |
+| 1 · trampoline | "≈ a page per arch" | **Badly understated, and it is per-architecture** | The full clobber set including FP/SIMD, IBT/BTI, varargs and `x8`, CFI so core dumps survive, the ctx copy, a re-entrancy guard. A page of assembly, then a long tail of ABI edge cases. |
+| 2 · arm/disarm | "small" | **Badly understated, and TMA-gated** | W^X relaxation in TMM's memory manager, shared-vs-private text, hugepage COW, code-integrity interaction, a per-arch `text_poke` equivalent. |
+| 3 · loader handler | "hundreds of lines" | **Understated** — thousands, not hundreds | Missing epoch and quiescence handling, re-entrancy, memory accounting, `do_set_mode`, ISSU. |
+| 4 · signature verification | *"possibly reusable"* | **Was missing from this table entirely** | On-box verification of the signed binding against a baked-in key, plus the binding serialization and its failure paths. |
+| 5 · hook-map generator | "tool" | **The sleeper — the most understated item here** | A **SysV/AAPCS parameter classifier** driven from DWARF: struct-by-value splitting, HFA/HVA, stack spill, unions — against an optimised build, per architecture. |
+| 6 · ctx descriptors | "40 lines" | **Badly understated, and permanent** | O1/O2, DWARF-true offsets, a C++ platform-table entry in PREVAIL. The scope doc is right that this is the largest conceptual item and wrong about its size. |
+| 7 · safe-return table | "tool + process" | **Understated** | `caller_null_checked` is whole-program call-site analysis, plus typedef and enum resolution, plus a human review process that never ends. |
+| 8 · budget pass | "conventional… tool" | **Partly done, and the rest is real** | O9 is done and O10 is closed by refusing loops rather than bounding them (§1.1). What remains is O11's framing plus a calibrated per-target cost model. |
+| 9–12 | "conventional" | **Fair as scoped** | Genuinely the easy part. |
+| 15 · back-edge fuel | "optional, staged" | **Understated, and it is day one, not optional** | O6 and §3's `path_class` finding. It is a uBPF JIT patch on **both** backends, plus the plumbing, plus carrying the fork. |
+| — · debuggability | *not listed* | **Missing** | Core dumps, qkview, and whether a backtrace survives the trampoline. |
 
-**Total for a defensible v1 on two architectures: 50–80 SEM**, plus TMA and certification engagement. (That is `engine-hard-problems.md` §6.1's staffing, adopted verbatim so every document in the package multiplies out the same way: 5×10 = 50 to 6×14 = 84.)
+**Read the table as a ranking, not a budget.** Four items — the safe point, the trampoline, arm/disarm,
+and the hook-map generator — are each substantial engineering in their own right, and two of them were
+not in the scope document at all. That is the finding. Whether it adds up to something worth doing is a
+judgement for the people who would do it, and they will size it better than this register can.
 
-**How that reconciles with the column.** Taking each row's own low and high, and counting the trampoline **twice** for two architectures, the table sums to **52–97 SEM** — not 50–80. The two are not the same number, and the difference should be stated rather than smoothed: 50–80 is the column's floor through roughly its midpoint, i.e. the planning range. **97** is the answer to "what does the tail look like if every row lands at its own worst case" — a real possibility, but not a plan, because the rows are not independent worst cases (most of the tail is items 2, 5 and 6, and item 2's tail is a memory-manager change that §4's measurement would surface early). The floor is 52, so the headline's "50" is a rounding, not a computation.
+**Excluded from the table, deliberately:** items **13** (rate-limited per-firing log line), **14**
+(egress ring + drain agent), **16** (canary auto-unload) and **17** (`tmmtrace`). All four are real
+work and none of them is on the critical path to answering the three questions in §8.
 
-**Excluded from the table, deliberately:** items **13** (rate-limited per-firing log line), **14** (egress ring + drain agent), **16** (canary auto-unload) and **17** (`tmmtrace`). None is on the defensible-v1 critical path — 13 and 16 are small and follow the trampoline and the loader respectively, 14 is a self-contained ring whose design is already written up, and 17 is an authoring convenience. Together they are plausibly **4–8 SEM** and they are *not* inside the 50–80. Also excluded: the TMA, certification engagement, and the productisation of the §4 measurement into a permanent CI performance gate.
-
-**Overstated (easier than presented — say so, it helps):** a designed-in **USDT catalog needs no VM at all** (static markers + a host reader gets most of the observability value with none of §3's risk — and it is what the TMM org will accept first); **control-plane uprobes** are nearly off-the-shelf and cover the bulk of disclosed CVEs; **auto-retirement** is a local version/build/hotfix read plus a boot-location hook, not a polling subsystem; **evidence counters** are table stakes, not a staged tier.
-
----
+**Overstated (easier than presented — say so, it helps):** a designed-in **USDT catalog needs no VM at
+all** (static markers plus a host reader gets most of the observability value), and auto-retirement is a
+local version read plus a boot hook rather than an iControl-REST polling subsystem.
 
 ## 6 · What is genuinely strong — and mostly buried
 
@@ -179,7 +189,7 @@ Ranked by how much it would help to move it forward.
 ## 7 · The three questions to answer before anything else
 
 1. **Measure the flag** (§4). Two weeks. Kill criterion >1% pps.
-2. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A couple of weeks of SIRT-plus-engineering, and it either makes the case obvious or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
+2. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A focused SIRT-plus-engineering exercise, and it either makes the case obvious or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
 3. **The trilemma — pick one, in the room, not in month nine.** With no preemption, enforcing a time bound needs fuel; fuel has no effect under uBPF's JIT; wall-clock is unmeasurable at hot-hook granularity on aarch64. **Which do you give up: the run-to-completion loop, the unmodified uBPF, or enforce mode?** The available good answer — fork uBPF's JIT for back-edge fuel, own it, upstream it — costs "reused as-is" on one of the three reused components.
 
 **And the question with no answer in any document:** who owns the safe-return policy for every hookable TMM function, *in perpetuity*, and what mechanical gate catches it when someone edits one of those functions two releases from now? Skipping a body is a per-function proof obligation over buffer ownership, refcounts, locks held on entry, flow-state advancement, and divergence from the mirrored connflow. There is no test for the absence of an obligation you didn't think of. The failure mode: a shield blocks the CVE, passes red team, ships, and leaks a packet buffer at 40k conn/sec on one customer's traffic mix three weeks later — presenting as a memory-pressure TMM restart with no attribution back to the shield.
@@ -198,7 +208,7 @@ of asking it first.
 2. **A `ctx` model that actually verifies.** Reuse PREVAIL's `tracing` program type, copy the ctx into per-core scratch, and express the worked CVE as a scalar predicate against it. If the CVE class we care about *needs* pointer chasing, then day one includes a bounded `probe_read` helper and the §4 threat surface grows — decide that now, on paper, with SIRT in the room.
 3. **One hook armed end-to-end on one architecture in a lab TMM**, with core dumps and backtraces still working through the trampoline.
 
-If all three land, what follows is a real 50–80 senior-engineer-month programme, and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, the idea dies early and cheaply, which is strictly better than discovering it in month nine.
+If all three land, what follows is a real subsystem-scale programme (§5), and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, the idea dies early and cheaply, which is strictly better than discovering it in month nine.
 
 ---
 

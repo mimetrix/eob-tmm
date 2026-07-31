@@ -4,9 +4,9 @@
 
 > An earlier framing of this file was "so 'hundreds of lines, not subsystems' can be checked." That
 > claim is **retired** ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1): the item *list*
-> is right, the sizes were low by roughly 3–10×, and the subsystem being added is a code-patching,
+> is right, the sizes were low — in several cases badly — and the subsystem being added is a code-patching,
 > live-text, dynamic-code-loading facility inside the crown-jewel process — **50–80
-> senior-engineer-months** for a defensible v1 on two architectures. What these skeletons still do,
+> subsystem-scale work, not a feature** for a defensible v1 on two architectures. What these skeletons still do,
 > and all they do, is show the *shape* of each item and mark honestly where reuse ends.
 
 **Status:** Candidate code for review — **not TMM source**
@@ -1697,11 +1697,12 @@ reusing uBPF and PREVAIL." The first sentence is retired. Nobody writes a VM, a 
 compiler — that reuse is real, and narrow. What is being built instead is a **code-patching,
 live-text, dynamic-code-loading facility inside the crown-jewel process**, carrying a build-pipeline
 toolchain and a permanent per-build ABI, and needing a fork of one of the three reused components to
-get time safety at all (item 15). Sized honestly that is **50–80 senior-engineer-months** for a
-defensible v1 on two architectures — months, plus the TMA and
-certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item list in
+get time safety at all (item 15). Sized honestly that is **subsystem-scale work** for a
+defensible v1 on two architectures, plus the TMA and certification engagement
+([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). No month figure is offered anywhere in
+this package, on purpose: it is a proposal, not a plan. The item list in
 these two documents is right; the size classes are shape, not effort, and reviewed against what each
-item actually requires they are low by roughly 3–10×.
+item actually requires they are low — in several cases badly, and two of the largest items were missing altogether.
 
 ---
 
