@@ -44,6 +44,14 @@ prototype/
     ls_shield_ubpf.bpf.c  the Live Shield as eBPF bytecode (filter / enforce)
     ls_trace_ubpf.bpf.c   an observe-mode tracepoint + flight-recorder trigger (telemetry, never drops)
     ls_shield_bad.bpf.c   a deliberately-unsafe shield (OOB read) the verifier must reject
+  substrate/
+    shield_abi.h          the substrate ABI: loader message, signed binding, safe-return policy, hook slot
+    hook_map.schema.json  JSON Schema for the per-build hook map the generator emits
+    check_offsets.py      generates _Static_asserts from the hook map and compiles them against the header
+    check_hook_map.py     validates hook-point-map.json against the schema
+    budget_pass.py        the admission-time cost pass: decodes .text, prices instructions, refuses loops
+    Makefile              make check (header + schema + offsets + budget)
+    README.md             what is real in these artifacts and what is not
   client.py         sends benign / attack / arbitrary-opcode frames
   demo.sh           Track 1 (reference shield)
   demo-ubpf.sh      Track 2 (embedded uBPF VM): enforce holds, monitor crashes, flight recorder (§3.1)
@@ -57,6 +65,17 @@ prototype/
   ../ubpf/            uBPF clone (the embedded VM); libubpf.a built by minimm/Makefile
   ../ebpf-verifier/   PREVAIL clone (the verifier); prevail-cli built separately
 ```
+
+`substrate/` holds the two artifacts the scope docs call *the ones worth having as real files* —
+`shield_abi.h` and `hook_map.schema.json` — plus the checkers that keep them honest. They need
+only a C compiler and Python 3:
+
+```bash
+make -C substrate check    # header compiles + schema validates + offsets round-trip + budget pass runs
+```
+
+The budget-pass step prices whatever `shields/*.bpf.o` exist, so run `make -C minimm ubpf` first if
+you want that part to be non-vacuous — the shield objects are gitignored.
 
 ## Track 1 — run now, no dependencies
 
@@ -98,12 +117,14 @@ At the hook point (`minimm.c`, `LS_UBPF`):
 ubpf_exec(g_vm, &ctx, sizeof(ctx), &ret);   // run the shield bytecode
 // ret: 0=PASS, 1=match/monitor (pass), 2=match/enforce -> host returns LS_DROP
 ```
-The host owns the enumerated outcomes (§6.1); the shield only chooses among them.
+The host owns the enumerated outcomes (`design §6.1`; the canonical outcome set — PASS · DROP ·
+RESET · SAFE-RETURN · STEER · SAMPLE — is defined once in `../embedded-ebpf-substrate.md` §2);
+the shield only chooses among them.
 
 **Observe mode (tracepoint).** `minimm-trace` (built by `make ubpf`, `LS_TRACE`) runs the
 same VM at the same hook but treats the return as *telemetry* (histogrammed into the shared
 map) and **never** changes flow — eBPF observability reaching data-plane internals that
-kernel `eob` can't see. Same substrate, different host use of the result.
+kernel eBPF can't see. Same substrate, different host use of the result.
 
 **Flight recorder (observe-mode, substrate §3.1).** The same observe program also keeps a
 **ring of recent frames** in the shared map and **arms a dump** (it ORs `LS_FR_TRIGGER` into
@@ -185,7 +206,13 @@ CVE example) and the substrate doc §8.5.
   holds, monitor crashes; `minimm-trace` histograms opcodes in observe mode. Verified on
   the dev box **and** in the Rocky 8.10 container.
 - **§9 gate (PREVAIL)** — built and run: good shield verified + enforced; unsafe shield
-  rejected (fail closed) before load.
+  rejected (fail closed) before load. **What it does not show:** the prototype registers no
+  program type, so the verdict is computed against `socket_filter`'s 192-byte `__sk_buff`
+  context — the 28-byte `ls_ctx` loads pass because they *fit inside 192 bytes* and miss the
+  descriptor's pointer slots — and `--termination` (off by PREVAIL's default) is never passed.
+  So this proves **memory safety inside a 192-byte region**: not a TMM `ctx` model, and not
+  termination. See [`TOOLCHAIN.md`](TOOLCHAIN.md) stage 2 for the limits and the 100,000-iteration
+  bound that applies where `--termination` *is* enabled.
 
 ## Caveats / honest notes
 
@@ -198,4 +225,3 @@ CVE example) and the substrate doc §8.5.
 - This is a mechanism prototype, not the design's full trust/lifecycle machinery (signing,
   SIRT validation, auto-retirement, HA config-sync, per-CPU telemetry). Those are
   `design §7–§9` and `substrate §6`.
-```

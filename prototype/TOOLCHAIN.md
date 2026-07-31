@@ -13,7 +13,7 @@ the demos see [`README.md`](README.md). Everything here is what the
 ## The pipeline
 
 ```
- ls_shield_ubpf.bpf.c                                    host owns the outcomes (§6.1)
+ ls_shield_ubpf.bpf.c                                    host owns the outcomes (design §6.1)
    (eBPF C source)                                       shield only picks among them
         │                                                          ▲
         │ clang -O2 -target bpf                                    │
@@ -60,12 +60,26 @@ observe-mode tracepoint (`ls_trace_ubpf`), and the deliberately-unsafe one
 | **Prereq** | PREVAIL is C++23: needs a modern compiler (`gcc-toolset-13`) + modern Boost headers; el8's base gcc 8.5 / Boost 1.66 are too old. |
 
 > **This gate is *safety*, not *security*.** PREVAIL proves the program is
-> memory-safe and terminating — it will not crash or hang TMM. It proves *nothing*
-> about whether the program is malicious within the rules, or was loaded by the
+> memory-safe — it will not crash TMM. Termination is a *separate* check, behind
+> `--termination`, which the invocation above does not pass (see the limits below). It
+> proves *nothing* about whether the program is malicious within the rules, or was loaded by the
 > wrong party. Signing, authorization tiers, load-path hardening, audit/revocation,
 > and resource governance are the security layer *around* the VM — see
 > [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) §6 and
 > [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §8.
+
+**What this stage does *not* prove.** Two limits, both consequences of the invocation above.
+First, `--termination` is **off by PREVAIL's default** (`src/config.hpp:57`) and neither
+`ls_verify()` nor the demo scripts pass it, so the demonstrated pipeline proves **memory
+safety, not termination**. Second, the prototype registers **no program type**, so PREVAIL
+falls back to `socket_filter`'s 192-byte `__sk_buff` context: the prototype's 28-byte `ls_ctx`
+loads pass because they *fit inside 192 bytes* and miss the descriptor's pointer slots. That
+demonstrates a small struct fitting inside a big one — not that a TMM `ctx` model verifies.
+Where `--termination` *is* enabled, the guarantee it buys is PREVAIL's **100,000 loop
+iterations** (`src/ir/syntax.hpp:465`) — roughly **300 µs** at ~10 instructions per iteration on
+a 3 GHz core. That number is the clearest argument for the admission-time budget pass: a
+program can be provably terminating and still be three orders of magnitude outside a hot-path
+budget, so termination and cost are two gates, not one.
 
 In the prototype the gate is **env-wired** and the verifier runs as a **subprocess**:
 
@@ -124,7 +138,9 @@ ubpf_exec(g_vm, &ctx, sizeof(ctx), &ret);   // at ls_request_eval_decision
 // ret: 0 = PASS · 1 = match/monitor (pass) · 2 = match/enforce -> host returns LS_DROP
 ```
 
-The **host owns the enumerated outcomes** (§6.1) — `LS_PASS` / `LS_DROP`; the shield
+The **host owns the enumerated outcomes** (design §6.1; the canonical outcome set —
+PASS · DROP · RESET · SAFE-RETURN · STEER · SAMPLE — is defined once in
+[`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) §2) — here `LS_PASS` / `LS_DROP`; the shield
 only chooses among them via its return value. uBPF has no native maps, so mode and
 hit/enforce counters live in host memory. In the prototype the shield is a pure
 `ctx → return code` function that touches nothing else: the **host** reads that return
@@ -146,9 +162,9 @@ build with base gcc 8.5.
 
 | Stage | Prototype | Product (design §11/§9/§5.3) |
 |---|---|---|
-| Execute | uBPF **interpreter** (`ubpf_exec`), for portability | uBPF **JIT** — indirect call into native code, ~tens of ns; required on hot-path hooks |
+| Execute | uBPF **interpreter** (`ubpf_exec`), for portability | uBPF **JIT** — indirect call into native code, ~tens of ns; required on hot-path hooks. Specifically `ubpf_compile_ex` / `ubpf_jit_ex_fn` against a **per-core preallocated program stack**: plain `ubpf_compile`'s prologue takes a 4 KiB frame unconditionally with no stack probe, which can step over a single guard page at depth in TMM's call graph |
 | Verify | `prevail` CLI as a **subprocess**, env-wired (`LS_VERIFIER`) | verifier **embedded** as the designed-in load gate, fail-closed |
-| Hook | one hook (`ls_request_eval_decision`), no `path_class` | hook-point **catalog** with per-build map + `path_class` (`hot`/`warm`/`cold`) |
+| Hook | one hook (`ls_request_eval_decision`), no `path_class` | hook-point **catalog** with per-build map + `path_class` (`hot`/`warm`/`cold`), where the class is **static structure ∧ adversarial reachability** — anything reachable from unauthenticated input at attacker-controlled rate is `hot` regardless of how cold it looks in a profile |
 | State | host memory counters in `/dev/shm` | **per-CPU** state on hot paths (no cache-line contention across core-pinned TMM) |
 
 See [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §9 (verify

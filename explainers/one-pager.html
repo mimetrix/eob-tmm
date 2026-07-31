@@ -121,7 +121,7 @@
         nanoseconds is noise, and the hooks worth having sit at warm per-request boundaries.</p></div>
     <div class="card have"><p class="ct">◆ vendor-owned, shipped, closed</p><h3>The proof is required</h3>
       <p>F5 owns the source, so hooks are <b>designed in</b> and the hook map comes out of the build. And F5
-        can't ship a customer a mitigation that <em>might</em> crash the data plane — which is why a verifier is
+        can't ship a customer a mitigation that <em>might</em> put the data plane into a repeatable crash-loop — which is why a verifier is
         the precondition for the artifact existing, not a feature bolted on.</p></div>
   </div>
 
@@ -129,8 +129,9 @@
   <div class="chain">author (a few lines of C) → <b>clang -target bpf</b> → <b>PREVAIL verify</b> → budget pass →
     <b>sign the binding</b> → load at a named hook → monitor → enforce → auto-retire</div>
   <p>Two hook kinds cover the <b>anticipated</b> and the <b>unanticipated</b>: designed-in USDT tracepoints with a
-    curated, versioned context, and <b>function-boundary probes</b> at any named function in the build's signed
-    hook map — so a question nobody planned for needs no new build. A program is a pure function of its context: it
+    curated, versioned context, and <b>function-boundary probes</b> at any function the build emitted as its own
+    out-of-line body and listed in its signed hook map — so a question nobody planned for needs no new
+    build, once the enabling build ships. A program is a pure function of its context: it
     reads scalars and returns a verdict. <b>The host owns every outcome</b> (<span class="mono">pass · drop ·
     reset · safe-return · steer · sample</span>) and applies whichever the hook allows; the program cannot invent
     control flow, inject a value, or reach memory it wasn't handed.</p>
@@ -165,7 +166,7 @@
   <div class="box ask"><p><b>The ask is a one-quarter feasibility phase, not a build.</b> Three deliverables:
     <b>(1)</b> measure the dark cost of the compiler flag — kill criterion ~1% pps; <b>(2)</b> settle a context
     model that verifies, against real TMM debug info; <b>(3)</b> arm one hook end-to-end in a lab TMM with core
-    dumps still readable. If all three land, the rest is a real 12–18-month programme for 6–8 engineers. If any
+    dumps still readable. If all three land, the rest is a real 50–80 senior-engineer-month programme — five to six people over ten to fourteen months. If any
     fails, a quarter was spent instead of two years.</p></div>
 
   <p class="foot">
