@@ -47,6 +47,11 @@ That is real per-packet work — so P4 is exactly the kind of workload that **ex
 - **A validation workload.** P4 gives the budget pass and the runtime deadline a *realistic, non-trivial* thing to
   prove themselves against — a genuine stress test, not a toy. If the time-safety machinery holds for P4-authored
   packet pipelines, it holds.
+- **Invocation granularity is the other constraint.** A P4 program is per-packet by construction, and eBPF's
+  calling convention takes one `ctx` at a time — which is precisely why bytecode never displaced native nodes in
+  VPP's vector pipeline. TMM's run-to-completion loop is the favorable case, but on burst-receive hot paths the
+  answer is a burst-capable invocation form (DPDK's `rte_bpf_exec_burst()`), with the budget reasoned per burst;
+  see [`engine-hard-problems.md`](engine-hard-problems.md) §5.
 - **The budget pass becomes a placement decision.** Because P4 programs are heavier, some will *exceed* a hot
   per-packet hook's budget. The admission-time budget pass then does more than accept/reject — it **routes**: a P4
   program that fits the software budget runs inline in uBPF; one that doesn't is steered to a looser (cold/warm)

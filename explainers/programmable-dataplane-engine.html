@@ -390,6 +390,13 @@
     <div class="callout sig"><p><b>Say it plainly: TMM is its own kernel.</b> It plays every role Linux plays for the traffic it carries. Linux earned
       an eBPF VM inside it for exactly this job; <b>a kernel of TMM's standing and maturity deserves its own eBPF
       hosting VM</b>. That's the move.</p></div>
+    <p class="aside-note"><b>And TMM's shape is the favorable one.</b> DPDK and VPP extend their data planes with
+      native-code plugins, which is right for a <em>toolkit</em> — the third party's code <em>is</em> the data
+      plane, its author owns the crash risk, and a rebuild is cheap. TMM is a <b>shipped appliance</b>: F5 owns the
+      source (so designed-in hooks exist at all), can't ship a mitigation that might take the data plane down (so
+      the proof is the requirement), and a rebuild costs a maintenance window. Even the execution model favors us —
+      eBPF takes one <span class="inlinecode">ctx</span> at a time and can't express a vector, which is fatal
+      inside VPP's vector-graph node and a non-issue in a <b>run-to-completion poll loop</b>.</p>
   </section>
 
   <!-- 02 MOVE -->

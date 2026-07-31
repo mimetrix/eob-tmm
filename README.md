@@ -33,6 +33,18 @@ the signing gate as the security perimeter and the budget pass + watchdog as the
 > eBPF extends that power to the code/instrumentation layer, and is the one surface whose
 > runtime changes are provably safe.*
 
+**Why here and not in DPDK or VPP** — the question a reviewer will ask first. Both chose
+**native-code plugins** for dataplane extension, and for their problem that is correct: they are
+*toolkits*, so the third party's code **is** the data plane, its author accepts the crash risk in
+their own process, and "just rebuild" is cheap. TMM is a **shipped, closed appliance**: F5 owns the
+source (so designed-in hooks and a signed per-build hook map are possible), cannot ship a customer a
+mitigation that might crash the data plane (so the proof is a requirement, not overhead), and a
+rebuild costs a maintenance window rather than a `make`. Execution model matters too: eBPF takes one
+`ctx` at a time and cannot express a vector, which is fatal in VPP's vector-graph pipeline and a
+non-issue in TMM's run-to-completion loop. Full argument, including the corrected record on what
+DPDK and VPP actually did with BPF, in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md)
+§1.1.
+
 ## What the substrate enables
 
 A verified VM at designed-in hook points — and, via function-boundary probes, at any named
