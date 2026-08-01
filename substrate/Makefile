@@ -2,9 +2,9 @@
 # directory holds the two candidate ABI artifacts, not a program.
 #
 #   make check    syntax-check shield_abi.h (incl. its wire-layout asserts) and
-#                 validate prototype/hook-point-map.json against the schema.
+#                 validate hook-point-map.json against the schema.
 #
-# See README.md for what is real vs. illustrative, and ../../development-scope-code.md
+# See README.md for what is real vs. illustrative, and ../development-scope-code.md
 # for the per-item skeletons that use this ABI.
 
 CC     ?= cc
@@ -33,9 +33,9 @@ check-schema:
 check-offsets:
 	@$(PYTHON) ./check_offsets.py
 
-# The budget pass, run for real against the repo's own shield objects. It parses
-# the ELF, decodes the instruction stream (including lddw's 16-byte form), builds
-# the CFG and prices the longest path. Refuses anything with an unproven loop.
+# The budget pass, over its own self-test cases: hand-assembled eBPF in a
+# synthesized ELF, covering lddw's 16-byte form, longest-path over a branch, a
+# fail-closed budget, and refusing a loop rather than guessing its trip count.
 check-budget:
 	@$(PYTHON) ./budget_pass.py
 

@@ -9,7 +9,9 @@ recompile once the enabling build ships. Programs either **observe**
 internal state (a tracepoint) or **act** on a verdict the host applies (a datapath
 control) — each one **statically proven safe before it loads**.
 
-This repo holds the design proposals and a working prototype. **Live Shield** —
+This repo holds design proposals, visual explainers, and a small set of **candidate ABI artifacts
+that compile and check themselves**. It does **not** contain a running implementation: nothing here
+executes a shield. **Live Shield** —
 vendor-authored runtime CVE mitigations between patch windows — is the *first instance*
 of the substrate, not the whole of it.
 
@@ -153,45 +155,50 @@ exfiltration control and attestation are **not** yet specified there).
 | [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) | How data leaves the embedded VM — a per-core, single-producer, shared-memory ring; the **host emits, the program only signals** (no helpers, stock verifier). Prior-art review (DPDK `rte_ring`, kernel BPF ringbuf, bpftime), and the record-layout / backpressure / wakeup / crash design |
 | [`development-scope.md`](development-scope.md) | **What F5 actually builds** beyond the reused OSS (uBPF/PREVAIL/clang) — in-TMM code, build-pipeline tooling, control-plane pieces, optional tiers, and the one recurring per-CVE cost (a few lines of C). Keyed to the walkthrough's step numbers |
 | [`design-review-findings.md`](design-review-findings.md) | **Three architect reviews and what they change** — the register. Demonstrably-broken items (several verified against the uBPF and PREVAIL sources cloned into the working tree), wrong-about-TMM claims, missing specifications, the measurement that gates everything, honest scope restatement (a subsystem, not "hundreds of lines"), what's genuinely strong and currently buried, and the three questions that would decide this before anything is built — one of them carrying a kill criterion |
-| [`development-scope-code.md`](development-scope-code.md) | **Candidate code** for every day-one scope item (1–12 + the shield program) — skeletons scaled to each item's size class, each with a real / stubbed / TODO breakdown, plus a naming-reconciliation table. Backed by two real files in [`prototype/substrate/`](prototype/substrate/): `shield_abi.h` (compiles; asserts the loader message's wire layout) and `hook_map.schema.json` (the prototype's hook map validates against it) |
+| [`development-scope-code.md`](development-scope-code.md) | **Candidate code** for every day-one scope item (1–12 + the shield program) — skeletons scaled to each item's size class, each with a real / stubbed / TODO breakdown, plus a naming-reconciliation table. Backed by the checked artifacts in [`substrate/`](substrate/) — which is also where several of these skeletons were caught being wrong |
 | [`engine-hard-problems.md`](engine-hard-problems.md) | The load-bearing problems the pitch glosses — **termination ≠ WCET**, the **ctx/helper/program-type ABI is the real 90%**, **maps under CMP + HA mirroring**, and **verifier soundness as a data-plane RCE surface** (with the signing gate as the real perimeter). Honest mitigations, day-one vs. deferred — the "what a security review will ask" register |
-| [`prototype/`](prototype/) | A minimal data-plane relay with a synthetic CVE, a designed-in hook point, and a runnable proof of the substrate mechanism |
-| [`prototype/tmmtrace`](prototype/tmmtrace) | **tmmtrace** — a bpftrace-style front-end to the embedded VM: one grammar spanning observe (tracepoint) and filter (CVE shield), with compile → verify → run |
+| [`substrate/`](substrate/) | **The artifacts that check themselves** — the loader/binding ABI as a header whose `_Static_assert`s pin the wire layout, the hook-map JSON Schema plus an example map, an admission-time budget pass with a self-test, an offset check, and a guard that fails the build if the safe-return two-gate rule regresses. `make -C substrate check` runs all of it |
 | [`explainers/README.md`](explainers/README.md) | **The reading map** — which artifact answers which question, the intended order, and what to hand a skeptic first. Start here when circulating |
 | [`explainers/one-pager.html`](explainers/one-pager.html) | **The one-pager** — the whole proposal on a single printable sheet, ending on the feasibility-phase ask |
 | [`explainers/`](explainers/) | Visual explainers (HTML), one job each. [`programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) — **the engine** (the generic verified-eBPF utility in TMM); [`cve-mitigation.html`](explainers/cve-mitigation.html) — data-plane **CVE mitigation** (the shield); [`cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) — a **worked example**: shielding a real TMM NULL-deref crash class step by step; [`engine-hard-problems.html`](explainers/engine-hard-problems.html) — the **engineering register** (the load-bearing hard problems, honestly scoped) |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
 
-## Prototype at a glance
+## What is actually checkable here
 
-The prototype is a transparent TCP relay reproducing the *structural* properties the substrate
-depends on (kernel-bypass-style poll loop, inline eval stage, a designed-in hook point).
-Three tracks:
+There is no prototype in this repo, and no claim in these documents rests on one. What there is, in
+[`substrate/`](substrate/), is the handful of items from the scope that are worth having as **real
+files rather than illustrative blocks** — because their value is precisely that they compile, validate,
+and run. `make -C substrate check` runs five checks with nothing but a C compiler and Python 3:
 
-1. **Reference** — shield logic compiled into the host (plain C); proves the lifecycle.
-2. **uBPF** — the program as eBPF bytecode run by the embedded VM, in both **enforce** and
-   **monitor** (observe-only) modes; enforce holds, monitor crashes.
-3. **PREVAIL gate** — the good program verifies and loads; a deliberately-unsafe one is
-   rejected before load. Two limits, stated so the demo is not over-read: with no registered program
-   type PREVAIL falls back to `socket_filter`'s 192-byte `__sk_buff`, so the prototype's 28-byte
-   context passes because it *fits inside* that region and misses the pointer slots — this shows a
-   small struct fitting in a big one, not that a TMM context model verifies. And `--termination` is
-   off by PREVAIL's default and the prototype does not pass it, so what is demonstrated is memory
-   safety, not termination.
+1. **`shield_abi.h` compiles standalone and asserts its own wire layout** — fifteen `_Static_assert`s
+   pinning `struct shield_msg` and `struct shield_binding` byte for byte.
+2. **The hook-map schema is valid, and the example map validates against it** — and the check reports
+   which product-only fields a given instance is not yet emitting rather than silently passing.
+3. **The example map's declared `ctx` offsets are compiled against the real header**, so a wrong offset
+   fails rather than being trusted. This check exists because there *was* a wrong offset here.
+4. **The budget pass runs its own self-test** — six hand-assembled eBPF programs wrapped in a
+   synthesized ELF, covering `lddw`'s 16-byte form, longest-path over a branch, a fail-closed
+   over-budget rejection, and refusing a loop rather than guessing its trip count.
+5. **The safe-return two-gate rule is asserted, not just documented** — five cases, and the build fails
+   if an unanalysed function body is ever treated as enforce-capable.
 
-Over the top, **`tmmtrace`** is a bpftrace-style front-end: write a one-liner and it compiles to a
-shield, runs the verify gate, and drives the VM in observe *or* filter mode — one grammar for
-*explore → shield*. It is also the natural target for **AI-assisted authoring** (CVE → predicate →
-verify → replay); see [`explainers/`](explainers/).
-
-See [`prototype/README.md`](prototype/README.md) for build & run of all three tracks — Track 1
-needs no dependencies; the uBPF and verify-gate tracks include Rocky Linux 8.10 container
-builds — and [`prototype/TOOLCHAIN.md`](prototype/TOOLCHAIN.md) for the end-to-end
-source → bytecode → verify → load → run pipeline.
+**Why that is the whole of it, stated plainly.** Writing these for real has already caught four defects
+that the prose versions carried unnoticed: a signature documented as covering a binding the message
+could not carry; a replay that defeated the kill switch; a safe-return model inverted so that `void`
+looked like the easy case; and a hook map declaring offsets that did not match its own header. That is
+the argument for these files existing. It is *not* an argument that the mechanism works — **no shield
+is compiled, verified, loaded, or executed anywhere in this repo**, and every performance and behaviour
+claim in these documents is a design claim awaiting measurement.
 
 ## Notes
 
-- The third-party clones `ubpf/` and `ebpf-verifier/` are **not** vendored here — clone them
-  yourself as described in the prototype README (they're gitignored).
-- This repo holds design proposals and proof-of-concept code. Patent/invention disclosure
-  artifacts are kept out by policy (and gitignored).
+- The third-party clones `ubpf/` and `ebpf-verifier/` are **not** vendored here — clone them yourself
+  if you want to check the source citations in [`design-review-findings.md`](design-review-findings.md)
+  (they are gitignored, and the register pins the commit of each).
+- An earlier version of this repo carried a working prototype: a TCP relay with a synthetic crash bug,
+  a designed-in hook, a uBPF track and a PREVAIL verify gate. **It was removed deliberately.** Its
+  name read as an F5 component and invited the wrong question — whether it was cut-down TMM source —
+  and a toy relay standing in for TMM invites an argument about the analogy rather than the design.
+  The cost of removing it is real and worth stating: the verify gate is no longer demonstrable here.
+- This repo holds design proposals and candidate artifacts. Patent/invention disclosure artifacts are
+  kept out by policy (and gitignored).

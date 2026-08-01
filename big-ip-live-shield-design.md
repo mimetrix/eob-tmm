@@ -4,7 +4,7 @@
 **Status:** Draft for architecture review
 **Audience:** TMOS architecture, F5 SIRT, BIG-IP security engineering
 **Scope:** On-box, vendor-authored runtime shields for TMOS's *own* control-plane and data-plane code paths
-**Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — Live Shield is its first instance) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `prototype/` (working proof: uBPF embedded + PREVAIL verify gate)
+**Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — Live Shield is its first instance) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `substrate/` (**candidate ABI artifacts + their checkers** — shield ABI header, hook-map schema and example map, budget/offset/gate checks; **not a running prototype** — no shield executes anywhere in this repo)
 
 ---
 
@@ -125,7 +125,7 @@ A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter 
 
 There are two ways to get userspace eBPF into a process, and the distinction is the crux of this design (§3.1):
 
-- **Inject** into an unmodified, running process (the bpftime model — `LD_PRELOAD`/ptrace, binary rewriting, a syscall-emulation shim). Powerful for instrumenting software you don't own, but brittle and invasive. **Evaluated and rejected** — see §3.1; a prototype confirmed the injection path is fragile in practice while the embedded path works.
+- **Inject** into an unmodified, running process (the bpftime model — `LD_PRELOAD`/ptrace, binary rewriting, a syscall-emulation shim). Powerful for instrumenting software you don't own, but brittle and invasive. **Evaluated and rejected** — see §3.1, on documented grounds: the kernel forbids `bpf_override_return` on uprobes, and injection needs ptrace/`LD_PRELOAD` against stripped binaries at guessed offsets. (No empirical comparison is claimed — this repo ships no running prototype of either path.)
 - **Embed** the VM as a library and call it at designed-in hook points (the uBPF model). This is what Live Shield uses.
 
 For a customer, userspace eBPF's headline benefit would be routing around a locked-down kernel. **For F5 as the vendor that benefit is irrelevant** — we can enable kernel eBPF in our own build, and we already ship kernel eBPF in BIG-IP eBPF Observability ("eob") for Kubernetes traffic on Cloud-Native Edition.
@@ -143,7 +143,7 @@ expensive rebuild, and a run-to-completion loop rather than a vectorized pipelin
 
 ### 3.1 The vendor inversion: instrument by design, do not inject
 
-Off-the-shelf userspace eBPF *injection* tooling (bpftime) attaches to processes the operator does not own, using ptrace/`LD_PRELOAD` injection and binary rewriting against stripped, symbol-less binaries at guessed offsets. That is brittle and invasive — and unnecessary for us. (A prototype bore this out: the injection runtime never reliably engaged, whereas embedding uBPF and calling it at a hook point worked directly.)
+Off-the-shelf userspace eBPF *injection* tooling (bpftime) attaches to processes the operator does not own, using ptrace/`LD_PRELOAD` injection and binary rewriting against stripped, symbol-less binaries at guessed offsets. That is brittle and invasive — and unnecessary for us. The case against it rests on documented properties, not on an experiment we can show: injection depends on ptrace/`LD_PRELOAD` and offset-guessed rewriting of a binary whose symbols are stripped, and the *acting* half is foreclosed outright — the kernel does not permit `bpf_override_return` on a uprobe, so the model cannot change a return value even when attachment succeeds (§3). Embedding sidesteps both by construction: a named call site in our own source, and a return value the host reads. **Neither path is exercised by any artifact in this repo** — the argument is architectural.
 
 **We own TMM's source.** Therefore Live Shield does not inject into a running TMM. Instead:
 
@@ -215,7 +215,7 @@ Three adapters, in increasing order of audacity. Crucially, **two distinct eBPF 
 ### 5.2 The embedded eBPF VM
 
 - **uBPF**, linked as a library (~150 KB, Apache-2.0): an in-process eBPF VM with x86-64/arm64 JIT. Shields are authored as ordinary eBPF C and compiled with `clang -target bpf`. On the hot path the JIT is used (a shield invocation is an indirect call into native code; the interpreter is a debug/portability fallback). uBPF is the engine in Microsoft's eBPF-for-Windows and one of the VMs bpftime can use — though what that deployment proves is the **interpreter** plus PREVAIL; the JIT is the half F5 would have to own and harden (§3, §11).
-- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield in F5's admission pipeline, **before** it is signed — nothing unverified is ever signed, and nothing unsigned ever loads; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read out of bounds. Two precisions on that sentence, both load-bearing: **termination is proved only when `--termination` is passed**, which is off by default and which the prototype does not currently pass; and PREVAIL does not express a read-only `ctx`, so out-of-bounds *writes* are bounded while writes **to `ctx` are not** — hence the mandatory per-core `ctx` copy above. (PREVAIL is the verifier for *this* userspace engine; the control-plane adapter rides the kernel's own in-tree BPF verifier instead — §5.1. Two engines, two verifiers, one catalog.)
+- **PREVAIL** (`vbpf/ebpf-verifier`, the verifier in eBPF-for-Windows) statically verifies every shield in F5's admission pipeline, **before** it is signed — nothing unverified is ever signed, and nothing unsigned ever loads; nonzero verdict ⇒ reject (fail closed). The verifier is **load-bearing for safety** (§9). uBPF runs whatever bytecode it is given, so the verifier — not the VM — is what guarantees a shield can't read out of bounds. Two precisions on that sentence, both load-bearing: **termination is proved only when `--termination` is passed**, which is off by default — so an admission pipeline that simply shells out to PREVAIL's defaults proves memory safety and *not* halting, and passing the flag is a deliberate choice the pipeline has to make; and PREVAIL does not express a read-only `ctx`, so out-of-bounds *writes* are bounded while writes **to `ctx` are not** — hence the mandatory per-core `ctx` copy above. (PREVAIL is the verifier for *this* userspace engine; the control-plane adapter rides the kernel's own in-tree BPF verifier instead — §5.1. Two engines, two verifiers, one catalog.)
 - **No helpers, no verifier extension for the core.** Both `filter` shields and `observe` tracepoints are **pure functions of the context**: they read `ctx` and return a value (a verdict, or a telemetry sample). They call nothing. So mode, hit/enforce counters, and `observe`-mode telemetry live in host memory (per-CPU on hot paths) that the **host** reads and writes *around* the call — the lifecycle engine acts on the return value; the program never touches host state directly. Two consequences: (a) **no eBPF helper functions need to be defined, registered, or secured**, and (b) **no verifier *extension*** — a bounded predicate over a typed `ctx` is the canonical case any eBPF verifier already proves. But be precise about what "stock" means, because PREVAIL has **no `--program-type` flag**: it deduces the type from the ELF *section-name prefix* against a compiled-in table, falling back to `socket_filter`. So there are two honest options — (i) ride PREVAIL's existing **`tracing`** type unchanged, which is the Phase-1 choice and puts no fork in the trust path, or (ii) register a named TMM type, which is **a PREVAIL patch set carrying a per-release rebase cost**. Either way the `ctx` descriptor itself is real, bounded work (`engine-hard-problems.md` §2). Anything stateful is handled by the host pre-computing it into `ctx`. **And that `ctx` must be a per-core scratch *copy*, discarded on fall-through — never a live view of TMM state.** PREVAIL's context descriptor is four integers (`size`/`data`/`end`/`meta`); it does not express a read-only region, so a verified program **can write every byte of its `ctx`**. Handing it the live argument frame would turn the safety mechanism into an argument-injection primitive. Helpers — letting the program manipulate host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite for Live Shield or tracepoints.
 
 ### 5.3 Native hook-point API and build-pipeline integration
@@ -362,6 +362,89 @@ approval for a bounded artifact class (verified, budget-passed, hook-bound, expi
 signing is hours rather than days. That single process change is what converts "days, not hours" into
 "hours," and it is worth more than any engineering optimisation available here.
 
+### 8.1 Does the verifier remove the need for the pipeline?
+
+**Asked plainly, because it is the first thing anyone will ask about "days, not hours": if a shield is
+verified bytecode rather than a code change, does it still have to be tested, certified, and installed
+on a maintenance window?** The answer is no, it does not remove the pipeline — but it **re-proportions**
+it, and the compression lands almost entirely in one of those three steps. That distinction is worth
+making carefully, because "the verifier makes this fast" is both wrong and easy to attack, while the
+real answer is defensible.
+
+| Step | Does bytecode + a verifier reduce it? | What actually does the work |
+|---|---|---|
+| **Test** | **Substantially, but not to zero** | Not the verifier alone — the **bounded outcome set**. A hotfix needs full-image regression because a hotfix *can break anything*; the burden scales with the image. A shield can only select an outcome the host already owns at a hook the build declared, so its blast radius is bounded **by construction**, which is what makes a proportionate test regime defensible rather than a corner cut. What remains is irreducible: does the predicate actually match the exploit, what is its false-positive rate against a legitimate-traffic corpus, and is the chosen outcome safe to *take* (§6.1's skippability gate — a separate obligation from memory safety that no verifier addresses). |
+| **Certify** | **Barely, and it may add a problem** | The verifier is close to irrelevant here: evaluators care about *what code is inside the validated boundary*, and that answer now changes at runtime. What speaks to them is the **signature**, because signed code authenticity is an established construct. This is the program's likeliest productization gate (`engine-hard-problems.md` §5), and the failure mode is a forced dynamic-load-disabled certified mode rather than a refusal. |
+| **Install** | **Yes — and this is where the value is** | Nothing about the artifact requires a reboot, a failover, or a maintenance window; `REVOKE` reverses it in seconds and expiry retires it unattended. The customer-side burden drops from "window + regression risk + rollback plan" to accepting a signed content update. **Note this is also the step a faster release train cannot help with at all**, because it sits on the customer's calendar rather than F5's. |
+
+So: **the bounded outcome set buys a proportionate test surface; the signature buys the certification
+argument; and being an artifact rather than an image buys the install window.** Three mechanisms doing
+three different jobs — and it is worth keeping them distinct, because collapsing them into one claim
+about the verifier is what makes the pitch sound like hand-waving.
+
+**And the pipeline this belongs in already exists, which reframes the ask.** The instinct is to compare
+a shield to a **hotfix**, and by that comparison every question above is hard. But F5 already operates a
+vendor-authored, HSM-signed, proportionately-qualified, no-maintenance-window distribution channel for a
+different artifact class: **attack-signature updates, WAF/ASM policy updates, threat feeds.** Those are
+authored by F5, signed, shipped continuously, applied without a software upgrade, and qualified in
+proportion to their blast radius rather than by re-testing TMOS. A shield is far more like one of those
+than like a hotfix. **So the request is not "grant this an exception from the software-release process."
+It is "this artifact class belongs in the content lane you already run"** — and what earns it the right
+to be treated as content rather than as code is precisely the verifier plus the enumerated outcome set.
+That is a much easier proposition to agree to, and it is the same argument the signing ask above rests
+on.
+
+**The precedent for running foreign logic in TMM is stronger still, because it is already customer
+code.** BIG-IP lets *customers* write **iRules** — TCL executing inline on the data path — and is
+gaining a **WASM** extension surface for the same purpose. Both run in TMM, on certified appliances,
+authored by people F5 does not employ and cannot review. So *"this appliance executes logic that was not
+in the validated image"* is not a new question here; it has an existing answer, from evaluators and from
+support, and the sensible move is to find that answer and reuse it rather than re-litigate it.
+
+Against that baseline the shield is the **more** constrained artifact on every axis that matters:
+
+| | customer iRule | customer WASM | F5 shield |
+|---|---|---|---|
+| Author | the customer | the customer or a partner | **F5 SIRT** |
+| Reviewed by F5 | no | no | **yes, plus red-team** |
+| Static safety proof | none | none | **memory safety before it is signed** |
+| Bound on what it may read | none — the whole exposed data model | sandbox boundary only | **a declared `ctx` of resolved scalars** |
+| Bound on what it may do | any sanctioned iRule action | whatever its imports allow | **one host-owned outcome from a fixed set** |
+| Cost bound | none; a runaway rule is a documented cause of a stalled TMM | fuel only | **admission budget pass + runtime fuel** |
+| Signed | no | no | **yes, over a binding that pins hook, build range, mode ceiling and expiry** |
+| Expires by itself | no | no | **yes, on patched-build detection** |
+
+Which **inverts the burden of proof**, and the proposal should say so rather than arguing purely
+defensively. If the objection is "we cannot allow foreign logic to execute in the data plane," the
+answer is that BIG-IP has allowed exactly that for years, with materially weaker controls, and that the
+artifact under discussion is the most constrained thing ever proposed for that position.
+
+**Two honest qualifications, because a good reviewer raises both immediately.**
+
+**First, liability is the real disanalogy.** An iRule is the customer's code, on the customer's box, and
+the crash risk is theirs to accept; a shield is F5's code and F5's liability. That asymmetry is genuine,
+and it is not an argument against the comparison — it is the reason the proof is a *precondition* here
+rather than a feature (§3). We are volunteering a higher standard than the surface next door, and the
+right framing is that we hold ourselves to it because we are the author, not that we are exempt from
+anything.
+
+**Second, the precedent has a real hole, and it is exactly where the certification risk lives: the
+JIT.** iRules are *interpreted*. WASM runs in a *sandboxed runtime*. Neither one **writes executable
+native code into TMM's address space at runtime** — and that is different in kind, not degree, from
+interpreting data. So the iRules/WASM precedent covers the interpreter path cleanly and does **not**
+cover the JIT. That is an independent argument for the interpreter-only high-assurance build already
+proposed as a mitigation (`engine-hard-problems.md` §1, §4): on a certified platform the interpreter is
+the configuration with a precedent, and it is also the one where uBPF's instruction limit actually
+works. The JIT is the part to argue for separately, with numbers.
+
+**And one governance question this exposes that is not answered anywhere yet.** If the test regime is
+proportionate rather than full-image, **who signs off that a shield is safe to ship — and is that the
+same authority that signs off a hotfix, or a new one?** The comparison above suggests the answer should
+look like the sign-off for a signature update rather than for a software release, but that is an
+assertion, not a decision. It is a governance question rather than a technical one, and it is precisely
+the kind of thing that stalls a programme in month nine if it is left until the engineering is done.
+§13 lists mode-promotion governance as open; this belongs beside it.
+
 ## 9. Safety and blast radius
 
 Unlike Cisco's kernel-isolated shields, a Live Shield in the TMM adapter runs **in TMM's address space**, so a faulty shield can fault TMM. State the harm precisely, because the imprecise version is both scarier and wrong: `sod` restarts TMM within seconds and an HA pair fails over, so a single fault is a blip. **The harm that matters is a repeatable crash-loop** — a shield that faults on a condition the traffic keeps supplying drops every flow on that TMM each time and can flap HA. That is worse than a one-shot crash, and it is what the watchdog below is actually for. Mitigations:
@@ -432,12 +515,13 @@ rest of it worth taking seriously.
 
 - **VM-in-TMM stability** is the program's single biggest technical risk; the watchdog + verifier + cold-path policy are the controls, but Phase 3 should not start until they are proven in Phases 1–2.
 - **Hook-point map drift** across builds — needs hard CI ownership so no build ships without a current map and no shield ships without a resolvable target.
-- **Runtime maturity** — uBPF (the VM) and PREVAIL (the verifier) enter the trust path of critical infrastructure. Both are proven elsewhere (eBPF-for-Windows — for the interpreter and the verifier; **not** for the JIT), permissively licensed, and small, but they must build against the TMOS base OS toolchain (a prototype built both on the RHEL-8 family) and be brought under F5's own maintenance/hardening. Note PREVAIL is C++23 — it needs a modern compiler in the build pipeline. **This risk is bounded by the no-helpers/pure-predicate model (§5.2): the core defines *no* custom helpers and rides PREVAIL's existing `tracing` program type, so there is no verifier fork in the trust path and no helper ABI to secure — the maturity work is "consume and harden," not "extend."** A *named* TMM program type would be a PREVAIL patch set with a per-release rebase cost, and Phase 1 deliberately does not take it. The helper tier, if pursued later, is what would reintroduce verifier-integration surface.
+- **Runtime maturity** — uBPF (the VM) and PREVAIL (the verifier) enter the trust path of critical infrastructure. Both are proven elsewhere (eBPF-for-Windows — for the interpreter and the verifier; **not** for the JIT), permissively licensed, and small, but they must build against the TMOS base OS toolchain — **unverified here; no build of either against a TMOS-family toolchain is demonstrated in this repo** — and be brought under F5's own maintenance/hardening. Note PREVAIL is C++23 — it needs a modern compiler in the build pipeline. **This risk is bounded by the no-helpers/pure-predicate model (§5.2): the core defines *no* custom helpers and rides PREVAIL's existing `tracing` program type, so there is no verifier fork in the trust path and no helper ABI to secure — the maturity work is "consume and harden," not "extend."** A *named* TMM program type would be a PREVAIL patch set with a per-release rebase cost, and Phase 1 deliberately does not take it. The helper tier, if pursued later, is what would reintroduce verifier-integration surface.
 - **Licensing & OSS posture — an enabler, not a blocker.** Both core components are **permissively licensed and safe to statically link into a proprietary appliance**: uBPF is **Apache-2.0** (with an express patent grant — net-positive alongside the parallel invention disclosure), PREVAIL is **MIT**, and PREVAIL's build dependency Boost is under the permissive **Boost Software License**. Nothing in the primary path is copyleft, so there is **no source-disclosure obligation** — only routine NOTICE/attribution preservation, already handled for other TMOS OSS. This is *enabling*, not merely acceptable: the counterfactual verifier is the Linux kernel's in-tree eBPF verifier, which is **GPLv2 and cannot be lifted into a userspace product** — permissive PREVAIL is precisely what makes an embeddable, shippable verifier possible, and what makes the "consume and harden" posture above legally real. Two items to close:
   - **OSPO action (the only real risk):** abstract-interpretation verifiers sometimes link **copyleft numeric-domain libraries** — PPL is GPLv3; APRON and parts of ELINA are LGPL. Current PREVAIL appears to use its own vendored domains (CRAB heritage, Apache-2.0) rather than PPL/APRON, but the transitive dependency tree drifts by version. **Pin the PREVAIL commit and run an SBOM + license scan** (`syft` / Scancode / FOSSA) to confirm no GPL/LGPL in the shipping path. A small, bounded task that converts "probably clean" into "verified clean," and it should gate Phase 1.
   - **For patent counsel (FTO note):** MIT (PREVAIL) carries **no patent grant**; Apache-2.0 (uBPF) does. A low-but-nonzero freedom-to-operate consideration worth one line alongside the filing — some verification technique in PREVAIL could in principle be third-party patented.
 - **Overlap/positioning** with existing Advanced WAF virtual patching and EOB — messaging must be crisp: Live Shield protects the **BIG-IP's own code (incl. TMM)**, which neither of those does. Resist the temptation to extend that into a claim about Cisco's silicon: Live Protect covers **NX-OS**, and asserting what it cannot do on their forwarding engine is unverifiable and invites a correction. The defensible statement is about the technique — runtime patching of live text is well established (ftrace, kernel livepatch, kernel error injection); what no vendor ships is that technique **inside a proxy data plane**.
 - **Mode-promotion governance** — who is authorized to promote monitor→enforce, and under what change control.
+- **Shipping authority for a proportionately-tested artifact** (§8.1) — if a shield is qualified in proportion to its blast radius rather than by re-testing TMOS, **who signs off that it is safe to ship?** The same authority as a hotfix, or the one that releases attack-signature content? The comparison in §8.1 argues for the latter, but that is an assertion and not a decision, and it is a governance question rather than a technical one. Settle it early: it is the class of item that stalls a programme once the engineering is finished.
 - **Two control-plane adapter implementations, not one** — the native-uprobe path and the JVM path (iControl REST) are separate implementations of the single control-plane adapter (§5.1), under one catalog and lifecycle. The JVM path is the less-trodden one and carries its own runtime-maturity and overhead questions.
 - **Config-sync is now in the trust path** — shields propagate as device-group objects (§7.2), so the sync channel's integrity becomes part of the shield's integrity story, and a sync-group with mixed TMOS versions must resolve hook-point maps and auto-retirement per member.
 

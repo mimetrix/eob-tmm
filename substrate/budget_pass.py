@@ -4,8 +4,11 @@ budget_pass.py — the admission-time cost gate, for real.
 
 development-scope.md item 8. This is not a sketch: it parses a genuine eBPF ELF
 object, decodes the instruction stream, builds a control-flow graph, finds the
-longest path, and prices it against a per-hook budget. It runs on the real
-shields in ../shields/.
+longest path, and prices it against a per-hook budget.
+
+Run with no arguments it executes a built-in self-test over hand-assembled eBPF
+wrapped in a synthesized ELF (see the bottom of this file). Pass object files to
+gate them instead.
 
 Writing it for real fixed three bugs that were in the illustrative version:
   * it read the whole ELF FILE as instructions — the first eight bytes are
@@ -24,8 +27,8 @@ Treat the output as a RELATIVE sanity check ("is this program ten instructions
 or ten thousand?"), which is what makes it useful as an admission gate, and read
 engine-hard-problems.md §1 for why a runtime guard is still required.
 
-Usage:  ./budget_pass.py [--budget N] <prog.bpf.o> [...]
-        ./budget_pass.py ../shields/*.bpf.o
+Usage:  ./budget_pass.py                        run the self-test
+        ./budget_pass.py [--budget N] <prog.bpf.o> [...]
 """
 import struct
 import sys
@@ -50,6 +53,11 @@ def elf_section(path, want=".text"):
     """Return the bytes of `want` from a 64-bit little-endian ELF. No deps."""
     with open(path, "rb") as f:
         blob = f.read()
+    return elf_section_bytes(blob, want, path)
+
+
+def elf_section_bytes(blob, want=".text", path="<bytes>"):
+    """Same, over a buffer — so the self-test needs no files on disk."""
     if blob[:4] != b"\x7fELF":
         raise ValueError("%s: not an ELF object" % path)
     if blob[4] != 2 or blob[5] != 1:
@@ -180,28 +188,142 @@ def longest_path(blocks, edges):
     return best(sorted(blocks)[0]) if blocks else 0
 
 
+# ------------------------------------------------------------------- self-test
+# The repo used to run this pass over three real clang-built shield objects. Those
+# lived in a prototype that has been removed, so the pass now carries its own
+# cases — hand-assembled eBPF wrapped in a minimal ELF, built in memory.
+#
+# That is not a downgrade. The three real shields were straight-line predicates:
+# none contained a `lddw` and none contained a loop, so neither the 16-byte
+# instruction form nor the loop refusal was ever actually exercised. Both are
+# covered below, and both were bugs in the first version of this file.
+
+def _elf(text):
+    """Wrap a .text payload in the smallest 64-bit LE ELF this parser accepts."""
+    shstr = b"\0.text\0.shstrtab\0"
+    eh_sz, sh_sz = 64, 64
+    text_off = eh_sz
+    shstr_off = text_off + len(text)
+    sh_off = shstr_off + len(shstr)
+
+    eh = bytearray(eh_sz)
+    eh[0:4] = b"\x7fELF"
+    eh[4] = 2                      # ELFCLASS64 — the parser insists
+    eh[5] = 1                      # little endian
+    eh[6] = 1                      # EV_CURRENT
+    struct.pack_into("<H", eh, 16, 1)          # ET_REL
+    struct.pack_into("<H", eh, 18, 247)        # EM_BPF
+    struct.pack_into("<I", eh, 20, 1)
+    struct.pack_into("<Q", eh, 40, sh_off)     # e_shoff
+    struct.pack_into("<H", eh, 52, eh_sz)      # e_ehsize
+    struct.pack_into("<H", eh, 58, sh_sz)      # e_shentsize
+    struct.pack_into("<H", eh, 60, 3)          # e_shnum: null, .text, .shstrtab
+    struct.pack_into("<H", eh, 62, 2)          # e_shstrndx
+
+    def shdr(name_off, typ, off, size):
+        b = bytearray(sh_sz)
+        struct.pack_into("<IIQQQQ", b, 0, name_off, typ, 0, 0, off, size)
+        return bytes(b)
+
+    return (bytes(eh) + text + shstr
+            + shdr(0, 0, 0, 0)                            # SHT_NULL
+            + shdr(1, 1, text_off, len(text))             # .text, PROGBITS
+            + shdr(8, 3, shstr_off, len(shstr)))          # .shstrtab, STRTAB
+
+
+def _i(op, dst=0, src=0, off=0, imm=0):
+    return struct.pack("<BBhi", op, (src << 4) | dst, off, imm)
+
+
+MOV, JEQ, LDXW = 0xb7, 0x15, 0x61
+
+_CASES = [
+    # name, .text, budget, expected (verdict, insns, blocks, cycles)
+    ("straight-line",
+     _i(MOV, 0, imm=0) + _i(EXIT),
+     800, ("ok", 2, 1, 2)),
+
+    # lddw is a 16-BYTE pseudo-instruction. Decoded 8 bytes at a time, its zero
+    # second half becomes a phantom instruction (opcode 0x00) — so a correct
+    # decoder reports 3 instructions here and the buggy one reports 4. This case
+    # is the regression test for that bug, and no real shield ever had a lddw.
+    ("lddw is 16 bytes",
+     _i(LDDW, 1, imm=0x55667788) + _i(0, imm=0x11223344)
+     + _i(MOV, 0, imm=0) + _i(EXIT),
+     800, ("ok", 3, 1, 6)),
+
+    # diamond: the conditional's taken and fall-through paths differ in cost, so
+    # this exercises longest-path rather than a straight sum.
+    ("branch diamond",
+     _i(JEQ, 0, off=1) + _i(MOV, 0, imm=1) + _i(MOV, 0, imm=2) + _i(EXIT),
+     800, ("ok", 4, 3, 5)),
+
+    # the same program under a budget it cannot meet — the gate must fail closed.
+    ("over budget rejects",
+     _i(JEQ, 0, off=1) + _i(MOV, 0, imm=1) + _i(MOV, 0, imm=2) + _i(EXIT),
+     3, ("REJECT", 4, 3, 5)),
+
+    # a back-edge. PREVAIL reports one aggregate max_loop_count and not a
+    # per-loop trip count, so there is nothing sound to price this with: the pass
+    # must REFUSE rather than guess. Also never exercised by a real shield.
+    ("loop is refused, not guessed",
+     _i(MOV, 0, imm=0) + _i(JA, off=-1),
+     800, ("REFUSE", 2, 2, None)),
+
+    # a memory load costs more than an ALU op in the cost table; this pins that
+    # the class mapping is actually consulted.
+    ("load is priced above alu",
+     _i(LDXW, 1, 2) + _i(MOV, 0, imm=0) + _i(EXIT),
+     800, ("ok", 3, 1, 6)),
+]
+
+
+def selftest():
+    fails = 0
+    print("budget_pass self-test (hand-assembled eBPF in a synthesized ELF):")
+    for name, text, budget, expect in _CASES:
+        got = gate_text(name, elf_section_bytes(_elf(text)), budget, quiet=True)
+        good = (got == expect)
+        cost = "loop refused" if got[3] is None else "%d cycles" % got[3]
+        print("  %-4s %-30s %-7s %2d insn · %d blocks · %s"
+              % ("ok" if good else "FAIL", name, got[0], got[1], got[2], cost))
+        if not good:
+            print("       expected %r" % (expect,))
+            fails += 1
+    if fails:
+        print("budget_pass self-test: %d failure(s)" % fails)
+        return 1
+    print("ok    budget_pass.py  (%d cases: lddw's 16-byte form, longest path, "
+          "fail-closed budget, loop refusal)" % len(_CASES))
+    return 0
+
+
 # --------------------------------------------------------------------- the gate
 def gate(path, budget):
-    text = elf_section(path)
+    return gate_text(os.path.basename(path), elf_section(path), budget)
+
+
+def gate_text(name, text, budget, quiet=False):
     insns = decode(text)
     blocks, edges = build_cfg(insns)
     loops = back_edges(blocks, edges)
-    name = os.path.basename(path)
 
     if loops:
         # PREVAIL proves each loop terminates and reports ONE aggregate bound
         # (max_loop_count) — not a per-loop map. Without a per-loop trip count we
         # cannot price a loop soundly, so refuse rather than guess.
-        print("REFUSE  %-26s loop back-edge at block %d — needs a proven trip "
-              "count (PREVAIL reports only an aggregate max_loop_count)"
-              % (name, loops[0][1]))
-        return 1
+        if not quiet:
+            print("REFUSE  %-26s loop back-edge at block %d — needs a proven trip "
+                  "count (PREVAIL reports only an aggregate max_loop_count)"
+                  % (name, loops[0][1]))
+        return ("REFUSE", len(insns), len(blocks), None)
 
     cycles = longest_path(blocks, edges)
     verdict = "ok    " if cycles <= budget else "REJECT"
-    print("%s  %-26s %3d insn · %2d blocks · longest path ~%4d cycles  (budget %d)"
-          % (verdict, name, len(insns), len(blocks), cycles, budget))
-    return 0 if cycles <= budget else 1
+    if not quiet:
+        print("%s  %-26s %3d insn · %2d blocks · longest path ~%4d cycles  (budget %d)"
+              % (verdict, name, len(insns), len(blocks), cycles, budget))
+    return (verdict.strip(), len(insns), len(blocks), cycles)
 
 
 def main(argv):
@@ -210,18 +332,15 @@ def main(argv):
     it = iter(argv[1:])
     for a in it:
         if a == "--budget": budget = int(next(it))
+        elif a == "--selftest": pass
         else: args.append(a)
     if not args:
-        here = os.path.dirname(os.path.abspath(__file__))
-        d = os.path.join(here, os.pardir, "shields")
-        args = sorted(os.path.join(d, f) for f in os.listdir(d)
-                      if f.endswith(".bpf.o")) if os.path.isdir(d) else []
-    if not args:
-        print("no .bpf.o inputs found"); return 0
+        return selftest()
     rc = 0
     for p in args:
         try:
-            rc |= gate(p, budget)
+            verdict = gate(p, budget)[0]
+            if verdict != "ok": rc = 1
         except Exception as e:
             print("ERROR   %-26s %s" % (os.path.basename(p), e)); rc = 1
     return rc

@@ -225,7 +225,7 @@
   .swnote{margin:1rem 0 0; font-size:.9rem; color:var(--muted)}
   .swnote b{color:var(--ink)}
   .mode-obs .swnote .only-enf{display:none} .mode-enf .swnote .only-obs{display:none}
-  /* tmmtrace DSL grammar template */
+  /* dptrace DSL grammar template */
   .dsl{margin:1.4rem 0 0; display:grid; grid-template-columns:auto auto auto; gap:.45rem 1.6rem;
     justify-content:start; align-items:baseline; border:1px solid var(--line-2); border-radius:8px;
     background:var(--surface-2); padding:.9rem 1rem; overflow-x:auto}
@@ -340,7 +340,7 @@
   <section class="hero" id="hero" data-sec="hero">
     <p class="eyebrow">F5 TMM · design proposal</p>
     <h1>A <em class="sig">runtime, programmable, provably-safe</em> data plane.</h1>
-    <p class="sub"><b>Two clocks, running at very different speeds.</b> Vulnerability discovery and exploit tooling now move at machine speed; a data-plane release train moves in weeks, deliberately, because that cadence is what certification and quality discipline cost. The gap between those two clocks is the problem — not F5's release cadence, which is doing its job.
+    <p class="sub"><b>Two clocks, running at very different speeds.</b> Vulnerability discovery and exploit tooling now move at machine speed; a data-plane release train moves in weeks. That is under real pressure to compress, and compressing it is worth doing — but it cannot close this gap, because a build still has to be tested, certified, and then installed on the customer's maintenance window rather than ours. Whatever the train's cadence, a window remains, and the window is the problem.
       The data plane already flexes at its edges — a config push, a policy change, traffic logic in an iRule — but
       changing its <b>own code and behavior</b> has exactly one path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
@@ -488,7 +488,7 @@
       internal state out to userspace</em> — for discovery, root-cause analysis, debugging, and uses still to
       come — or treats it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
     <p><b>So how would you write one?</b> You write a few lines of C and compile with
-      <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>tmmtrace</b>, a proposed
+      <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>dptrace</b>, a proposed
       authoring front-end that emits the same bytecode: <em>bpftrace for TMM</em>. You describe
       the probe in a small, familiar language and it does the rest — <b>compile</b> to eBPF bytecode,
       <b>verify</b>, and, once <b>signed</b>, <b>attach</b> at the named hook. One line or a full multi-probe
@@ -496,7 +496,7 @@
     <p>And it <b>spans both planes</b> from one grammar: point a probe at a data-plane hook and it runs in TMM's
       embedded VM; point it at a control-plane daemon and it rides kernel eBPF — one language for the whole box.
       Each probe is <b>three parts</b>:</p>
-    <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
+    <div class="dsl" aria-label="dptrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
       <span class="dslpart act">{ action }</span>
@@ -509,7 +509,7 @@
 
     <div class="switchwrap" id="switch">
       <div class="switchhead">
-        <span class="lbl">tmmtrace · one hook, two modes</span>
+        <span class="lbl">dptrace · one hook, two modes</span>
         <div class="seg" role="group" aria-label="Choose mode">
           <button class="obs" id="obsBtn" aria-pressed="true">observe</button>
           <button class="enf" id="enfBtn" aria-pressed="false">act</button>
@@ -554,8 +554,8 @@
       <b>programmability and observability</b> inside a black box:</p>
     <ul class="unlocks">
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
-        kernel-bypassed data plane — summarized with <span class="mono">tmmtrace</span> (<em>bpftrace for TMM</em>)
-        or captured byte-for-byte with <span class="mono">tmmdump</span> (<em>tcpdump for TMM</em>).</li>
+        kernel-bypassed data plane — summarized with <span class="mono">dptrace</span> (<em>bpftrace for TMM</em>)
+        or captured byte-for-byte with <span class="mono">dpdump</span> (<em>tcpdump for TMM</em>).</li>
       <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev — a
         metric you didn't think to collect, or reading internal load to nudge a knob.</li>
       <li><b>In-path control.</b> Steer, sample, rate-limit, or gate a flow on an internal signal — the decision
@@ -654,7 +654,7 @@
       </tbody>
     </table></div>
     <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier; the data plane is the crown
-      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">tmmtrace</span>
+      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">dptrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
       kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
       engines, one trust path. (Not one binary for both: a different engine means a different

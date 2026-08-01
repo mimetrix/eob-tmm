@@ -11,6 +11,8 @@
 >
 > The ask currently under review is a **feasibility phase**: measure the hook cost, stand up the verifier and VM path, and prove one shield end to end. **Nothing on this page is being requested, funded, or scheduled by that ask** — no fleet model, no federated training, no data product, no external feed. It is written down for two narrow reasons: so the hook and `ctx` design is not accidentally foreclosed by decisions made for the shield alone, and so the data-governance questions are visible early rather than discovered late.
 >
+> One consequence worth stating outright, since this page names tooling freely: **everything it builds on is proposed and unbuilt** — the hooks, the `ctx` catalog, the egress ring, and the `dptrace` DSL front-end it cites in Tiers 2–3 (a **placeholder name for a proposed utility**; `tmm-usdt-tracepoints.md` §1). Nothing in this repo runs a program, drains a ring, or answers a query.
+>
 > **Two pieces here do not depend on the model story at all**, and stand on their own even if nothing else on this page is ever built:
 >
 > - **§4 Tier 1 and §6 — API discovery, which needs no model.** Deterministic aggregation over structural `ctx`, in observe mode. It is an existing product category and a coherent second use case for the same hooks.
@@ -95,7 +97,7 @@ The learn node isn't one model; it's a tier, and the right technique shifts with
 |---|---|---|
 | **On-box** (control plane) | **SLM** — compact scorers: distilled small transformers, gradient-boosted trees, streaming anomaly detectors | real-time scoring of the live feature stream; arm / parameterize monitor programs; self-tuning decisions — **no fleet round-trip, data stays local** |
 | **Fleet** | **Foundation model** — larger, trained **federated** on aggregated features | learn cross-tenant / per-industry norms and representations; ship distilled task heads + model updates back down to every box |
-| **Human-facing** (heavier, likely off-box) | **LLM** — generative | RCA narratives; `tmmtrace` natural-language → verified probe; and — via the shield pipeline — drafting candidate verified programs (the *act* arrow), **human-gated and verifier-admitted** |
+| **Human-facing** (heavier, likely off-box) | **LLM** — generative | RCA narratives; natural-language → verified probe via the proposed `dptrace` front-end; and — via the shield pipeline — drafting candidate verified programs (the *act* arrow), **human-gated and verifier-admitted** |
 
 **By supervision — mostly unsupervised early, by necessity:**
 
@@ -115,13 +117,13 @@ The learn node isn't one model; it's a tier, and the right technique shifts with
 - **Encrypted-blind-spot detection** — beaconing periodicity, exfil entropy, malware staging visible only in *decrypted server-side* streams — signals NDR physically cannot see.
 
 **Tier 2 — small on-box model (SLM):**
-- **RCA copilot** — reads the flight-recorder ring + tmmtrace histograms on an incident, writes the root-cause narrative, and *proposes the next probe to load* to confirm it.
+- **RCA copilot** — reads the flight-recorder ring + `dptrace` histograms on an incident, writes the root-cause narrative, and *proposes the next probe to load* to confirm it.
 - **Self-tuning** — features → predicted optimal knobs (buffer sizing, LB weights, reuse policy) per-tenant per-time-of-day; verified programs **recommend** them as scalars and the host's controller applies them within sanctioned bounds — the program never writes host config.
 
 **Tier 3 — fleet-scale foundation model (the factory):**
 - **F5 Traffic Foundation Model** — trained federated on anonymized fleet features; its value is realized **inside the product** — sharper detection, self-tuning, and pre-trained anomaly heads shipped back down to every box as *signed programs + model updates* that competitors cannot source the data to match.
 - **A stronger shield factory** — the AI-shield pipeline's false-positive oracle graduates from synthetic corpora to *real fleet traffic distributions*; fleet data makes machine-authored shields measurably safer. (The security and data theses reinforce each other.)
-- **tmmtrace copilot** — plain English → verified probe, grounded on the signed hook-point map; democratizes the surface to any SE or support engineer.
+- **`dptrace` copilot** — plain English → verified probe, grounded on the signed hook-point map; democratizes the surface to any SE or support engineer.
 - **Scoped exposure reports** — computed in-situ and surfaced as a *box capability*. Not an attested negative: "no PAN crossed this boundary unencrypted" is a claim the box cannot support, because §1's coverage bounds (offload, FastL4, pass-through, non-terminated UDP) plus any sampling divisor mean it does not see every flow, and a negative over unobserved traffic is not evidence of anything. The supportable form is a **scoped positive**: *"N flows inspected on virtual X between T1 and T2; zero class-Y matches; coverage caveats attached."* Statements *about* observed data rather than the data itself — and explicit about what was never observed.
 
 > **Where the value is captured — the product first.** The compounding advantage is a **better proxy**: fleet intelligence that makes every F5 box detect more, tune itself, and gain capabilities no competitor can source the data to match. **Selling the raw intelligence as an external data feed is a secondary, optional, and fraught path** — it commoditizes the edge, drags F5 into the regulated-data-broker business, and competes with the security vendors and customers F5 sells through. Capture the value in the product; treat any external data offering as a deliberate, later choice, not the plan.
@@ -188,7 +190,7 @@ Most of the pipeline (§3.1) assembles from mature, permissively-licensed open s
 
 | Stage | Reuse (open source) | Build (net-new) |
 |---|---|---|
-| **Sense** | uBPF + PREVAIL (VM + verifier), clang/LLVM + libbpf/BTF (compile, typed CO-RE), Apache DataSketches / t-digest (HLL, count-min, quantiles), Feast (feature store) | the **verified in-situ extractor** + `tmmtrace` DSL, the signed TMM hook-point map + `ctx`/BTF, and the **host-owned schema-checked one-way sink** (§2 mechanism 2) |
+| **Sense** | uBPF + PREVAIL (VM + verifier), clang/LLVM + libbpf/BTF (compile, typed CO-RE), Apache DataSketches / t-digest (HLL, count-min, quantiles), Feast (feature store) | the **verified in-situ extractor** + the `dptrace` DSL, the signed TMM hook-point map + `ctx`/BTF, and the **host-owned schema-checked one-way sink** (§2 mechanism 2) |
 | **Learn** | PyTorch / JAX (training), PyOD · River · XGBoost (anomaly, SLM), HuggingFace Transformers (sequence SSL), Flower or NVIDIA FLARE (federated) + Opacus (DP), ONNX Runtime · llama.cpp (on-box inference) | the **protocol-event feature schema & self-supervised objective**, federation bound to the *proof-confined* sensor, and the model-registry → signed-program bridge |
 | **Act** | PREVAIL (reuse the gate), clang/LLVM, Sigstore/cosign + in-toto + TUF (sign, attest, distribute), Outlines · llguidance (grammar-constrained LLM output) | the **model-output → DSL candidate** synthesis, the **verifier-as-oracle refine loop**, and the **lifecycle engine** (observe-first, catalog, auto-retire, kill-switch) |
 

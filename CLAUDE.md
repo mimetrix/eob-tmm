@@ -1,7 +1,9 @@
 # Working conventions — eob-tmm
 
 Guidance for Claude Code sessions and contributors working in this repo. This repo holds design
-proposals, PoC code, and visual explainers for the embedded-eBPF-in-TMM proposal.
+proposals, candidate ABI artifacts, and visual explainers for the embedded-eBPF-in-TMM proposal.
+There is deliberately **no prototype**: an earlier relay named for TMM invited the wrong question and
+was removed. Nothing in this repo executes a shield, and no claim should imply otherwise.
 
 ## 1. The git repo is the system of record — publishing to claude.ai needs explicit approval
 
@@ -47,7 +49,7 @@ helps. Current set: the programmable-data-plane **engine**, **CVE mitigation** (
 ## 4. IP / disclosures
 
 Patent and invention-disclosure artifacts stay **out of this repo** (gitignored). Only papers,
-design docs, and PoC code belong here. Novel method & claims are referenced as living in a separate
+design docs, and candidate artifacts belong here. Novel method & claims are referenced as living in a separate
 disclosure — never included by path or content.
 
 ---

@@ -2,7 +2,7 @@
 
 ### A proposed set of designed-in hook points for TMM — USDT-style tracepoints plus filter-capable decision points — consumed by the embedded userspace-eBPF VM. Observability, debug & RCA are the primary lens here; CVE shields, steering, and self-tuning are **peer consumers of the same hooks**. The engine is generic; the shield is one application.
 
-**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`prototype/tmmtrace`](prototype/tmmtrace) (the front-end)
+**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`substrate/`](substrate/) (candidate ABI artifacts + checkers — **not** a running prototype)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
 
 ---
@@ -30,13 +30,22 @@ The engine is generic; the shield is one application on top of it. The reason a 
 - **No helpers, no verifier *extension* — stock PREVAIL under its existing `tracing` program type.** A program is a pure function of `ctx` (read fields → return a value); the host owns all state and effects. So a new hook needs **no eBPF helper** and **no verifier extension**: PREVAIL already proves the canonical case — a bounded predicate over a fixed-width `ctx` — and Phase 1 rides its existing `tracing` type (12 `u64` args, nothing dereferenced) so there is **no fork in the trust path**. PREVAIL has no `--program-type` switch; a *named* TMM program type is a patch set with a per-release rebase cost, which we deliberately have not taken. It will also reject plenty of predicates that are bounded in principle (awkward loop shapes, unresolved pointer arithmetic) — write to the canonical case. The `ctx`/program-type descriptor is the real, bounded work (`engine-hard-problems.md` §2). Adding a hook is then: *define its `ctx`, place the hook, publish it in the hook-point map.*
 - **Incremental.** Each subsystem owner can instrument their own code in a normal release. The surface grows over time; every new `ctx` field widens what can be **observed, enforced, steered, or distilled into signal** (a hook can only act on what its `ctx` exposes).
 
-> **Consuming a hook.** A few lines of C compiled with `clang -target bpf` — or the `tmmtrace` one-liner
-> convenience: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
-> `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** authors an
+> **Consuming a hook.** A few lines of C compiled with `clang -target bpf` — or, with a DSL front-end,
+> a one-liner convenience: `dptrace list 'tmm:l7:*'` to discover, then e.g.
+> `dptrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** would author an
 > acting program — a `filter`/drop shield, a steer, a sampler — by swapping the action verb; observe and act
 > share the machinery (design §6.1, `big-ip-live-shield-design.md`).
 
-**Two companion utilities.** `tmmtrace` is the *summary* consumer — bpftrace-for-TMM: counters, histograms, predicates, shields. `tmmdump` (proposed) is the *capture* consumer — tcpdump-for-TMM: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both are thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
+**Two companion utilities — both proposed, neither built.** `dptrace` would be the *summary* consumer — bpftrace-for-the-data-plane: counters, histograms, predicates, shields. `dpdump` would be the *capture* consumer — tcpdump-for-the-data-plane: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both would be thin front-ends over the same in-process VM: **`dptrace : bpftrace :: dpdump : tcpdump`**.
+
+> **On the names, and on what exists.** `dptrace` and `dpdump` are **placeholder names for proposed
+> utilities** — nothing by either name exists, here or in any product, and no invocation shown in this
+> document has ever been run. They are written in imperative CLI form because that is the clearest way to
+> specify an interface, not because there is a binary behind it. Names are deliberately kept free of
+> `tmm` so they are not mistaken for existing TMM components; final naming is a product decision. The
+> tracepoint *namespace* (`tmm:<stage>:<event>`, §2) does keep the `tmm` prefix — it names hooks in TMM,
+> which is exactly what it should say. Every example invocation and every field name below is a **proposal**
+> against a hook-point catalog that is itself proposed.
 
 ## 2. Conventions
 
@@ -174,7 +183,7 @@ One hook cannot honestly carry both rate classes.
 The catalog above is raw signal. These are the **reusable patterns** that turn it into named RCA capabilities — each built from the same observe machinery — no helpers, no verifier *extension* (stock PREVAIL under its existing `tracing` program type; the `ctx` descriptor is the real, bounded work).
 
 ### 10.1 Flight recorder (the run-up *into* a fault)
-A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and dumped on a trigger** (an error-branch tracepoint, a watchdog, a stall). Yields the state leading *into* the failure — the blind spot a post-crash core dump can't give you. Because the ring is shm-backed it **usually survives** a data-plane crash and can be drained post-mortem (with the honest caveat that a memory-safety fault may have scribbled the ring on its way down; see [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md)). *Two coordinated hooks: one records, one trips.* (Worked in the prototype: the observe-mode flight recorder + `ctl flightrec`; substrate §3.1.)
+A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and dumped on a trigger** (an error-branch tracepoint, a watchdog, a stall). Yields the state leading *into* the failure — the blind spot a post-crash core dump can't give you. Because the ring is shm-backed it **usually survives** a data-plane crash and can be drained post-mortem (with the honest caveat that a memory-safety fault may have scribbled the ring on its way down; see [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md)). *Two coordinated hooks: one records, one trips.* (**Proposed, not demonstrated in this repo** — no artifact here records, trips, or drains such a ring; the pattern is specified in substrate §3.1 and in [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).)
 
 - **Per-context ring** — recent state for the active flow, dumped on that flow's error branch.
 - **Global tripwire** — cross-cutting state (poll jitter, pool pressure), dumped on `tmm:rt:poll_stall` / `tmm:rt:watchdog`.
@@ -189,9 +198,9 @@ Arm `tmm:l7:parse_error` / `tmm:tls:decrypt_err` / `tmm:plugin:degrade` as **con
 A narrowly-scoped observe program targeting the *exact* hook + condition behind an intermittent field issue, **signed, shipped, loaded read-only, captured, then pulled** — with context minimization, a one-way audited sink, and auto-retirement (substrate §3.1). Turns "ship a debug build and wait for it to recur" into "load signed bytecode for a while." Reaches in-TMM state logs and iRules can't.
 
 ### 10.5 Combined play — enforce **and** capture
-Pair a `filter` shield with a flight recorder on the *same* condition (e.g. `tmm:l7:parse_error`): the malformed frame is **dropped** (data plane survives) *and* the run-up into the blocked attempt is **captured**. Every block becomes an intelligence source for SIRT. Be careful to claim only half of what that sounds like, though: a capture of **blocked** attempts is strong evidence for "are these real attacks?" and no evidence at all for "is it breaking legitimate traffic?" — the second half needs monitor-mode data over a legitimate-traffic corpus, where the predicate runs and is counted without acting. The two questions need two different datasets, and only one of them comes from enforcing. (Worked in the prototype: `LS_FLIGHTREC=1`.)
+Pair a `filter` shield with a flight recorder on the *same* condition (e.g. `tmm:l7:parse_error`): the malformed frame is **dropped** (data plane survives) *and* the run-up into the blocked attempt is **captured**. Every block becomes an intelligence source for SIRT. Be careful to claim only half of what that sounds like, though: a capture of **blocked** attempts is strong evidence for "are these real attacks?" and no evidence at all for "is it breaking legitimate traffic?" — the second half needs monitor-mode data over a legitimate-traffic corpus, where the predicate runs and is counted without acting. The two questions need two different datasets, and only one of them comes from enforcing. (**Proposed, not demonstrated in this repo**: arming two programs on one condition is a lifecycle-engine behavior nothing here implements.)
 
-### 10.6 Targeted data capture / streaming — `tmmdump`
+### 10.6 Targeted data capture / streaming — `dpdump`
 Sometimes you don't want a summary, you want **the actual bytes** traversing the proxy. Be precise about what already exists here, because a TMM engineer will be: BIG-IP implements **its own capture path**, so `tcpdump -i 0.0` works today, the `:p`/`:n`/`:0.0` suffixes give pre- and post-TMM views of the same flow, and `tcpdump --f5 ssl` exports the session secrets needed to decrypt it offline. What a packet tap at the **interface boundary** cannot give you is **post-parse, post-decrypt state at an arbitrary internal hook** — the parser state variable that was set when the frame was rejected, the header-table size, the plugin queue depth — *alongside* the bytes and correlated to them by construction. That tap has to be **in-process, where the VM already sits.** But the single-threaded, core-pinned poll loop forbids bulk work inline, so the division of labor is strict:
 
 > **The VM selects. The host streams. Nothing blocks the poll loop.**
@@ -207,12 +216,12 @@ Levers that keep it tractable: **target** (one flow, not all), **sample** (1-in-
 
 **Payoff:** in-process at L7 means **decrypted** application data — post-TLS content a wire tap can only reach by exporting the session secrets (`tcpdump --f5 ssl`, which the box will do for you today), which is precisely why the in-process path sits at the **strictest authorization tier** instead: signed, RBAC-gated, redact-by-default, time-boxed, one-way audited sink (substrate §6.3). "Vendor streams my decrypted traffic" is a non-starter *without* that governance.
 
-**`tmmdump`** is the proposed utility — `tmmtrace : bpftrace :: tmmdump : tcpdump`, both over the in-process VM:
+**`dpdump`** is the proposed utility — `dptrace : bpftrace :: dpdump : tcpdump`, both over the in-process VM. The invocations below are an **interface sketch for a tool that does not exist** (§1, placeholder names):
 
 ```
-tmmdump --hook tmm:l7:http_request --filter 'args.method == POST' --snap 256 --ttl 5m --sink file
-tmmdump --flow 10.0.0.5:443 --decrypted --snap 512      # decrypted L7 — strict authz tier
-tmmdump --hook tmm:tls:record --headers-only            # bounded window, no payload
+dpdump --hook tmm:l7:http_request --filter 'args.method == POST' --snap 256 --ttl 5m --sink file
+dpdump --flow 10.0.0.5:443 --decrypted --snap 512      # decrypted L7 — strict authz tier
+dpdump --hook tmm:tls:record --headers-only            # bounded window, no payload
 ```
 
 Two things about that syntax, so it isn't read as more than it is. **`--flow` is a host-side pre-filter, not a
@@ -222,7 +231,7 @@ and the program compares hashes. And a bare symbol like `POST` resolves against 
 `ctx` field in the per-build hook map** — there is no implicit vocabulary; a field with no declared enum is
 compared as a number.
 
-The VM program is the **selector** (verified inline); `tmmdump` (the host) owns the bounded copy + off-loop export. It is deliberately distinct from `tmmtrace`'s scalar summaries — heavier, governed, capture-oriented. *(Proposed; the prototype's shm-backed `head[]` ring is the working seed of the copy-and-drain path.)*
+The VM program is the **selector** (verified inline); `dpdump` (the host) owns the bounded copy + off-loop export. It is deliberately distinct from `dptrace`'s scalar summaries — heavier, governed, capture-oriented. *(Proposed. The copy-and-drain path it depends on is specified in [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) and is likewise unbuilt — a written ring protocol, not a measured one.)*
 
 ---
 

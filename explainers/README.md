@@ -18,7 +18,7 @@ programmability surface it is.
 - [`../development-scope-code.md`](../development-scope-code.md) — a candidate code skeleton per item, with real/stubbed/TODO marked.
 - [`../design-review-findings.md`](../design-review-findings.md) — three architect reviews and their dispositions, including the findings that changed the design.
 - [`../engine-hard-problems.md`](../engine-hard-problems.md) · [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) · [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) — the long-form docs these pages are distilled from.
-- [`../prototype/`](../prototype/) — a working relay with a synthetic CVE, a designed-in hook, and a PREVAIL gate that rejects a deliberately-unsafe program.
+- [`../substrate/`](../substrate/) — the candidate ABI artifacts and their checkers: a header whose `_Static_assert`s pin the loader message's wire layout, a hook-map schema, an admission-time budget pass with a self-test, and a check that fails the build if the safe-return two-gate rule regresses. **Not a running prototype — nothing in this repo executes a shield.**
 
 ## Canonical sources
 
@@ -28,8 +28,8 @@ these is the thing that's wrong.
 | Fact | Defined in |
 |---|---|
 | The host-owned outcome set | [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) §2 |
-| Hook-map schema | [`../prototype/substrate/hook_map.schema.json`](../prototype/substrate/hook_map.schema.json) |
-| Loader ABI + wire layout | [`../prototype/substrate/shield_abi.h`](../prototype/substrate/shield_abi.h) (compiles; asserts its own offsets) |
+| Hook-map schema | [`../substrate/hook_map.schema.json`](../substrate/hook_map.schema.json) |
+| Loader ABI + wire layout | [`../substrate/shield_abi.h`](../substrate/shield_abi.h) (compiles; asserts its own offsets) |
 | Per-item scope, ranked by how far the original sizing was off | [`../design-review-findings.md`](../design-review-findings.md) §5 |
 | Scope of the whole (subsystem, not a feature) | [`../engine-hard-problems.md`](../engine-hard-problems.md) §6.1 · [`../design-review-findings.md`](../design-review-findings.md) §5 |
 

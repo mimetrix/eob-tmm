@@ -12,8 +12,8 @@ hard — this doc covers *what gets written, where it runs, and how often*.
 The organizing fact: **nothing on this list recurs per CVE except the shield program itself** (a
 few lines of C). Everything else is written once or generated automatically per build.
 
-**The honest size, up front.** A defensible v1 on two CPU architectures is **50–80
-subsystem-scale work, not a feature**, plus the TMA and the
+**The honest size, up front.** A defensible v1 on two CPU architectures is **subsystem-scale
+work, not a feature**, plus the TMA and the
 certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item
 *list* below is right; the size classes in §6 are shape, not effort, and reviewed against what each
 item actually requires they are low — in several cases badly, and two of the largest items were missing altogether. `design-review-findings.md` §5 ranks them rather than pricing them. Earlier drafts of this doc described the whole
@@ -23,9 +23,8 @@ process, with its own build-pipeline toolchain and a permanent per-build ABI.
 
 **Candidate code for every day-one item** (1–12 plus the shield program) is in
 [`development-scope-code.md`](development-scope-code.md) — one skeleton per item, each with an
-explicit real / stubbed / TODO breakdown. The two artifacts worth having as real files rather than
-blocks live in [`prototype/substrate/`](prototype/substrate/) and are verified by
-`make -C prototype/substrate check`.
+explicit real / stubbed / TODO breakdown. The artifacts worth having as real files rather than
+blocks live in [`substrate/`](substrate/) and are verified by `make -C substrate check`.
 
 ---
 
@@ -33,16 +32,22 @@ blocks live in [`prototype/substrate/`](prototype/substrate/) and are verified b
 
 | Component | Role | License | Status |
 |---|---|---|---|
-| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | proven in the prototype (`ubpf_create` / `ubpf_load_elf` / `ubpf_exec` — the **interpreter**; the prototype never calls `ubpf_compile`, so the JIT path is unexercised). Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
-| **PREVAIL** | the static verifier | MIT **+ Apache-2.0** (the clone ships both `LICENSE` files, plus `external/{CLI11,bpf_conformance,libbtf}`; the SBOM/license scan is a Phase-1 gate per `big-ip-live-shield-design.md` §13) | proven in the prototype's verify-gate track |
+| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | the calls item 3 is built on are the library's **real public API**, not invented for this proposal: `ubpf_create` / `ubpf_load_elf` / `ubpf_exec` (`vm/inc/ubpf.h:129, 458, 510` in the gitignored `ubpf/` clone), with `ubpf_compile` (`:553`) as the JIT path. **No runnable demonstration ships in this repo** — read this cell as an API-surface claim, checkable against uBPF's own header, and *not* as evidence that the load-and-run path has been stood up. Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
+| **PREVAIL** | the static verifier | MIT **+ Apache-2.0** (the clone ships both `LICENSE` files, plus `external/{CLI11,bpf_conformance,libbtf}`; the SBOM/license scan is a Phase-1 gate per `big-ip-live-shield-design.md` §13) | stock, driven as a CLI invocation — `-q [--section <s>]` (`src/main.cpp:65, 74`). **No verify gate is demonstrated in this repo.** O3 in [`design-review-findings.md`](design-review-findings.md) records the ctx-model limit that any future demonstration has to clear, and it is a property of PREVAIL, not of any one harness |
 | **clang** | C → eBPF bytecode | — | standard toolchain |
 
-Nobody at F5 writes a VM, a verifier, or a compiler. The prototype ([`prototype/`](prototype/))
-already demonstrates the load-and-run half of the loader with the real uBPF API — via the
-interpreter, which is also why the JIT's own properties (item 15's fuel, and its unprobed 4 KiB
-stack frame) are still open questions rather than measured ones. The one exception to "reused
-as-is" is item 15's back-edge-fuel patch to uBPF's JIT: a bounded, upstreamable change to a
-component otherwise taken whole, not a rewrite.
+Nobody at F5 writes a VM, a verifier, or a compiler. **What this repo no longer shows is that any of
+it runs.** An earlier revision carried a prototype — a small relay that loaded and ran a shield
+through the real uBPF API, plus a verify-gate track that invoked PREVAIL — and this paragraph cited
+it as demonstrating the load-and-run half of item 3. That prototype has been removed, and the
+demonstration went with it. The reuse argument above now rests on the two upstream projects' public
+APIs, which any reviewer can read for themselves; it no longer rests on anything executable here.
+So: "reused, not written" stands, and **"already works in our hands" is not currently shown** — a
+real loss of evidence, and the honest way to state the reuse case until something runnable is stood
+up again. The JIT's own properties (item 15's fuel, its unprobed 4 KiB stack frame) were open
+questions before and remain so; they were never measured even while the prototype existed, because
+it ran the interpreter. The one exception to "reused as-is" is item 15's back-edge-fuel patch to
+uBPF's JIT: a bounded, upstreamable change to a component otherwise taken whole, not a rewrite.
 
 ---
 
@@ -94,11 +99,11 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    (`void`/benign)" is precisely the inversion this now blocks.
    **This is enforced in code, not asserted in prose:** `enum shield_skippable` is gate 1 and sits
    ahead of `kind` in `struct shield_sr_policy`, `shield_sr_enforce_capable()` requires both gates
-   ([`prototype/substrate/shield_abi.h`](prototype/substrate/shield_abi.h)),
-   [`check_sr_gates.c`](prototype/substrate/check_sr_gates.c) asserts five cases — including the
+   ([`substrate/shield_abi.h`](substrate/shield_abi.h)),
+   [`check_sr_gates.c`](substrate/check_sr_gates.c) asserts five cases — including the
    `void` + unanalysed case the retired model accepted — and
-   [`hook_map.schema.json`](prototype/substrate/hook_map.schema.json) requires `skippable` alongside
-   `kind`. `make -C prototype/substrate check` fails on regression. The residual work is partly
+   [`hook_map.schema.json`](substrate/hook_map.schema.json) requires `skippable` alongside
+   `kind`. `make -C substrate check` fails on regression. The residual work is partly
    tooling, partly one-time human annotation; the honest v1 hand-audits a short candidate list
    rather than trusting a tool to prove absence of side effects across TMM.
 
@@ -116,8 +121,10 @@ Conventional engineering — no novel machinery.
 8. **Budget pass** *(step 8; hard-problems §1)* — admission-time cost estimator + gate: CFG
    longest-path over the verified bytecode → a cycle *estimate*, compared against the hook's
    per-invocation budget. A build artifact, off the data path; fail-closed. Real code:
-   [`prototype/substrate/budget_pass.py`](prototype/substrate/budget_pass.py). It is an estimate,
-   not a WCET bound — which is why item 15's fuel is the enforcement half and is day one.
+   [`substrate/budget_pass.py`](substrate/budget_pass.py), exercised by `make -C substrate check`
+   against a **built-in self-test** — six hand-assembled programs in a synthesized ELF, since this
+   repo ships no compiled shield objects for it to price. It is an estimate, not a WCET bound —
+   which is why item 15's fuel is the enforcement half and is day one.
 9. **Signing-service integration** *(step 9)* — the binding format
    (`prog hash · hook · build range · mode ceiling · expiry`) wired into F5's existing
    HSM-backed release-signing flow. New manifest, existing infrastructure.
@@ -150,8 +157,13 @@ Conventional engineering — no novel machinery.
     with no fork.
 16. **Canary auto-unload** — health-metric-driven auto-revoke (verified ≠ correct;
     hard-problems §4).
-17. **tmmtrace** — the bpftrace-style authoring DSL. Convenience front-end only; emits the same
-    bytecode the C path produces.
+17. **Authoring DSL** — a bpftrace-style one-liner front-end, **proposed and unbuilt**. Convenience
+    only: it emits the same bytecode the C path produces, so it adds no capability and carries no
+    security surface of its own. An earlier revision of this list described it as already existing as
+    working code, citing a prototype front-end that has since been removed; nothing of it survives in
+    this repo, and it is a follow-on scope item like the rest of this tier. It is deliberately left
+    unnamed here — the removed tool's name read as a shipped TMM component and caused exactly that
+    confusion.
 
 ## 5. Recurring cost — per CVE, forever
 

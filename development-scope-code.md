@@ -5,15 +5,15 @@
 > An earlier framing of this file was "so 'hundreds of lines, not subsystems' can be checked." That
 > claim is **retired** ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1): the item *list*
 > is right, the sizes were low — in several cases badly — and the subsystem being added is a code-patching,
-> live-text, dynamic-code-loading facility inside the crown-jewel process — **50–80
-> subsystem-scale work, not a feature** for a defensible v1 on two architectures. What these skeletons still do,
+> live-text, dynamic-code-loading facility inside the crown-jewel process — **subsystem-scale
+> work, not a feature** for a defensible v1 on two architectures. What these skeletons still do,
 > and all they do, is show the *shape* of each item and mark honestly where reuse ends.
 
 **Status:** Candidate code for review — **not TMM source**
 **Companion:** [`development-scope.md`](development-scope.md) (the item list this follows, 1:1) ·
 [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the canon; step
 numbers below refer to its build steps 1–4 and CVE-day steps 5–13) ·
-[`prototype/substrate/`](prototype/substrate/) (the two artifacts here that are real files) ·
+[`substrate/`](substrate/) (the artifacts here that are real files) ·
 [`engine-hard-problems.md`](engine-hard-problems.md) (why the flagged items are hard)
 **Audience:** TMM core engineering — the people who would have to write this
 
@@ -43,26 +43,40 @@ Three standing rules for everything below:
    back-edge fuel (item 15, a uBPF JIT patch, day one). And "memory-safe" does not mean "cannot
    write its `ctx`": PREVAIL permits ctx writes, which is why item 1's `ctx` is a per-core **copy**.
 
-Two of these artifacts are worth having as **real files** rather than blocks, because their value is
-that they compile and validate — they live in [`prototype/substrate/`](prototype/substrate/) and are
-*referenced* here rather than re-printed, so the two can't drift:
+Some of these artifacts are worth having as **real files** rather than blocks, because their value is
+that they compile and validate — they live in [`substrate/`](substrate/) and are *referenced* here
+rather than re-printed, so the two copies can't drift:
 
-- [`prototype/substrate/shield_abi.h`](prototype/substrate/shield_abi.h) — `struct shield_msg`,
+- [`substrate/shield_abi.h`](substrate/shield_abi.h) — `struct shield_msg`,
   `struct shield_binding`, `struct shield_sr_policy`, `struct hook_slot`, `shield_jit_fn`, the
   `SHIELD_ERR_*` codes, the mode/verdict/disposition enums. Compiles; its `_Static_assert`s pin the
   message's wire layout.
-- [`prototype/substrate/hook_map.schema.json`](prototype/substrate/hook_map.schema.json) — the hook
-  map item 5 emits and items 6–8 consume. The prototype's existing
-  [`hook-point-map.json`](prototype/hook-point-map.json) validates against it.
+- [`substrate/hook_map.schema.json`](substrate/hook_map.schema.json) — the hook
+  map item 5 emits and items 6–8 consume. The example instance
+  [`substrate/hook-point-map.json`](substrate/hook-point-map.json) validates against it, and
+  `check_offsets.py` compiles that instance's declared `ctx` offsets against the header they describe
+  ([`substrate/example_hook_ctx.h`](substrate/example_hook_ctx.h)).
 
 ```bash
-make -C prototype/substrate check
+make -C substrate check
 ```
+
+**What this repo does and does not execute.** Everything under `substrate/` really runs, and
+`make -C substrate check` is the whole of it: header and wire-layout asserts, the safe-return gate
+cases, the schema, the offset check, and the budget pass over its own self-test. All of it is
+**build- and admission-time** material. An earlier revision of this repo also carried a prototype — a
+relay that loaded and ran a shield through uBPF and drove PREVAIL as a verify gate — and several
+sections below cited it as evidence that the load-and-run path worked. **That prototype has been
+removed and nothing replaces it**, so no claim of the form "this runs today" survives anywhere in this
+file. Each place one used to stand now says so explicitly. The skeletons are unchanged in substance;
+what changed is that they are now candidates only, with no executable counterpart.
 
 ## Naming reconciliation
 
 These skeletons are the first place all twelve items share one namespace, so the spellings already
-committed across the docs and the prototype have to be reconciled once, here. **Nothing committed
+committed across the docs — and, while it existed, the prototype — have to be reconciled once, here.
+The `ls_*` spellings below came from that prototype and are retained as **retired** entries: they
+record where a divergence came from, and no longer name anything in this repo. **Nothing committed
 was rewritten to produce this table** — where a divergence exists, this is the resolution used
 below, and the small doc tidies that would unify things are listed at the end for separate
 approval.
@@ -70,13 +84,13 @@ approval.
 | Concept | Already committed as | Used below |
 |---|---|---|
 | program result | `verdict` (walkthrough trampoline), `ret`/`r` (egress §5.3), `&ret` out-param (`ubpf_exec`) | **`verdict`** |
-| modes | `MONITOR`/`ENFORCE` bare, `MODE_MONITOR` (in `trampoline_arm`), lowercase `monitor` (CLI/JSON), `LS_MONITOR` (prototype) | **`MODE_DISABLE`/`MODE_MONITOR`/`MODE_ENFORCE`**; lowercase stays CLI/JSON only |
+| modes | `MONITOR`/`ENFORCE` bare, `MODE_MONITOR` (in `trampoline_arm`), lowercase `monitor` (CLI/JSON), `LS_MONITOR` (removed prototype — retired) | **`MODE_DISABLE`/`MODE_MONITOR`/`MODE_ENFORCE`**; lowercase stays CLI/JSON only |
 | skip-the-body | `SAFE_RETURN` (block), `SAFE-RETURN` (substrate prose) | **`SAFE_RETURN`** = `TRAMP_SAFE_RETURN` |
 | hook cost class | `path_class` (hook map, USDT catalog), `perf_class` (shield-object JSON) | **`path_class`** |
-| bytecode load | `ubpf_load` (walkthrough: raw bytecode), `ubpf_load_elf` (prototype: ELF object) | **both** — different calls; item 3 uses `ubpf_load_elf` because the signed artifact is an ELF, and says so |
+| bytecode load | `ubpf_load` (walkthrough: raw bytecode), `ubpf_load_elf` (uBPF's ELF-object entry point, `vm/inc/ubpf.h:458`) | **both** — different calls; item 3 uses `ubpf_load_elf` because the signed artifact is an ELF, and says so |
 | JIT'd program | `jit_fn(&ctx)` (walkthrough, one arg) | **`slot->fn(ctx, ctx_len)`** — uBPF's real signature is `uint64_t (*)(void *mem, size_t mem_len)`; the canon block elides `mem_len` |
 | loader ops | `LOAD · SET_MODE · STATUS · REVOKE` (bare) | **`SHIELD_OP_*`** — prefixed for C namespace hygiene; the bare names are the wire vocabulary |
-| the shield program | `int shield(struct ctx *c)` returning a predicate (walkthrough) and `int ls_ptlog_nullderef(struct ctx *c)` returning `LS_SAFE_RETURN`/`LS_PASS` (design §14) — one product form, two names for the same worked bug; `uint64_t ls_decision(void *data)` (prototype, uBPF's memory-arg form, what actually verifies today) | **the product form** for the shape, with the prototype form given alongside — see the last section |
+| the shield program | `int shield(struct ctx *c)` returning a predicate (walkthrough) and `int ls_ptlog_nullderef(struct ctx *c)` returning `LS_SAFE_RETURN`/`LS_PASS` (design §14) — one product form, two names for the same worked bug; `uint64_t ls_decision(void *data)` (the removed prototype's spelling of the memory-argument form uBPF's own `ubpf_exec`/JIT signature imposes — **nothing in this repo verifies or runs it**) | **the product form** for the shape, with the uBPF-signature form given alongside — see the last section |
 | the shield's ELF section | `SEC("tracing/…")` (design §14) | **`SEC("fentry/<hook>")`** — the section prefix *is* PREVAIL's type-selection mechanism, and `tracing/` is not one of the prefixes that selects the `tracing` type. See item 6 |
 
 ---
@@ -362,9 +376,13 @@ but every error path leaving the hook dark, plus expiry, teardown, and per-shiel
 /*
  * substrate/loader.c — handle one shield_msg, between poll-loop iterations.
  *
- * Sketch over uBPF's real API. Extends the prototype's ls_ubpf_init()
- * (prototype/minimm/minimm.c:156) with everything the prototype has no analog
- * for: signature, binding, hook map, arming, expiry, teardown.
+ * Sketch over uBPF's real API — ubpf_create / ubpf_load_elf / ubpf_compile, all
+ * in the library's own vm/inc/ubpf.h. An earlier revision of this file described
+ * this as extending a prototype relay's working init path; that prototype has
+ * been removed, so this skeleton now builds on nothing runnable in this repo.
+ * It is a candidate written against uBPF's published API, and everything the
+ * loader has to add around those three calls — signature, binding, hook map,
+ * arming, expiry, teardown — is unwritten.
  */
 #include "shield_abi.h"
 #include "ubpf.h"                                /* the real library           */
@@ -554,9 +572,9 @@ property, which is the load-bearing performance claim. `ExtendedJitMode` and `ub
 `(mem, mem_len, stack, stack_len)` signature are uBPF's real API
 (`ubpf/vm/inc/ubpf.h`); so is the basic JIT's unprobed `sub rsp, 4096` prologue
 (`ubpf/vm/ubpf_jit_x86_64.c`) that makes the extended form the right call here.
-**Real, and checkable:** [`prototype/substrate/shield_abi.h`](prototype/substrate/shield_abi.h) now
+**Real, and checkable:** [`substrate/shield_abi.h`](substrate/shield_abi.h) now
 carries the binding *inside* `struct shield_msg` (`binding` at offset 16, 112 bytes, `sizeof` 192, all
-pinned by `_Static_assert` and checked by `make -C prototype/substrate check`), so
+pinned by `_Static_assert` and checked by `make -C substrate check`), so
 `shield_binding_of()` is a real accessor rather than a function that could not be written. `epoch` is
 a top-level field at offset 4 and the signature covers `op · epoch · mode · prog_len · binding ·
 prog`. Note what is deliberately *absent*: there is no top-level `msg->hook` or `msg->expires_with`
@@ -577,8 +595,10 @@ into the header, because its `_Static_assert`s pin a wire layout other documents
 **Also TODO(f5):** the ISSU/upgrade hook for expiry; `SHIELD_MAX_SHIELDS`; the per-core program stack
 handed to `ubpf_jit_ex_fn`; and the real message plumbing (item 10) that gets a `shield_msg` here on
 every core, carrying the received datagram length with it.
-**Why this is "hundreds of lines":** the error returns above are the item. The prototype's equivalent
-is ~25 lines because it has no signature, no binding, no map, and no arming to get wrong.
+**Why this is "hundreds of lines":** the error returns above are the item. The removed prototype's
+equivalent was ~25 lines, because it had no signature, no binding, no map and no arming to get wrong
+— the contrast is still the point, but it is now a recollection rather than a diff a reviewer can
+run.
 
 ## Item 4 · Signature verification in TMM
 
@@ -666,7 +686,7 @@ int sig_verify(const struct shield_msg *msg, size_t datagram_len,
 **Real:** the check order — **bound the length**, hash the program, *then* verify the signature over
 the canonical form. Constant-time comparison for the digest. `shield_binding_of()` and the fields it
 reaches are real, `_Static_assert`-pinned members of
-[`shield_abi.h`](prototype/substrate/shield_abi.h).
+[`shield_abi.h`](substrate/shield_abi.h).
 **Stubbed:** `f5_verify_detached`, `f5_sha256`, `ct_equal`, `sig_payload_serialize`.
 **TODO(f5):** decide reuse-vs-new for the crypto path (strong preference: reuse); pin the algorithm
 and `SHIELD_SIG_MAX` accordingly — `shield_abi.h` currently sizes it for Ed25519 and says so;
@@ -690,7 +710,7 @@ makes them maintenance-free rather than a growing pile of hand-maintained metada
 > **step 3** · runs in the **build pipeline** · written **once** · **tool**
 
 Debug info in, signed hook map out. The schema it must satisfy is a real file:
-[`prototype/substrate/hook_map.schema.json`](prototype/substrate/hook_map.schema.json).
+[`substrate/hook_map.schema.json`](substrate/hook_map.schema.json).
 
 ```python
 #!/usr/bin/env python3
@@ -698,7 +718,7 @@ Debug info in, signed hook map out. The schema it must satisfy is a real file:
 hookmap_gen.py — emit this build's signed hook map from its debug info.
 
 Sketch. pyelftools and DWARF are real; every f5_* call is a stub.
-Output validates against prototype/substrate/hook_map.schema.json.
+Output validates against substrate/hook_map.schema.json.
 """
 import json, subprocess, sys
 from elftools.elf.elffile import ELFFile          # real: pyelftools
@@ -757,7 +777,7 @@ def emit(elf_path, build_id, tmos_version, allowlist):
                     "path_class": allowlist[name]["path_class"],
                     "enumerated_outcomes": allowlist[name]["outcomes"],
                     "arg_btf": fields,
-                    # product fields the prototype map does not carry yet:
+                    # product fields the example map in substrate/ does not carry yet:
                     "entry_offset": 0,                        # pad sits at +0
                     "patchable_pad_bytes": pad_bytes(elf_path, name),   # TODO(f5)
                     "budget_cycles": allowlist[name]["budget_cycles"],
@@ -880,10 +900,14 @@ def main(map_path, out_path):
 ```
 
 **Real:** PREVAIL's stock invocation, and the fact that what teaches it a ctx layout is a
-*descriptor* rather than a change to its analysis. The prototype already runs the gate — but only as
-`-q [--section <s>]` ([`prototype/minimm/minimm.c:137`](prototype/minimm/minimm.c)), so the printed
-line above is *not* "exactly what the prototype invokes today," and an earlier draft of this file
-that said so was wrong.
+*descriptor* rather than a change to its analysis. Both flags on the printed line are real options —
+`-q,--quiet` and `--section` (`ebpf-verifier/src/main.cpp:74,65`) — so it is checkable against
+PREVAIL's own source, which is the only place it can be sourced to now. Two things it is *not*: it is
+not a transcript of a run in this repo, and it is not the full set of flags a product gate needs (O4:
+`--termination` is off by default and must be passed explicitly). An earlier draft called this
+"exactly what the prototype invokes today" and cited a prototype relay's call site. That was wrong
+even then — the relay invoked only `-q [--section <s>]` — and the citation is dead now, because the
+prototype has been removed. **No verify gate runs in this repo at all.**
 **Not real — `--program-type` does not exist.** PREVAIL has no such option
 (`ebpf-verifier/src/main.cpp`); the type comes from the section-name prefix, matched against a
 compiled-in C++ table, fallback `socket_filter`. **So registering a TMM program type is a PREVAIL
@@ -900,8 +924,10 @@ patch," is all this needs. There are exactly two honest options, and the choice 
   **`tracing/` is not among them** (`ebpf-verifier/src/linux/linux_platform.cpp`; the string
   `"tracing"` appears there as the *type's* name, never as a section prefix). A shield emitted as
   `SEC("tracing/<hook>")` matches no prefix and therefore lands on the `socket_filter` fallback and
-  its 192-byte `__sk_buff` — silently, with a green verdict, which is the same trap the prototype's
-  verify gate currently sits in. Use `SEC("fentry/<hook>")`. The one adjacent prefix that *does*
+  its 192-byte `__sk_buff` — silently, with a green verdict. That is the trap the removed prototype's
+  verify gate sat in (O3 in [`design-review-findings.md`](design-review-findings.md)), and with the
+  prototype gone it is now a trap waiting for whatever gate replaces it rather than a defect anyone
+  can go look at. Use `SEC("fentry/<hook>")`. The one adjacent prefix that *does*
   read like its type is `tracepoint/`, which selects `tracepoint` (a `perf_max_trace_size` region),
   not `tracing`.
 - **Own a patch set** that registers a TMM program type with its own descriptor per `ctx_abi_version`
@@ -935,14 +961,14 @@ Two independent gates, in this order:
   1. SIDE EFFECTS — may this body be skipped at all?   (the dangerous question)
   2. RETURN VALUE — if so, what does the caller get?   (the easy question)
 
-Mirrors, field for field, the two enums in prototype/substrate/shield_abi.h:
+Mirrors, field for field, the two enums in substrate/shield_abi.h:
     enum shield_skippable   GATE 1: unanalysed (default, observe-only) | no | yes
     enum shield_sr_kind     GATE 2: none | void | zero | const
 and emits the `safe_return` object hook_map.schema.json now REQUIRES both keys of.
 The rule is not documentation any more: shield_sr_enforce_capable() demands both
-gates, and prototype/substrate/check_sr_gates.c asserts five cases — including
+gates, and substrate/check_sr_gates.c asserts five cases — including
 `void` + unanalysed, the case the retired return-type model accepted — so
-`make -C prototype/substrate check` fails on regression.
+`make -C substrate check` fails on regression.
 """
 ZERO_OK = {"int", "long", "unsigned int", "_Bool"}      # 0 = "did nothing, fine"
 
@@ -1025,10 +1051,10 @@ def v1_gate(policy, path_class, attacker_reachable):
 body with any caller-visible side effect is not skippable *whatever* it returns; a status-code return
 where zero means success is not safe-returnable; anything unanalysed or unannotated defaults to
 observe-only. Gate 1 is `enum shield_skippable` in
-[`shield_abi.h`](prototype/substrate/shield_abi.h), it sits *ahead of* `kind` in `struct
+[`shield_abi.h`](substrate/shield_abi.h), it sits *ahead of* `kind` in `struct
 shield_sr_policy`, `shield_sr_enforce_capable()` requires both gates, and
-[`check_sr_gates.c`](prototype/substrate/check_sr_gates.c) asserts five cases — `void` + unanalysed
-among them — so `make -C prototype/substrate check` fails if the retired return-type model creeps
+[`check_sr_gates.c`](substrate/check_sr_gates.c) asserts five cases — `void` + unanalysed
+among them — so `make -C substrate check` fails if the retired return-type model creeps
 back. `hook_map.schema.json` requires `skippable` alongside `kind` for the same reason.
 **Stubbed:** the `fn` dict's provenance — return type and signature come from DWARF, but every
 `DISQUALIFYING` flag and `caller_null_checked` need real analysis.
@@ -1073,7 +1099,7 @@ easy to get wrong, not as a specification.
 #!/usr/bin/env python3
 """
 budget_pass.py — THE SKETCH (superseded; kept for contrast). The working version
-is prototype/substrate/budget_pass.py.
+is substrate/budget_pass.py.
 
 Runs AFTER PREVAIL and BEFORE signing, so the signature attests that this gate
 ran. Off the data path entirely.
@@ -1149,17 +1175,33 @@ def gate(prog_path, hook, hook_map):
 # failure the working implementation exists to prevent.
 ```
 
-**This one is now real code, not a sketch.** [`prototype/substrate/budget_pass.py`](prototype/substrate/budget_pass.py)
+**This one is now real code, not a sketch.** [`substrate/budget_pass.py`](substrate/budget_pass.py)
 parses a genuine eBPF ELF, decodes the stream, builds the CFG and prices the longest path — no
-dependencies — and `make -C prototype/substrate check` runs it against the repo's own shield objects
-(after `make -C prototype/minimm ubpf` has built them: `prototype/shields/*.bpf.o` is gitignored, and
-on a fresh clone the budget check reports "no `.bpf.o` inputs found" and passes **vacuously**):
+dependencies. It used to be run against three clang-built shield objects that lived in the prototype;
+**those objects are gone with it, and the cycle counts they produced (6, 17 and 12) are no longer
+reproducible here.** What `make -C substrate check` runs instead is the pass's own **self-test** — six
+programs hand-assembled as raw eBPF and wrapped in a synthesized ELF in memory, each with an asserted
+expected verdict, instruction count, block count and cost:
 
 ```
-ok      ls_shield_bad.bpf.o          3 insn ·  1 blocks · longest path ~   6 cycles  (budget 800)
-ok      ls_shield_ubpf.bpf.o         9 insn ·  4 blocks · longest path ~  17 cycles  (budget 800)
-ok      ls_trace_ubpf.bpf.o          8 insn ·  3 blocks · longest path ~  12 cycles  (budget 800)
+budget_pass self-test (hand-assembled eBPF in a synthesized ELF):
+  ok   straight-line                  ok       2 insn · 1 blocks · 2 cycles
+  ok   lddw is 16 bytes               ok       3 insn · 1 blocks · 6 cycles
+  ok   branch diamond                 ok       4 insn · 3 blocks · 5 cycles
+  ok   over budget rejects            REJECT   4 insn · 3 blocks · 5 cycles
+  ok   loop is refused, not guessed   REFUSE   2 insn · 2 blocks · loop refused
+  ok   load is priced above alu       ok       3 insn · 1 blocks · 6 cycles
 ```
+
+Losing the real objects is a real loss — those were compiler output, and these are hand-written
+instruction streams. But on the specific question of *whether this pass is correct* the self-test is
+**better coverage than the objects ever gave**, and that is worth stating plainly rather than
+conceding grudgingly: none of the three shields contained a `lddw` and none contained a loop, so the
+16-byte instruction form and the loop refusal — two of the three bugs this rewrite fixed, and the two
+hardest things in the decoder — **were never actually exercised by them**. Both are asserted cases
+now, alongside a fail-closed over-budget rejection and a check that a load really is priced above an
+ALU op. What the self-test cannot do is tell you what a real clang-emitted predicate costs; for that,
+see the design conclusion below, which does not depend on the deleted objects.
 
 Writing it for real fixed three bugs that were in the sketch above: it read the whole ELF *file* as
 instructions (the first eight bytes are `\x7fELF`); it strided 8 bytes blindly, so `lddw` — a
@@ -1170,13 +1212,17 @@ returns. It also refuses, rather than guesses, when it finds a loop back-edge: P
 (`ebpf-verifier/src/result.hpp`, `src/fwd_analyzer.cpp`), not a per-loop trip count, so there is
 nothing sound to price a loop with.
 
-**And the numbers make a point worth carrying into the design.** These predicates cost **6–17
-cycles**. That is far below any plausible hook budget — which means for programs of this shape the
-budget pass is not the binding constraint; **the trampoline's register save/restore is.** The thing to
-measure first is invocation overhead, not program cost.
+**The design conclusion survives the loss of the measurement.** A shield of this kind is a handful of
+loads, a compare and a return — single-digit to low-tens of cycles, which anyone can confirm by
+counting instructions against the `CYCLES` table above without needing an object file to point at.
+That is far below any plausible hook budget, and the consequence is the part worth carrying into the
+design: for programs of this shape **the budget pass is not the binding constraint — the trampoline's
+register save/restore is.** The thing to measure first is invocation overhead, not program cost. Note
+the epistemic status honestly: this was previously stated with three measured objects behind it and is
+now an instruction-count argument. The conclusion is unchanged and the support is weaker.
 
 **Real:** eBPF's 8-byte encoding **with `lddw`'s 16-byte form**, the CFG-longest-path approach, and
-the implementation in `prototype/substrate/`.
+the implementation in `substrate/`.
 **Stubbed (in the retired sketch only):** `cls`, `topo`, `collapse_loops`, `block_cost`, `ok`/`fail`.
 **Cannot exist — `prevail_loop_bounds()` is not "stubbed", it is unimplementable as specified.** The
 sketch's design assumed a per-loop trip count it could ask PREVAIL for. PREVAIL exposes one
@@ -1265,7 +1311,7 @@ def sign(prog_path, op, epoch, hook, build_range, mode, mode_ceiling,
 ```
 
 **Real:** the canonical fixed-width serialization — its field order and offsets are
-[`shield_abi.h`](prototype/substrate/shield_abi.h)'s, `_Static_assert`-pinned there — SHA-256, and the
+[`shield_abi.h`](substrate/shield_abi.h)'s, `_Static_assert`-pinned there — SHA-256, and the
 ordering rule (verify → budget → sign).
 **Stubbed:** `hsm_sign`, `require`, `has_two_person_approval`, `audit`.
 **TODO(f5):** PKCS#11 wiring to the existing release-signing HSM; where the verify/budget reports
@@ -1593,11 +1639,21 @@ the same form the canon ships — `explainers/cve-shield-walkthrough.html` step 
 > insisting on NULL checks; it refuses pointer-chasing outright, which is a stronger and much simpler
 > property, and it is why the ctx-builder has to do the walking in host code.
 
-**Also real:** the prototype's shield, at
-[`prototype/shields/ls_shield_ubpf.bpf.c`](prototype/shields/ls_shield_ubpf.bpf.c), which compiles,
-passes the PREVAIL gate and executes end to end today. It is *not* the two-line predicate this
-document used to print for it: the real one selects among the host's three verdict codes and reads a
-`mode` field the host packed into its ctx —
+**What this section used to claim, and cannot any more.** Printed alongside the product form above was
+a second one: the prototype's own shield, cited by path under `prototype/shields/`, and described as
+compiling, passing the PREVAIL gate and **executing end to end today**. That file has been removed
+along with the rest of the prototype. **No shield in this repo compiles, verifies, or runs**, and this
+was the single strongest piece of evidence the document had — the loss should be read as exactly that
+rather than smoothed over. One qualification, in fairness to the reviewers rather than to the claim:
+"passes the PREVAIL gate" was already weaker than it sounded, because that gate ran under the
+`socket_filter` fallback (O3), so it never established that a TMM ctx model verifies.
+
+Two things survive the file, because they are claims about *shapes* rather than about an artifact.
+First, the signature uBPF imposes: `ubpf_exec` and the JIT both pass `(void *mem, size_t mem_len)`
+(`ubpf/vm/inc/ubpf.h:510`), so any program actually run under uBPF receives its ctx as an untyped
+memory pointer and casts, where the product form above takes a typed struct pointer. Second, the
+mode-handling divergence noted below. The form looked like this — now **illustrative only, compiled
+and verified by nothing in this repo**:
 
 ```c
 uint64_t ls_decision(void *data)
@@ -1611,11 +1667,12 @@ uint64_t ls_decision(void *data)
 }
 ```
 
-**A prototype→product divergence worth naming**, since neither prototype doc does: here the *program*
-consults `mode`, whereas item 1 has the *host* gate on `slot->mode` and the program return only a
-predicate. The product shape is the right one — a program that reads its own mode is a program that
-can be confused about which mode it is in — and the prototype's form is an artefact of having no
-trampoline to hold the policy.
+**A divergence worth naming**, because it is a design point and not a property of the deleted file:
+above, the *program* consults `mode` and picks among three verdict codes, whereas item 1 has the
+*host* gate on `slot->mode` and the program return only a predicate. The product shape is the right
+one — a program that reads its own mode is a program that can be confused about which mode it is in —
+and the form above is what you get when there is no trampoline to hold the policy, which is precisely
+the condition a prototype without one is in.
 **Stubbed:** `struct ctx`'s field names come from the worked example, and the
 real one is generated per build by item 6.
 **TODO(f5):** nothing. This is the item that needs no new tooling — which is the point of the other
@@ -1625,8 +1682,10 @@ twelve.
 
 # Staged tiers 13–17 — not coded here (except that **15 is day one**)
 
-Items 13, 14, 16 and 17 are follow-ons, and three of them already have a design or an implementation
-elsewhere. Coding them here would imply a commitment the scope doc deliberately withholds. **Item 15
+Items 13, 14, 16 and 17 are follow-ons. Two of them — 14 and 16 — already have a design, or the
+mechanism they would be built on, elsewhere in this repo; 17 used to have a working implementation and
+no longer does (see below). Coding them here would imply a commitment the scope doc deliberately
+withholds. **Item 15
 is not a follow-on** and is called out below.
 
 - **13 · Rate-limited per-firing log line** — evidence tier 2, emitted from the trampoline (item 1).
@@ -1653,10 +1712,14 @@ is not a follow-on** and is called out below.
 - **16 · Canary auto-unload** — health-metric-driven auto-revoke, `engine-hard-problems.md` §4. The
   mechanism it needs already exists: `SHIELD_OP_REVOKE` (item 3) is the action; what is missing is the
   policy that decides to fire it.
-- **17 · tmmtrace** — **already exists as working code**:
-  [`prototype/tmmtrace`](prototype/tmmtrace) parses a one-liner, generates C, compiles it, runs the
-  PREVAIL gate and drives the VM. It is an authoring convenience, and nothing in items 1–12 depends on
-  it.
+- **17 · Authoring DSL** — a bpftrace-style one-liner front-end: parse a one-liner, generate C, compile
+  it, run the verify gate, load it. **Proposed and unbuilt.** This entry previously read "already
+  exists as working code" and cited a prototype front-end that parsed a one-liner and drove the whole
+  pipeline; that tool has been removed, so item 17 is now a follow-on like 13, 14 and 16 rather than
+  the one item on the list with an implementation behind it. Left deliberately unnamed here — the
+  removed tool's name read as a shipped TMM component, which is what caused the confusion that removed
+  it. It stays an authoring convenience either way: it emits the same bytecode the C path does, so
+  nothing in items 1–12 depends on it and it adds no security surface of its own.
 
 ---
 

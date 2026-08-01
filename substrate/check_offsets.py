@@ -4,7 +4,7 @@ check_offsets.py — assert a hook map's declared ctx offsets against the real h
 
 This is the check that a per-build hook-map generator MUST have, and whose absence
 was demonstrated in this very repo: an earlier revision of
-prototype/hook-point-map.json omitted the `mode` field of `struct ls_ctx`, so any
+hook-point-map.json omitted the `mode` field of `struct ls_ctx`, so any
 tool that re-derived offsets by packing the field list computed `head` at byte 8
 when it actually lives at byte 12. A shield reading `head` would have read
 `mode`'s four bytes plus twelve bytes of `head`, and every artifact in the repo
@@ -14,7 +14,7 @@ The fix is mechanical: generate a C translation unit full of _Static_asserts fro
 the map's own field_offsets/ctx_size, compile it against the real header, and fail
 the build on mismatch. Offsets are then verified, not asserted by a human.
 
-Usage:  ./check_offsets.py [map.json]      (default: ../hook-point-map.json)
+Usage:  ./check_offsets.py [map.json]      (default: ./hook-point-map.json)
 """
 import json
 import os
@@ -23,13 +23,13 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MAP = os.path.join(HERE, os.pardir, "hook-point-map.json")
+DEFAULT_MAP = os.path.join(HERE, "hook-point-map.json")
 
 # Which header + struct backs each argument type in the prototype build. In
 # product this comes from the map's own debug-info provenance, not a table.
 TYPE_TO_HEADER = {
-    "const struct ls_ctx *": ("../minimm/ls_shield.h", "struct ls_ctx"),
-    "struct ls_ctx *":       ("../minimm/ls_shield.h", "struct ls_ctx"),
+    "const struct ls_ctx *": ("example_hook_ctx.h", "struct ls_ctx"),
+    "struct ls_ctx *":       ("example_hook_ctx.h", "struct ls_ctx"),
 }
 
 

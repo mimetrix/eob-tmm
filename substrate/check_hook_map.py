@@ -8,7 +8,7 @@ bare box. Also reports which product-only fields an instance still lacks — tha
 is informative, not a failure: the prototype map is deliberately a subset (see
 README.md and development-scope.md item 5).
 
-Usage:  ./check_hook_map.py [map.json ...]      (default: ../hook-point-map.json)
+Usage:  ./check_hook_map.py [map.json ...]      (default: ./hook-point-map.json)
 """
 import json
 import re
@@ -63,7 +63,7 @@ def structural_check(schema, inst):
 
 
 def main(argv):
-    paths = argv[1:] or [os.path.join(HERE, os.pardir, "hook-point-map.json")]
+    paths = argv[1:] or [os.path.join(HERE, "hook-point-map.json")]
     schema = json.load(open(SCHEMA_PATH))
 
     try:
