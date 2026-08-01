@@ -324,7 +324,7 @@
 
 <nav class="rail" aria-label="Sections">
   <p class="brand"><b>F5 · TMM</b>a verified<br>eBPF engine</p>
-  <a href="#hero"   data-sec="hero"><span class="n">00</span><span class="t">machine speed</span></a>
+  <a href="#hero"   data-sec="hero"><span class="n">00</span><span class="t">two clocks</span></a>
   <a href="#holdout" data-sec="holdout"><span class="n">01</span><span class="t">the holdout</span></a>
   <a href="#move"   data-sec="move"><span class="n">02</span><span class="t">the move</span></a>
   <a href="#surface" data-sec="surface"><span class="n">03</span><span class="t">one shape</span></a>
@@ -340,10 +340,9 @@
   <section class="hero" id="hero" data-sec="hero">
     <p class="eyebrow">F5 TMM · design proposal</p>
     <h1>A <em class="sig">runtime, programmable, provably-safe</em> data plane.</h1>
-    <p class="sub"><b>In the generative-AI world we live in, everything ships at machine speed.</b> When software
-      needs to change, it changes now — a config push, a hot reload, a redeploy, a security mitigation, a new capability in minutes.
-      The data plane already flexes at its edges — config, traffic logic — but changing its <b>own code and
-      behavior</b> still waits on a release train.</p>
+    <p class="sub"><b>Two clocks, running at very different speeds.</b> Vulnerability discovery and exploit tooling now move at machine speed; a data-plane release train moves in weeks, deliberately, because that cadence is what certification and quality discipline cost. The gap between those two clocks is the problem — not F5's release cadence, which is doing its job.
+      The data plane already flexes at its edges — a config push, a policy change, traffic logic in an iRule — but
+      changing its <b>own code and behavior</b> has exactly one path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
@@ -760,7 +759,7 @@
     <p class="big">Make the data plane <span class="hl">runtime, programmable, and provably&nbsp;safe</span>.</p>
     <p class="rlabel">the whole story, one line per beat</p>
     <div class="recap">
-      <div class="rrow"><span class="rn">00</span><span class="rt">Everything ships at <b>machine speed now</b> —
+      <div class="rrow"><span class="rn">00</span><span class="rt">Attacks arrive at <b>machine speed</b> —
         but the data plane's <b>own code</b> still waits on a release train.</span></div>
       <div class="rrow"><span class="rn">01</span><span class="rt">TMM is a <b>kernel</b> that bypassed the
         kernel — reachable from outside only at a cost the poll loop can't pay, and never with the power to
