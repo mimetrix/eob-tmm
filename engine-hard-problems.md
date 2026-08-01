@@ -404,7 +404,12 @@ memory ordering and quiescence.
 - **Deferred:** anything that makes state shared *between* instances (§3). The single-writer-per-core
   property above is doing a lot of work, and a shared writable map is what spends it.
 
-## 4. Verifier soundness is a data-plane RCE surface
+## 4. Verifier soundness is a data-plane remote-code-execution surface
+
+Throughout this section, **traffic-borne RCE** means **remote code execution triggered purely by sending
+traffic through the data path** — no credentials, no management-plane access, no local foothold. It is the
+worst class precisely because it needs nothing from the attacker but reachability, and it is what the
+signing gate below trades away for supply-chain and insider risk.
 
 **This is the one a security review will (correctly) fixate on.** uBPF JITs native code into
 TMM's address space — the crown-jewel process of a security appliance. An **unsound PREVAIL** or

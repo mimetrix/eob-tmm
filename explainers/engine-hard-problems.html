@@ -487,7 +487,9 @@
     <div class="callout accent"><span class="lbl">the load-bearing point</span>
       <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
         verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
-        traffic-borne RCE</b>; it's a supply-chain concern, gated by signing-key protection.</p></div>
+        traffic-borne RCE</b> — remote code execution triggered purely by sending traffic through the data
+        path, needing no credentials and no management-plane access; it's a supply-chain concern, gated by
+        signing-key protection.</p></div>
     <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; the verifier runs at F5 before signing, and only F5-signed bytecode reaches the JIT and JIT.">
       <div class="srow blocked"><span class="flow">attacker-controlled bytecode → signing gate</span><span class="tag">✗ rejected</span></div>
       <div class="srow pass"><span class="flow">F5-signed bytecode → verify → JIT</span><span class="tag">✓ runs</span></div>

@@ -27,7 +27,7 @@ Cisco's mechanism is kernel eBPF in NX-OS's Linux kernel. TMOS is not one OS; it
 
 | Plane | What runs there | Exploit classes | Shieldable by kernel eBPF? |
 |---|---|---|---|
-| **Control plane** | Hardened RHEL-family Linux (CentOS → Rocky). **Three runtimes, not one:** native C daemons (httpd, MCPD, logging, SNMP), a **JVM** tier (Tomcat, `restjavad`/`icrd`), and a **Node** tier (`restnoded`, iControl LX). `tmsh` is a per-invocation shell, not a resident daemon. | iControl REST auth-bypass, Config-utility RCE, command injection, privilege escalation | Yes — normal Linux processes and syscalls |
+| **Control plane** | Hardened RHEL-family Linux (CentOS → Rocky). **Three runtimes, not one:** native C daemons (httpd, MCPD, logging, SNMP), a **JVM** tier (Tomcat, `restjavad`/`icrd`), and a **Node** tier (`restnoded`, iControl LX). `tmsh` is a per-invocation shell, not a resident daemon. | iControl REST auth-bypass, Config-utility remote code execution (RCE), command injection, privilege escalation | Yes — normal Linux processes and syscalls |
 | **Data plane** | TMM — F5's own microkernel. Own scheduler, own memory manager, own TCP/IP stacks. Core-pinned poll loop; bypasses the Linux kernel for all traffic. | Malformed-input crashes, parser bugs, `bd`/enforcement-process termination, traffic-borne RCE | **No** — a uprobe *attaches* today, but it costs a kernel trap per hit inside a run-to-completion loop, and the kernel forbids overriding a return from a uprobe. Attachable; neither affordable nor enforceable |
 
 The consequence is the central design constraint:

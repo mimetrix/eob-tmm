@@ -147,7 +147,9 @@
   <div class="box"><p><b>The security perimeter is the signature, not the verifier.</b> Only F5-signed bytecode
     ever reaches the engine, and verification happens earlier — in F5's pipeline, never on anything an attacker
     supplied. So even a verifier bug is <b>not remotely triggerable</b>: exploiting it would also require
-    compromising the HSM-held signing key. That collapses the risk from traffic-borne RCE to supply-chain/insider.
+    compromising the HSM-held signing key. That collapses the risk from <b>traffic-borne RCE</b> — remote code execution triggered purely by sending
+    traffic through the data path, needing no credentials or management-plane access — to
+    supply-chain/insider.
     What's signed is the whole binding — program hash, the one hook it may attach to, build range, mode ceiling,
     expiry — so a shield can't be replayed elsewhere or escalated to enforce.</p></div>
 

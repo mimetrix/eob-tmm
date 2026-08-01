@@ -125,7 +125,9 @@ not reach **TMM**. Not because the kernel cannot see TMM: a uprobe on the `tmm` 
 today. It is that a uprobe traps into the kernel on every hit, which a run-to-completion poll
 loop cannot afford, and that the kernel forbids overriding a return from a uprobe, so it could
 never *act* even where it can watch. Meanwhile the most damaging data-plane CVEs — malformed-input
-crashes, parser bugs, traffic-borne RCE — are exactly the ones inside TMM, and iRules reach only
+crashes, parser bugs, **traffic-borne remote code execution (RCE)** — arbitrary code execution triggered
+purely by sending traffic through the data path, needing no credentials and no management-plane access —
+are exactly the ones inside TMM, and iRules reach only
 part of that path. An in-process VM is the only form that is both affordable per invocation and
 able to take an outcome.
 

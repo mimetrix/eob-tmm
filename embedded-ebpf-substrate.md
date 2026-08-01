@@ -158,7 +158,7 @@ PREVAIL proves a program is **memory-safe**, and **terminating only when the ter
 
 ### 6.2 Threat model
 
-- **The load path is a crown-jewel target** — code execution in the data plane. (Note the irony: the management plane that loads programs is the same plane with the historical RCEs.)
+- **The load path is a crown-jewel target** — code execution in the data plane. (Note the irony: the management plane that loads programs is the same plane with the historical remote-code-execution (RCE) bugs.)
 - **Provenance** — forged or tampered programs.
 - **Exfiltration** — an *observe* program reading TLS secrets / PII / decrypted payload and leaking it. Read-only ≠ harmless.
 - **Subversion** — a "shield" that disables WAF, drops legitimate traffic (DoS), or weakens a policy.

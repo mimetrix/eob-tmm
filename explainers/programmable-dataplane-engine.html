@@ -689,7 +689,7 @@
       reaches it — PREVAIL itself runs off-box at build/control-plane time — so an unsound verifier would
       still mean arbitrary code in the data plane — the risk a security review will press
       hardest. But <b>only bytecode F5 authored ever reaches the verifier</b> — it runs in F5's admission pipeline, <em>before</em> signing — and <b>only F5-signed bytecode ever reaches the in-TMM JIT</b>; attacker-controlled input
-      never touches them, so a soundness bug is not a traffic-borne RCE — it's a supply-chain concern, gated by
+      never touches them, so a soundness bug is not a <b>traffic-borne RCE</b> — remote code execution triggered purely by sending traffic through the data path, with no credentials or management-plane access needed — it's a supply-chain concern, gated by
       signing-key protection. A per-hook watchdog stands behind all of it. Trust the proof; don't depend on it
       alone. (The load-bearing problems are catalogued in
       <a href="engine-hard-problems.html" style="color:var(--signal-ink)">the engineering register</a>.)</p>
