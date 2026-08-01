@@ -503,6 +503,28 @@ the day-one posture, but the safe point and certification are the most likely to
 - **ISSU / hitless upgrade + failover.** F5 sells zero-downtime upgrades. Loaded programs need
   defined behavior across an in-service upgrade and HA failover — **re-verify and reload on the
   new TMM**, with explicit map-state handling. (Extends §3.)
+- **Post-mortem debuggability — and it cuts both ways.** This is the concern most likely to be raised
+  by the people who actually support the product, and it was absent from this register. Three distinct
+  problems, in increasing order of how badly they are usually underestimated:
+  **(1)** a **backtrace through a hooked function** is garbage unless the trampoline carries correct
+  CFI / `.eh_frame`, because the unwinder meets a stub that did not set up a frame the way the ABI
+  says. **(2)** a **PC inside JIT'd code** lands in anonymous executable memory with no symbol, so the
+  frame is unresolvable — the loader has to register the JIT region the way perf-map / JIT-dump
+  interfaces do, or every shield-involved crash reads as `??`. **(3)** the one that is rarely listed:
+  **a core dump must record which shields were armed**, with their hashes, hooks and modes, and the
+  fact that text was patched at all. Without that, an analyst holding a dump cannot tell whether a
+  shield was involved, so **every future crash on a box that has ever loaded one becomes ambiguous** —
+  which is a support-organisation cost, not just an engineering one, and it is incurred even by crashes
+  the shield had nothing to do with. Note also that patched text means **the dump no longer matches
+  the shipped binary**, so any tooling that checksums or symbolises against the release image needs to
+  know about the pads.
+  And the flip side, stated so this does not read as pure cost: *the same mechanism improves
+  pre-mortem* debuggability, because a flight recorder captures the run-up **into** a fault, which a
+  core dump structurally cannot — a dump is the state at the moment of death, not the sequence that
+  reached it. **But it does not replace core dumps, and no document here should imply it does:** a
+  probe only answers a question you already thought to ask, and a dump is the artifact you fall back
+  on precisely when you had no hypothesis.
+
 - **Jitter-sensitive deployments.** Trading, 5G UPF, and similar won't tolerate *any* added
   per-packet jitter, even budgeted. Expect a **per-hook / per-deployment opt-out**; "dark until
   lit" is ~a branch, but a populated hot hook costs real cycles.

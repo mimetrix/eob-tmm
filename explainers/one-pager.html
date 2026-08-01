@@ -155,7 +155,8 @@
     <li><b>Deep observability into a black box</b> — counters, latency across internal stages, a flight recorder
       that survives a data-plane crash. <em>bpftrace</em> and <em>tcpdump</em>, for TMM.</li>
     <li><b>Field diagnostics</b> — ship a customer a signed probe, characterise the issue in situ, pull it. No
-      debug build, no core-dump archaeology.</li>
+      debug build, and often no waiting for a repro — though it complements core-dump analysis rather than
+      replacing it, since a probe only answers what someone already thought to ask.</li>
     <li><b>Adaptive control</b> — steer, sample, gate or shed on an internal signal, decided at the hook.</li>
     <li><b>Runtime CVE mitigation</b> — recognise a bug's precondition and take a safe outcome between patch
       windows. One application, and the narrowest: it needs the same hooks, verifier and signing gate as

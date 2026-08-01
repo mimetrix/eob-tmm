@@ -79,7 +79,11 @@ of which CVE shielding is only one:
   *flight recorder* that snapshots state when an error branch fires; new metrics as
   bytecode, no TMOS rev.
 - **Diagnostics & field support** — ship a customer a *signed probe* to characterize a
-  production issue in situ, then remove it. No debug build, no core-dump archaeology.
+  production issue in situ, then remove it — no debug build, and often no need to wait for a repro.
+  It does **not** replace core-dump analysis: a probe only answers a question someone already thought
+  to ask, and a dump is what you fall back on when you had no hypothesis. See the debuggability item in
+  [`engine-hard-problems.md`](engine-hard-problems.md) §5, which also covers how the trampoline can
+  *degrade* a dump if the CFI and JIT-symbol work is skipped.
 - **Security beyond CVE shields** — behavioral exploit detection on internal state;
   protocol-anomaly detection at the parser (pre-event); adaptive rate-limiting, which composes from
   DROP or SAMPLE plus host-side state rather than being an outcome of its own.

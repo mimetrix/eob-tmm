@@ -119,6 +119,45 @@ So the architecture is **both**, with a clean line:
 
 Doing safety-critical inline shields *in* WASM would mean reinventing eBPF's verifier — which is exactly why the uBPF investment is durable: its value is the verifier + cost profile, neither of which WASM provides.
 
+### 2.4 How iRules and WASM handle the same two problems
+
+Both questions a reviewer asks about per-packet work — *can the existing surfaces even reach that
+level, and how do they survive a poll loop?* — have answers that are useful to state, because one
+supports this proposal and the other names something we give up.
+
+**Neither reaches the packet level in the sense that matters here.** iRules are *event-gated*: they run
+at sanctioned proxy events, and the lowest-level access they offer is to **collected payload** at
+data-ish events (`CLIENT_DATA` / `SERVER_DATA` after a `TCP::collect`), which is per-buffer rather than
+per-packet. There is no event that fires on every ingress packet, and nothing that exposes fragment
+reassembly, TCP option parsing, or TLS record-layer internals — which is precisely the pre-L7 hole in
+§2.1, restated from the other side. F5's WASM surface is expected to be filter-shaped in the same way
+(a request/stream/chunk model rather than an L3/L4 one), though **the specific ABI should be confirmed
+against the shipping implementation rather than assumed from this document.** The consequence either
+way: the pre-L7 CVE classes are not reachable from those surfaces at all, which is the gap the embedded
+VM exists to close.
+
+**They survive the poll loop by three means, and only the third is a bound — which is the honest
+comparison.** First, **coarse placement**: an iRule runs at a boundary where the budget is microseconds,
+not inside the tight path, so most rules are cheap by construction. Second, **suspend and resume**: a
+rule that must block — a cross-blade `table` lookup, a sideband connection, `after` — is *suspended*
+and its flow parked, so the loop keeps turning. Third, and the actual backstop, **a watchdog that
+restarts TMM** when a rule spins anyway; a runaway iRule stalling TMM is a documented failure mode
+rather than a theoretical one. WASM hosts add fuel or epoch interruption, which is the same shape:
+a runtime kill, not a static bound.
+
+So the existing surfaces manage this risk and **accept** what remains. This proposal adds a static
+memory-safety proof, an admission-time cost bound, and fuel — a strictly stronger position, and worth
+stating plainly next to the fact that the weaker position has been in production for years (§8.1).
+
+**But name what eBPF gives up, because it is not small: a verified program cannot yield.** iRules can
+suspend mid-rule and resume; an eBPF program must run to completion in a single invocation. There is no
+blocking, no sideband call, no waiting on a cross-blade lookup — not deferred to a later tier, but
+architecturally unavailable. That is the real reason the division of labour exists, and it is a better
+explanation than "iRules see the data model and eBPF sees the code": **anything that needs to wait
+belongs in an iRule or a WASM filter, and anything that must be provably bounded belongs here.** A
+program that needs state it cannot compute in one pass gets it the only way the model allows — the host
+pre-computes it into `ctx`.
+
 ## 3. Why userspace eBPF (and why F5 specifically wants it)
 
 A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter plus a JIT — with no dependency on the kernel eBPF subsystem. The chosen engine is **uBPF**: a small (~150 KB), Apache-2.0, embeddable VM with x86-64 and arm64 JITs. It is the same userspace execution engine Microsoft ships in eBPF-for-Windows, and one of the VMs bpftime can use (bpftime defaults to its own LLVM-based JIT) — consumed here as a **library**, not a framework. **Be exact about which half is proven:** eBPF-for-Windows' production posture is the *interpreter* plus PREVAIL, and that is what its deployment attests. uBPF's **JIT** — the half we want on a hot path — is the less mature half, and our own register flags two specifics (no working instruction limit, an unprobed 4 KiB stack frame). Proven floor for the interpreter and the verifier; owned work for the JIT.
@@ -411,6 +450,8 @@ Against that baseline the shield is the **more** constrained artifact on every a
 | Bound on what it may read | none — the whole exposed data model | sandbox boundary only | **a declared `ctx` of resolved scalars** |
 | Bound on what it may do | any sanctioned iRule action | whatever its imports allow | **one host-owned outcome from a fixed set** |
 | Cost bound | none; a runaway rule is a documented cause of a stalled TMM | fuel only | **admission budget pass + runtime fuel** |
+| How time is ultimately bounded | coarse placement, suspend/resume for blocking work, and a **watchdog that restarts TMM** | a runtime fuel or epoch kill | **a static proof, an admission-time cost bound, *and* fuel** |
+| Can it block or yield? | **yes** — suspend and resume, so a cross-blade lookup or sideband call is possible | host-dependent | **no, and this is architectural** — one invocation, run to completion. Anything that must wait belongs in an iRule or WASM filter, not here (§2.4) |
 | Signed | no | no | **yes, over a binding that pins hook, build range, mode ceiling and expiry** |
 | Expires by itself | no | no | **yes, on patched-build detection** |
 

@@ -567,7 +567,7 @@
       <li><b>In-path control.</b> Steer, sample, rate-limit, or gate a flow on an internal signal — the decision
         computed right at the hook, inline, with no round-trip out of the data path.</li>
       <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
-        no debug build, no core-dump archaeology.</li>
+        no debug build, and often no waiting for a repro. It complements post-mortem analysis rather than replacing it: a probe answers a question someone already had, and a core dump is the fallback for when nobody did.</li>
       <li><b>Runtime CVE mitigation.</b> Recognize a bug's precondition and take a host-owned safe outcome, between
         patch windows — the one application worked end-to-end, with its limits, in
         <a href="cve-shield-walkthrough.html" style="color:var(--signal-ink)">the CVE walkthrough</a>. It is
