@@ -4,10 +4,17 @@ A **verified, dynamic, in-data-plane programmability surface** for F5 BIG-IP: em
 userspace eBPF VM ([uBPF](https://github.com/iovisor/ubpf)) inside TMM and attach small
 programs at **two kinds of hook** — a curated set of designed-in **hook points**, and
 **function-boundary probes** at any function that survived the build as its own out-of-line
-body (patchable-entry pad → F5 trampoline), so an unforeseen CVE needs no pre-placed hook and no
-recompile once the enabling build ships. Programs either **observe**
-internal state (a tracepoint) or **act** on a verdict the host applies (a datapath
-control) — each one **statically proven safe before it loads**.
+body (patchable-entry pad → F5 trampoline). Programs either **observe** internal state (a
+tracepoint) or **act** on a verdict the host applies (a datapath control) — each one
+**statically proven safe before it loads**.
+
+The second hook kind is what makes an *unforeseen* CVE addressable: **no bug-specific tracepoint has to
+have been anticipated**, and no recompile is needed once the enabling build ships. Note carefully that
+this is narrower than "any CVE is shieldable," and deliberately so — a reachable boundary must exist
+before the fault, expose the triggering condition through a declared walk, offer a safe outcome, and fit
+its budget (design §10.1). **What fraction of real data-plane advisories clear those bars is not yet
+known**, and the retrospective study that would answer it needs no engineering and is the most decisive
+thing missing from this proposal.
 
 This repo holds design proposals, visual explainers, and a small set of **candidate ABI artifacts
 that compile and check themselves**. It does **not** contain a running implementation: nothing here

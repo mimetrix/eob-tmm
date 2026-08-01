@@ -464,6 +464,42 @@ This is the right-hand-column residual from the §2.1 coverage map. Two things f
 
 2. **Traffic offloaded to hardware.** On appliances with **ePVA / FPGA (TurboFlex) / crypto offload**, some flows are switched or mitigated in silicon and never enter TMM software. An embedded userspace VM runs *in TMM software*, so it cannot see an offloaded fast path — the same way iRules and kernel eBPF cannot (§2.2). This is a **hardware boundary, not a shortcoming of the mechanism**: it is exactly the FastL4/hardware-offload hole already noted for iRules. Crucially, the high-severity data-plane CVE classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute in TMM software regardless (a flow that needs L7 inspection is escalated back off the offload path), so they remain reachable. A CVE **in** the hardware fast path itself, in the offload/escalation decision, or in a pure-L4 vector that stays offloaded, needs a firmware/FPGA fix — out of scope for any software shield.
 
+### 10.1 What has to be true for a function-boundary probe to reach a given CVE
+
+**The claim to be careful with is "an unforeseen CVE needs no pre-placed hook."** The defensible version
+is narrower and worth stating precisely, because the loose version invites a demolition: **no
+*bug-specific* tracepoint has to have been anticipated.** That is the real advance over a designed-in
+catalog alone, and it is genuinely large. It is *not* the same as "any data-plane CVE is shieldable," and
+four things still have to hold:
+
+1. **A surviving boundary on the path, before the fault.** The hookable set is whatever the build emitted
+   as its own out-of-line body (§5.3). Inlining does not remove reach, but it pushes the usable boundary
+   *outward* to a caller — and the further out it goes, the more a safe-return discards along with the
+   bug. Past some radius the only honest answer is that the boundary is too coarse to use.
+2. **The condition has to be derivable from that boundary's arguments**, through the declared bounded
+   walk the host's ctx-builder performs. **And note the timing, which is the constraint people miss:** an
+   entry probe fires *before the body runs*, so a condition the body itself constructs is not visible to
+   it. A malformed-frame state assembled inside a parser, or one accumulated across several earlier
+   frames, is not reachable from the entry arguments of the function that faults. What you need is a
+   boundary *downstream* of where the condition becomes determinable and *upstream* of the fault — and
+   that window may contain no function boundary at all.
+3. **A safe outcome has to exist there** — the skippability gate of §6.1, or a clean upstream flow reset.
+   A boundary that exposes the condition perfectly but cannot be skipped or aborted is not a `filter`
+   point.
+4. **The budget has to allow it** at that boundary's rate class, read as structure ∧ adversarial
+   reachability (§11). This one is a policy block rather than an impossibility, but it is a real block.
+
+Two whole classes sit outside regardless: **hardware-offloaded flows** (item 2 below), and anything at
+all before **the enabling build ships** — the mechanism itself rides one release train, once.
+
+**And the honest position on coverage is that we do not know the fraction.** Nobody has taken a set of
+real, published F5 data-plane advisories and asked, per CVE, whether conditions 1–4 hold. Until that is
+done, any statement about how many data-plane CVEs this would have caught is an assertion. **That study
+is cheap, it needs no engineering, and it is the single most decisive artifact this proposal could
+acquire** — it either establishes the coverage claim with evidence or right-sizes the whole programme
+early. If the answer turns out to be "a minority, and mostly in one subsystem," that is a smaller and
+still-worthwhile project, and far better learned now.
+
 **Form-factor consequence.** The *mechanism* (an embedded VM at designed-in hooks) is identical across appliance, VE, and BIG-IP Next for Kubernetes, because all three run the same TMM data plane. **Coverage** is not: **BIG-IP VE** (pure software, no offload) is the best case — the VM sees the entire data path; an **appliance** carries the offload dead zone above; **BNK** on a DPU depends on how much traffic the DPU steers versus lands in the containerized TMM. Coverage scales inversely with how much the platform offloads to hardware.
 
 Live Shield narrows the window for most data-plane CVEs; it does not claim to close all of them. Those in the residual zone require an engineering hotfix.
