@@ -544,8 +544,7 @@
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
     <h2>Thirteen more to get ahead of — and one of them is the biggest item here.</h2>
-    <p class="lede">The four above are the ones the design turns on; these are the next tier. Each has a stance, none changes the
-      day-one posture, and the first two shape what the first shippable form looks like.</p>
+    <p class="lede">The four above are the ones the design turns on; these are the next tier. <b>Read the list with its severity in mind, because thirteen equal-looking boxes overstate the risk.</b> Exactly one is both unavoidable and hard — <b>the safe point</b>, needed for any dynamic load into a running TMM whatever the hook kind. Two are not open questions at all: keeping the verifier out of TMM is a decision already taken, and the concurrency item records a property that makes three other things simple. Four are ordinary lifecycle and governance work. And <b>four exist only because function-boundary probes are on the table</b> — the build-specific probe context, the optimiser deciding the hookable set, the unwind information a trampoline needs, and the JIT&rsquo;s maturity. Take the narrowest form of the mechanism, designed-in call sites only (outcome 3 of the measurement), and those four go away along with live-text patching: what remains is the safe point, certification, and the ordinary work.</p>
     <div class="concerns">
       <div class="concern"><span class="cl">item zero · the safe point itself</span><p>Every in-TMM piece assumes
         &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; <b>That does not exist
