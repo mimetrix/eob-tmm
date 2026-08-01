@@ -83,7 +83,7 @@ In short: **iRules express traffic logic in the sanctioned data-model at proxy e
 | Pre-L7 / record-layer paths — TLS record parse, L3/L4 stack, protocol framers | (a) — no event fires before the vulnerable code | hook at the parser function itself |
 | Enforcement-plugin internals — `bd` / WAF / ASM | (b)+(c) — plugin-process internals invisible to the proxy model | hook *inside* the plugin process |
 | The iRule / TCL engine or rule dispatcher | — a rule cannot shield itself | a separate mechanism hooks it |
-| FastL4 / hardware-offload fast paths | (c) — flow bypasses the iRule VM | hook the *software* fast path — but flows offloaded to ePVA/FPGA bypass TMM software entirely and are out of reach (§10) |
+| FastL4 / hardware-offload fast paths | (c) — flow bypasses the iRule VM | hook the *software* fast path; a flow accelerated end-to-end in ePVA/FPGA bypasses TMM software, so its **contents** are out of reach — but the **offload boundary itself is software and is hookable on both sides**, which also makes declining the offload a usable mitigation (§10) |
 | Internal program state — connection-table internals, memory-pool pressure, parser state machines, inter-function latency, error-branch hit-counts | (b) — no iRule command exposes it | an `observe`-mode tracepoint (§6.1) reads it in-process |
 | Code-level **crash mitigation** for a malformed condition not surfaced as a clean field | (b) — condition invisible in the data model | inspect the raw argument at the vulnerable function |
 
@@ -503,7 +503,40 @@ This is the right-hand-column residual from the §2.1 coverage map. Two things f
 
 1. **No boundary exposes the condition, or no safe outcome exists there.** A TMM bug is unshieldable where no reachable boundary exposes the triggering condition in its arguments — e.g. a fault deep in TLS record parsing whose trigger is not visible at any earlier hook — or where the only interception point has no safe outcome (§6.1); an iRule (the event never fires) or kernel eBPF (TMM bypasses the kernel) cannot catch these either. For the flow-hook fallback, the hook-point map should push the earliest viable instrumentation point as close to ingress as performance allows, shrinking this zone over time.
 
-2. **Traffic offloaded to hardware.** On appliances with **ePVA / FPGA (TurboFlex) / crypto offload**, some flows are switched or mitigated in silicon and never enter TMM software. An embedded userspace VM runs *in TMM software*, so it cannot see an offloaded fast path — the same way iRules and kernel eBPF cannot (§2.2). This is a **hardware boundary, not a shortcoming of the mechanism**: it is exactly the FastL4/hardware-offload hole already noted for iRules. Crucially, the high-severity data-plane CVE classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute in TMM software regardless (a flow that needs L7 inspection is escalated back off the offload path), so they remain reachable. A CVE **in** the hardware fast path itself, in the offload/escalation decision, or in a pure-L4 vector that stays offloaded, needs a firmware/FPGA fix — out of scope for any software shield.
+2. **Traffic offloaded to hardware — but be precise, because this splits three ways and an earlier draft
+   of this document got one of them wrong.** On appliances with **ePVA / FPGA (TurboFlex) / crypto
+   offload**, some flows are switched or mitigated in silicon. An embedded userspace VM runs *in TMM
+   software*, so:
+
+   - **The flow's contents while it is in silicon are genuinely invisible.** A packet accelerated
+     end-to-end never presents itself to a software hook. This is a hardware boundary, not a shortcoming
+     of the mechanism, and it is the same FastL4/offload hole iRules and kernel eBPF have (§2.2).
+   - **The offload *boundary* is not invisible at all — it is ordinary TMM software, and it is
+     hookable on both sides.** Deciding to accelerate, escalate or reject; building the descriptor
+     handed to the accelerator; receiving a flow back on escalation; and handling completions, errors
+     and counters — all of that executes in TMM. So there are hook points **before the accelerator is
+     invoked and after it returns**, and an earlier draft of this section was wrong to file *"a CVE in
+     the offload/escalation decision"* alongside silicon bugs as needing a firmware fix. A bug in that
+     decision, in descriptor construction, or on the escalation-return path is a **software** bug in
+     code we own, reachable and shieldable like any other. Error and completion paths deserve
+     particular attention, because that is where crash bugs concentrate.
+   - **A bug *inside* the silicon, or in a pure-L4 vector that stays fully offloaded, does need a
+     firmware/FPGA fix** — that part stands.
+
+   **Two consequences worth taking, both of which improve the proposal.** First, **coverage stops being
+   unknowable and becomes measured**: a hook at the offload decision is what tells you how many flows
+   went to silicon, which resolves the ambiguity that otherwise makes a zero count useless — "no
+   attempts", "attempts handled in hardware" and "wrong TMM instance" become distinguishable rather
+   than conflated. Second, **declining the offload is itself a mitigation.** At a designed-in decision
+   point, `STEER` can mean *do not accelerate this flow* — pushing it onto the software path where the
+   rest of this mechanism applies. That buys reach into a class of flows the shield could not otherwise
+   touch, at a real and bounded cost: matching flows lose acceleration for as long as the shield is
+   armed. It is a throughput-for-coverage trade, made explicit, and available only because the decision
+   was in software to begin with.
+
+   The high-severity classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute
+   in TMM software regardless, since a flow needing L7 inspection is escalated off the offload path
+   anyway. So they were never in this dead zone.
 
 ### 10.1 What has to be true for a function-boundary probe to reach a given CVE
 
