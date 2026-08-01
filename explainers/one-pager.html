@@ -121,8 +121,11 @@
   <div class="cols">
     <div class="card have"><p class="ct">◆ a proxy, not a forwarder</p><h3>The budget is there</h3>
       <p>A forwarder's unit of work is a packet — single-digit nanoseconds, where bytecode is a meaningful
-        fraction. TMM's unit is a flow, a connection, a request: <b>microseconds</b>. A hook costing tens of
-        nanoseconds is noise, and the hooks worth having sit at warm per-request boundaries.</p></div>
+        fraction. TMM's unit is a flow, a connection, a request: <b>microseconds</b>, so a hook costing tens of
+        nanoseconds is noise there. <b>But read that as the cheapest tier, not the only one</b> — the pre-L7 CVE
+        classes this exists for (fragments, TCP state, TLS records) fault <em>per packet</em>, where a proxy still
+        has hundreds of nanoseconds rather than a forwarder's tens. That tier is affordable with measurement and
+        sign-off, not free; a pure FastL4 fast path is not affordable at all. Three tiers, not two.</p></div>
     <div class="card have"><p class="ct">◆ vendor-owned, shipped, closed</p><h3>The proof is required</h3>
       <p>F5 owns the source, so hooks are <b>designed in</b> and the hook map comes out of the build. And F5
         can't ship a customer a mitigation that <em>might</em> put the data plane into a repeatable crash-loop — which is why a verifier is

@@ -52,9 +52,13 @@ it's the right answer for this one, and the reason starts with **TMM being a pro
 packet-forwarding plane**. A forwarder's unit of work is the packet, with a per-packet budget in
 single-digit nanoseconds — bytecode is a meaningful fraction of that. TMM's unit of work is a flow, a
 connection, a request: it spends **microseconds where a forwarder spends nanoseconds**, so a hook
-costing tens of nanoseconds is noise, and the hooks that matter sit at warm per-request boundaries
-rather than a per-packet fast path. A proxy also *has state worth looking at* — listeners, profiles,
-parser state, plugin internals — which is exactly where its CVEs live. Three more preconditions
+costing tens of nanoseconds is noise there. **Read that as the cheapest tier, not the only one:** the
+pre-L7 classes this exists for — fragment reassembly, TCP state, TLS record parsing — fault *per
+packet*, before any request exists, and a proxy still has hundreds of nanoseconds there where a
+forwarder has tens. That tier is affordable with measurement and sign-off; a pure FastL4 fast path is
+not affordable at all. Three tiers, not two (`engine-hard-problems.md` §1.1). A proxy also *has state
+worth looking at* — listeners, profiles, parser state, plugin internals — which is the other reason
+its CVEs are reachable at all. Three more preconditions
 follow from being a shipped product: **F5 owns the source** (so hooks are designed in and the signed
 hook map comes out of the build), **it's a closed appliance** (so a mitigation that might put the
 data plane into a **crash-loop** is unshippable — `sod` restarts TMM in seconds and HA fails over, so

@@ -113,6 +113,82 @@ cost, and a stall/overrun tripwire (`tmm:rt:poll_stall`). The engine ends up **i
 in** — so the same surface that makes this problem tractable *is* the observability capability the engine exists
 to provide. Describing the problem and demonstrating the payoff turn out to be one move.
 
+## 1.1 What is affordable per *packet*, and what is worth doing there
+
+**The claim to retire:** "TMM's unit of work is a flow or a request, measured in microseconds, so a hook
+costing tens of nanoseconds is noise."
+
+That sentence is true, useful, and **being asked to carry more weight than it can.** It is the argument
+for why bytecode fits a proxy where it did not fit a packet forwarder, and as such it is right. But it
+justifies cost against the *per-request* budget while this proposal claims its differentiating value in
+**pre-L7 CVE classes — fragment reassembly, TCP option and state handling, TLS record parsing, protocol
+framers** (§2.1, §2.2). Those fault **per packet or per record, before any request exists**. So the
+affordability argument and the value argument are currently made about two different budgets, and a
+reviewer who notices will conclude, fairly, that the cheap case was described and the valuable case was
+not costed.
+
+**Three tiers, not two.** The forwarder/proxy dichotomy is too coarse for our own purposes, because TMM
+contains all three of these:
+
+| Rate | Budget available per invocation | A ~20–40 ns hook is | Honest verdict |
+|---|---|---|---|
+| **Per connection / per request** (`warm`) | microseconds — the proxy is doing TCP, TLS and L7 work | genuinely noise | the easy case, and where the cheapest wins are |
+| **Per packet inside the proxy path** (`hot`) — TCP reassembly, TLS records, L7 framing | hundreds of nanoseconds; a proxy's packet already costs far more than a forwarder's | a few percent | **affordable sometimes**, with measurement and explicit sign-off — not free, not excluded |
+| **Per packet on a pure fast path** — FastL4, offload escalation, simple forwarding | tens of nanoseconds | a large fraction | **concede this one.** Here the objection that sank bytecode in packet forwarders applies to us too |
+
+Stating the middle tier is the point. It is where the flagship CVE classes live, and collapsing it into
+either neighbour is what produced the contradiction: fold it upward and per-packet work looks free, fold
+it downward and we have argued our own differentiator out of scope.
+
+**What per-packet work is actually worth doing.** Some of it is not reachable any other way, which is
+why this cannot simply be deferred:
+
+- **Pre-connection faults.** A fragment-reassembly or TCP-state crash happens before a connection
+  exists, so there is no per-request boundary to hook. iRules cannot reach these either — that is the
+  §2.1 hole this mechanism exists to fill.
+- **Per-record, not per-request.** A TLS record-layer parse fault fires per record; records neither
+  align with nor nest inside requests.
+- **Connectionless protocols.** DNS over UDP and QUIC datagrams are per-packet by construction, and DNS
+  is the canonical unauthenticated amplification surface.
+- **Sub-request framing.** An HTTP/2 frame hook is finer-grained than a request by an order of magnitude.
+- **Distributions that cannot be reconstructed later.** Packet-size and inter-arrival histograms are
+  per-packet facts; a per-request summary has already destroyed them.
+
+**Four levers make per-packet tractable, and they are not equally honest:**
+
+1. **Condition-scoped placement** — hook the exceptional branch (fragment present, record-parse error)
+   rather than the common path. This reduces **steady-state** cost close to zero and **does not reduce
+   the worst case**, because adversarial reachability means an attacker makes that branch the common
+   path (§1, §5). Claim it as a steady-state argument only; anyone who claims it as a bound is wrong.
+2. **Burst-capable invocation** — TMM already batches on receive, so a burst invocation form amortises
+   per-invocation overhead across *K* packets and lets the budget pass reason per burst. **This is the
+   real answer for per-packet enforcement**, and it is currently filed as a concern (§5) rather than as
+   the enabling mechanism for a whole class of value. It should be reframed.
+3. **Sampling divisor** — fine for observability, useless for enforcement. You cannot block one in N
+   instances of an exploit.
+4. **Time-boxing, which applies only to mitigation** — a CVE shield is armed for an exposure window, not
+   forever. **A few percent of throughput for two weeks is a categorically different trade from a few
+   percent permanently**, and it is the strongest per-packet argument available. It does not transfer to
+   telemetry, which is by nature always-on.
+
+**How likely is any of this, honestly?** Ranked, and every line is conditional on measurement nobody has
+taken:
+
+- **Per-packet observability with a sampling divisor** — high confidence. The mechanism is understood and
+  the cost is adjustable downward by construction.
+- **Per-packet enforcement on an exceptional branch, time-boxed** — good, and this is where the flagship
+  CVEs sit. Conditional on the back-edge fuel guard existing (§1), since an unbudgeted program on an
+  attacker-driven branch is the worst case in this register.
+- **Per-packet enforcement on the common path at line rate** — doubtful without the burst form, and
+  honest to say so.
+- **Anything on a FastL4 or offloaded path** — no. It never enters TMM software (design §10).
+
+**And there is a gap in the measurement plan that this exposes.** The three questions the package asks
+first measure the **always-on cost of the pads when nothing is armed**. Nothing measures **an armed hook
+on a per-packet path**, which is the number that decides whether the middle tier above is real. That is a
+second experiment, it is cheap once the first build exists, and it should be named rather than discovered
+later.
+
 ## 2. The context / helper / program-type ABI is the actual project
 
 **The claim to retire:** "the base tier is a trivial pure function of `ctx`."

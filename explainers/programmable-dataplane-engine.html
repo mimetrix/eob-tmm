@@ -398,10 +398,16 @@
       work is the packet, with a per-packet budget in <em>single-digit nanoseconds</em> — verified bytecode is a
       meaningful fraction of that, which is why it struggles to earn its place there. TMM's unit of work is a flow,
       a connection, a request: terminate TCP, negotiate TLS, parse L7, evaluate policy — <b>microseconds where a
-      forwarder spends nanoseconds</b>. A hook costing tens of nanoseconds is noise against that, and the hooks
-      worth having sit at <b>warm</b> per-request boundaries, not in a per-packet fast path. A proxy also
-      <em>has state worth looking at</em> — listeners, profiles, parser state, plugin internals — which is exactly
-      where its CVEs live.</p>
+      forwarder spends nanoseconds</b>. A hook costing tens of nanoseconds is noise against that.
+      <b>But that is the cheapest tier, not the only one — and it is not where the hardest CVEs are.</b>
+      Read TMM as three budgets rather than two: <em>per request</em>, microseconds, where a hook is genuinely
+      free; <em>per packet inside the proxy path</em> — TCP reassembly, TLS records, L7 framing — where a proxy
+      still has hundreds of nanoseconds and a hook costs a few percent, affordable with measurement and
+      sign-off; and a <em>pure FastL4 fast path</em>, tens of nanoseconds, where the objection that sank
+      bytecode in packet forwarders applies to us too. The middle tier matters because the pre-L7 classes this
+      engine exists for — fragment reassembly, TCP state, record-layer parsing — fault there, before any request
+      exists. A proxy also <em>has state worth looking at</em> — listeners, profiles, parser state, plugin
+      internals — which is the other reason its CVEs are reachable at all.</p>
   </section>
 
   <!-- 02 MOVE -->
