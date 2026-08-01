@@ -9,8 +9,8 @@ tracepoint) or **act** on a verdict the host applies (a datapath control) — ea
 **statically proven safe before it loads**.
 
 **Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
-deployed** wins, and TMM is where BIG-IP is furthest from that. Its behaviour already changes at runtime
-through config, profiles, WAF policy, iRules and an arriving WASM surface — each acting on the
+deployed** wins. TMM — BIG-IP's data-plane microkernel — already changes behaviour at runtime through
+config, profiles, WAF policy, iRules and an arriving WASM surface — each acting on the
 **curated traffic model the proxy chose to expose**. A change that has to reach the code's own internals — a parser's error branch, a
 plugin handoff, the condition behind a crash — has one path: a build. Which is why a new metric, a diagnostic
 probe, a steering decision and a mitigation for a live CVE all cost the same thing. This changes the unit of change from **a release** to

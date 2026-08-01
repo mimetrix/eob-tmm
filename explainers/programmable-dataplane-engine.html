@@ -341,16 +341,17 @@
     <p class="eyebrow">F5 TMM · design proposal</p>
     <h1>A <em class="sig">runtime, programmable, provably-safe</em> data plane.</h1>
     <p class="sub"><b>Whoever shortens the distance from code commit to code deployed wins.</b> That is the
-      whole game in software, and a data plane is where it is hardest. <b>TMM's behaviour already changes at
-      runtime through several surfaces</b> — a config push, a profile change, a WAF policy update, traffic
-      logic in an iRule, and a WASM extension surface arriving for the same purpose — but each of those acts
+      whole game in software, and a data plane is where it is hardest. <b>TMM — F5's Traffic Management
+      Microkernel, the process that carries the traffic — already changes its behaviour at runtime through
+      several surfaces</b>: a config push, a profile change, a web-application-firewall (WAF) policy update,
+      traffic logic in an iRule, and a WASM extension surface arriving for the same purpose — but each acts
       on the <em>curated traffic model the proxy chose to expose, at the events it chose to fire</em>. A change
       that has to reach the code's own internals — a parser's error branch, a plugin handoff, the condition
       behind a crash — has exactly one path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points <em>and at existing function boundaries</em> — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
-      reboot, no release train. <em>(The engine ships in one enabling build. After that, every mitigation — and every probe at a boundary
+      reboot, no release train. <em>(The engine ships in one enabling build. After that, every program — every probe at a boundary
       that build exposes — is a load.)</em></p>
     <div class="herotriad" aria-label="runtime, programmable, provably safe">
       <span class="td">runtime</span><span class="tdot">·</span>
@@ -384,7 +385,7 @@
       <div class="plane ctrl">
         <p class="pt">◇ control plane</p>
         <h4>Linux daemons</h4>
-        <p>httpd, MCPD and the other resident C daemons — ordinary processes the kernel can see. (Not <span class="inlinecode">tmsh</span>: it is a shell that runs per command and exits, so an entry probe on it shields nothing. And iControl REST runs on the <b>JVM</b> while iControl LX runs on <b>Node</b> — three runtimes, so three adapter implementations.)</p>
+        <p>httpd, MCPD and the other resident C daemons — ordinary processes the kernel can see. (iControl REST runs on a <b>Java VM</b> and iControl LX on <b>Node</b>: three runtimes, so three adapters.)</p>
         <p class="see">kernel eBPF reaches this ✓</p>
       </div>
       <div class="plane data">
@@ -402,52 +403,55 @@
       two.</b> <em>Per request</em>: microseconds, because TMM terminates TCP, negotiates TLS, parses L7 and
       evaluates policy — a hook costing tens of nanoseconds is noise. <em>Per packet inside the proxy path</em>
       (TCP reassembly, TLS records, L7 framing): hundreds of nanoseconds, so a hook is a few percent — affordable
-      with measurement and sign-off, not free. <em>A pure FastL4 fast path</em>: tens of nanoseconds, where the
-      objection that sank bytecode in packet forwarders applies to us too. A forwarder only ever has that third
-      budget. The middle tier is the one that matters, because the pre-L7 classes this engine exists for —
-      fragment reassembly, TCP state, record-layer parsing — fault there, before any request exists. A proxy also
-      <em>has state worth looking at</em>, which is the other reason its CVEs are reachable at all.</p>
+      with measurement and sign-off, not free. <em>A pure FastL4 fast path</em> (L4-only forwarding that skips the
+      proxy machinery): tens of nanoseconds, where the objection that keeps bytecode out of packet forwarders
+      applies to us too. A forwarder only ever has that third budget. The middle tier is the one that matters,
+      because the pre-L7 stages worth reaching — fragment reassembly, TCP state, record-layer parsing — run
+      there, before any request exists. A proxy also <em>has deep internal state worth looking at</em>, which is
+      what makes a curated context valuable here rather than trivial.</p>
   </section>
 
   <!-- 02 MOVE -->
   <section class="beat reveal" id="move" data-sec="move">
     <p class="kicker"><span class="num">02</span> the move</p>
     <h2>Give TMM — a microkernel — its own eBPF.</h2>
-    <p class="lede">F5 has a long history of extending programmability into the runtime data plane — this is its
-      next step.</p>
     <p class="lede">It's entirely buildable, because what makes kernel eBPF safe was never the kernel: it's a
       <b>static verifier</b> and a <b>small sandboxed VM</b>. The verifier analyzes the bytecode and proves —
-      <em>before</em> it ever runs — that the program is <b>bounded</b> (every path terminates in a known number
-      of steps; it cannot loop forever) and <b>memory-safe</b> (every load and
+      <em>before</em> it ever runs — that the program is <b>memory-safe</b> (every load and
       store stays inside the bytes it was handed; it cannot read what it wasn't given or scribble on TMM's
-      memory). Both are libraries. Neither needs the kernel. <em>Termination isn't the whole of hot-path
+      memory) and, with its termination check switched on — <em>off</em> in PREVAIL's default configuration —
+      <b>bounded</b>: no path can loop forever. Both are libraries. Neither needs the kernel. <em>Termination isn't the whole of hot-path
       safety — a per-hook time budget handles the rest (§5.4);</em> the verifier is the floor, not the ceiling.</p>
     <p class="lede" style="margin-top:1.2rem">So bring them inside. Embed a small userspace eBPF VM —
-      <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, JIT-compiled — <em class="sig">inside TMM's own address
+      <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, compiled just-in-time (JIT) to native code — <em class="sig">inside TMM's own address
       space</em>, at designed-in hook points and at existing function boundaries, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
       Now behavior arrives as <b>bytecode, proven safe before it loads</b>. No rebuild. No reboot. The data
       plane gets a fast lane:</p>
     <div class="schematic">
       <div class="srow slow">
-        <span class="k">change today</span><span class="flow">C source → rebuild → re-qualify → release train</span><span class="cost">weeks–quarters</span>
+        <span class="k">change today</span><span class="flow">C source → rebuild → re-qualify → release train</span><span class="cost">a release</span>
       </div>
       <div class="srow fast">
-        <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">hours</span>
+        <span class="k">the proposal</span><span class="flow">author → clang → PREVAIL verify → budget pass → sign → load</span><span class="cost">days</span>
       </div>
     </div>
+    <p class="aside-note"><b>Bytecode plus a verifier doesn't delete the test–certify–apply pipeline; it
+      re-proportions it.</b> <em>Testing</em> shrinks because the outcome set is bounded by construction, not
+      because the verifier says so. <em>Certification</em> barely shrinks — what speaks to an evaluator is the
+      <b>signature</b>, an established construct. <em>Applying</em> is where the artifact property does the work: a
+      load is not an image install.</p>
     <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> Microsoft's <b>eBPF-for-Windows</b> ships this pair
       — <b>uBPF</b> as the execution engine, <b>PREVAIL</b> as the verifier — in a maintained, production-used
       component. The verifier half is the well-trodden part; the JIT is where we do our own hardening (§5.4). A userspace VM
-      running verified bytecode at a designed-in hook is an established pattern with a maintained implementation
-      behind it; what's new here is bringing it to a proxy data plane that hasn't had it. The parts we'd build are
+      running verified bytecode at a designed-in hook is an established pattern; what's new is bringing it to a
+      proxy data plane that hasn't had it. The parts we'd build are
       the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
-    <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b> —
-      so the surface can start from what's in the code today and grow as the code does, not a blank page. A
+    <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b>,
+      not a blank page. A
       <b>candidate catalog of USDT tracepoints</b> (<em>userland statically-defined tracing</em> — named probe
       points designed into the source) can be drawn up alongside the engine, right where that state
       already lives: L3/L4 ingress and the connection table, the TLS
-      record layer, the L7 parsers, the plugin processes, the poll loop itself. Each hook that lands adds one more
-      place to observe, one more place to act.</p>
+      record layer, the L7 parsers, the plugin processes, the poll loop itself.</p>
     <div class="gist">
       <p class="glabel">the whole proposal, in three terms</p>
       <div class="triad" aria-label="runtime, programmable, and provably safe — equal weight">
@@ -456,18 +460,18 @@
         <span class="td">provably safe</span>
       </div>
       <p style="text-align:center">Three properties, <b>equal weight</b> — and nothing else brings all three
-        <b>in-process</b>, at the data plane:</p>
+        <b>in-process</b>:</p>
       <div class="misses">
         <div class="miss"><span class="who">iRules</span>
           <span class="gap"><b>runtime</b>, but not provably safe</span></div>
         <div class="miss"><span class="who">DynaD</span>
-          <span class="gap"><b>runtime</b> too — an earlier scripting-based swing at exactly this, since
-            deprecated. What's different now: an unverified script had no proof, no signing gate, and no
+          <span class="gap"><b>runtime</b> too — an earlier scripting-based swing at this, since
+            deprecated. The difference: an unverified script had no proof, no signing gate and no
             host-owned outcome set — the three things that make this one governable</span></div>
         <div class="miss"><span class="who">WASM</span>
           <span class="gap"><b>programmable</b>, but its guarantees are enforced <em>dynamically</em> — bounds-checked as it
-            runs, time bounded by a counter that aborts. eBPF moves the same guarantees earlier: memory safety and
-            termination <b>proven before load</b>. Both still need a runtime time guard; ours is §5.4</span></div>
+            runs, time bounded by a counter that aborts. eBPF proves the same properties <b>before load</b>; both
+            still need a runtime time guard (§5.4)</span></div>
         <div class="miss"><span class="who">kernel eBPF</span>
           <span class="gap"><b>provably safe</b>, but in the wrong kernel — a USDT lets it <em>watch</em> TMM,
             not act inside it, and traps on every hit</span></div>
@@ -475,32 +479,36 @@
       <p class="punch"><em class="sig">An embedded eBPF engine is the only surface that is all three, in-process</em> — reaching
         the data plane's own code and state.</p>
     </div>
-    <div class="callout sig" style="margin-top:1.6rem"><p><b>Complementary, not a replacement.</b> iRules stays
-      the first line for traffic logic, WASM the home for rich extensions. This reaches the layer none of them
-      can, and modernizes that lineage for the AI age.</p></div>
+    <div class="callout sig" style="margin-top:1.6rem"><p><b>Complementary, not a replacement — and the dividing
+      line is sharper than "iRules see the traffic model, eBPF sees the code".</b> iRules and WASM survive the
+      poll loop by coarse placement, by suspend-and-resume when a rule has to block, and ultimately by a watchdog
+      that restarts TMM: they manage that risk and <em>accept</em> what is left, where a static proof, an
+      admission-time cost bound and fuel are a strictly stronger position. What eBPF gives up in exchange is not
+      small — <b>a verified program cannot yield</b>. No blocking, no sideband call, no cross-blade lookup,
+      architecturally rather than as a deferred tier. So anything that must <em>wait</em> belongs in an iRule or a
+      WASM filter; anything that must be <em>provably bounded</em> belongs here. That is the division of labour,
+      and it modernizes the lineage.</p></div>
   </section>
 
   <!-- 03 SURFACE (interactive) -->
   <section class="beat reveal" id="surface" data-sec="surface">
     <p class="kicker"><span class="num">03</span> one shape · observe · act</p>
     <h2>Observe and act are the same machinery. Only the last step differs.</h2>
-    <p class="lede">First, what a program <em>is</em>. It isn't a process that runs on its own — it's a small
-      <b>event handler</b>, a callback the engine invokes at a hook, triggered by the very thing it's watching:
-      execution reaches that point in the code, the program fires, and it's handed a <b>curated context</b>
+    <p class="lede">First, what a program <em>is</em>. Not a process that runs on its own — a small
+      <b>event handler</b> the engine invokes at a hook, triggered by the very thing it's watching:
+      execution reaches that point in the code, the program fires, and it is handed a <b>curated context</b>
       describing what's there. In its <em>simplest</em> shape it reads that context and returns a value — the
-      engine can do far more, but this base shape is all the symmetry needs. Whether the host
+      engine can do more, but that base shape is all the symmetry needs. Whether the host
       <em class="sig">records that value as a metric</em>, uses it to <em class="sig">stream a window of live
-      internal state out to userspace</em> — for discovery, root-cause analysis, debugging, and uses still to
-      come — or treats it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
+      internal state out to userspace</em> — for discovery, debugging and root-cause analysis (RCA) — or treats
+      it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
     <p><b>So how would you write one?</b> You write a few lines of C and compile with
       <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>dptrace</b>, a proposed
-      authoring front-end that emits the same bytecode: <em>bpftrace for TMM</em>. You describe
-      the probe in a small, familiar language and it does the rest — <b>compile</b> to eBPF bytecode,
-      <b>verify</b>, and, once <b>signed</b>, <b>attach</b> at the named hook. One line or a full multi-probe
-      script, same path.</p>
-    <p>And it <b>spans both planes</b> from one grammar: point a probe at a data-plane hook and it runs in TMM's
-      embedded VM; point it at a control-plane daemon and it rides kernel eBPF — one language for the whole box.
-      Each probe is <b>three parts</b>:</p>
+      authoring front-end that emits the same bytecode: <em>bpftrace for TMM</em>. It <b>compiles</b> the probe to
+      bytecode, <b>verifies</b> it and, once <b>signed</b>, <b>attaches</b> it at the named hook — one line or a
+      full multi-probe script, same path.</p>
+    <p>And it <b>spans both planes</b> from one grammar: a data-plane hook runs in TMM's embedded VM, a
+      control-plane daemon rides kernel eBPF (§5.2). Each probe is <b>three parts</b>:</p>
     <div class="dsl" aria-label="dptrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
@@ -543,12 +551,8 @@
     </div>
     <p style="margin-top:1.4rem">Nothing about the VM, the verifier, or the context changed — only what the
       host does with the answer. That symmetry <em class="sig">is</em> the thesis: one verified surface,
-      serving observation and control as equals.</p>
-    <div class="callout sig" style="margin-top:1.5rem"><p>And read-a-context, return-a-value is just the
-      <b>floor</b>. The hook surface is designed to grow — a widening catalog of designed-in USDTs, plus every
-      named function the build's signed hook map already exposes, each new
-      context field opening more of the data plane to both observation and control, with room to give programs
-      more power over time.</p></div>
+      serving observation and control as equals. And it is the <b>floor</b>, not the ceiling: the hook surface is
+      built to grow (§5.6).</p>
   </section>
 
   <!-- 04 UNLOCK -->
@@ -559,26 +563,29 @@
       <b>programmability and observability</b> inside a black box:</p>
     <ul class="unlocks">
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
-        kernel-bypassed data plane — summarized with <span class="mono">dptrace</span> (<em>bpftrace for TMM</em>)
-        or captured byte-for-byte with <span class="mono">dpdump</span> (<em>tcpdump for TMM</em>).</li>
+        kernel-bypassed data plane — summarized with <span class="mono">dptrace</span> or captured byte-for-byte
+        with <span class="mono">dpdump</span>: <em>proposed</em> front-ends, bpftrace and tcpdump for TMM.</li>
       <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev — a
         metric you didn't think to collect, or reading internal load to nudge a knob.</li>
       <li><b>In-path control.</b> Steer, sample, rate-limit, or gate a flow on an internal signal — the decision
         computed right at the hook, inline, with no round-trip out of the data path.</li>
       <li><b>Field diagnostics.</b> Ship a signed probe to characterize a production issue in situ, then pull it —
-        no debug build, and often no waiting for a repro. It complements post-mortem analysis rather than replacing it: a probe answers a question someone already had, and a core dump is the fallback for when nobody did.</li>
-      <li><b>Runtime CVE mitigation.</b> Recognize a bug's precondition and take a host-owned safe outcome, between
-        patch windows — the one application worked end-to-end, with its limits, in
+        no debug build, often no waiting for a repro. It complements post-mortem analysis: a probe only answers a question someone already thought to ask, and a core dump is the fallback for when nobody did.</li>
+      <li><b>Runtime CVE mitigation.</b> Recognize a bug's precondition and take a host-owned safe outcome in the
+        window before a patched build is installed. <b>Two assumptions carry that</b>, and both are arguable: that
+        an operator cannot always install one immediately, and that enough real advisories are reachable from a
+        surviving function boundary at all — nobody has yet checked published ones one by one. Traced end to end,
+        with its limits, in
         <a href="cve-shield-walkthrough.html" style="color:var(--signal-ink)">the CVE walkthrough</a>. It is
-        <em>one</em> use of the engine, and the narrowest: it needs the same hooks, the same verifier and the same
+        <em>one</em> use of the engine, and the narrowest: it needs the same hooks, verifier and
         signing gate as everything above it.</li>
       <li class="prf"><b>AI-authored programs.</b> Because safety is a <em class="prf">proof, not trust</em>, a model
         can draft one and the verifier is a <b>fail-closed acceptance gate</b> — blast radius bounded before a
         human signs.</li>
     </ul>
-    <div class="callout sig"><p><b>Every one of these is the same engine.</b> A verified program runs at a
+    <div class="callout sig"><p><b>Every one of these is the same engine</b> — a verified program at a
       hook; they differ only in what the host does with its result. A new capability ships as
-      <b>verified bytecode</b>, on demand, then retires — not as a TMOS release.</p></div>
+      <b>verified bytecode</b>, then retires — not as a TMOS release.</p></div>
   </section>
 
   <!-- 05 DEEP DIVE -->
@@ -594,35 +601,33 @@
     <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT-compiled VM that runs arbitrary
       <em>verified</em> bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
       F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
-      machinery feeds counters, latency histograms, and flight-recorder rings for deep <em>observability</em>,
-      streams captured windows of internal state out to userspace for RCA, and drives steering and self-tuning
-      where the host wants to act on the return. Returning a value the host acts on is one thing the engine does —
-      not the point of it.</p>
+      machinery feeds counters, histograms and flight-recorder rings, streams captured state out to userspace for
+      RCA, and drives steering and self-tuning where the host wants to act on the return.</p>
     <p><b>Two kinds of hook — the anticipated and the unanticipated.</b> The first is a <b>designed-in
       tracepoint</b> (a USDT): F5 places a named, versioned point exposing a <em>curated</em>
       <span class="inlinecode">ctx</span> — a stable contract, published in a per-build map. That is the
       <em>planned</em> surface, and it is where the standing value lives: the metrics, histograms and latency
-      breakdowns you want on every box, whose meaning holds across releases. But no catalog anticipates every
-      question. <b>F5 cannot pre-place a tracepoint for every question someone will need to ask three years from
-      now</b> — which is what the second kind is for.</p>
+      breakdowns you want on every box, whose meaning holds across releases. But <b>no catalog anticipates every
+      question someone will need to ask three years from now</b> — which is what the second kind is for.</p>
     <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of an
       existing named function</em> — any function that survived the build as its own out-of-line body — reading
-      that function's arguments and reachable state as the <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
-      signatures — so you can instrument a spot <em>nobody thought to instrument ahead of time</em>, with no new
-      build. That is what makes the engine answer questions it was never designed for: <b>why is this one
-      customer's TLS renegotiation path slow</b>, <b>what state does the parser hold when this rare error branch
-      fires</b>, <b>which flows are reaching a code path we thought was unreachable</b> — and, as one case among
+      that function's arguments, resolved by the host into the <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
+      signatures — so you can instrument a spot <em>nobody thought of ahead of time</em>, with no new
+      build, and the engine answers questions it was never designed for: <b>why is this one
+      customer's TLS renegotiation path slow</b>, <b>which flows are reaching a code path we thought was
+      unreachable</b> — and, as one case among
       those, <b>recognising the precondition of a bug nobody foresaw</b>. (The mechanism is the kernel's own
       <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions.)</p>
     <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
-      capability in (patchable function entries), and attaches at a <em>named symbol</em> — never fragile offsets
+      capability in (patchable function entries), and attaches at a <em>named symbol</em>, not offsets
       an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
       And the honest bound on reach: <b>which functions are hookable is decided by the optimiser, not by us.</b>
       At <span class="inlinecode">-O2</span> an inlined or identical-code-folded function has no entry pad of its
       own, and a cloned one (<span class="inlinecode">.constprop</span>,
       <span class="inlinecode">.isra</span>) changes both its symbol name and its argument list. So the hookable
-      set is whatever the build's signed hook map <em>says</em> it is — which is knowable per build, but is a
-      subset of the source, and pinning a specific function into it means marking it
+      set is whatever the build's signed hook map <em>says</em> it is — a subset of the source, derived from the
+      build's own debug information, which is the <em>least-proven</em> engineering assumption here. Pinning a
+      specific function in means marking it
       <span class="inlinecode">noinline</span>: a source change, with its own cost.</p>
     <p>The honest trade is <b>stability</b>: a tracepoint's <span class="inlinecode">ctx</span> is a curated,
       versioned contract; a function-boundary probe's is <em>build-specific</em> (function X's signature at build
@@ -636,9 +641,10 @@
 <span class="c">//   summarize  →  recorded as a counter, histogram, or ring</span>
 <span class="c">//   capture    →  a window of state streamed out to userspace (RCA, debug)</span>
 <span class="c">//   act        →  a decision from the host's set — e.g. steer / drop</span></div>
-    <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world — it's
-      <b>input</b>; what the return <em>means</em> is the host's choice — a value to record, a window to capture and stream out, or a code to act on.
-      In the <b>base tier</b>, programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
+    <p style="margin-top:.9rem">The <span class="inlinecode">ctx</span> is the program's entire world, and it is a
+      <b>per-core copy</b>, discarded on fall-through: the host's builder walks TMM's structures in native C and
+      hands over resolved scalars, so a program never chases a pointer. What the return <em>means</em> is the
+      host's choice. In the <b>base tier</b>, programs are <b>pure functions of <span class="inlinecode">ctx</span></b>
       — they read fields and return a number, and call nothing; the host owns the counters, histograms, rings,
       and any decision logic around the call. Two consequences fall out, and they erase the
       hardest parts: <b>no custom helpers</b> to define, register, or secure; and <b>stock PREVAIL</b> — a bounded
@@ -661,8 +667,8 @@
     <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier; the data plane is the crown
       jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">dptrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
-      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). One DSL, two
-      engines, one trust path. (Not one binary for both: a different engine means a different
+      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL).
+      (Not one binary for both: a different engine means a different
       <span class="inlinecode">ctx</span> and a different verifier, so retargeting is a re-author, not a rename.)</p>
   </div>
 
@@ -674,51 +680,51 @@
       <thead><tr><th>Form factor</th><th>Data path</th><th>Coverage</th></tr></thead>
       <tbody>
         <tr><td>BIG-IP VE</td><td>pure software, no offload</td><td><b>full</b> — the VM sees the entire path</td></tr>
-        <tr><td>Appliance</td><td>hardware offload (ePVA, FPGA/TurboFlex)</td><td>software path only — offloaded flows are a hardware boundary</td></tr>
-        <tr><td>BIG-IP Next (BNK)</td><td>containerized TMM, DPU-dependent</td><td>depends on how much the DPU steers vs. lands in TMM</td></tr>
+        <tr><td>Appliance</td><td>offload to the ePVA flow accelerator, FPGA/TurboFlex</td><td>software path only — offloaded flows are a hardware boundary</td></tr>
+        <tr><td>BIG-IP Next for Kubernetes</td><td>containerized TMM, fronted by a DPU (SmartNIC)</td><td>depends on how much the DPU steers vs. lands in TMM</td></tr>
       </tbody>
     </table></div>
-    <p style="margin-top:.9rem"><b>Honest boundary:</b> a flow handled entirely in silicon never enters TMM software,
-      so an in-TMM hook can't see it — the same limit iRules and kernel eBPF already have. The L7/parser stages and
-      the plugin processes worth reaching execute in software regardless, so they stay in view.</p>
+    <p style="margin-top:.9rem"><b>Honest boundary:</b> a flow accelerated end to end never enters TMM software,
+      so its <em>contents</em> are invisible to an in-TMM hook — the same limit iRules and kernel eBPF already
+      have. But the offload <em>boundary</em> is ordinary TMM software and hookable on both sides — the
+      accelerate/escalate decision, the escalation return, the error paths — while the L7/parser stages and plugin
+      processes run in software regardless. Only a fault inside the silicon needs a firmware fix.</p>
   </div>
 
   <div class="spec reveal">
     <h3><span class="sn">5.4</span> Why it's safe to run inline</h3>
-    <p>Start with the load-bearing assumption, named plainly: <b>every claim on this page leans on the verifier
-      being right.</b> Three reasons that's a strong bet. <b>Provenance</b> — PREVAIL is the verifier Microsoft
+    <p>Start with the assumption every claim on this page leans on: <b>the verifier being right.</b> Three reasons that's a strong bet. <b>Provenance</b> — PREVAIL is the verifier Microsoft
       ships in eBPF-for-Windows: built on abstract interpretation, a formal method rather than hand-grown
       heuristics, publicly maintained and hardened in production. <b>Narrow envelope</b> — this design uses it at
       its best-proven case: a bounded predicate over a small typed struct, no helpers, no maps. <b>Depth</b> —
-      and this is the load-bearing point. The JIT emits native code inside TMM, and the verifier gates what
-      reaches it — PREVAIL itself runs off-box at build/control-plane time — so an unsound verifier would
-      still mean arbitrary code in the data plane — the risk a security review will press
-      hardest. But <b>only bytecode F5 authored ever reaches the verifier</b> — it runs in F5's admission pipeline, <em>before</em> signing — and <b>only F5-signed bytecode ever reaches the in-TMM JIT</b>; attacker-controlled input
-      never touches them, so a soundness bug is not a <b>traffic-borne RCE</b> — remote code execution triggered purely by sending traffic through the data path, with no credentials or management-plane access needed — it's a supply-chain concern, gated by
-      signing-key protection. A per-hook watchdog stands behind all of it. Trust the proof; don't depend on it
-      alone. (The load-bearing problems are catalogued in
+      the JIT emits native code inside TMM, so an unsound verifier would mean arbitrary code in the data plane,
+      and that is what a security review will press
+      hardest. But <b>only bytecode F5 authored ever reaches the verifier</b> — it runs in F5's admission pipeline, <em>before</em> signing, never on the box — and <b>only F5-signed bytecode ever reaches the in-TMM JIT</b>. Attacker-controlled input
+      never touches either, so a soundness bug is not a <b>traffic-borne RCE</b> — remote code execution triggered purely by sending traffic through the data path, needing no credentials and no management-plane access — but a supply-chain concern, gated by
+      signing-key protection. Trust the proof; don't depend on it
+      alone. (The hard problems are catalogued in
       <a href="engine-hard-problems.html" style="color:var(--signal-ink)">the engineering register</a>.)</p>
     <p>The second principle is just as blunt: <b>verified ≠ secure, and verified ≠ correct</b>. PREVAIL proves a
-      program is memory-safe and terminates — <em>not</em> that it fits the hook's budget, and nothing
-      about intent. Time-safety and security both live in the governance <em>around</em> the VM:</p>
+      program is memory-safe, and terminating where that check is enabled — <em>not</em> that it fits the hook's
+      budget, and nothing about intent. Time-safety and security both live in the governance <em>around</em> the VM:</p>
     <ul class="unlocks" style="margin-top:1rem">
       <li class="prf"><b>Proven before load</b> — bounded memory + termination, or it's rejected (fail closed).</li>
       <li><b>Bounded in time, not just in steps</b> — a proof that a program <em>terminates</em> is not a
-        <b>worst-case execution time (WCET)</b>: the longest it can actually take on the hardware. So each hook
+        <b>worst-case execution time (WCET)</b>: the longest it can take on the hardware. So each hook
         adds an <b>instruction-budget ceiling</b> at load and a <b>runtime guard</b> as it runs — a provably-terminating
-        program still can't overrun its hook's budget — the guard's mechanism is the register's §01 open question — which is set per <em>invocation</em> and gated by the hook's rate (per packet, per connection, per request), not by one global number.</li>
+        program still can't overrun its hook's budget (the guard's mechanism is the register's §01 open question). The budget is set per <em>invocation</em> and gated by the hook's rate — per packet, per connection, per request — not by one global number.</li>
       <li><b>Signed &amp; authorized</b> — the box checks the signature before the JIT sees bytecode (the verifier already ran, at F5); a program that
-        <em>acts</em> needs stricter authz than one that only observes; RBAC-gated.</li>
+        <em>acts</em> needs stricter authorization than one that only observes, and role-based access control gates who may load it.</li>
       <li><b>Host-owned outcomes</b> — a program only returns a value; everything done with it, the host does.
         Even at an acting hook, the return merely <em>selects among</em> outcomes the host code already owns
         (<span class="mono">steer / drop / sample</span>, from the canonical set); a program cannot invent control
         flow or force an arbitrary early return.</li>
-      <li><b>Context minimization</b> — the signed hook-point map declares, per hook, exactly which <span class="mono">ctx</span> fields are exposed; secrets and PII are withheld by default.</li>
-      <li><b>One-way egress</b> — with no helpers a program has no I/O of its own; it returns a value to a
-        host-owned, schema-checked sink it cannot read back or redirect. The verifier proves the program reads
-        only its declared <span class="mono">ctx</span> fields and has no exit of its own; the host owns the single
-        sink — so only host-approved <em>derived</em> output ever leaves, never raw memory.</li>
-      <li><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, instant kill-switch +
+      <li><b>Context minimization</b> — the signed hook-point map declares which <span class="mono">ctx</span> fields each hook exposes; secrets and personal data are withheld by default.</li>
+      <li><b>One-way egress</b> — with no helpers a program has no I/O of its own: it returns a value to a
+        host-owned, schema-checked sink it cannot read back or redirect, and the verifier proves it reads
+        only its declared <span class="mono">ctx</span> fields. Only host-approved <em>derived</em> output ever
+        leaves, never raw memory.</li>
+      <li><b>Governed lifecycle</b> — attestation/inventory, tamper-evident audit, a kill-switch and
         revocation, a per-hook perf budget with a watchdog, and a <b>control-plane canary that auto-unloads on a
         health signal</b> — because a verified, signed program can still be <em>wrong</em> (black-hole or
         misroute traffic); the proof bounds crashes, the canary bounds bad-but-valid programs.</li>
@@ -728,7 +734,7 @@
   <div class="spec reveal">
     <h3><span class="sn">5.5</span> Lifecycle — nothing outlives its purpose</h3>
     <p>Every program is authored, proven, signed, loaded — and can carry an expiry, so nothing outlives its
-      purpose: a diagnostic probe when its window closes, a temporary control when it's no longer needed. No zombies.</p>
+      purpose: a diagnostic probe when its window closes, a temporary control when it is no longer needed.</p>
     <div class="lifecycle">
       <span class="step"><b>author</b> (human or AI-assisted)</span><span class="arr">→</span>
       <span class="step"><b>clang</b> → bytecode</span><span class="arr">→</span>
@@ -750,11 +756,11 @@
         the compiler flag — <b>no VM, verifier, or helper work</b> either way. Honest cost: the flag pads every
         function entry in the image, so there is a <b>one-time build-time footprint</b> (i-cache/size) paid whether
         or not a hook is ever armed — a number to measure before committing, not to assume. Every new field
-        widens what can be observed <em>and</em> acted on, so the instrumentation surface compounds over time.</li>
+        widens what can be observed <em>and</em> acted on, so the surface compounds.</li>
       <li class="prf"><b>Helpers — if and when needed.</b> Richer, stateful programs (direct host-map access,
         cross-flow state) can be enabled later through an <em>optional</em> helper tier. The honest trade: helpers
         reintroduce an ABI to secure and verifier surface to manage — which is exactly why the base ships without
-        them and stays on <b>stock PREVAIL</b>. Power is available; safety stays the default.</li>
+        them and stays on <b>stock PREVAIL</b>.</li>
     </ul>
   </div>
 
@@ -778,7 +784,7 @@
       <div class="rrow"><span class="rn">05</span><span class="rt">Every change <b>proven safe before it
         runs</b> — signed, governed, self-retiring.</span></div>
     </div>
-    <p>This isn't a feature request. It's a direction: give TMM the one in-process surface that is
+    <p>The direction: give TMM the one in-process surface that is
       <b>runtime, programmable, and provably safe</b> — reaching the data plane's own code and state. The parts
       are proven libraries; the hooks are ours to place; the safety is <b>a proof, not a promise</b>.</p>
     <p class="foot">
