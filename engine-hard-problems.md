@@ -275,6 +275,22 @@ own state-sync fabric; the map model must defer to that fabric, not compete with
 **The claim to retire:** "a shield is a bounded predicate at one hook, so N shields are just N
 bounded predicates."
 
+**And before the problems, the answer in one table, because "are simultaneous handlers supported?" has
+five different meanings and they do not all get the same answer:**
+
+| What is being asked | Supported? | Mechanism, or why not |
+|---|---|---|
+| Several **different hooks** armed at once, one program each | **Yes** | Up to `SHIELD_MAX_SHIELDS` concurrently loaded (64 in the candidate ABI). Bounded not by that count but by a **global armed-cost ceiling**, because a flow pays the *sum* of the hooks it traverses, not the maximum. |
+| **The same program on every TMM instance** at once | **Yes, and unavoidable** | Arming a hook arms it everywhere, so N copies execute genuinely in parallel on disjoint flows. This is why all-or-nothing arming matters: a partially armed set is not "mostly protected" — an attacker only has to reach the instance that missed. |
+| **Two or more programs chained on one hook** | **No — refused by design** | One program slot per hook; a second `LOAD` on an armed hook returns `SHIELD_ERR_BUSY` rather than overwriting. Replacing a shield is `REVOKE` then `LOAD`, explicitly. Deferred rather than forbidden forever — see below for why the blocker is outcome composition and not plumbing. |
+| **Two handlers running at the same instant on one core** | **No — impossible by construction** | The poll loop is single-threaded, un-preemptible and run-to-completion. This is not a restriction the design imposes; it is the property that *lets* per-core counters skip atomics and one `ctx` scratch buffer per core suffice (§3.2). |
+| **A handler re-entered while already on the stack** | **Possible by nesting, and guarded** | Hook A's generated ctx-builder calls a function carrying hook B, whose builder reaches back into A. A per-core depth guard covers it, and covers it *completely*, because there is no parallel entry to also worry about. |
+| **Two hooks both firing within one unit of work** | **Yes — and it is an accounting problem, not a race** | Run-to-completion serialises them; their costs add. That is the cumulative-budget item below, and its fix is a ceiling, not memory ordering. |
+
+So: **concurrent hooks yes, concurrent programs at one hook no, and true simultaneity within a core is
+not a thing that can happen.** The rest of this section is the four consequences of the first two, and
+§3.2 is the concurrency model the fourth and fifth rows rest on.
+
 Every cost and safety argument in this register is written for **one program at one hook**. The
 moment two are armed, four things appear that no single-hook analysis covers — and the first is a
 defect in the ABI as it currently stands, not just an unwritten policy.
