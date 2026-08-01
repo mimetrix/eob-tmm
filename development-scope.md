@@ -212,4 +212,4 @@ original scoping was off without pricing them.
 ---
 
 *A design proposal. Security-review-worthy items feed the formal TMA (Threat Model Analysis),
-a gating prerequisite. Detailed method & claims are held in a separate invention disclosure.*
+a gating prerequisite.*

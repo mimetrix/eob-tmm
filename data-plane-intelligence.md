@@ -4,7 +4,7 @@
 
 **Status:** **Strategy annex** / opportunity framing — deliberately **out of scope for the feasibility phase**
 **Audience:** F5 product & strategy, TMOS architecture, F5 SIRT, data/ML leadership, OSPO
-**Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (the security instance), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a signal actually leaves the poll loop), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (the hook + `ctx` catalog whose fields are the feature inputs assumed here) · *Detailed method & claims are held in a separate invention disclosure, per IP policy.*
+**Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (the security instance), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a signal actually leaves the poll loop), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (the hook + `ctx` catalog whose fields are the feature inputs assumed here)
 **Scope:** What a bounded in-process substrate could unlock if it is later pointed not at *behavior* but at *data* — and the flywheel that would connect the two.
 
 > ### Read this as an annex, not as a request

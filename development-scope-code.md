@@ -1769,5 +1769,4 @@ item actually requires they are low — in several cases badly, and two of the l
 
 ---
 
-*Candidate code for review — not TMM source, and not a commitment to an implementation. Detailed
-method & claims are held in a separate invention disclosure.*
+*Candidate code for review — not TMM source, and not a commitment to an implementation.*

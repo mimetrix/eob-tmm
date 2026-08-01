@@ -215,4 +215,4 @@ If all three land, what follows is a real subsystem-scale programme (§5), and i
 
 ---
 
-*A review register. Findings are recorded here; fixes land in the documents they affect and are marked in this table as they do. Detailed method & claims are held in a separate invention disclosure.*
+*A review register. Findings are recorded here; fixes land in the documents they affect and are marked in this table as they do.*
