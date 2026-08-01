@@ -88,7 +88,7 @@ The consequence is the central design constraint:
 
 ### 2.1 The data-plane coverage map
 
-iRules — the sanctioned, in-TMM scripting surface — do not reach every data-path CVE. An iRule can shield a CVE only when **(a)** an iRule event fires *before* the vulnerable code executes, **(b)** the triggering condition is observable through the iRule command/data model at that event, and **(c)** the flow actually reaches the iRule VM (it isn't bypassed by FastL4/hardware offload). Whenever any one fails, there is a hole — and the holes are positional, clustering before L7 parsing and inside the enforcement plugins, bracketing the reachable middle:
+iRules — the sanctioned, in-TMM scripting surface — do not reach every data-path CVE. An iRule can shield a CVE only when **(a)** an iRule event fires *before* the vulnerable code executes, **(b)** the triggering condition is observable through the iRule command/data model at that event, and **(c)** the flow actually reaches the iRule VM (it isn't bypassed by FastL4/hardware offload). Whenever any one fails, there is a hole — and the holes are positional, clustering before L7 parsing and inside the enforcement path — `bd`/WAF out of process, AFM and DoS inside TMM — bracketing the reachable middle:
 
 ```
  Ingress

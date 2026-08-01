@@ -50,7 +50,7 @@ ahead of time, but *how long* they take is not.
   the program's cost and gates on the hook's budget:
   1. The program is already verified, so its control-flow graph is finite and every loop carries a
      proven iteration bound — which makes a **longest-path instruction count** over the CFG
-     computable (WCET-*lite*, tractable precisely because unbounded code was already rejected).
+     computable (an instruction-count bound rather than a time bound, tractable precisely because unbounded code was already rejected).
      PREVAIL's loop bounds are *reused* here, not recomputed.
   2. Map that count to a conservative **cycle estimate** via a per-target cost model (a per-opcode
      cycle cost, with loads and stores costed above register operations) and compare to the hook's

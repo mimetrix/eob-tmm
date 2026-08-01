@@ -33,7 +33,7 @@ This is the deliberate **inversion of the kernel/bpftime model**, where the *pro
 
 1. **Never block.** Under sink pressure the ring's **declared policy** decides which end loses: a `STREAM` ring **drops the new record and counts it**; a `RECORD` ring **overwrites its oldest record**. Neither ever stalls the poll loop. These are two policies, not one rule, and they are mutually exclusive — see §5.1.
 2. **Bounded inline work.** The inline side does at most one bounded `memcpy` (a window), or just a descriptor write. All heavy work (serialize, off-box) is off-loop.
-3. **Single producer per ring.** The producer is the pinned poll-loop core → strict **SPSC** → no locks, plain reserve. (Contrast: bpftime carries a `pthread_spinlock` only because it supports MPSC producers — we don't need it.)
+3. **Single producer per ring.** The producer is the pinned poll-loop core → strict **SPSC** (single-producer / single-consumer) → no locks, plain reserve. (Contrast: bpftime carries a `pthread_spinlock` only because it supports MPSC — multi-producer — rings; ours has one producer by construction.)
 4. **Host-emits / program-signals** (§2) — no helpers, stock verifier, initially.
 5. **shm-backed.** The ring lives in shared memory, so the *segment* outlives the producer process and is drainable post-mortem (the flight-recorder property). State the bound with it: the fault class a flight recorder exists to capture is largely memory-safety faults, and a fault that corrupted memory on the way down can have scribbled the ring itself. Records are therefore **structurally validated** on drain rather than trusted, and the ring is **not** trustworthy after a memory-corruption fault (§5.7).
 6. **Coverage honesty.** A flow handled entirely in hardware (ePVA/FPGA/DPU) never enters TMM software, so it is not in software to capture — the same limit iRules and kernel eBPF already have.
@@ -45,7 +45,7 @@ TMM is kernel-bypass DNA, so the **nearest idiom is DPDK**, not the kernel-eBPF 
 | Source | What it offers | What we take |
 |---|---|---|
 | **DPDK `rte_ring`** | Canonical lock-free SPSC/MPSC ring; the native idiom for a core-pinned engine | The **SPSC ring structure** and busy-poll drain model |
-| **Kernel `BPF_MAP_TYPE_RINGBUF`** | A variable-length, libbpf-drainable ring ABI (consumer/producer pages, pow2 data, BUSY/DISCARD bits, 8-byte header) | The **record byte-layout** (documented ABI; clean-room implementable) |
+| **Kernel `BPF_MAP_TYPE_RINGBUF`** | A variable-length, libbpf-drainable ring ABI — application binary interface (consumer/producer pages, pow2 data, BUSY/DISCARD bits, 8-byte header) | The **record byte-layout** (documented ABI; clean-room implementable) |
 | **bpftime** (userspace eBPF, MIT) | The eBPF-flavored instance — a port of the kernel ringbuf ABI over Boost.Interprocess shm | A **worked reference** that the kernel-ringbuf byte-layout drains at the byte level in userspace |
 
 **What bpftime's transport actually is** (read from source, `runtime/src/bpf_map/userspace/ringbuf_map.{hpp,cpp}`):
@@ -70,8 +70,8 @@ TMM is kernel-bypass DNA, so the **nearest idiom is DPDK**, not the kernel-eBPF 
 
 **Classes** decide how a record is *shaped*:
 
-- **Event ring — fixed-slot.** For `ctx` samples, counter/histogram feeds, small events. One fixed record size per ring, power-of-two slots, `producer_pos`/`consumer_pos` as plain monotonic indices masked into the slot array.
-- **Capture ring — variable-length.** For `dpdump` byte-windows. Length-prefixed records in the **kernel-ringbuf byte-layout** (8-byte header: `u32 len` + BUSY/DISCARD bits, `u32` reserved/aux; 8-byte-aligned payload; pow2 data area with wraparound by mask). Optionally libbpf-drainable (§4, §6).
+- **Event ring — fixed-slot.** For `ctx` samples, counter/histogram feeds, small events. One fixed record size per ring, power-of-two slots, `producer_pos` — and, on a `STREAM` ring, `consumer_pos` — as monotonic **slot indices** masked into the slot array. Because the positions count slots rather than bytes, this class is **not** libbpf-drainable (§6).
+- **Capture ring — variable-length.** For `dpdump` byte-windows. Length-prefixed records in the **kernel-ringbuf byte-layout** (8-byte header: `u32 len` + BUSY/DISCARD bits, `u32` reserved/aux; 8-byte-aligned payload; pow2 data area with wraparound by mask), with byte positions. This is the only class for which the libbpf option in §6 arises (§4, §6).
 
 **Policies** decide what happens when the ring is *full*. Policy is a **per-ring property declared at ring creation**, orthogonal to class, and the two policies are mutually exclusive because they want opposite things:
 
@@ -80,15 +80,15 @@ TMM is kernel-bypass DNA, so the **nearest idiom is DPDK**, not the kernel-eBPF 
 | **`STREAM`** | **drop the new record and count it** — never overwrite unconsumed data | `drops` / `drop_bytes` (§5.5) | yes — the drainer publishes `consumer_pos` | live drain: `dptrace` feeds, streaming `dpdump` capture, the feature sink |
 | **`RECORD`** | **overwrite the oldest record** | none — loss is the design, not an anomaly; the ring instead reports the window it holds | none — the producer never consults a reader | the **flight recorder** (`tmm-usdt-tracepoints.md` §10.1): a rolling window of recent records, frozen and dumped on a trigger |
 
-This split is load-bearing, and getting it wrong is not cosmetic. A flight recorder **requires** overwrite-oldest: the entire reason it exists is that its dump holds the **run-up into the fault**. A recorder that drops-and-counts when full stops recording at the moment it fills, so its dump contains the *oldest* records — the state of the box long before the incident, which is precisely the window nobody wants. Conversely a streaming ring must never overwrite, because a consumer draining for export cannot have records pulled out from under it mid-read. Assigning one fixed-slot ring to both roles under one "never overwrite unconsumed data" rule makes the recorder useless, which is why the rule is now stated per policy: **§5.5's drop-and-count applies to `STREAM` only.** §5.4's reserve/commit protocol is shared, with the per-policy differences called out step by step.
+A flight recorder **requires** overwrite-oldest: the reason it exists is that its dump holds the **run-up into the fault**. A recorder that drops-and-counts when full stops recording at the moment it fills, so its dump contains the *oldest* records — the state of the box long before the incident. Conversely a streaming ring must never overwrite, because a consumer draining for export cannot have records pulled out from under it mid-read. Assigning one fixed-slot ring to both roles under one "never overwrite unconsumed data" rule makes the recorder useless, which is why the rule is now stated per policy: **§5.5's drop-and-count applies to `STREAM` only.** §5.4's reserve/commit protocol is shared, with the per-policy differences called out step by step.
 
 ### 5.2 Per-core, single-producer
 
-One ring instance **per core, per active sink** (or per hook class). The producer is the pinned poll loop → strict **SPSC** → no spinlock, no CAS. Per-CPU rings are the natural analog of kernel per-CPU maps — with no locking, because each core owns its ring.
+One ring instance **per core, per active sink** (or per hook class). The producer is the pinned poll loop → strict SPSC → no spinlock, no CAS (compare-and-swap). Per-CPU rings are the natural analog of kernel per-CPU maps — with no locking, because each core owns its ring.
 
 **Ordering is specified by semantics, not per architecture.** `producer_pos`, `consumer_pos`, and each record's header word are C11 `_Atomic` and are accessed with `memory_order_acquire` / `memory_order_release`; the compiler emits whatever the target needs. We deliberately do **not** write the spec as `volatile` plus a compiler barrier. `volatile` is not an ordering primitive: it constrains neither the compiler nor the hardware with respect to the *surrounding non-`volatile` accesses* — and the access that matters most here is exactly one of those, the payload `memcpy` that must not become visible after the commit. Writing the rule as an acquire/release pair makes the payload part of the release, which is the property we actually depend on. (§4 attributes the `volatile`+`barrier()` idiom to *bpftime*; that is a description of bpftime's source, not an inherited spec.)
 
-*What that lowers to, for the reader who wants it:* on aarch64, `ldar`/`stlr`; on x86-64, a plain load/store plus a compiler barrier, because TSO already supplies the hardware ordering. Same source, no `#ifdef`.
+*What that lowers to, for the reader who wants it:* on aarch64, `ldar`/`stlr`; on x86-64, a plain load/store plus a compiler barrier, because that architecture's TSO (total store ordering) memory model already supplies the hardware ordering. Same source, no `#ifdef`.
 
 ### 5.3 The no-helper emit contract
 
@@ -127,12 +127,12 @@ The program never sees `ring_reserve`. **What may be emitted without a helper:**
 
 ### 5.4 Reserve / commit protocol
 
-The protocol below is shared by both classes and both policies. Note that this makes the **fixed-slot** event ring (§5.1) carry a per-slot header word for the BUSY/DISCARD bits and a `seq`+timestamp preamble too, not bare payload: the price of a uniform commit and a uniform crash-recovery rule across every ring is a few bytes per slot, and it is worth paying rather than maintaining two protocols.
+The protocol below is shared by both classes and both policies. Note that this makes the **fixed-slot** event ring (§5.1) carry a per-slot header word for the BUSY/DISCARD bits and a `seq`+timestamp preamble too, not bare payload: a uniform commit and a uniform crash-recovery rule across every ring cost a few bytes per slot, and the alternative is two protocols.
 
 **`ring_reserve(ring, len)`** — the one step that differs by policy (§5.1):
 
 - **`STREAM`:** if free space < needed, bump `drops`/`drop_bytes` and return `NULL`.
-- **`RECORD`:** cannot fail. Advance the tail past as many oldest records as the new one needs, then reserve.
+- **`RECORD`:** cannot fail. The producer owns a `tail` marking its own oldest retained record — there is no reader position to consult (§5.1) — and advances it past as many oldest records as the new one needs, then reserves.
 - Either policy: write the record header with the **BUSY** bit set, write the **record preamble** (`seq`, timestamp — see below) at the head of the payload area, and return a pointer just past the preamble.
 
 Host then does the bounded `memcpy` into the reserved slot.
@@ -165,8 +165,10 @@ A **`RECORD`** ring has no drop counter and cannot report loss this way, because
 
 ### 5.6 Wakeup — batched, off the hot path
 
+Wakeup is a **`STREAM`** concern only. A `RECORD` ring has no standing drainer to wake: it is read once, on a trigger or post-mortem (§5.1), so its producer does no wakeup work at all.
+
 - **Default: a sleeping drainer, woken by a batched `eventfd`/futex.** The producer signals only on an empty→non-empty edge, or every *K* records / *T* µs — **never per record**. Be explicit about what this costs the producer rather than calling it free: the wakeup *is* a syscall, issued from the poll loop, which is exactly why it is edge-triggered and batched. §1's "never syscalls for traffic" remains true — no syscall sits on the per-packet path — but an amortized wakeup syscall on the *emit* path is a real, measurable cost that belongs in the budget.
-- **Opt-in: busy-poll drain, no wakeup at all** (the DPDK idiom) — a drainer thread that polls `has_data()` across rings and never sleeps, so the producer does zero wakeup work. This is **not** the appliance default, because on an appliance there is no spare core: TMM owns nearly all of them, and what remains runs the entire control plane (`mcpd`, `bd`, `restjavad`/`icrd`, `restnoded`, monitors). A 100 %-CPU busy-poll drainer there competes with the control plane rather than soaking up idle cycles, which is the opposite of the "use cycles only when the data plane has them" discipline the companion docs commit to. Enable it on VE and lab rigs where a core can genuinely be dedicated, or where a measurement needs zero wakeup jitter.
+- **Opt-in: busy-poll drain, no wakeup at all** (the DPDK idiom) — a drainer thread that polls `has_data()` across rings and never sleeps, so the producer does zero wakeup work. This is **not** the appliance default, because on an appliance there is no spare core: TMM owns nearly all of them, and what remains runs the entire control plane (`mcpd`, `bd`, `restjavad`/`icrd`, `restnoded`, monitors). A 100 %-CPU busy-poll drainer there competes with the control plane rather than soaking up idle cycles, which is the opposite of the "use cycles only when the data plane has them" discipline the companion docs commit to. Enable it on VE and lab rigs where a core can be dedicated, or where a measurement needs zero wakeup jitter.
 
 ### 5.7 shm lifecycle & crash semantics
 
@@ -183,7 +185,7 @@ A **`RECORD`** ring has no drop counter and cannot report loss this way, because
 
 ## 6. Consumer ABI — the one deliberate compatibility choice
 
-Records use the **kernel BPF-ringbuf byte-layout** (len+bits header, 8-byte alignment, pow2 data), so a stock libbpf `ring_buffer` consumer can be pointed at our pages if we ever want an off-the-shelf drainer — bpftime proves this works at the byte level. **But we do not adopt libbpf's fd+`epoll` transport**; our drainer maps the shm arena directly. Byte-layout compatible, transport ours. This keeps the ecosystem-reuse option open (fits `dpdump : tcpdump :: dptrace : bpftrace`) at zero hot-path cost.
+**Capture-ring** records (§5.1) use the **kernel BPF-ringbuf byte-layout** (len+bits header, 8-byte alignment, pow2 data), so a stock libbpf `ring_buffer` consumer can be pointed at those pages if we ever want an off-the-shelf drainer — bpftime proves this works at the byte level. **But we do not adopt libbpf's fd+`epoll` transport**; our drainer maps the shm arena directly. Byte-layout compatible, transport ours. This keeps the ecosystem-reuse option open (fits `dpdump : tcpdump :: dptrace : bpftrace`) at zero hot-path cost.
 
 **Scope the compat claim precisely, though.** Our records carry a `seq`+timestamp **preamble inside the payload** (§5.4), because the 8-byte header has no room for it. A stock libbpf consumer therefore *frames* our records correctly — it walks lengths and bits and hands each record to a callback — but the record contents are **opaque** to it: it does not know the preamble is there, so it cannot interpret `seq`, ordering, or the abandon logic. Compatibility is at the **framing level**, not the record level. That is enough for "point an existing tool at these pages and get records out," and not enough for "an existing tool understands our records." §8 keeps the commit-or-not decision open on those terms.
 

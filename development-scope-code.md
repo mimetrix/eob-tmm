@@ -220,8 +220,8 @@ int tramp_dispatch(struct hook_slot *slot, void *ctx, size_t ctx_len)
      * memory outside ctx. It also cannot WRITE outside ctx — but it can write
      * freely INSIDE it, which is why the copy exists and is discarded. And it
      * terminates only within PREVAIL's 100,000-loop-iteration bound, and only
-     * when admission passed --termination (off by PREVAIL's default). 100,000
-     * iterations is itself ~300 µs at ~10 instructions each on 3 GHz, so
+     * when admission passed --termination (off by PREVAIL's default). That bound
+     * is an iteration count rather than a duration, so
      * "terminates" is not "cannot stall the poll loop": that is what item 8's
      * admission budget and item 15's back-edge fuel are for.
      *
