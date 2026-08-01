@@ -588,8 +588,9 @@
         build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
         smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine. <b>So this
         register argues for a sequencing, not a commitment: three questions decide whether any of the rest is
-        worth designing, and none of them requires building the engine.</b> Measure the always-on cost of the
-        compiler flag (<b>kill criterion, ~1% pps</b> — this one can end the idea outright), settle a
+        worth designing, and none of them requires building the engine.</b> Measure the compiler flag <b>twice</b> — its
+        always-on cost with nothing armed (<b>kill criterion, ~1% pps</b> — this one can end the idea
+        outright), then the armed cost at rate — settle a
         <span class="inlinecode">ctx</span> model that actually verifies against real TMM debug info,
         and arm one hook end-to-end in a lab TMM with core dumps still readable.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>

@@ -613,10 +613,13 @@ in [`engine-hard-problems.md`](engine-hard-problems.md) §6.1 and
 purpose** — this is a proposal, not a plan.
 
 **None of which has to be committed to in order to evaluate this.** Three questions decide whether the
-rest is worth designing, and the first is a *measurement* rather than a feature: the dark cost of
-building TMM with `-fpatchable-function-entry` (throughput, latency distribution, text size, i-cache
-behaviour). **Kill criterion, stated up front: if the padding flag costs more than ~1% of pps, the
-function-boundary half of this proposal is dead** and only designed-in call sites survive. The other
+rest is worth designing, and the first is a *measurement* rather than a feature — in fact two,
+from the same build. The **dark cost** of compiling TMM with `-fpatchable-function-entry` when nothing is
+armed (throughput, latency distribution, text size, i-cache behaviour), because that is the only cost
+every customer pays forever whether or not a shield ever loads; **kill criterion, stated up front: if the
+padding flag costs more than ~1% of pps, the function-boundary half of this proposal is dead** and only
+designed-in call sites survive. Then the **armed cost at rate**, with one hook live on a per-packet path,
+which is the number that decides whether per-packet shielding is real (`engine-hard-problems.md` §1.1). The other
 two are a `ctx` model that actually verifies against real TMM debug info, and one hook armed end-to-end
 in a lab TMM with core dumps still readable. Naming the number that would kill this is what makes the
 rest of it worth taking seriously.

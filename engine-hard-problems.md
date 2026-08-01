@@ -183,11 +183,11 @@ taken:
   honest to say so.
 - **Anything on a FastL4 or offloaded path** — no. It never enters TMM software (design §10).
 
-**And there is a gap in the measurement plan that this exposes.** The three questions the package asks
-first measure the **always-on cost of the pads when nothing is armed**. Nothing measures **an armed hook
-on a per-packet path**, which is the number that decides whether the middle tier above is real. That is a
-second experiment, it is cheap once the first build exists, and it should be named rather than discovered
-later.
+**And this is where the second measurement comes from.** An earlier version of the measurement plan asked
+only for the **always-on cost of the pads with nothing armed** — which is the right first number, but says
+nothing about **an armed hook on a per-packet path**, and that is what decides whether the middle tier
+above is real. It is cheap once the first build exists (same rig, one hook live), so the flag measurement
+is now specified as two numbers rather than one: dark cost, then armed cost at rate.
 
 ## 2. The context / helper / program-type ABI is the actual project
 
@@ -573,9 +573,9 @@ is doesn't make it easier to say yes to; it makes the yes collapse in month nine
 
 Which is why this register argues for a **sequencing**, not a commitment. **Three questions decide
 whether any of the rest is worth designing**, and none of them requires building the thing: measure the
-always-on cost of the padding flag (**kill criterion ~1% pps** — this one can end the idea outright),
-settle a `ctx` model that actually verifies against real TMM debug info, and arm one hook end-to-end in
-a lab TMM with core dumps still readable. Answer those three and the argument is either real or dead,
+padding flag twice — the always-on cost with nothing armed (**kill criterion ~1% pps** — this one can end
+the idea outright) and then the armed cost at rate (§1.1) — settle a `ctx` model that actually verifies
+against real TMM debug info, and arm one hook end-to-end in a lab TMM with core dumps still readable. Answer those three and the argument is either real or dead,
 for a small fraction of what the programme would cost.
 
 ## 7. The honest one-liner

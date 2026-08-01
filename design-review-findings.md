@@ -10,7 +10,7 @@
 
 ## The verdict, stated first
 
-All three reviewers would **back answering three questions first** (§8). None would back the twelve-item build as scoped. Their shared reasoning:
+All three reviewers would **back settling two questions on paper (§7) and proving three in a lab (§8) first**. None would back the twelve-item build as scoped. Their shared reasoning:
 
 - **The mechanism is the right shape** — patchable entry pad, trampoline, signed per-build hook map, monitor-before-enforce, signing gate as the perimeter.
 - **The `ctx` model as written does not work**, and that is provable from PREVAIL's own source, not a matter of taste.
@@ -189,11 +189,14 @@ Ranked by how much it would help to move it forward.
 
 ---
 
-## 7 · The three questions to answer before anything else
+## 7 · Two things to settle on paper, before any build
 
-1. **Measure the flag** (§4). Two weeks. Kill criterion >1% pps.
-2. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A focused SIRT-plus-engineering exercise, and it either makes the case obvious or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
-3. **The trilemma — pick one, in the room, not in month nine.** With no preemption, enforcing a time bound needs fuel; fuel has no effect under uBPF's JIT; wall-clock is unmeasurable at hot-hook granularity on aarch64. **Which do you give up: the run-to-completion loop, the unmodified uBPF, or enforce mode?** The available good answer — fork uBPF's JIT for back-edge fuel, own it, upstream it — costs "reused as-is" on one of the three reused components.
+These need no engineering at all — no build, no lab, no measurement rig — which is why they belong
+before §8's three rather than alongside them. Either one can change the shape of the programme, and the
+first can change whether there is one.
+
+1. **The retrospective shieldability study.** Take the last three years of *real* F5 data-plane advisories — every TMM and `bd` CVE. Per CVE: was there a reachable boundary exposing the triggering condition in its arguments; which named function; what the safe outcome was; would the predicate have had an acceptable false-positive rate. Report **N shieldable, M not, and the M-list reasons**. A focused SIRT-plus-engineering exercise, and it either makes the case obvious or right-sizes it. (If the answer is "3 of 40, all in `bd`," that is a different, smaller, still-worthwhile project.)
+2. **The trilemma — pick one, in the room, not in month nine.** With no preemption, enforcing a time bound needs fuel; fuel has no effect under uBPF's JIT; wall-clock is unmeasurable at hot-hook granularity on aarch64. **Which do you give up: the run-to-completion loop, the unmodified uBPF, or enforce mode?** The available good answer — fork uBPF's JIT for back-edge fuel, own it, upstream it — costs "reused as-is" on one of the three reused components.
 
 **And the question with no answer in any document:** who owns the safe-return policy for every hookable TMM function, *in perpetuity*, and what mechanical gate catches it when someone edits one of those functions two releases from now? Skipping a body is a per-function proof obligation over buffer ownership, refcounts, locks held on entry, flow-state advancement, and divergence from the mirrored connflow. There is no test for the absence of an obligation you didn't think of. The failure mode: a shield blocks the CVE, passes red team, ships, and leaks a packet buffer at 40k conn/sec on one customer's traffic mix three weeks later — presenting as a memory-pressure TMM restart with no attribution back to the shield.
 
@@ -203,15 +206,31 @@ Ranked by how much it would help to move it forward.
 
 ## 8 · The recommended path
 
-**Three questions, answered before anything is built.** All three reviewers wanted these settled first,
-none of them requires building the engine, and the first can end the idea outright — which is the point
-of asking it first.
+**Three things to prove in a lab**, on top of §7's two paper decisions. Each is small next to building
+the engine, and they are ordered so the cheapest possible *no* comes first: **(1)** asks whether the
+mechanism is affordable at all, **(2)** whether anything useful can be expressed, and **(3)** whether the
+pieces compose without wrecking serviceability. That ordering is the point — a failure at (1) means the
+rest was never worth designing.
 
-1. **The dark-cost measurement** and the text-mapping determination (§4). Kill criterion >1% pps.
-2. **A `ctx` model that actually verifies.** Reuse PREVAIL's `tracing` program type, copy the ctx into per-core scratch, and express the worked CVE as a scalar predicate against it. If the CVE class we care about *needs* pointer chasing, then day one includes a bounded `probe_read` helper and the §4 threat surface grows — decide that now, on paper, with SIRT in the room.
-3. **One hook armed end-to-end on one architecture in a lab TMM**, with core dumps and backtraces still working through the trampoline.
+1. **The cost of the compiler flag, measured twice.** Build TMM with and without
+   `-fpatchable-function-entry` and compare throughput, the latency *distribution* (the tail, not the
+   mean — that is what a proxy is judged on), text size, and i-cache/i-TLB behaviour. Two numbers, not
+   one:
+   - **The dark cost — nothing armed.** This is the one that matters most, because it is the only cost
+     **every customer pays forever**, whether or not a shield is ever loaded. The pads are bytes in the
+     instruction stream, so the mechanism is second-order: text inflation, worse i-cache locality, more
+     i-TLB pressure, and possible perturbation of the optimiser's layout and inlining decisions (which
+     can move performance in *either* direction). Plus the text-mapping determination (§4).
+     **Kill criterion >1% pps** — a business threshold as much as a technical one, since a permanent
+     regression across the product line for a feature most customers never activate is a hard sell.
+   - **The armed cost, at rate.** Nothing in an earlier version of this list measured **an armed hook on
+     a per-packet path**, which is the number that decides whether per-packet shielding is real at all
+     (`engine-hard-problems.md` §1.1). It is cheap once the first build exists — same rig, one hook
+     armed — and it should not be discovered as a missing number later.
+2. **A `ctx` model that actually verifies, against real TMM debug info.** Two independent difficulties meet here. PREVAIL's side: there is no `--program-type`, the context descriptor is four integers with no read-only region (so the program can write its own ctx, forcing the per-core copy), and a load out of `ctx` yields an unconstrained *number* — dereferencing which is refused however many NULL checks precede it, so the program can never chase a pointer and must receive resolved scalars. TMM's side: the host therefore walks the pointers in native C, and that walker is **generated per build from DWARF**, which means classifying struct-by-value splitting, HFA/HVA, stack spill and unions correctly against an *optimised* build. The test: reuse PREVAIL's `tracing` program type, copy the ctx into per-core scratch, and express the worked CVE as a scalar predicate whose field offsets are demonstrably right for that build. If the CVE class we care about *needs* pointer chasing, then day one includes a bounded `probe_read` helper and the §4 threat surface grows — decide that now, on paper, with SIRT in the room.
+3. **One hook armed end-to-end on one architecture in a lab TMM**, with core dumps and backtraces still working through the trampoline. The debuggability clause is not an afterthought and belongs in the same sentence: a trampoline that *works* while destroying post-mortem analysis is unshippable in a product whose support model runs on core dumps and qkviews (§3). It needs correct CFI or every backtrace through a hooked function is garbage; a PC inside JIT'd code must be resolvable; the dump must record which shields were armed, or every subsequent crash on that box is ambiguous. There is also a hard fail lurking — jumping to `entry + pad_bytes` is an indirect branch into mid-function, which faults immediately on CET-IBT/BTI-hardened builds without a landing pad. Note the scope: **one** hook, **one** architecture, a lab. A minimal composition proof, not a product.
 
-If all three land, what follows is a real subsystem-scale programme (§5), and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, the idea dies early and cheaply, which is strictly better than discovering it in month nine.
+If §7's two decisions and these three all land, what follows is a real subsystem-scale programme (§5), and it is worth doing: the mechanism is right, and the operational discipline around monitor-before-enforce, signed bindings and safe-return rationale is better than most things that ship. If any of the three fails, the idea dies early and cheaply, which is strictly better than discovering it in month nine.
 
 ---
 
