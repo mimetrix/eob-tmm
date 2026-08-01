@@ -394,20 +394,15 @@
     <div class="callout sig"><p><b>Say it plainly: TMM is its own kernel.</b> It plays every role Linux plays for the traffic it carries. Linux earned
       an eBPF VM inside it for exactly this job; <b>a kernel of TMM's standing and maturity deserves its own eBPF
       hosting VM</b>. That's the move.</p></div>
-    <p class="aside-note"><b>And a proxy is the favorable shape for this.</b> A packet-forwarding plane's unit of
-      work is the packet, with a per-packet budget in <em>single-digit nanoseconds</em> — verified bytecode is a
-      meaningful fraction of that, which is why it struggles to earn its place there. TMM's unit of work is a flow,
-      a connection, a request: terminate TCP, negotiate TLS, parse L7, evaluate policy — <b>microseconds where a
-      forwarder spends nanoseconds</b>. A hook costing tens of nanoseconds is noise against that.
-      <b>But that is the cheapest tier, not the only one — and it is not where the hardest CVEs are.</b>
-      Read TMM as three budgets rather than two: <em>per request</em>, microseconds, where a hook is genuinely
-      free; <em>per packet inside the proxy path</em> — TCP reassembly, TLS records, L7 framing — where a proxy
-      still has hundreds of nanoseconds and a hook costs a few percent, affordable with measurement and
-      sign-off; and a <em>pure FastL4 fast path</em>, tens of nanoseconds, where the objection that sank
-      bytecode in packet forwarders applies to us too. The middle tier matters because the pre-L7 classes this
-      engine exists for — fragment reassembly, TCP state, record-layer parsing — fault there, before any request
-      exists. A proxy also <em>has state worth looking at</em> — listeners, profiles, parser state, plugin
-      internals — which is the other reason its CVEs are reachable at all.</p>
+    <p class="aside-note"><b>And a proxy is the favorable shape for this — but read it as three budgets, not
+      two.</b> <em>Per request</em>: microseconds, because TMM terminates TCP, negotiates TLS, parses L7 and
+      evaluates policy — a hook costing tens of nanoseconds is noise. <em>Per packet inside the proxy path</em>
+      (TCP reassembly, TLS records, L7 framing): hundreds of nanoseconds, so a hook is a few percent — affordable
+      with measurement and sign-off, not free. <em>A pure FastL4 fast path</em>: tens of nanoseconds, where the
+      objection that sank bytecode in packet forwarders applies to us too. A forwarder only ever has that third
+      budget. The middle tier is the one that matters, because the pre-L7 classes this engine exists for —
+      fragment reassembly, TCP state, record-layer parsing — fault there, before any request exists. A proxy also
+      <em>has state worth looking at</em>, which is the other reason its CVEs are reachable at all.</p>
   </section>
 
   <!-- 02 MOVE -->
