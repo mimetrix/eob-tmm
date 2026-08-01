@@ -126,7 +126,7 @@ A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter 
 There are two ways to get userspace eBPF into a process, and the distinction is the crux of this design (§3.1):
 
 - **Inject** into an unmodified, running process (the bpftime model — `LD_PRELOAD`/ptrace, binary rewriting, a syscall-emulation shim). Powerful for instrumenting software you don't own, but brittle and invasive. **Evaluated and rejected** — see §3.1, on documented grounds: the kernel forbids `bpf_override_return` on uprobes, and injection needs ptrace/`LD_PRELOAD` against stripped binaries at guessed offsets. (No empirical comparison is claimed — this repo ships no running prototype of either path.)
-- **Embed** the VM as a library and call it at designed-in hook points (the uBPF model). This is what Live Shield uses.
+- **Embed** the VM as a library and call it at designed-in hook points — and, via compiler-reserved entry pads, at function boundaries the build already emitted (§5.3). This is what Live Shield uses. Both halves matter: the designed-in catalog covers what was anticipated, and the function boundaries are what make an *unforeseen* CVE shieldable without a pre-placed hook.
 
 For a customer, userspace eBPF's headline benefit would be routing around a locked-down kernel. **For F5 as the vendor that benefit is irrelevant** — we can enable kernel eBPF in our own build, and we already ship kernel eBPF in BIG-IP eBPF Observability ("eob") for Kubernetes traffic on Cloud-Native Edition.
 

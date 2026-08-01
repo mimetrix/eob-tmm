@@ -5,7 +5,7 @@
 **Status:** Strategy / use-case exploration
 **Audience:** TMOS architecture, F5 SIRT, BIG-IP security & observability engineering, product
 **Companion:** `big-ip-live-shield-design.md` (the detailed Live Shield mechanism — the first instance of this substrate) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `substrate/` (**candidate ABI artifacts and their checkers** — the shield ABI header, the hook-map schema + an example map, the budget/offset/gate checks. These are proposed interfaces under mechanical check, **not a running prototype**: nothing in this repo executes a shield.)
-**Scope:** What becomes possible once a verified userspace-eBPF VM (uBPF) is embedded in TMM and instrumented with designed-in hook points
+**Scope:** What becomes possible once a verified userspace-eBPF VM (uBPF) is embedded in TMM and instrumented with designed-in hook points **and function-boundary probes at entries the build already emitted**
 
 ---
 

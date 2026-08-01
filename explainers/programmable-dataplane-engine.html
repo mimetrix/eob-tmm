@@ -344,7 +344,7 @@
       The data plane already flexes at its edges — a config push, a policy change, traffic logic in an iRule — but
       changing its <b>own code and behavior</b> has exactly one path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
-      verified VM at designed-in hook points — so its code and behavior can change at runtime, provably safely.
+      verified VM at designed-in hook points <em>and at existing function boundaries</em> — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
       reboot, no release train. <em>(The engine ships in one enabling build; after that every mitigation — and every probe at a boundary that build exposes —
       after that is a load.)</em></p>
@@ -419,7 +419,7 @@
       safety — a per-hook time budget handles the rest (§5.4);</em> the verifier is the floor, not the ceiling.</p>
     <p class="lede" style="margin-top:1.2rem">So bring them inside. Embed a small userspace eBPF VM —
       <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, JIT-compiled — <em class="sig">inside TMM's own address
-      space</em>, at designed-in hook points, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
+      space</em>, at designed-in hook points and at existing function boundaries, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
       Now behavior arrives as <b>bytecode, proven safe before it loads</b>. No rebuild. No reboot. The data
       plane gets a fast lane:</p>
     <div class="schematic">
