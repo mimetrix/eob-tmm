@@ -2,7 +2,7 @@
 
 | Page | What it covers | Read |
 |---|---|---|
-| [`one-pager.html`](one-pager.html) | The whole proposal, one printable sheet, ending on the ask | 3 min |
+| [`one-pager.html`](one-pager.html) | The whole proposal on one printable sheet, ending on the questions that would decide it | 3 min |
 | [`programmable-dataplane-engine.html`](programmable-dataplane-engine.html) | The engine as a general capability — hooks, the `ctx` model, safety, form-factor coverage | 15 min |
 | [`cve-mitigation.html`](cve-mitigation.html) | The CVE-mitigation case in plain language, with the perimeter argument and coverage limits | 8 min |
 | [`cve-shield-walkthrough.html`](cve-shield-walkthrough.html) | A real TMM NULL-deref crash class end to end: 4 build steps, 9 runtime steps, the eBPF program line by line | 20 min |
@@ -27,7 +27,12 @@ these is the thing that's wrong.
 
 | Fact | Defined in |
 |---|---|
+| **What the proposal assumes** — split into known, controlled, and assumed, with the two that end the case if false | [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §1.1 |
 | The host-owned outcome set | [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) §2 |
+| What must be true for a hook to reach a given CVE, and that the fraction of real advisories clearing those bars is unknown | [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §10.1 |
+| `path_class` as the rate class, read as structure ∧ adversarial reachability | [`../engine-hard-problems.md`](../engine-hard-problems.md) §1 |
+| What is and is not supported when several programs are armed or running | [`../engine-hard-problems.md`](../engine-hard-problems.md) §3.1 · §3.2 |
+| The first experiment, and the three forms the mechanism can take depending on its result | [`../design-review-findings.md`](../design-review-findings.md) §4 |
 | Hook-map schema | [`../substrate/hook_map.schema.json`](../substrate/hook_map.schema.json) |
 | Loader ABI + wire layout | [`../substrate/shield_abi.h`](../substrate/shield_abi.h) (compiles; asserts its own offsets) |
 | Per-item scope, ranked by how far the original sizing was off | [`../design-review-findings.md`](../design-review-findings.md) §5 |
@@ -36,5 +41,6 @@ these is the thing that's wrong.
 ## Open
 
 No performance numbers exist yet. Every cost claim — "free when dark," "tens of nanoseconds is
-noise" — is an estimate, which is why the first thing to settle is a
-measurement.
+noise" — is an estimate, which is why the first thing to settle is a measurement.
+The experiment is specified in [`../design-review-findings.md`](../design-review-findings.md) §4, together
+with the three forms the mechanism can take depending on what it returns.
