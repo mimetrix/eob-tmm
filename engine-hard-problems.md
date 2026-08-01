@@ -572,8 +572,6 @@ for a small fraction of what the programme would cost.
 
 ---
 
-> **IP note.** Novel method & claims are held in a separate invention disclosure (gitignored),
-> per policy; this document is engineering rigor only.
 
 [^src]: Sharper still given the source-code exposure — an adversary holding the code can hunt
     verifier/JIT soundness bugs directly. Which is exactly the point: secrecy was never the

@@ -215,5 +215,4 @@ claim in these documents is a design claim awaiting measurement.
   name read as an F5 component and invited the wrong question — whether it was cut-down TMM source —
   and a toy relay standing in for TMM invites an argument about the analogy rather than the design.
   The cost of removing it is real and worth stating: the verify gate is no longer demonstrable here.
-- This repo holds design proposals and candidate artifacts. Patent/invention disclosure artifacts are
-  kept out by policy (and gitignored).
+- This repo holds design proposals and candidate artifacts. Nothing here is production TMM source.

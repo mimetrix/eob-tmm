@@ -207,4 +207,3 @@ Everything here holds the **no-helpers-initially** line. These reintroduce a hel
 
 ---
 
-> **IP note.** The host-emits/program-signals inversion and the specific egress primitives here may be disclosure-worthy. Per policy, novel method & claims are kept in a **separate invention disclosure** (gitignored), not in this repo; this document is the engineering design only.

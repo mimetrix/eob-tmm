@@ -58,7 +58,7 @@ So the honest form of the claim:
 
 That combination is still a **privacy** story — a data-minimization architecture designed for jurisdictions where centralizing decrypted traffic is not permissible — as well as an **economics** story (kilobytes of signal instead of gigabits of payload) and a **data-quality** story (post-decrypt, in-context, line-rate fidelity, within §1's coverage bounds).
 
-**Why it's defensible:** replicating it requires *both halves* — the vantage (be the proxy) **and** the bounded in-process surface (this substrate). No pure-play security or observability vendor has the first; no proxy without this substrate has the second. On the legal side, state only what is established: the verifier and VM carry permissive licenses, so there is **no copyleft in the primary path — subject to the pinned-version SBOM and license scan that `big-ip-live-shield-design.md` §13 (licensing & OSS posture) lists as still to be run**, including its open MIT/no-patent-grant freedom-to-operate note. That is a posture, not a clearance.
+**Why it's defensible:** replicating it requires *both halves* — the vantage (be the proxy) **and** the bounded in-process surface (this substrate). No pure-play security or observability vendor has the first; no proxy without this substrate has the second. On the legal side, state only what is established: the verifier and VM carry permissive licenses, so there is **no copyleft in the primary path — subject to the pinned-version SBOM and license scan that `big-ip-live-shield-design.md` §13 (licensing & OSS posture) lists as still to be run**. That is a posture, not a clearance.
 
 ## 3. The flywheel — where an F5 model lives
 
@@ -186,7 +186,7 @@ This item is also the one piece of the annex worth building **on its own merits*
 
 ## 7. Build vs. reuse — the open-source floor
 
-Most of the pipeline (§3.1) assembles from mature, permissively-licensed open source; the **net-new work is exactly what the invention disclosures cover.** This section and §7.1 are the part of the annex that is useful **immediately and unconditionally** — they hold regardless of whether the model story above is ever pursued, and the *Sense* row alone is the license inventory for the Tier 1 MVP and for the substrate itself.
+Most of the pipeline (§3.1) assembles from mature, permissively-licensed open source; the net-new work is the bounded in-process surface and the host-owned sink. This section and §7.1 are the part of the annex that is useful **immediately and unconditionally** — they hold regardless of whether the model story above is ever pursued, and the *Sense* row alone is the license inventory for the Tier 1 MVP and for the substrate itself.
 
 | Stage | Reuse (open source) | Build (net-new) |
 |---|---|---|
@@ -239,4 +239,4 @@ Say exactly that and no more. The audit log attests the host's own record of its
 
 **A bounded data plane could make the proxy a sensory organ for AI — turning traffic that only a terminating proxy sees into governed signal that never has to move, and closing the loop by letting models return to the plane as signed, verifier-admitted bytecode.**
 
-**Annex, not ask.** This page is a map of what the same hooks could later reach; every stage of it is a separately-authorized decision, and only two pieces stand on their own today — Tier 1 API discovery (§4, §6) and the OSS/license inventory (§7, §7.1). *Method and claims are held in a separate invention disclosure, per IP policy.*
+**Annex, not ask.** This page is a map of what the same hooks could later reach; every stage of it is a separately-authorized decision, and only two pieces stand on their own today — Tier 1 API discovery (§4, §6) and the OSS/license inventory (§7, §7.1).
