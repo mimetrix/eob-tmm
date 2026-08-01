@@ -5,7 +5,7 @@ check_hook_map.py — validate a hook-point map against hook_map.schema.json.
 Uses jsonschema when available; falls back to a structural check of the schema's
 own required/additionalProperties/enum/pattern rules so `make check` works on a
 bare box. Also reports which product-only fields an instance still lacks — that
-is informative, not a failure: the prototype map is deliberately a subset (see
+is informative, not a failure: the example map is deliberately a subset (see
 README.md and development-scope.md item 5).
 
 Usage:  ./check_hook_map.py [map.json ...]      (default: ./hook-point-map.json)
@@ -99,7 +99,7 @@ def main(argv):
                                for k in PRODUCT_HOOK if k not in hp})
         if missing_top or missing_hook:
             print("      product-only fields not yet emitted (expected for the "
-                  "prototype map):")
+                  "example map):")
             if missing_top:
                 print("        top level: %s" % ", ".join(missing_top))
             if missing_hook:

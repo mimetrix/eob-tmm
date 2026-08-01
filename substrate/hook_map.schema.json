@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mimetrix/eob-tmm/prototype/substrate/hook_map.schema.json",
   "title": "Per-build hook-point map",
-  "description": "The artifact the hook-map generator emits every TMOS build (development-scope.md item 5; walkthrough build step 3): named symbol -> patchable entry + typed argument layout, signed and shipped with the image. A shield resolves its target hook by NAME against this map, and the signed binding is checked against it at load. REQUIRED here is scoped to what prototype/hook-point-map.json already carries, so that instance validates clean; the fields a real generator must add are marked '$comment: required in product'.",
+  "description": "The artifact the hook-map generator emits every TMOS build (development-scope.md item 5; walkthrough build step 3): named symbol -> patchable entry + typed argument layout, signed and shipped with the image. A shield resolves its target hook by NAME against this map, and the signed binding is checked against it at load. REQUIRED here is scoped to what hook-point-map.json already carries, so that instance validates clean; the fields a real generator must add are marked '$comment: required in product'.",
   "type": "object",
   "required": ["tmos_version", "build_id", "hook_points"],
   "additionalProperties": false,

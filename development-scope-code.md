@@ -4,7 +4,7 @@
 
 > An earlier framing of this file was "so 'hundreds of lines, not subsystems' can be checked." That
 > claim is **retired** ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1): the item *list*
-> is right, the sizes were low — in several cases badly — and the subsystem being added is a code-patching,
+> is right, several of the sizes were low — and the subsystem being added is a code-patching,
 > live-text, dynamic-code-loading facility inside the crown-jewel process — **subsystem-scale
 > work, not a feature** for a defensible v1 on two architectures. What these skeletons still do,
 > and all they do, is show the *shape* of each item and mark honestly where reuse ends.
@@ -38,7 +38,7 @@ Three standing rules for everything below:
    These are candidates — the shape of the work, written down so it can be argued with.
 3. **No skeleton claims more safety than the design does.** A verified program is memory-safe, and
    terminating **only if admission passes PREVAIL's `--termination`** (off by its default) — and then
-   only within a 100,000-loop-iteration bound, itself ~300 µs. Termination is not a time bound. Its
+   only within its 100,000-loop-iteration ceiling. Termination is not a time bound. Its
    *cost* is *estimated* at admission by the budget pass (item 8) and *enforced* at runtime by
    back-edge fuel (item 15, a uBPF JIT patch, day one). And "memory-safe" does not mean "cannot
    write its `ctx`": PREVAIL permits ctx writes, which is why item 1's `ctx` is a per-core **copy**.
@@ -88,7 +88,7 @@ approval.
 | skip-the-body | `SAFE_RETURN` (block), `SAFE-RETURN` (substrate prose) | **`SAFE_RETURN`** = `TRAMP_SAFE_RETURN` |
 | hook cost class | `path_class` (hook map, USDT catalog), `perf_class` (shield-object JSON) | **`path_class`** |
 | bytecode load | `ubpf_load` (walkthrough: raw bytecode), `ubpf_load_elf` (uBPF's ELF-object entry point, `vm/inc/ubpf.h:458`) | **both** — different calls; item 3 uses `ubpf_load_elf` because the signed artifact is an ELF, and says so |
-| JIT'd program | `jit_fn(&ctx)` (walkthrough, one arg) | **`slot->fn(ctx, ctx_len)`** — uBPF's real signature is `uint64_t (*)(void *mem, size_t mem_len)`; the canon block elides `mem_len` |
+| JIT'd program | `jit_fn(&ctx)` (walkthrough, one arg) | **`slot->fn(ctx, ctx_len, stack, stack_len)`** — uBPF's **extended** JIT signature `ubpf_jit_ex_fn`, from `ubpf_compile_ex(vm, &err, ExtendedJitMode)` (`vm/inc/ubpf.h:98, 575`). The two-argument basic form is the one whose prologue takes an unprobed 4 KiB frame, so it is unusable here; the canon block elides everything after `mem` |
 | loader ops | `LOAD · SET_MODE · STATUS · REVOKE` (bare) | **`SHIELD_OP_*`** — prefixed for C namespace hygiene; the bare names are the wire vocabulary |
 | the shield program | `int shield(struct ctx *c)` returning a predicate (walkthrough) and `int ls_ptlog_nullderef(struct ctx *c)` returning `LS_SAFE_RETURN`/`LS_PASS` (design §14) — one product form, two names for the same worked bug; `uint64_t ls_decision(void *data)` (the removed prototype's spelling of the memory-argument form uBPF's own `ubpf_exec`/JIT signature imposes — **nothing in this repo verifies or runs it**) | **the product form** for the shape, with the uBPF-signature form given alongside — see the last section |
 | the shield's ELF section | `SEC("tracing/…")` (design §14) | **`SEC("fentry/<hook>")`** — the section prefix *is* PREVAIL's type-selection mechanism, and `tracing/` is not one of the prefixes that selects the `tracing` type. See item 6 |
@@ -146,7 +146,8 @@ slot), never in code.
  *   2. COPIES those saved registers into this core's ctx scratch buffer, laid
  *      out per this hook's arg_btf in the signed hook map, and hands the
  *      program the COPY (see "the copy is not optional" below)
- *   3. calls tramp_dispatch(slot, ctx, ctx_len)
+ *   3. calls tramp_dispatch(slot, ctx, ctx_len)  — which picks up this core's
+ *      program stack itself, for the extended JIT entry point
  *   4. TRAMP_FALLTHROUGH  -> discard the scratch copy, restore the SAVED
  *                            registers (never the copy), jump to
  *                            entry + pad_bytes
@@ -186,13 +187,17 @@ slot), never in code.
  *
  * Read-only is therefore a property of the copy and of the discard, not of
  * anything PREVAIL enforces. The copy is the cost, and it is the number to
- * measure first — see item 8's closing note, where 6–17-cycle predicates make
- * invocation overhead the binding constraint, not program cost.
+ * measure first — see item 8's closing note, where an instruction-count argument
+ * puts invocation overhead ahead of program cost as the binding constraint.
  * ------------------------------------------------------------------------- */
 
 /* TODO(f5): per-core ctx scratch, sized to the largest hook's ctx and padded to
- * a cache line. Statically reserved at substrate init — no allocation here. */
+ * a cache line. Statically reserved at substrate init — no allocation here.
+ * The extended JIT also needs a per-core PROGRAM stack (see item 3): uBPF's
+ * basic JIT would otherwise take an unprobed 4 KiB frame here, inside someone
+ * else's prologue. */
 extern void *tramp_ctx_scratch(unsigned core);
+extern uint8_t *tramp_prog_stack(unsigned core, size_t *len);
 
 /* TODO(f5): TMM already knows its own core index — use that, not a syscall. */
 static inline unsigned this_core(void);
@@ -219,8 +224,14 @@ int tramp_dispatch(struct hook_slot *slot, void *ctx, size_t ctx_len)
      * iterations is itself ~300 µs at ~10 instructions each on 3 GHz, so
      * "terminates" is not "cannot stall the poll loop": that is what item 8's
      * admission budget and item 15's back-edge fuel are for.
+     *
+     * Four arguments, not two: this is uBPF's EXTENDED JIT signature
+     * (ubpf_jit_ex_fn), which takes the program stack per call so the
+     * trampoline can hand over this core's preallocated buffer. See item 3.
      */
-    uint64_t verdict = slot->fn(ctx, ctx_len);
+    size_t stack_len;
+    uint8_t *stack = tramp_prog_stack(this_core(), &stack_len);
+    uint64_t verdict = slot->fn(ctx, ctx_len, stack, stack_len);
 
     if (verdict != MATCH)
         return TRAMP_FALLTHROUGH;
@@ -230,7 +241,8 @@ int tramp_dispatch(struct hook_slot *slot, void *ctx, size_t ctx_len)
      * is the whole point (item 3's STATUS read-back, item 12's audit trail).
      * TMM is core-pinned, so each core only ever touches its own slot: no
      * atomics, no lock. TODO(f5): pad fired[] to a cache line per core; as
-     * declared in shield_abi.h the array invites false sharing under CMP.
+     * declared in shield_abi.h the array invites false sharing under CMP
+     * (clustered multiprocessing — one TMM instance pinned per core).
      */
     slot->fired[this_core()]++;
 
@@ -255,11 +267,12 @@ int tramp_dispatch(struct hook_slot *slot, void *ctx, size_t ctx_len)
 }
 ```
 
-**Real:** the control flow, and the fact that `slot->fn` is uBPF's JIT'd entry point with uBPF's
-actual two-argument signature.
-**Stubbed:** `this_core()`, `tramp_ctx_scratch()`.
+**Real:** the control flow, and the fact that `slot->fn` is uBPF's JIT'd entry point with
+`ubpf_jit_ex_fn`'s four-argument extended signature — `(mem, mem_len, stack, stack_len)`, the form
+that lets the caller supply the program stack.
+**Stubbed:** `this_core()`, `tramp_ctx_scratch()`, `tramp_prog_stack()`.
 **TODO(f5):** both `.S` entry stubs; cache-line padding for `fired[]`; the per-core ctx scratch and
-its sizing; the decision of which registers each arch's stub must preserve for a *hooked* function
+the per-core program stack, and the sizing of each; the decision of which registers each arch's stub must preserve for a *hooked* function
 (stricter than a normal call, since the body still has to run after a fall-through).
 **Cost when dark:** nothing — an unarmed entry is nop bytes the CPU falls straight through. **Cost
 when armed and not matching:** the stub's register save/restore, **the ctx copy into per-core
@@ -359,7 +372,8 @@ reverse), and the fail-dark rule.
 **TODO(f5):** the per-arch encoders, and calibrating `SHIELD_PAD_MAX` — it is declared in
 `shield_abi.h` with a placeholder, and the per-hook truth is `patchable_pad_bytes` in the signed hook
 map. Whether W^X can be relaxed
-per-page in TMM's memory manager at all is a **TMA question**, not an implementation detail —
+per-page in TMM's memory manager at all is a **TMA** (Threat Model Analysis) **question**, not an
+implementation detail —
 `engine-hard-problems.md` §5 carries it.
 **The honest hard part:** this is the item where "proven in kernels" stops being an argument and
 becomes work. The safe point makes it far easier than ftrace's general case (no core is mid-prologue),
@@ -535,12 +549,14 @@ int shield_msg_handle(const struct shield_msg *msg, size_t datagram_len)
     /* 3. Replay. msg->epoch must strictly advance for this hook, so a revoked
      *    shield cannot be resurrected by re-sending an old LOAD. REVOKE bumps
      *    it, which is what makes it a kill switch rather than a suggestion.
-     *    TODO(f5): where the per-hook epoch lives across a TMM restart; and a
-     *    distinct SHIELD_ERR_REPLAY code — enum shield_err has none yet, so
-     *    this returns the perimeter's code. */
+     *    A replay gets its OWN code — SHIELD_ERR_REPLAY, distinct from
+     *    SHIELD_ERR_SIG — because "someone re-sent a valid old message" and
+     *    "someone sent a bad signature" are different events in the audit
+     *    record (item 12). TODO(f5): where the per-hook epoch lives across a
+     *    TMM restart. */
     if (!epoch_advance(shield_binding_of(msg)->hook, msg->epoch)) {
-        audit_emit(msg, SHIELD_ERR_SIG);
-        return SHIELD_ERR_SIG;
+        audit_emit(msg, SHIELD_ERR_REPLAY);
+        return SHIELD_ERR_REPLAY;
     }
 
     switch (msg->op) {
@@ -568,10 +584,10 @@ void shield_expire_all(uint32_t new_build)
 ```
 
 **Real:** `ubpf_create`, `ubpf_load_elf`, `ubpf_compile_ex`, `ubpf_destroy` — and the JIT-once-at-load
-property, which is the load-bearing performance claim. `ExtendedJitMode` and `ubpf_jit_ex_fn`'s
+property, on which the per-invocation cost claim rests. `ExtendedJitMode` and `ubpf_jit_ex_fn`'s
 `(mem, mem_len, stack, stack_len)` signature are uBPF's real API
 (`ubpf/vm/inc/ubpf.h`); so is the basic JIT's unprobed `sub rsp, 4096` prologue
-(`ubpf/vm/ubpf_jit_x86_64.c`) that makes the extended form the right call here.
+(`ubpf/vm/ubpf_jit_x86_64.c`), which is what rules the basic form out here.
 **Real, and checkable:** [`substrate/shield_abi.h`](substrate/shield_abi.h) now
 carries the binding *inside* `struct shield_msg` (`binding` at offset 16, 112 bytes, `sizeof` 192, all
 pinned by `_Static_assert` and checked by `make -C substrate check`), so
@@ -583,18 +599,15 @@ the answer is always the signed one — so every skeleton above reads them throu
 **Stubbed:** `sig_verify` (item 4), `hook_map_lookup` (item 5), `shield_slot_alloc`, `tmm_build_id`,
 `epoch_advance`, `audit_emit` (item 12), `do_set_mode`/`do_status`/`do_revoke` (shown by name; each is
 a dozen lines over `g_shields`).
-**TODO(f5) — three ABI gaps this sketch still runs ahead of.** Called out rather than quietly written
-into the header, because its `_Static_assert`s pin a wire layout other documents quote:
-1. **The received datagram length is not in the ABI.** `shield_msg_handle()` and `sig_verify()` are
-   declared in the header as `(msg)` and `(msg, pubkey)`; the length-before-content rule needs the
-   length passed alongside, as the skeletons above assume.
-2. **`SHIELD_ERR_REPLAY`** has no code in `enum shield_err`, so a rejected epoch is currently
-   indistinguishable from a bad signature in the audit record.
-3. **`shield_jit_fn`** is typed for the basic two-argument JIT, not `ubpf_jit_ex_fn`'s
-   `(mem, mem_len, stack, stack_len)` — which the stack-probe fix above requires.
-**Also TODO(f5):** the ISSU/upgrade hook for expiry; `SHIELD_MAX_SHIELDS`; the per-core program stack
-handed to `ubpf_jit_ex_fn`; and the real message plumbing (item 10) that gets a `shield_msg` here on
-every core, carrying the received datagram length with it.
+**Three ABI gaps this sketch used to run ahead of — all now closed in the header**, rather than left
+as prose the skeletons quietly assumed: `shield_msg_handle()` and `sig_verify()` **take the received
+length**, so the length-before-content rule is expressible instead of merely stated;
+**`SHIELD_ERR_REPLAY`** is a real code, so a rejected epoch is distinguishable from a bad signature in
+the audit record; and **`shield_jit_fn`** is typed as `ubpf_jit_ex_fn`, the four-argument extended
+form, not the basic JIT with the unprobed prologue.
+**TODO(f5):** the ISSU (in-service software upgrade) hook for expiry; `SHIELD_MAX_SHIELDS`; the
+per-core program stack handed to `ubpf_jit_ex_fn`; and the real message plumbing (item 10) that gets a
+`shield_msg` here on every core, carrying the received datagram length with it.
 **Why this is "hundreds of lines":** the error returns above are the item. The removed prototype's
 equivalent was ~25 lines, because it had no signature, no binding, no map and no arming to get wrong
 — the contrast is still the point, but it is now a recollection rather than a diff a reviewer can
@@ -612,7 +625,7 @@ attacker-controlled bytes never reach the JIT at all.
  * substrate/sigverify.c — check the signature over the BINDING, not just bytes.
  *
  * Sketch. TMM carries only the public half; the private key never leaves F5's
- * HSM-backed release-signing infrastructure (item 9).
+ * HSM-backed (hardware security module) release-signing infrastructure (item 9).
  */
 #include "shield_abi.h"
 
@@ -676,8 +689,10 @@ int sig_verify(const struct shield_msg *msg, size_t datagram_len,
      */
     uint8_t buf[SHIELD_BINDING_WIRE_MAX];
     size_t  n = sig_payload_serialize(msg, buf, sizeof buf);
-    if (n == 0)
-        return 0;
+    if (n == 0)                      /* refuses rather than truncates: the       */
+        return 0;                    /* payload is exactly 16 + 112 = 128 today, */
+                                     /* i.e. SHIELD_BINDING_WIRE_MAX with zero   */
+                                     /* headroom. TODO(f5) below.                */
 
     return f5_verify_detached(buf, n, msg->sig, SHIELD_SIG_MAX, pubkey) == 0;
 }
@@ -690,13 +705,17 @@ reaches are real, `_Static_assert`-pinned members of
 **Stubbed:** `f5_verify_detached`, `f5_sha256`, `ct_equal`, `sig_payload_serialize`.
 **TODO(f5):** decide reuse-vs-new for the crypto path (strong preference: reuse); pin the algorithm
 and `SHIELD_SIG_MAX` accordingly — `shield_abi.h` currently sizes it for Ed25519 and says so;
-FIPS/Common-Criteria implications are in `engine-hard-problems.md` §5. Also the ABI gaps listed under
-item 3, of which the one that bites here is that the header declares `sig_verify(msg, pubkey)` with no
-place to pass the received datagram length.
-**Small, but load-bearing:** this function is the entire reason a verifier-soundness bug is a
-supply-chain risk rather than a traffic-borne one. Which is also why the two corrections above are
-not style: a length read before authentication, and three of four ops dispatching with no
-authentication at all, are both holes in the only perimeter this design has.
+FIPS (Federal Information Processing Standards) / Common-Criteria implications are in
+`engine-hard-problems.md` §5. Also: `SHIELD_BINDING_WIRE_MAX` (128) was sized for the binding alone
+and is now the buffer for the *whole* signed payload — preamble (16) plus binding (112) — which fits
+exactly and leaves no room for a future field, so it wants either renaming or its own constant. The ABI
+gap that used to bite here — a `sig_verify()` declaration with no place to pass the received datagram
+length — is closed: the header now declares `sig_verify(msg, len, pubkey)`.
+**Small, and the perimeter:** this function is why a verifier-soundness bug is a supply-chain risk
+rather than a **traffic-borne** one — reachable by sending traffic through the data path, with no
+credentials and no management-plane access. Which is also what the two corrections above turn on: a
+length read before authentication, and three of four ops dispatching with no authentication at all,
+are both holes in the only perimeter this design has.
 
 ---
 
@@ -1058,7 +1077,7 @@ among them — so `make -C substrate check` fails if the retired return-type mod
 back. `hook_map.schema.json` requires `skippable` alongside `kind` for the same reason.
 **Stubbed:** the `fn` dict's provenance — return type and signature come from DWARF, but every
 `DISQUALIFYING` flag and `caller_null_checked` need real analysis.
-**TODO(f5):** the side-effect analysis behind gate 1 — this is the genuinely hard static analysis in
+**TODO(f5):** the side-effect analysis behind gate 1 — the hardest static analysis in
 the whole item list, and the honest v1 answer is probably **not to automate it**: hand-audit a
 short list of candidate functions and annotate them in source, rather than trusting a tool to prove
 absence of side effects across TMM. Also: the annotation mechanism for `const` cases (a source
@@ -1088,7 +1107,8 @@ Conventional engineering — no novel machinery, and none of it on the data path
 Longest-path instruction count over the verified bytecode → a cycle estimate → compare against the
 hook's budget → **fail closed**. A build artifact, off the data path. This is the layer that makes
 "termination is not a time bound" *actionable at admission* — it is an estimate and a relative sanity
-check, not a WCET bound, so it is the cheap half of time safety. The enforcement half is item 15's
+check, not a worst-case execution time (WCET) bound, so it is the cheap half of time safety. The
+enforcement half is item 15's
 back-edge fuel, at runtime.
 
 **The block below is the original illustrative sketch, kept for contrast only — it has three bugs,
@@ -1193,33 +1213,30 @@ budget_pass self-test (hand-assembled eBPF in a synthesized ELF):
   ok   load is priced above alu       ok       3 insn · 1 blocks · 6 cycles
 ```
 
-Losing the real objects is a real loss — those were compiler output, and these are hand-written
-instruction streams. But on the specific question of *whether this pass is correct* the self-test is
-**better coverage than the objects ever gave**, and that is worth stating plainly rather than
-conceding grudgingly: none of the three shields contained a `lddw` and none contained a loop, so the
+Losing the real objects is a loss — those were compiler output, and these are hand-written
+instruction streams. On the specific question of *whether this pass is correct* the self-test covers
+**more than the objects did**: none of the three shields contained a `lddw` and none contained a loop, so the
 16-byte instruction form and the loop refusal — two of the three bugs this rewrite fixed, and the two
 hardest things in the decoder — **were never actually exercised by them**. Both are asserted cases
 now, alongside a fail-closed over-budget rejection and a check that a load really is priced above an
 ALU op. What the self-test cannot do is tell you what a real clang-emitted predicate costs; for that,
 see the design conclusion below, which does not depend on the deleted objects.
 
-Writing it for real fixed three bugs that were in the sketch above: it read the whole ELF *file* as
-instructions (the first eight bytes are `\x7fELF`); it strided 8 bytes blindly, so `lddw` — a
-**16-byte** pseudo-instruction — had its second half decoded as a phantom instruction, corrupting
-every branch target after it; and it never treated `exit` as a block terminator, so blocks ran past
-returns. It also refuses, rather than guesses, when it finds a loop back-edge: PREVAIL reports one
+The three bugs writing it for real fixed are marked inline in the sketch above: the whole ELF *file*
+read as instructions, `lddw`'s **16-byte** form strided as 8 so its second half decoded as a phantom
+instruction and corrupted every branch target after it, and `exit` not treated as a block
+terminator. It also refuses, rather than guesses, when it finds a loop back-edge: PREVAIL reports one
 *aggregate* `max_loop_count`
 (`ebpf-verifier/src/result.hpp`, `src/fwd_analyzer.cpp`), not a per-loop trip count, so there is
 nothing sound to price a loop with.
 
 **The design conclusion survives the loss of the measurement.** A shield of this kind is a handful of
-loads, a compare and a return — single-digit to low-tens of cycles, which anyone can confirm by
-counting instructions against the `CYCLES` table above without needing an object file to point at.
-That is far below any plausible hook budget, and the consequence is the part worth carrying into the
-design: for programs of this shape **the budget pass is not the binding constraint — the trampoline's
-register save/restore is.** The thing to measure first is invocation overhead, not program cost. Note
-the epistemic status honestly: this was previously stated with three measured objects behind it and is
-now an instruction-count argument. The conclusion is unchanged and the support is weaker.
+loads, a compare and a return, and pricing that against the `CYCLES` table above needs no object file
+to point at. The consequence for the design: for programs of this shape **the budget pass is not the
+binding constraint — the trampoline's register save/restore and `ctx` copy are.** The thing to measure
+first is invocation overhead, not program cost. Epistemic status, stated: this was previously an
+instruction count with three measured objects behind it, and is now an instruction count alone. The
+conclusion is unchanged and the support is weaker.
 
 **Real:** eBPF's 8-byte encoding **with `lddw`'s 16-byte form**, the CFG-longest-path approach, and
 the implementation in `substrate/`.
@@ -1521,8 +1538,9 @@ def cmd_show(args):
 **TODO(f5):** the actual `tmsh` command-definition mechanism and RBAC role names; whether `sys` is
 the right namespace or this belongs under `security`.
 **Two deliberate frictions:** `load` refuses `mode enforce` outright, and promoting to enforce on a
-shield that has never fired prints a warning. Both exist because the failure mode in the field is not
-"the shield was too slow to deploy" — it is "someone enforced a predicate nobody had watched."
+shield that has never fired prints a warning. Both are properties of the front-end: enforcement is
+reachable only through a second, separately authorized command, and only with the monitor-mode
+evidence — or its absence — in front of whoever issues it.
 
 ## Item 12 · Audit trail
 
@@ -1585,8 +1603,9 @@ void audit_emit(const struct shield_msg *m, int rc)
 
 **Real:** the record's contents — in particular `prog_sha256` (which bytes, not merely "a shield"),
 `mode_from`/`mode_to`, `epoch`, and `fired_at_change`, so a later reviewer can reconstruct *what
-evidence existed when someone flipped enforce* — and, with `epoch` plus a `result` of "bad signature",
-*that someone replayed a captured message*.
+evidence existed when someone flipped enforce* — and, with `epoch` plus a `result` of
+`SHIELD_ERR_REPLAY`, *that someone replayed a captured message*, as an event distinct from a forged
+one.
 **Stubbed:** `tmm_now_ns`, `control_plane_actor`, `tmm_audit_write`, `op_name`, `log_warn`.
 **TODO(f5):** identify the existing TMOS audit sink and write to it; retention and forwarding are then
 inherited, not designed here.
@@ -1642,16 +1661,16 @@ the same form the canon ships — `explainers/cve-shield-walkthrough.html` step 
 **What this section used to claim, and cannot any more.** Printed alongside the product form above was
 a second one: the prototype's own shield, cited by path under `prototype/shields/`, and described as
 compiling, passing the PREVAIL gate and **executing end to end today**. That file has been removed
-along with the rest of the prototype. **No shield in this repo compiles, verifies, or runs**, and this
-was the single strongest piece of evidence the document had — the loss should be read as exactly that
-rather than smoothed over. One qualification, in fairness to the reviewers rather than to the claim:
+along with the rest of the prototype. **No shield in this repo compiles, verifies, or runs**, and it
+was the most direct evidence the document had. One qualification:
 "passes the PREVAIL gate" was already weaker than it sounded, because that gate ran under the
 `socket_filter` fallback (O3), so it never established that a TMM ctx model verifies.
 
 Two things survive the file, because they are claims about *shapes* rather than about an artifact.
-First, the signature uBPF imposes: `ubpf_exec` and the JIT both pass `(void *mem, size_t mem_len)`
-(`ubpf/vm/inc/ubpf.h:510`), so any program actually run under uBPF receives its ctx as an untyped
-memory pointer and casts, where the product form above takes a typed struct pointer. Second, the
+First, the ctx shape uBPF imposes: `ubpf_exec` takes `(vm, mem, mem_len, &ret)`
+(`ubpf/vm/inc/ubpf.h:510`) and the JIT'd entry point leads with `(void *mem, size_t mem_len)` in both
+its basic and its extended form (`:92, 98`), so any program actually run under uBPF receives its ctx as
+an untyped memory pointer and casts, where the product form above takes a typed struct pointer. Second, the
 mode-handling divergence noted below. The form looked like this — now **illustrative only, compiled
 and verified by nothing in this repo**:
 
@@ -1669,10 +1688,9 @@ uint64_t ls_decision(void *data)
 
 **A divergence worth naming**, because it is a design point and not a property of the deleted file:
 above, the *program* consults `mode` and picks among three verdict codes, whereas item 1 has the
-*host* gate on `slot->mode` and the program return only a predicate. The product shape is the right
-one — a program that reads its own mode is a program that can be confused about which mode it is in —
-and the form above is what you get when there is no trampoline to hold the policy, which is precisely
-the condition a prototype without one is in.
+*host* gate on `slot->mode` and the program return only a predicate. The product shape keeps mode out
+of the program: a program that reads its own mode can disagree with the host about which mode it is
+in, and the form above is what a design without a trampoline to hold the policy produces.
 **Stubbed:** `struct ctx`'s field names come from the worked example, and the
 real one is generated per build by item 6.
 **TODO(f5):** nothing. This is the item that needs no new tooling — which is the point of the other
@@ -1712,8 +1730,8 @@ is not a follow-on** and is called out below.
 - **16 · Canary auto-unload** — health-metric-driven auto-revoke, `engine-hard-problems.md` §4. The
   mechanism it needs already exists: `SHIELD_OP_REVOKE` (item 3) is the action; what is missing is the
   policy that decides to fire it.
-- **17 · Authoring DSL** — a bpftrace-style one-liner front-end: parse a one-liner, generate C, compile
-  it, run the verify gate, load it. **Proposed and unbuilt.** This entry previously read "already
+- **17 · Authoring DSL** (domain-specific language) — a bpftrace-style one-liner front-end: parse a
+  one-liner, generate C, compile it, run the verify gate, load it. **Proposed and unbuilt.** This entry previously read "already
   exists as working code" and cited a prototype front-end that parsed a one-liner and drove the whole
   pipeline; that tool has been removed, so item 17 is now a follow-on like 13, 14 and 16 rather than
   the one item on the list with an implementation behind it. Left deliberately unnamed here — the
@@ -1733,8 +1751,9 @@ the canon is not edited as a side effect of other work:
    the same block's `trampoline_arm` call uses `MODE_MONITOR`. Unify on `MODE_*`.
 2. **`data-plane-egress-primitives.md`** §5.3 assigns `ret = jit_fn(&ctx)` then switches on
    `host_action(hook, r)` — `ret` vs `r`. Pick one.
-3. **`explainers/cve-shield-walkthrough.html`** writes `jit_fn(&ctx)`; uBPF's JIT entry point takes
-   `(void *mem, size_t mem_len)`. A parenthetical would close the gap without lengthening the block.
+3. **`explainers/cve-shield-walkthrough.html`** writes `jit_fn(&ctx)`; the JIT entry point this design
+   uses is uBPF's extended form, `(mem, mem_len, stack, stack_len)`. A parenthetical would close the
+   gap without lengthening the block.
 4. **`big-ip-live-shield-design.md`** shield-object JSON uses `perf_class` where the hook map and the
    USDT catalog use `path_class`.
 5. **`embedded-ebpf-substrate.md`** prose writes `SAFE-RETURN`; the code constant is `SAFE_RETURN`.
@@ -1764,8 +1783,8 @@ get time safety at all (item 15). Sized honestly that is **subsystem-scale work*
 defensible v1 on two architectures, plus the TMA and certification engagement
 ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). No month figure is offered anywhere in
 this package, on purpose: it is a proposal, not a plan. The item list in
-these two documents is right; the size classes are shape, not effort, and reviewed against what each
-item actually requires they are low — in several cases badly, and two of the largest items were missing altogether.
+these two documents is right; the size classes are shape, not effort, and read against what each
+item actually requires, several are low — and two of the largest items were missing altogether.
 
 ---
 

@@ -13,10 +13,11 @@ The organizing fact: **nothing on this list recurs per CVE except the shield pro
 few lines of C). Everything else is written once or generated automatically per build.
 
 **The honest size, up front.** A defensible v1 on two CPU architectures is **subsystem-scale
-work, not a feature**, plus the TMA and the
+work, not a feature**, plus the TMA (Threat Model Analysis) and the
 certification engagement ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). The item
-*list* below is right; the size classes in §6 are shape, not effort, and reviewed against what each
-item actually requires they are low — in several cases badly, and two of the largest items were missing altogether. `design-review-findings.md` §5 ranks them rather than pricing them. Earlier drafts of this doc described the whole
+*list* below is right; the size classes in §6 are shape, not effort, and read against what each
+item actually requires, several are low — and two of the largest items were missing altogether.
+`design-review-findings.md` §5 ranks them rather than pricing them. Earlier drafts of this doc described the whole
 thing as "hundreds of lines, not subsystems." **That framing is retired.** What is being added is
 not a VM: it is a code-patching, live-text, dynamic-code-loading facility inside the crown-jewel
 process, with its own build-pipeline toolchain and a permanent per-build ABI.
@@ -32,7 +33,7 @@ blocks live in [`substrate/`](substrate/) and are verified by `make -C substrate
 
 | Component | Role | License | Status |
 |---|---|---|---|
-| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | the calls item 3 is built on are the library's **real public API**, not invented for this proposal: `ubpf_create` / `ubpf_load_elf` / `ubpf_exec` (`vm/inc/ubpf.h:129, 458, 510` in the gitignored `ubpf/` clone), with `ubpf_compile` (`:553`) as the JIT path. **No runnable demonstration ships in this repo** — read this cell as an API-surface claim, checkable against uBPF's own header, and *not* as evidence that the load-and-run path has been stood up. Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
+| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | the calls item 3 is built on are the library's **real public API**, not invented for this proposal: `ubpf_create` / `ubpf_load_elf` / `ubpf_exec` (`vm/inc/ubpf.h:129, 458, 510` in the gitignored `ubpf/` clone), with `ubpf_compile_ex` (`:575`) as the JIT path — the *extended* mode, because the basic `ubpf_compile` (`:553`) emits a prologue that takes an unprobed 4 KiB stack frame. **No runnable demonstration ships in this repo** — read this cell as an API-surface claim, checkable against uBPF's own header, and *not* as evidence that the load-and-run path has been stood up. Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
 | **PREVAIL** | the static verifier | MIT **+ Apache-2.0** (the clone ships both `LICENSE` files, plus `external/{CLI11,bpf_conformance,libbtf}`; the SBOM/license scan is a Phase-1 gate per `big-ip-live-shield-design.md` §13) | stock, driven as a CLI invocation — `-q [--section <s>]` (`src/main.cpp:65, 74`). **No verify gate is demonstrated in this repo.** O3 in [`design-review-findings.md`](design-review-findings.md) records the ctx-model limit that any future demonstration has to clear, and it is a property of PREVAIL, not of any one harness |
 | **clang** | C → eBPF bytecode | — | standard toolchain |
 
@@ -41,19 +42,18 @@ it runs.** An earlier revision carried a prototype — a small relay that loaded
 through the real uBPF API, plus a verify-gate track that invoked PREVAIL — and this paragraph cited
 it as demonstrating the load-and-run half of item 3. That prototype has been removed, and the
 demonstration went with it. The reuse argument above now rests on the two upstream projects' public
-APIs, which any reviewer can read for themselves; it no longer rests on anything executable here.
+APIs; it no longer rests on anything executable here.
 So: "reused, not written" stands, and **"already works in our hands" is not currently shown** — a
-real loss of evidence, and the honest way to state the reuse case until something runnable is stood
+loss of evidence, and the state of the reuse case until something runnable is stood
 up again. The JIT's own properties (item 15's fuel, its unprobed 4 KiB stack frame) were open
 questions before and remain so; they were never measured even while the prototype existed, because
-it ran the interpreter. The one exception to "reused as-is" is item 15's back-edge-fuel patch to
-uBPF's JIT: a bounded, upstreamable change to a component otherwise taken whole, not a rewrite.
+it ran the interpreter.
 
 ---
 
 ## 1. In-TMM data-plane code — ships in the substrate build
 
-The genuinely delicate systems work: small, but must be exactly right.
+The delicate systems work: small, but must be exactly right.
 
 1. **The trampoline** *(walkthrough step 2)* — per CPU architecture: save the hooked function's
    argument registers per the ABI, build the `ctx`, call the JIT'd program, bump the fire
@@ -85,7 +85,12 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    program-type descriptor stock PREVAIL verifies against. **Flagged honestly: this is
    hard-problems §2 — the ctx/helper/program-type ABI is the real 90% of the work.**
    Mechanically simple per hook; the discipline and versioning around it is the substrate's
-   biggest ongoing engineering surface.
+   largest ongoing engineering surface. One constraint sits in front of the tool: PREVAIL has
+   **no `--program-type` option** — the type comes from the ELF section-name prefix matched against a
+   table compiled into the binary, fallback `socket_filter` — so day one either rides PREVAIL's
+   existing `tracing` type (twelve u64 argument slots, nothing dereferenceable) or F5 owns a patch
+   set registering a TMM type, with a per-release rebase cost on the one reused component the trust
+   story wants unforked.
 7. **Safe-return policy table** *(steps 3, 12)* — **two gates, in this order, and the order is the
    whole point.** *Gate 1 — skippability:* may this body be skipped at all? Closed by default; any
    lock held across it, refcount moved, flow state advanced, input consumed, out-param written or
@@ -107,7 +112,8 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    tooling, partly one-time human annotation; the honest v1 hand-audits a short candidate list
    rather than trusting a tool to prove absence of side effects across TMM.
 
-*Also in this section's scope over time:* the **designed-in USDT tracepoint catalog** — hook
+*Also in this section's scope over time:* the **designed-in USDT** (userland statically-defined
+tracing) **tracepoint catalog** — hook
 kind (1), proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md): per-stage placement
 and a stable, versioned `ctx` ABI. Per-catalog-entry annotation work, distinct from the
 auto-generated function-boundary hook map above.
@@ -123,11 +129,11 @@ Conventional engineering — no novel machinery.
    per-invocation budget. A build artifact, off the data path; fail-closed. Real code:
    [`substrate/budget_pass.py`](substrate/budget_pass.py), exercised by `make -C substrate check`
    against a **built-in self-test** — six hand-assembled programs in a synthesized ELF, since this
-   repo ships no compiled shield objects for it to price. It is an estimate, not a WCET bound —
-   which is why item 15's fuel is the enforcement half and is day one.
+   repo ships no compiled shield objects for it to price. It is an estimate, not a worst-case
+   execution time (WCET) bound — which is why item 15's fuel is the enforcement half and is day one.
 9. **Signing-service integration** *(step 9)* — the binding format
    (`prog hash · hook · build range · mode ceiling · expiry`) wired into F5's existing
-   HSM-backed release-signing flow. New manifest, existing infrastructure.
+   HSM-backed (hardware security module) release-signing flow. New manifest, existing infrastructure.
 10. **Loader daemon side** *(steps 4, 10)* — pushing `shield_msg` over the **existing**
     control-plane config channel (the path profiles/iRules already ride), per-core fan-out,
     status/counter collection.
@@ -139,8 +145,9 @@ Conventional engineering — no novel machinery.
 ## 4. Staged tiers — 13, 14, 16, 17 are follow-ons; **15 is day one**
 
 13. **Rate-limited per-firing log line** in the trampoline (evidence tier 2).
-14. **Egress ring + drain agent** — per-core SPSC shared-memory ring for per-event records
-    (flow tuple + timestamp), drained off the hot path; enables out-of-band synthesis of a
+14. **Egress ring + drain agent** — per-core single-producer/single-consumer (SPSC) shared-memory
+    ring for per-event records (flow tuple + timestamp), drained off the hot path; enables
+    out-of-band synthesis of a
     suppressed log entry. Already designed:
     [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).
 15. **Back-edge fuel — a uBPF JIT patch. Day one, not optional.** The runtime half of time safety
@@ -157,13 +164,12 @@ Conventional engineering — no novel machinery.
     with no fork.
 16. **Canary auto-unload** — health-metric-driven auto-revoke (verified ≠ correct;
     hard-problems §4).
-17. **Authoring DSL** — a bpftrace-style one-liner front-end, **proposed and unbuilt**. Convenience
-    only: it emits the same bytecode the C path produces, so it adds no capability and carries no
-    security surface of its own. An earlier revision of this list described it as already existing as
-    working code, citing a prototype front-end that has since been removed; nothing of it survives in
-    this repo, and it is a follow-on scope item like the rest of this tier. It is deliberately left
-    unnamed here — the removed tool's name read as a shipped TMM component and caused exactly that
-    confusion.
+17. **Authoring DSL** (domain-specific language) — a bpftrace-style one-liner front-end, **proposed
+    and unbuilt**. Convenience only: it emits the same bytecode the C path produces, so it adds no
+    capability and no security
+    surface of its own. An earlier revision described it as already-working code, citing a prototype
+    front-end since removed; nothing of it survives here, and it is a follow-on like the rest of this
+    tier. Left unnamed deliberately — the removed tool's name read as a shipped TMM component.
 
 ## 5. Recurring cost — per CVE, forever
 
@@ -197,12 +203,11 @@ takes to get right. Items 1–4: delicate, small, must be exactly right. Items 5
 hard design decision (§2). Items 8–12: conventional control-plane engineering. Items 13, 14, 16, 17:
 staged follow-ons; **item 15 is day one**.
 
-What the reuse buys is real and narrow: nobody at F5 writes a VM, a verifier or a compiler. It does
+What the reuse buys is narrow: nobody at F5 writes a VM, a verifier or a compiler. It does
 **not** make this small. An earlier draft of this doc closed with "nothing is a subsystem on the
 scale of 'write a VM or a verifier'" — **retired**, because the subsystem being added is a
 code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, carrying its
-own build-pipeline toolchain and a permanent per-build ABI. That is worth building; describing it as
-smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine.
+own build-pipeline toolchain and a permanent per-build ABI.
 That is **subsystem-scale work for a defensible v1 on two architectures**, and this document
 deliberately does not convert it into months or people — see
 [`engine-hard-problems.md`](engine-hard-problems.md) §6.1 and

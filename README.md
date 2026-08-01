@@ -10,13 +10,15 @@ tracepoint) or **act** on a verdict the host applies (a datapath control) — ea
 
 **Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
 deployed** wins. TMM — BIG-IP's data-plane microkernel — already changes behaviour at runtime through
-config, profiles, WAF policy, iRules and an arriving WASM surface — each acting on the
+config, profiles, WAF (web application firewall) policy, iRules and an arriving WASM surface — each acting on the
 **curated traffic model the proxy chose to expose**. A change that has to reach the code's own internals — a parser's error branch, a
 plugin handoff, a counter or steering decision at a stage the model does not expose, the condition behind a
 crash — has one path: a build. Which is why a new metric, a diagnostic
-probe, a steering decision and a mitigation for a live CVE all cost the same thing. This changes the unit of change from **a release** to
-**a signed artifact** — one that applies with **no restart and no failover**, and that `REVOKE` reverses in
-seconds. The verifier is what makes that safe enough to allow on the data-plane path.
+probe, a steering decision and a mitigation for a live CVE (Common Vulnerabilities and Exposures entry)
+all cost the same thing. This changes the unit of change from **a release** to
+**a signed artifact** — one that applies with **no restart and no failover**, and that `REVOKE` reverses by
+restoring the original bytes at a safe point. The verifier is what makes that safe enough to allow on the
+data-plane path.
 **CVE mitigation is the first use case because it is the most urgent, not because it is the only one** —
 see [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §3–§4 for the rest.
 
@@ -25,14 +27,15 @@ have been anticipated**, and no recompile is needed once the enabling build ship
 this is narrower than "any CVE is shieldable," and deliberately so — a reachable boundary must exist
 before the fault, expose the triggering condition through a declared walk, offer a safe outcome, and fit
 its budget (design §10.1). **What fraction of real data-plane advisories clear those bars is not yet
-known**, and the retrospective study that would answer it needs no engineering and is the most decisive
-thing missing from this proposal.
+known** — nobody has checked published F5 advisories one by one, so *enough of them do* is an assumption
+the proposal rests on (design §1.1, assumption 8). The retrospective study that would settle it needs no
+engineering and has not been done.
 
-This repo holds design proposals, visual explainers, and a small set of **candidate ABI artifacts
-that compile and check themselves**. It does **not** contain a running implementation: nothing here
-executes a shield. **Live Shield** —
-vendor-authored runtime CVE mitigations between patch windows — is the *first instance*
-of the substrate, not the whole of it.
+This repo holds design proposals, visual explainers, and a small set of **candidate ABI (application
+binary interface) artifacts that compile and check themselves**. It does **not** contain a running
+implementation: nothing here executes a shield. **Live Shield** — vendor-authored runtime CVE
+mitigations that apply before the patched build does — is the *first instance* of the substrate, not the
+whole of it.
 
 ## Where this fits: TMM's programmability spectrum
 
@@ -50,8 +53,8 @@ eBPF is the only surface that is **dynamically loadable *and* statically proven 
 which is what makes it trustworthy on the most sensitive paths (the data-plane hot path,
 inline security controls), exactly where dynamic change is otherwise hardest to allow — with
 the signing gate as the security perimeter and the budget pass plus a fuel-metered runtime guard as
-the time perimeter. Two honest notes on that, since both are load-bearing: **eBPF's proof is not a
-time bound** — termination is not a WCET, so fuel is our mechanism too, not an optional extra — and
+the time perimeter. Two notes on that: **eBPF's proof is not a time bound** — termination is not a
+WCET (worst-case execution time), so fuel is our mechanism too, not an optional extra — and
 the fuel guard needs a uBPF JIT patch F5 owns, because `ubpf_set_instruction_limit` has no effect on
 JIT'd programs.
 
@@ -59,8 +62,8 @@ JIT'd programs.
 > eBPF extends that power to the code/instrumentation layer, and is the one surface whose
 > runtime changes are provably safe.*
 
-**Why TMM specifically.** An embedded verified VM isn't the right answer for every fast data plane;
-it's the right answer for this one, and the reason starts with **TMM being a proxy rather than a
+**Why TMM specifically.** What makes an embedded verified VM fit TMM, and not every fast data plane,
+starts with **TMM being a proxy rather than a
 packet-forwarding plane**. A forwarder's unit of work is the packet, with a per-packet budget in
 single-digit nanoseconds — bytecode is a meaningful fraction of that. TMM's unit of work is a flow, a
 connection, a request: it spends **microseconds where a forwarder spends nanoseconds**, so a hook
@@ -73,10 +76,11 @@ worth looking at* — listeners, profiles, parser state, plugin internals — wh
 its CVEs are reachable at all. Three more preconditions
 follow from being a shipped product: **F5 owns the source** (so hooks are designed in and the signed
 hook map comes out of the build), **it's a closed appliance** (so a mitigation that might put the
-data plane into a **crash-loop** is unshippable — `sod` restarts TMM in seconds and HA fails over, so
-the harm that matters is a fault the traffic keeps re-triggering, dropping every flow on that TMM each
-time and flapping HA — which is why the proof is a requirement, not overhead), and **a rebuild costs a
-maintenance window** rather than a `make`. Full argument in
+data plane into a **crash-loop** is unshippable — `sod` restarts TMM in seconds and HA (high
+availability) fails over, so the harm that matters is a fault the traffic keeps re-triggering, dropping
+every flow on that TMM each time and flapping HA — which is why the proof is a requirement, not
+overhead), and **the alternative to a shield is a build**, which has to be installed: restart or
+failover, regression risk, a rollback plan. Full argument in
 [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §1.1.
 
 ## What the substrate enables
@@ -89,13 +93,13 @@ of which CVE shielding is only one:
 - **Observability, on-demand** — *bpftrace-for-TMM*: deep telemetry for a specific
   condition / flow / tenant, on then off; per-flow latency across internal stages; a
   *flight recorder* that snapshots state when an error branch fires; new metrics as
-  bytecode, no TMOS rev.
+  bytecode, no TMOS (BIG-IP's operating system) rev.
 - **Diagnostics & field support** — ship a customer a *signed probe* to characterize a
   production issue in situ, then remove it — no debug build, and often no need to wait for a repro.
   It does **not** replace core-dump analysis: a probe only answers a question someone already thought
   to ask, and a dump is what you fall back on when you had no hypothesis. See the debuggability item in
   [`engine-hard-problems.md`](engine-hard-problems.md) §5, which also covers how the trampoline can
-  *degrade* a dump if the CFI and JIT-symbol work is skipped.
+  *degrade* a dump if the CFI (control-flow integrity) and JIT-symbol work is skipped.
 - **Security beyond CVE shields** — behavioral exploit detection on internal state;
   protocol-anomaly detection at the parser (pre-event); adaptive rate-limiting, which composes from
   DROP or SAMPLE plus host-side state rather than being an outcome of its own.
@@ -106,16 +110,16 @@ of which CVE shielding is only one:
 
 The differentiated asset is the compiled-in **attach capability** (patchable entries +
 trampoline) plus **where** in TMM a hook earns its keep — the hook-point
-catalog spanning L3/L4, the TLS record layer, L7 parse, the enforcement path (`bd`/WAF out-of-process; **AFM and DoS
-enforcement run inside TMM**, which is easy to lose sight of and roughly quadruples the surface that
-phrase implies), LB / persistence, and cross-cutting runtime (poll loop, memory pools, the poll
+catalog spanning L3/L4, the TLS record layer, L7 parse, the enforcement path (`bd`/WAF out-of-process;
+**AFM (Advanced Firewall Manager) and DoS (denial-of-service) enforcement run inside TMM**, so the
+enforcement path is only partly out-of-process), LB / persistence, and cross-cutting runtime (poll loop, memory pools, the poll
 loop's own iteration accounting). Most are read-only
 tracepoints that can graduate to active controls once the signal is trusted.
 
 ## Live Shield — the first instance
 
 The motivating application: **surgical, reversible, vendor-signed mitigations that block a
-specific exploit path between maintenance windows**, until the patched build ships. A shield
+specific exploit path** until the patched build is installed. A shield
 is a **crash mitigation, not a hot-patch**: the host takes a safe outcome (e.g. skip the
 vulnerable function's body); the corrected behaviour returns with the patch.
 There is a precedent for the idea: Cisco's Live Protect ships signed eBPF shields for NX-OS,
@@ -149,9 +153,8 @@ under one signed catalog and lifecycle (design §5):
   needing a third again. `tmsh` is not in this list — it is a per-invocation shell, not a resident
   daemon, so an entry probe on it would be a category error; what `tmsh` drives is shielded in MCPD,
   where the change actually lands.
-- **Data plane (TMM)** — kernel eBPF *can* attach to TMM (a uprobe on `tmm` works today) but cannot
-  afford to (a kernel trap per hit inside a run-to-completion loop) and cannot enforce (no return
-  override on uprobes), so shields are **userspace
+- **Data plane (TMM)** — attachable by kernel eBPF, but neither affordable nor enforceable there (the
+  per-hit trap and the return-override rule above), so shields are **userspace
   eBPF** run by an embedded uBPF VM: the host **calls the VM like a library** at a designed-in
   hook and acts on the return — no kernel, no injection, no added privileges. Each program is
   **statically verified by [PREVAIL](https://github.com/vbpf/ebpf-verifier)** (the verifier from
@@ -183,21 +186,21 @@ exfiltration control and attestation are **not** yet specified there).
 | [`data-plane-intelligence.md`](data-plane-intelligence.md) | The proxy as AI's sensory organ — the unique post-decrypt data vantage as a product moat, the sense→learn→act flywheel, tiered use-cases, and a reference architecture for the API-discovery MVP (value captured *in the product*, not sold as a feed) |
 | [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) | How data leaves the embedded VM — a per-core, single-producer, shared-memory ring; the **host emits, the program only signals** (no helpers, stock verifier). Prior-art review (DPDK `rte_ring`, kernel BPF ringbuf, bpftime), and the record-layout / backpressure / wakeup / crash design |
 | [`development-scope.md`](development-scope.md) | **What F5 actually builds** beyond the reused OSS (uBPF/PREVAIL/clang) — in-TMM code, build-pipeline tooling, control-plane pieces, optional tiers, and the one recurring per-CVE cost (a few lines of C). Keyed to the walkthrough's step numbers |
-| [`design-review-findings.md`](design-review-findings.md) | **Three architect reviews and what they change** — the register. Demonstrably-broken items (several verified against the uBPF and PREVAIL sources cloned into the working tree), wrong-about-TMM claims, missing specifications, the measurement that gates everything, honest scope restatement (a subsystem, not "hundreds of lines"), what's genuinely strong and currently buried, and the questions that would decide this before anything is built — two to settle on paper, three to prove in a lab, and the experiment that comes first |
+| [`design-review-findings.md`](design-review-findings.md) | **Three architect reviews and what they change** — the register. Demonstrably-broken items (several verified against the uBPF and PREVAIL sources cloned into the working tree), wrong-about-TMM claims, missing specifications, the measurement that gates everything, honest scope restatement (a subsystem, not "hundreds of lines"), what is strong and currently buried, and the questions that would decide this before anything is built — two to settle on paper, three to prove in a lab, and the experiment that comes first |
 | [`development-scope-code.md`](development-scope-code.md) | **Candidate code** for every day-one scope item (1–12 + the shield program) — skeletons scaled to each item's size class, each with a real / stubbed / TODO breakdown, plus a naming-reconciliation table. Backed by the checked artifacts in [`substrate/`](substrate/) — which is also where several of these skeletons were caught being wrong |
-| [`engine-hard-problems.md`](engine-hard-problems.md) | The load-bearing problems the pitch glosses — **termination ≠ WCET**, the **ctx/helper/program-type ABI is the real 90%**, **maps under CMP + HA mirroring**, and **verifier soundness as a data-plane RCE surface** (with the signing gate as the real perimeter). Honest mitigations, day-one vs. deferred — the "what a security review will ask" register |
+| [`engine-hard-problems.md`](engine-hard-problems.md) | The problems the pitch glosses — **termination ≠ WCET**, the **ctx/helper/program-type ABI is the real 90%**, **maps under CMP + HA mirroring**, and **verifier soundness as a data-plane RCE surface** (with the signing gate as the real perimeter). Honest mitigations, day-one vs. deferred — the "what a security review will ask" register |
 | [`substrate/`](substrate/) | **The artifacts that check themselves** — the loader/binding ABI as a header whose `_Static_assert`s pin the wire layout, the hook-map JSON Schema plus an example map, an admission-time budget pass with a self-test, an offset check, and a guard that fails the build if the safe-return two-gate rule regresses. `make -C substrate check` runs all of it |
 | [`explainers/README.md`](explainers/README.md) | **The reading map** — which artifact answers which question, the intended order, and what to hand a skeptic first. Start here when circulating |
 | [`explainers/one-pager.html`](explainers/one-pager.html) | **The one-pager** — the whole proposal on a single printable sheet, ending on the feasibility-phase ask |
-| [`explainers/`](explainers/) | Visual explainers (HTML), one job each. [`programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) — **the engine** (the generic verified-eBPF utility in TMM); [`cve-mitigation.html`](explainers/cve-mitigation.html) — data-plane **CVE mitigation** (the shield); [`cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) — a **worked example**: shielding a real TMM NULL-deref crash class step by step; [`engine-hard-problems.html`](explainers/engine-hard-problems.html) — the **engineering register** (the load-bearing hard problems, honestly scoped) |
-| [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
+| [`explainers/`](explainers/) | Visual explainers (HTML), one job each. [`programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) — **the engine** (the generic verified-eBPF utility in TMM); [`cve-mitigation.html`](explainers/cve-mitigation.html) — data-plane **CVE mitigation** (the shield); [`cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) — a **worked example**: shielding a real TMM NULL-deref crash class step by step; [`engine-hard-problems.html`](explainers/engine-hard-problems.html) — the **engineering register** (the hard problems, honestly scoped) |
+| [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style (user statically defined tracing) tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
 
 ## What is actually checkable here
 
 There is no prototype in this repo, and no claim in these documents rests on one. What there is, in
-[`substrate/`](substrate/), is the handful of items from the scope that are worth having as **real
-files rather than illustrative blocks** — because their value is precisely that they compile, validate,
-and run. `make -C substrate check` runs five checks with nothing but a C compiler and Python 3:
+[`substrate/`](substrate/), is the handful of items from the scope that are **real files rather than
+illustrative blocks** — they compile, validate, and run. `make -C substrate check` runs five checks with
+nothing but a C compiler and Python 3:
 
 1. **`shield_abi.h` compiles standalone and asserts its own wire layout** — fifteen `_Static_assert`s
    pinning `struct shield_msg` and `struct shield_binding` byte for byte.
@@ -211,7 +214,7 @@ and run. `make -C substrate check` runs five checks with nothing but a C compile
 5. **The safe-return two-gate rule is asserted, not just documented** — five cases, and the build fails
    if an unanalysed function body is ever treated as enforce-capable.
 
-**Why that is the whole of it, stated plainly.** Writing these for real has already caught four defects
+**Why that is the whole of it.** Writing these for real has already caught four defects
 that the prose versions carried unnoticed: a signature documented as covering a binding the message
 could not carry; a replay that defeated the kill switch; a safe-return model inverted so that `void`
 looked like the easy case; and a hook map declaring offsets that did not match its own header. That is
@@ -228,5 +231,5 @@ claim in these documents is a design claim awaiting measurement.
   a designed-in hook, a uBPF track and a PREVAIL verify gate. **It was removed deliberately.** Its
   name read as an F5 component and invited the wrong question — whether it was cut-down TMM source —
   and a toy relay standing in for TMM invites an argument about the analogy rather than the design.
-  The cost of removing it is real and worth stating: the verify gate is no longer demonstrable here.
-- This repo holds design proposals and candidate artifacts. Nothing here is production TMM source.
+  The cost of removing it: the verify gate is no longer demonstrable here.
+- Nothing here is production TMM source.

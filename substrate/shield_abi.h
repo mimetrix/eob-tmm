@@ -31,7 +31,14 @@
 #define SHIELD_SHA256_LEN     32u
 #define SHIELD_MAX_CORES      128u         /* CMP fan-out ceiling for counters     */
 #define SHIELD_MAX_SHIELDS     64u         /* concurrently loaded shields          */
-#define SHIELD_BINDING_WIRE_MAX 128u       /* 32 + 64 + 13, rounded up             */
+/* Bytes the signing service serialises and signs: the message preamble through the
+ * end of the binding. NOTE the arithmetic — 16 (op..prog_len) + 112 (binding) is
+ * EXACTLY 128, so this leaves zero headroom: adding one field to either the preamble
+ * or the binding overflows a buffer sized by this constant. The comment it replaced
+ * said "32 + 64 + 13, rounded up", which described an earlier binding that no longer
+ * exists. TODO(f5): derive it rather than hard-code it —
+ *   sizeof(struct shield_msg) - sizeof(((struct shield_msg *)0)->sig) - 0  */
+#define SHIELD_BINDING_WIRE_MAX 128u
 /* Bytes of entry pad arm/disarm may touch. TODO(f5): per-arch — x86-64 needs at
  * least 5 for a rel32 JMP; aarch64 needs 4 for a B (plus a veneer past ±128 MiB).
  * The per-hook truth is patchable_pad_bytes in the signed hook map. */
