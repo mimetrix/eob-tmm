@@ -21,6 +21,54 @@ This document proposes **Live Shield**: a vendor-authored, signed, auto-retiring
 
 The model is directly analogous to Cisco's Live Protect (eBPF shields embedded in NX-OS), but it must be adapted to a fundamentally different OS architecture — which is the crux of the rest of this document.
 
+### 1.1 Assumptions, stated so they can be disputed
+
+Everything after this section rests on the list below. It is separated by *how much we actually know*,
+because the three categories invite different responses: a **known** claim can be checked, a
+**controlled** one is F5's to decide, and an **assumed** one is where this proposal can be argued with
+productively. Two of the assumptions, if false, end the case — they are marked.
+
+**Known — checkable properties of TMM as it is built today.**
+
+1. TMM's poll loop is **single-threaded, un-preemptible, run-to-completion and core-pinned**, with N
+   instances on a box. Almost every safety and cost argument here depends on this;
+   [`engine-hard-problems.md`](engine-hard-problems.md) §3.2 spells out what it buys.
+2. TMM **bypasses the kernel for the data path**, so kernel eBPF can attach to it (a uprobe works) but
+   pays a kernel transition per hit and cannot override a return.
+3. The existing runtime surfaces — config, profiles, WAF policy, iRules, and an arriving WASM tier — act
+   on **the curated traffic model the proxy chose to expose, at the events it chose to fire** (§2.1,
+   §2.4). Reaching the code's own internals is outside all of them.
+4. A shield **applies with no restart and no failover**, and `REVOKE` reverses it in seconds. These are
+   properties of the artifact, not of anyone's process.
+
+**Controlled — F5's decisions, not external facts.**
+
+5. F5 owns TMM's source, so hooks are designed in and the per-build hook map is emitted by the build
+   (§5.3). This is what removes the guessed-offset problem that afflicts injection tooling.
+6. Only F5 authors and signs shields; the ABI is internal and not exposed to customers (§8).
+7. Verification runs in F5's pipeline **before** signing; on the box the signature over the binding is
+   the gate (§9).
+
+**Assumed — where this proposal is arguable, and should be argued.**
+
+8. **⚠ Enough real data-plane CVEs satisfy §10.1's four conditions to be worth the mechanism.** This is
+   *unknown*, not merely unproven: nobody has taken a set of published F5 data-plane advisories and
+   checked them one by one. The retrospective study named in §10.1 is what settles it, needs no
+   engineering, and could right-size or end the programme. **If the answer is "a small minority," this
+   becomes a much smaller project.**
+9. **⚠ Operators cannot always install a patched build immediately.** The entire exposure gap depends on
+   this. It is an assumption about operator behaviour rather than anything F5 observes or controls, and
+   if it is false there is no gap to fill and no need for a shield.
+10. An operator will accept a non-disruptive signed artifact more readily than a build. The artifact
+    properties in (4) are known; the *inference* about willingness is not, and this document does not
+    speculate about any particular operator's process.
+11. The hookable set and its argument layouts can be derived accurately from the build's own debug
+    information, against an optimised build (§5.3, scope item 5). This is the least-proven engineering
+    assumption in the package and the one the reviews found most understated.
+12. uBPF and PREVAIL can be brought under F5 maintenance without a fork in the trust path — day one by
+    riding PREVAIL's existing `tracing` program type (§5.2), with a uBPF JIT patch for back-edge fuel
+    owned and upstreamed (`engine-hard-problems.md` §1).
+
 ## 2. Why TMOS cannot copy the Cisco approach directly
 
 Cisco's mechanism is kernel eBPF in NX-OS's Linux kernel. TMOS is not one OS; it is a partitioned system with two execution environments, and a single mechanism cannot cover both.
@@ -414,7 +462,7 @@ real answer is defensible.
 |---|---|---|
 | **Test** | **Substantially, but not to zero** | Not the verifier alone — the **bounded outcome set**. A hotfix needs full-image regression because a hotfix *can break anything*; the burden scales with the image. A shield can only select an outcome the host already owns at a hook the build declared, so its blast radius is bounded **by construction**, which is what makes a proportionate test regime defensible rather than a corner cut. What remains is irreducible: does the predicate actually match the exploit, what is its false-positive rate against a legitimate-traffic corpus, and is the chosen outcome safe to *take* (§6.1's skippability gate — a separate obligation from memory safety that no verifier addresses). |
 | **Certify** | **Barely, and it may add a problem** | The verifier is close to irrelevant here: evaluators care about *what code is inside the validated boundary*, and that answer now changes at runtime. What speaks to them is the **signature**, because signed code authenticity is an established construct. This is the program's likeliest productization gate (`engine-hard-problems.md` §5), and the failure mode is a forced dynamic-load-disabled certified mode rather than a refusal. |
-| **Install** | **Yes — and this is where the value is** | Nothing about the artifact requires a reboot, a failover, or a maintenance window; `REVOKE` reverses it in seconds and expiry retires it unattended. The customer-side burden drops from "window + regression risk + rollback plan" to accepting a signed content update. **Note this is also the step a faster release train cannot help with at all**, because it sits on the customer's calendar rather than F5's. |
+| **Apply** | **Yes — and state it as a property of the artifact** | A build has to be installed, which means a restart or a failover, regression risk across the whole image, and a rollback plan. A signed shield has none of those properties: it applies **with no restart and no failover**, `REVOKE` reverses it in seconds, and expiry retires it unattended. That is the whole of the claim. What any given operator's change process then requires of them is theirs, not ours, and this document does not speculate about it. |
 
 So: **the bounded outcome set buys a proportionate test surface; the signature buys the certification
 argument; and being an artifact rather than an image buys the install window.** Three mechanisms doing
