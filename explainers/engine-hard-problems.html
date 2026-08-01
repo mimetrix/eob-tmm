@@ -259,11 +259,12 @@
   <section class="hero" id="hero" data-sec="hero">
     <p class="eyebrow">F5 TMM · <b>engineering register</b> · the honest half</p>
     <h1>Before we build it: <em>where this gets hard</em>.</h1>
-    <p class="sub"><b>The proposal says a verified eBPF engine is safe to run inside TMM. True — as far as it
-      goes.</b> This page is the other half: the load-bearing problems building it actually raises — engineering
-      as much as security — stated plainly, before anyone has to ask.</p>
-    <p class="pivot">None of them is a show-stopper. Each has a known mitigation and a clear day-one path.
-      They are <b>the work to do — not a verdict against doing it.</b></p>
+    <p class="sub"><b>The proposal says a verified eBPF engine is safe to run inside TMM</b> — F5's data-plane
+      microkernel, with its own scheduler and stacks, bypassing the Linux kernel for all traffic. <b>True, as far
+      as it goes.</b> This page is the other half: the problems it raises —
+      engineering as much as security.</p>
+    <p class="pivot">None is a show-stopper: each has a known mitigation and a day-one path. <b>The work to do,
+      not a verdict against doing it.</b></p>
     <div class="chiprow" aria-label="the four themes">
       <span class="chip">time</span><span class="dot">·</span>
       <span class="chip">the interface</span><span class="dot">·</span>
@@ -277,65 +278,88 @@
   <section class="beat reveal" id="time" data-sec="time">
     <p class="kicker"><span class="num">01</span> time</p>
     <h2>A proof that a program <em>terminates</em> is not a promise it fits the budget.</h2>
-    <p class="lede">The verifier proves every program halts — it bounds loop iterations, so nothing runs forever. (With <span class="inlinecode">--termination</span> enabled: it is <em>not</em> PREVAIL's default, and the prototype does not yet pass it. This design requires it.)
+    <p class="lede">The verifier proves every program halts — it bounds loop iterations. (With <span class="inlinecode">--termination</span> enabled — <em>not</em> the default of <b>PREVAIL</b>, the abstract-interpretation eBPF verifier this design uses.)
       That is <b>not</b> a <b>worst-case execution time (WCET)</b>: the longest it can actually take on the
       hardware. Halting says nothing about fitting the budget at the hook it runs on.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
       <p>&ldquo;It's verified as bounded, so it can't hang the poll loop.&rdquo;</p></div>
-    <p style="margin-top:1.4rem">And the resource is unforgiving. TMM's poll loop is <b>single-threaded,
-      un-preemptible, run-to-completion</b> — there is no OS underneath to preempt an overrunning hook. Every
+    <p style="margin-top:1.4rem">TMM's poll loop is <b>single-threaded,
+      un-preemptible, run-to-completion</b> — no OS underneath to preempt an overrunning hook, and every
       hook borrows cycles from the <em>same</em> loop, so <b>one misjudged hook starves every flow on that
       core.</b></p>
-    <p style="margin-top:1.4rem">The fix is <b>two layers — and only one is free.</b> Static analysis can bound
-      how <em>many</em> instructions a program runs; it cannot bound how <em>long</em> they take. So one layer
-      settles size ahead of time; a second guards time as the program runs.</p>
+    <p style="margin-top:1.4rem">The fix is <b>two layers — and only one is free.</b></p>
     <div class="layers">
       <div class="layer admit">
         <p class="lh"><span class="num">①</span> at admission · static · once, off-box</p>
         <h4>The budget pass</h4>
-        <p>Cost the worst-case path through the program's CFG (finite, loops proven-bounded), compare to the
-          hook's <b>budget</b> — and the budget is per <em>invocation</em>, gated by the hook's
-          <b>rate</b>: <span class="inlinecode">path_class</span> <em>is</em> that rate class, so
-          <b>hot</b> fires per packet, <b>warm</b> per connection or request, <b>cold</b> per exceptional event.
-          The same 100&nbsp;ns program is noise on a request the proxy spends 50&nbsp;µs on and a problem on a
-          packet forwarded in 200&nbsp;ns — and <b>reject over-budget,
-          fail closed</b>. Bounds <b>instruction count</b>, proven before the program loads.</p>
+        <p>Cost the worst-case path through the program's CFG (finite, loops proven-bounded) against the hook's
+          <b>budget</b> — per <em>invocation</em>, gated by the hook's <b>rate</b>:
+          <span class="inlinecode">path_class</span> <em>is</em> that rate class (<b>hot</b> per packet,
+          <b>warm</b> per connection or request, <b>cold</b> per exceptional event), and it reads as <b>structure ∧
+          adversarial reachability</b> — anything an attacker can drive at will is <b>hot</b> wherever it sits in
+          the source. Over budget → <b>reject, fail closed</b>.</p>
         <p class="cost">runtime cost: none · a build artifact</p>
       </div>
       <div class="layer run">
         <p class="lh"><span class="num">②</span> at runtime · every execution</p>
         <h4>The runtime guard</h4>
-        <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything. Something must stop a slow execution from stalling the
-          loop as it runs. <b>Irreducible</b>, and it carries a small per-execution cost — but <em>which</em>
-          mechanism is the open question below, not a settled matter. And note what &ldquo;terminating&rdquo;
-          buys on its own: PREVAIL's own ceiling is <b>100,000 loop iterations</b> — at ~10 instructions each that
-          is ~300&nbsp;µs on a 3&nbsp;GHz core. A <em>proven-terminating</em> program can still stall the loop for
-          a third of a millisecond. That number is the argument for ①.</p>
+        <p>Instruction count is <em>not</em> time — warm cache versus cold changes everything, so something must stop a
+          slow execution stalling the loop as it runs. <b>Irreducible</b>, with a small per-execution cost;
+          <em>which</em> mechanism is the open question below. And note what &ldquo;terminating&rdquo;
+          buys alone: PREVAIL's ceiling is <b>100,000 loop iterations</b> — ~300&nbsp;µs at ~10 instructions each
+          on a 3&nbsp;GHz core, so a <em>proven-terminating</em> program can stall the loop for a third of a millisecond.
+          That is the argument for ①.</p>
         <p class="cost">runtime cost: small, bounded · live machinery</p>
       </div>
     </div>
     <div class="callout accent"><span class="lbl">why both</span>
-      <p>① proves the program is <b>small</b> — static and provable. ② proves it's <b>fast this time</b> — only
-        knowable as it runs. <b>Size settles statically; timing does not.</b> None of this needs helpers or a
-        verifier change — the pass, the budget table, the cost model, and the deadline are new
-        <b>F5 build work</b>.</p></div>
-    <div class="callout"><span class="lbl">and here is the trilemma — the hardest open question in this document</span>
-      <p>Enforcing a time bound in a loop with <b>no preemption</b> leaves three mechanisms, and each costs
-        something we have claimed:</p>
+      <p><b>Size settles statically; timing does not.</b> Neither layer needs helpers or a verifier change — the
+        pass, the budget table, the cost model and the guard are new <b>F5 build work</b>.</p></div>
+    <p style="margin-top:1.4rem">And the budget divides <b>three</b> ways, not two — the
+      forwarder-versus-proxy dichotomy is too coarse, because TMM contains all three:</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Rate per invocation</th><th>Budget there</th><th class="df">A hook of tens of ns is</th><th class="d1">Honest verdict</th></tr></thead>
+      <tbody>
+        <tr><td>per request (<span class="mono">warm</span>)</td><td>microseconds — the proxy's own TCP, TLS, L7 work</td><td class="df">noise</td><td class="d1">the easy case</td></tr>
+        <tr><td>per packet <em>inside</em> the proxy path (<span class="mono">hot</span>)</td><td>hundreds of ns — reassembly, TLS records, L7 framing</td><td class="df">a few percent</td><td class="d1"><b>affordable sometimes</b>, with measurement and explicit sign-off</td></tr>
+        <tr><td>per packet on a pure fast path</td><td>tens of ns — FastL4 (accelerated non-proxy forwarding), offload escalation</td><td class="df">most of it</td><td class="d1">conceded — the objection that sank bytecode in forwarders applies</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-top:1rem">The middle row is the point: it is where <b>the pre-L7 CVE classes sit</b>, faulting
+      per packet or per record before any request exists. Fold it upward and per-packet work looks free; fold it
+      down and the differentiator is out of scope.</p>
+    <div class="callout"><span class="lbl">the trilemma — the hardest open question here</span>
+      <p>Enforcing a time bound with <b>no preemption</b> leaves three mechanisms, each costing something we have
+        claimed:</p>
       <p style="margin-top:.7rem"><b>Fuel</b> (a counter at loop back-edges) is cheap and deterministic — but
-        uBPF's own API states it <em>&ldquo;has no effect on JIT'd programs.&rdquo;</em> So fuel means
-        <b>patching uBPF's JIT</b>, which costs the &ldquo;reused as-is&rdquo; claim on one of the three reused
-        components. <b>Wall-clock</b> reads a clock at back-edges — but on aarch64 the counter ticks at tens of
-        MHz (10–40&nbsp;ns granularity) against a hot-hook budget of tens of nanoseconds, so it is
-        <b>not measurable at the granularity that matters</b> on half our platforms. <b>Signals/timers</b> mean a
-        syscall per invocation plus delivery jitter — a non-starter in this loop.</p>
-      <p style="margin-top:.7rem">So the honest position is: <b>fuel is the mechanism, not the optional extra</b>,
-        and the wall-clock deadline is best understood as <em>reporting</em> rather than enforcement. Earlier
-        drafts of this register had that backwards. The decision to make in the room — before month nine — is
-        which of the three we give up: <b>the run-to-completion loop, the unmodified uBPF, or enforce mode on hot
-        hooks.</b> The available good answer is to fork uBPF's JIT for back-edge fuel, own it, and upstream it.</p></div>
+        <b>uBPF</b>, the small userspace eBPF interpreter and <b>JIT</b> (just-in-time native compiler) this design
+        embeds, states that its limit <em>&ldquo;has no effect on JIT'd programs&rdquo;</em>: fuel means
+        <b>patching uBPF's JIT</b>, costing the &ldquo;reused as-is&rdquo; claim on one reused component. (The limit
+        <em>does</em> work in uBPF's <b>interpreter</b>, so an interpreter-only high-assurance build has enforceable
+        fuel with no fork.) <b>Wall-clock</b> reads a clock at back-edges — but on aarch64 that counter ticks at
+        tens of MHz, 10–40&nbsp;ns granularity against a hot-hook budget of tens of nanoseconds:
+        <b>not measurable at the granularity that matters</b> on half our platforms. <b>Signals/timers</b> cost a
+        syscall per invocation plus delivery jitter — a non-starter here.</p>
+      <p style="margin-top:.7rem">So: <b>fuel is the mechanism, not the optional extra</b>, and the wall-clock
+        deadline is <em>reporting</em> rather than enforcement. Decide in the room, not in month nine, which of the
+        three we give up: <b>the run-to-completion loop, the unmodified uBPF, or enforce mode on hot hooks.</b> The
+        good answer is to fork uBPF's JIT for back-edge fuel, own it, upstream it.</p></div>
+    <div class="callout accent"><span class="lbl">what is plausible per packet — ranked, all conditional on measurement nobody has taken</span>
+      <p><b>Per-packet observability with a sampling divisor:</b> high confidence — the cost is adjustable
+        downward by construction. <b>Per-packet enforcement on an exceptional branch, time-boxed:</b> good, and
+        where the flagship CVE classes sit — conditional on the fuel guard existing, since an unbudgeted program
+        on an attacker-driven branch is the worst case here. <b>Per-packet enforcement on the common
+        path at line rate:</b> doubtful without a burst-capable invocation form (§05). <b>The contents of an
+        offloaded flow:</b> no — they never enter TMM software (the offload <em>boundary</em> is hookable software;
+        the accelerated middle is not).</p>
+      <p style="margin-top:.7rem">Two levers are narrower than they look. A <b>sampling divisor</b> is fine for
+        observability and useless for enforcement: you cannot block one in N instances of an exploit. And
+        <b>time-boxing applies only to mitigation</b> — a few percent for an exposure window is a categorically
+        different trade from a few percent permanently, and does not transfer to always-on telemetry. That window is
+        itself an <em>assumption</em> about operator behaviour: that a patched build cannot always be installed at
+        once.</p></div>
     <figure class="bp">
-      <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The budget pass on one program: a verified control-flow graph with a proven loop bound of 64; worst-case path is 8 plus 10 times 64 plus 4 = 652 instructions, about 800 cycles; compared to the hook's budget it loads if under and is rejected fail-closed if over.">
+      <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A verified control-flow graph with a proven loop bound of 64: worst case 652 instructions, about 800 cycles, compared to the hook's budget — load if under, reject if over.">
         <defs>
           <marker id="bpah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head"/></marker>
           <marker id="bpaha" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head-a"/></marker>
@@ -360,13 +384,12 @@
         <rect class="bp-warn" x="340" y="186" width="230" height="38" rx="7"/>
         <text class="bp-warn-t" x="455" y="210" text-anchor="middle">&gt; budget → reject (fail closed)</text>
       </svg>
-      <figcaption class="bp-cap"><b>Layer ①, on one program.</b> A <b>control-flow graph (CFG)</b> — the
-        program's basic blocks and the branches between them. Because it's <em>verified</em>, every loop has a
-        proven bound, so the <b>worst-case path</b> is computable: cost it, gate on the hook's budget, load or
-        reject. Layer ② (the deadline) then guards the one thing this can't see — wall-clock time.</figcaption>
+      <figcaption class="bp-cap"><b>Layer ①, on one program.</b> Because the <b>control-flow graph (CFG)</b> —
+        basic blocks and branches — is <em>verified</em>, every loop carries a proven bound, so the <b>worst-case
+        path</b> is computable: cost it, gate on the budget, load or reject.</figcaption>
     </figure>
     <figure class="bdd">
-      <svg viewBox="0 0 720 154" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline from source to hot path. compile (dev/CI) emits bytecode; verify (PREVAIL), budget pass, and sign — the F5 build-and-sign pipeline, off-box, once per program — emit a verified, budget-stamped, signed program; load attaches it to a hook on the control plane; run executes it per packet in the TMM data plane. Everything except run is amortized off the data path; only run is per-packet in the poll loop.">
+      <svg viewBox="0 0 720 154" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline from source to hot path: compile in dev/CI, then verify, budget pass and sign in F5's off-box pipeline, then load on the control plane, then run per packet in the TMM data plane. Only run is per-packet in the poll loop; everything before it is amortized off the data path.">
         <defs>
           <marker id="bdah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bd-head"/></marker>
         </defs>
@@ -405,20 +428,17 @@
         <path class="bd-brk" d="M604,131 L604,126 L708,126 L708,131"/>
         <text class="bd-blbl hot" x="656" y="145" text-anchor="middle">per packet · poll loop</text>
       </svg>
-      <figcaption class="bd-cap"><b>From source to hot path</b> — where each step runs and what it emits. Everything
-        left of the divider is <b>amortized</b> (once per program, or per TMOS build) and runs <b>off the data
-        path</b>; only <b>run</b> executes per packet, in the poll loop. Separately, each <b>TMOS build</b> emits
-        the config the pipeline consumes — the signed hook-point map, the ctx/BTF descriptors, the per-hook budget
-        table, and the cost model.</figcaption>
+      <figcaption class="bd-cap"><b>From source to hot path.</b> Everything
+        left of the divider is <b>amortized</b> and off the data path; only <b>run</b> executes per packet, in the
+        poll loop. Separately, each <b>TMOS build</b> emits
+        the config the pipeline consumes: the signed hook-point map, the <span class="mono">ctx</span>/<b>BTF</b>
+        (BPF Type Format) descriptors, the per-hook budget table, the cost model.</figcaption>
     </figure>
     <div class="callout accent"><span class="lbl">the problem is also the pitch</span>
-      <p>And the budgets shouldn't be pulled from the air. Setting a per-hook budget — and catching one at risk —
-        is itself an <b>observability</b> problem, and it's exactly what a few <b>designed-in USDTs</b> would
-        expose: per-iteration <b>poll-loop duration</b> (<span class="inlinecode">tmm:rt:poll_iter</span>), per-hook
-        <b>execution cost</b>, and a <b>stall/overrun tripwire</b> (<span class="inlinecode">tmm:rt:poll_stall</span>).
-        The engine ends up <b>instrumenting the very loop it runs in</b> — so the same surface that makes this hard
-        problem tractable <em>is</em> the observability the engine exists to provide. Describing the problem and
-        showing the payoff turn out to be one move.</p></div>
+      <p>Setting those budgets is itself an <b>observability</b> problem — exactly what a few <b>designed-in
+        USDTs</b> (<em>userland statically-defined tracing</em> — probe points built into the source) expose:
+        <b>poll-loop duration</b> per iteration, per-hook <b>execution cost</b>, a <b>stall tripwire</b>. The engine
+        <b>instruments the very loop it runs in</b>.</p></div>
   </section>
 
   <!-- 02 THE INTERFACE -->
@@ -426,32 +446,32 @@
     <p class="kicker"><span class="num">02</span> the interface</p>
     <h2>The VM is the easy 10%. The interface is the other 90%.</h2>
     <p class="lede">What a program <em>sees</em> — the <span class="inlinecode">ctx</span>: which fields of the
-      flow, the buffer, the profile — plus the verified <b>helper surface</b> and the <b>map model</b>: that is
-      the real design. And it is a <b>permanent, versioned ABI</b> you carry the moment you ship it.</p>
+      flow, the buffer, the profile — plus the verified <b>helper surface</b> and the <b>map model</b>. That is the
+      real design, and a <b>permanent, versioned ABI</b> once shipped.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
-      <p>&ldquo;The base tier is a trivial pure function of <span class="mono">ctx</span>.&rdquo; The base
-        <span class="mono">ctx</span> is real, forever-facing interface work.</p></div>
-    <p style="margin-top:1.4rem"><b>The good news, stated precisely:</b> this work is exactly the input the
-      verifier is built to consume. The task is <em class="accent">&ldquo;write the program-type
-      descriptor&rdquo;</em> — the <span class="inlinecode">ctx</span> layout, memory regions, helper prototypes
-      — <b>not</b> &ldquo;modify the verifier.&rdquo; The no-verifier-fork claim survives; the effort estimate
-      does not.</p>
+      <p>&ldquo;The base tier is a trivial pure function of <span class="mono">ctx</span>.&rdquo;</p></div>
+    <p style="margin-top:1.4rem"><b>The good news, stated precisely:</b> the task is <em class="accent">&ldquo;write
+      the program-type descriptor&rdquo;</em> — <span class="inlinecode">ctx</span> layout, memory regions, helper
+      prototypes — <b>not</b> &ldquo;modify the verifier.&rdquo; The no-verifier-fork claim survives; the effort
+      estimate does not.</p>
     <div class="callout accent"><span class="lbl">the interface is the USDT catalog</span>
-      <p>Put concretely, the designed-in half of that interface <em>is</em> a <b>catalog of well-defined
-        USDTs</b> (<em>userland statically-defined tracing</em> — named probe points designed into the source) — one per hook, each a curated <span class="inlinecode">ctx</span> — and the other half is the
-        per-build typed-argument map that <b>function-boundary probes</b> read. Getting them right isn't
-        incidental to the project; it is the project: together they are the <b>ceiling on what the engine can
-        observe or enforce</b> — the catalog bounds the <em>anticipated</em> surface; function-boundary probes
-        reach any named function that survived the build as its own out-of-line body, whose arguments reach the state you need — and it's the permanent ABI. This is
-        exactly where the design effort earns its keep, and it's what makes the difference between a toy and a
-        platform.</p></div>
+      <p>The designed-in half of that interface <em>is</em> a <b>catalog of well-defined USDTs</b> — one per hook,
+        each a curated <span class="inlinecode">ctx</span> — and the other half the per-build typed-argument map
+        that <b>function-boundary probes</b> read. Together they are the <b>ceiling on what the engine can observe
+        or enforce</b>: the catalog bounds the <em>anticipated</em> surface; boundary probes reach any function that
+        survived the build as its own out-of-line body and whose arguments expose the fault. Getting both right is
+        not incidental to the project — it <em>is</em> the project, and the permanent ABI.</p></div>
     <div class="dayone"><p class="h">day one</p>
       <ul class="checks">
-        <li>Ship a <b>minimal, read-only <span class="mono">ctx</span></b> per hook + its program-type descriptor.</li>
+        <li>Ship a <b>minimal <span class="mono">ctx</span></b> per hook + its program-type descriptor — built as a
+          <b>per-core scratch copy, discarded on fall-through</b>, never a live view of TMM state. PREVAIL's
+          descriptor expresses no read-only region, so a verified program can write every byte of its
+          <span class="mono">ctx</span>: handed the live argument frame, an observe-only program would be an
+          argument-injection primitive. The copy is the cost, and the copy is what to measure.</li>
         <li><b>Start from what's already there — no blank page.</b> TMM's code already holds the state these USDTs
           expose: the connection table, the TLS record layer, the L7 parser state, the <span class="mono">bd</span>/plugin
-          internals, the poll-loop counters. The first USDTs are a <b>curated window onto structures that already
-          exist</b>, so the surface can begin the day the engine lands and grow from there.</li>
+          internals, the poll-loop counters. So the first USDTs are a <b>curated window onto structures that
+          already exist</b>, and can begin the day the engine lands.</li>
       </ul>
       <p class="deferred"><b>Deferred:</b> helpers. Each one is a new ABI to secure and a new verifier prototype
         — <span class="mono">ctx</span>-first, helpers-later.</p>
@@ -463,14 +483,14 @@
     <p class="kicker"><span class="num">03</span> shared state</p>
     <h2>TMM is not one kernel. It's N core-pinned kernels with their own state fabric.</h2>
     <p class="lede">Multiple TMM instances per box (<b>CMP</b> — clustered multiprocessing, one TMM pinned per core), plus <b>connection mirroring</b> to an HA peer,
-      make map and state semantics <em>harder</em> than Linux's single-kernel case — not easier.</p>
+      make map and state semantics <em>harder</em> than Linux's single-kernel case, not easier.</p>
     <div class="callout"><span class="lbl">the claim to retire</span>
       <p>&ldquo;Maps work like they do in Linux.&rdquo;</p></div>
     <div class="dayone"><p class="h">day one</p>
       <ul class="checks">
-        <li><b>When the helper tier lands (deferred): per-CPU maps only</b> — no cross-TMM sharing. The base tier registers no helpers, so it has no map access at all.</li>
+        <li><b>When the helper tier lands (deferred): per-CPU maps only</b> — no cross-TMM sharing. The base tier registers no helpers, so it has no map access.</li>
         <li>State that must survive failover <b>rides TMM's existing mirroring channel</b> — don't reinvent HA
-          replication inside the map layer.</li>
+          replication in the map layer.</li>
       </ul>
       <p class="deferred"><b>Deferred:</b> shared, writable maps across TMMs — they need an explicit concurrency
         and reconciliation model.</p>
@@ -480,78 +500,81 @@
   <!-- 04 THE TRUST SURFACE -->
   <section class="beat reveal" id="trust" data-sec="trust">
     <p class="kicker"><span class="num">04</span> the trust surface</p>
-    <h2>The JIT emits native code into the crown-jewel process, and the verifier decides what reaches it. This is the one a review presses hardest.</h2>
-    <p class="lede">PREVAIL runs outside TMM — in F5's build/admission pipeline, never in TMM's address space and never on attacker-supplied input (§05) — so an <b>unsound
-      verifier</b>, or a <b>buggy JIT</b>, still means arbitrary native code in the data plane — the single
-      biggest risk class eBPF carries, relocated into TMM.<sup class="fnref">†</sup></p>
-    <div class="callout accent"><span class="lbl">the load-bearing point</span>
+    <h2>The JIT emits native code into the crown-jewel process, and the verifier decides what reaches it.</h2>
+    <p class="lede">PREVAIL runs outside TMM — in F5's build/admission pipeline, never in TMM's address space and
+      never on attacker-supplied input — yet an <b>unsound verifier</b> or a <b>buggy JIT</b> still means arbitrary
+      native code in the data plane: the biggest risk class eBPF carries, relocated into
+      TMM.<sup class="fnref">†</sup></p>
+    <div class="callout accent"><span class="lbl">the point</span>
       <p><b>The perimeter is the signing gate, not the verifier.</b> Only F5-signed bytecode ever reaches the
         verifier or JIT — attacker-controlled input never touches them. So a soundness bug is <b>not a
         traffic-borne RCE</b> — remote code execution triggered purely by sending traffic through the data
-        path, needing no credentials and no management-plane access; it's a supply-chain concern, gated by
+        path, needing no credentials and no management-plane access; it's a supply-chain concern gated by
         signing-key protection.</p></div>
-    <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; the verifier runs at F5 before signing, and only F5-signed bytecode reaches the JIT and JIT.">
+    <div class="schematic" role="img" aria-label="Attacker bytecode is rejected at the signing gate; only F5-signed bytecode reaches the verifier and JIT, both of which run at F5 before signing.">
       <div class="srow blocked"><span class="flow">attacker-controlled bytecode → signing gate</span><span class="tag">✗ rejected</span></div>
       <div class="srow pass"><span class="flow">F5-signed bytecode → verify → JIT</span><span class="tag">✓ runs</span></div>
     </div>
-    <p style="margin-top:1.4rem"><b>And verified ≠ correct.</b> The proof is about memory-safety and termination,
-      not intent — a verified, signed program can still <b>black-hole traffic</b>. So blast radius needs its own
-      bound, separate from the proof.</p>
+    <p style="margin-top:1.4rem"><b>And verified ≠ correct.</b> The proof covers memory-safety and termination,
+      not intent — a verified, signed program can still <b>black-hole traffic</b>, so blast radius needs its own
+      bound.</p>
     <div class="dayone"><p class="h">day one</p>
       <ul class="checks">
-        <li><b>Signing gate + HSM-backed key protection</b> — the real perimeter; protect it accordingly.</li>
+        <li><b>Signing gate + HSM-backed key protection</b> — a hardware security module holding the signing key. This is the real perimeter; protect it accordingly.</li>
         <li><b>JIT hardening</b> (W^X, guard pages) and an <b>interpreter-only high-assurance build</b> option —
-          trade JIT speed for a smaller native-code surface where it matters most.</li>
-        <li>A <b>control-plane canary</b> that auto-unloads on a health signal — the proof bounds crashes; the
-          canary bounds a bad-but-valid program.</li>
+          trade JIT speed for a smaller native-code surface.</li>
+        <li>A <b>control-plane canary</b> that auto-unloads on a health signal — the proof bounds crashes, the
+          canary a bad-but-valid program.</li>
       </ul>
     </div>
-    <div class="callout"><span class="lbl">we're not alone on this — and that's new information</span>
+    <div class="callout"><span class="lbl">we're not alone on this</span>
       <p>&ldquo;How do you know the verifier is sound?&rdquo; has no satisfying answer of the form <em>it's widely
-        used</em>. The answer that works is <b>inspectability</b> — tooling that steps through the abstract
-        interpretation so a reviewer can see <em>why</em> a program was accepted, and so the verifier can be
-        unit-tested against adversarial input. That is the form soundness evidence has to take for a <b>TMA</b> (Threat Model Analysis — F5's formal security review, a gating prerequisite here). Establish
-        early whether PREVAIL offers it and what a soundness-evidence package contains: the signing gate bounds
-        <em>who</em> could exploit a soundness bug, but only auditability reduces the chance there is one.</p></div>
-    <p class="fnote"><sup>†</sup> Sharper still given the source-code exposure — an adversary holding the code can
-      hunt verifier/JIT soundness bugs directly. Which is exactly the point: <b>secrecy was never the defense; the
-      signing gate is.</b> The perimeter holds whether or not the source is public.</p>
+        used</em>. What works is <b>inspectability</b> — tooling that steps through the abstract interpretation so a
+        reviewer can see <em>why</em> a program was accepted, and so the verifier can be unit-tested against
+        adversarial input. That is the form soundness evidence has to take for a <b>TMA</b> (Threat Model Analysis —
+        F5's formal security review, gating here). Establish early whether PREVAIL offers it: the signing gate
+        bounds <em>who</em> could exploit a soundness bug, but only auditability reduces the chance there is
+        one.</p></div>
+    <p class="fnote"><sup>†</sup> Sharper still given source-code exposure — an adversary holding the code can hunt
+      soundness bugs directly. Which is the point: <b>secrecy was never the defense; the signing gate is.</b> The
+      perimeter holds whether or not the source is public.</p>
   </section>
 
   <!-- 05 FURTHER CONCERNS -->
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
     <h2>Thirteen more to get ahead of — and one of them is the biggest item here.</h2>
-    <p class="lede">The four above are load-bearing. These are the next tier: each has a stance, none changes the
-      day-one posture — and the first two are the most likely to shape what the first shippable form looks like.</p>
+    <p class="lede">The four above are the ones the design turns on; these are the next tier. Each has a stance, none changes the
+      day-one posture, and the first two shape what the first shippable form looks like.</p>
     <div class="concerns">
       <div class="concern"><span class="cl">item zero · the safe point itself</span><p>Every in-TMM piece assumes
         &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; <b>That does not exist
         in TMM today.</b> Building it means a per-instance message queue and <b>a new check in the poll loop</b> —
-        one load and branch per iteration, on the loop this organisation guards hardest. And the handler must be
-        bounded: as first sketched it did an ELF parse and a <b>JIT compile</b> at the safe point, which is
-        milliseconds during which the loop is not polling — a latency spike, possibly a dropped heartbeat. Compile
-        and populate pages <em>off</em> the safe point; leave it publishing a pointer and patching a few bytes.
-        <b>This is the most expensive item on the list and it was not on the list.</b></p></div>
-      <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>A certified appliance that loads code into its data plane at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate; raise it early.</p></div>
-      <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) should verify at <b>build / control-plane time</b> — only the small runtime and a signature check live in TMM's address space. This <em>shrinks</em> the §04 surface.</p></div>
-      <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated and re-validated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range are what keep it honest.</p></div>
-      <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter on high-assurance builds.</p></div>
+        one load and branch per iteration, on the loop this organisation guards hardest. The handler must also be
+        bounded: as first sketched it did an ELF parse and a <b>JIT compile</b> there, milliseconds in which the
+        loop is not polling — a latency spike, possibly a dropped heartbeat. Compile off the safe point; leave it
+        publishing a pointer and patching a few bytes. <b>The most expensive item here, and it was not on the
+        list.</b></p></div>
+      <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>An appliance validated under <b>FIPS</b> 140-2/3 (crypto-module validation) or <b>Common Criteria</b> (independent evaluation against a stated target) that also loads data-plane code at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate.</p></div>
+      <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) verifies at <b>build / control-plane time</b>; only the small runtime and a signature check live in TMM. This <em>shrinks</em> the §04 surface.</p></div>
+      <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range keep it honest.</p></div>
+      <div class="concern"><span class="cl">uBPF JIT maturity</span><p>§04 is really &ldquo;the verifier <em>and this JIT</em>.&rdquo; uBPF's JIT is far less battle-tested than the kernel's — <b>audit / harden / fork</b> it, or default to the interpreter.</p></div>
       <div class="concern"><span class="cl">the optimiser decides the hookable set</span><p>The flag pads the
         entries of functions the build <em>emits</em>. At <span class="inlinecode">-O2</span> that is a subset of
-        the source: an inlined function has no entry of its own, <span class="inlinecode">-fipa-icf</span> folds
-        identical functions so one pad can serve two names, and clones
+        the source: an inlined function has no entry of its own (pushing the boundary out to its caller — a
+        wider skip radius, not lost reachability), <span class="inlinecode">-fipa-icf</span> folds
+        identical bodies so arming one arms the other, and clones
         (<span class="inlinecode">.constprop</span>) change both symbol and argument list. So <b>the hookable set is
         knowable per build but is not the set of functions you can name from reading the code</b>, and pinning a
-        specific one into it means <span class="inlinecode">noinline</span> — a source change. Publish the hookable
-        set as a build artifact and treat it as the contract.</p></div>
-      <div class="concern"><span class="cl">invocation granularity · per-packet vs. batched</span><p>eBPF's calling convention takes <b>one <span class="inlinecode">ctx</span>, once</b> — it cannot express &ldquo;here is a vector of 256 packets,&rdquo; so a data plane whose speed comes from a stage seeing a whole batch is a poor host for bytecode. <b>TMM is the favorable case</b>: a proxy, run-to-completion and core-pinned, per-flow rather than per-vector — and spending microseconds per request where a forwarder spends nanoseconds per packet. What remains is per-invocation overhead where TMM <em>does</em> batch (burst receive): the answer is a <b>burst-capable invocation form</b>, with §01's budget pass reasoning <b>per burst</b>.</p></div>
-      <div class="concern"><span class="cl">handlers running at the same time</span><p>A different question from arming, and the answer is worth stating because three simplifications depend on it. <b>Within one TMM instance there is no concurrency at all</b> — the loop is single-threaded, un-preemptible and run-to-completion, so a handler finishes before anything else runs on that core. That is <em>why</em> per-core counters need no atomics, why one <span class="inlinecode">ctx</span> scratch buffer per core suffices, and why a depth guard is a complete answer to re-entrancy rather than a partial one. <b>Across instances there is full N-way parallelism</b>: arming a hook arms it everywhere, so N copies run simultaneously on disjoint flows — which is why anything shared between instances is a real concurrency problem, why <span class="inlinecode">STATUS</span> must report per-instance (skew is diagnostic, since disaggregation picks the instance), and why partial arming is not &ldquo;mostly protected&rdquo; — an attacker only has to reach an unarmed instance. <b>The one real seam</b> is the loader mutating a slot while that slot&rsquo;s program runs on another core: those fields need defined memory ordering, and freeing a VM needs epoch-based quiescence.</p></div>
-      <div class="concern"><span class="cl">many programs armed at once</span><p>Every cost and safety argument here is written for <b>one program at one hook</b>. Arm two and four things appear. <b>(1)</b> There is one program slot per hook, so a second load on an armed hook must be <b>refused</b>, not silently accepted — overwriting disarms a live shield and resets its counter, so the swap looks exactly like &ldquo;no matches.&rdquo; <b>(2)</b> Chaining is deferred, because the hard part is not the plumbing but declaring a <b>total order over the outcome set</b>: without one, behaviour depends on load order, and load order is config-sync arrival order, which differs across HA peers. <b>(3)</b> The budget is <em>per hook</em> and nothing bounds the sum — and hooks on one flow&rsquo;s path are not independent, so <b>a flow pays the sum of the hooks it traverses</b>, not the maximum. <b>(4)</b> Worst of the four: a shield that <b>safe-returns past a body containing another hook</b> silences it, and that hook then reads <b>zero fires</b> — indistinguishable from &ldquo;nothing matched.&rdquo; Same false-success shape as partial inlining, except caused by our own mitigation, so a masked hook must report <span class="inlinecode">masked</span> and never zero.</p></div>
-      <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant; vCMP guests each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
-      <div class="concern"><span class="cl">ISSU + failover</span><p><b>ISSU</b> (in-service software upgrade) — zero-downtime upgrades and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
-      <div class="concern"><span class="cl">post-mortem debuggability — it cuts both ways</span><p>The concern the people who support the product raise first, and it was missing from this register. A <b>backtrace through a hooked function</b> is garbage without correct CFI on the trampoline; a <b>PC inside JIT&rsquo;d code</b> lands in anonymous memory with no symbol unless the loader registers the region; and the one rarely listed — <b>a core dump has to record which shields were armed</b>, with hashes, hooks and modes. Without that, an analyst cannot tell whether a shield was involved, so <b>every future crash on a box that has ever loaded one becomes ambiguous</b> — a support cost, not just an engineering one, paid even on crashes the shield had nothing to do with. Patched text also means the dump no longer matches the shipped binary. The flip side: a flight recorder captures the run-up <em>into</em> a fault, which a dump structurally cannot — but it <b>does not replace</b> core dumps, because a probe only answers a question someone already thought to ask.</p></div>
-      <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and the like won't tolerate <em>any</em> added per-packet jitter, even budgeted — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>
+        specific one into it means <span class="inlinecode">noinline</span> — a source change. Publish the set as a
+        build artifact and treat it as the contract.</p></div>
+      <div class="concern"><span class="cl">invocation granularity · per-packet vs. batched</span><p>eBPF's calling convention takes <b>one <span class="inlinecode">ctx</span>, once</b> — it cannot express &ldquo;here is a vector of 256 packets,&rdquo; so a data plane whose speed comes from a stage seeing a whole batch is a poor host for bytecode. <b>TMM is the favorable case</b>: a proxy, run-to-completion and core-pinned, per-flow rather than per-vector. What remains is per-invocation overhead where TMM <em>does</em> batch (burst receive): a <b>burst-capable invocation form</b>, with §01's budget pass reasoning <b>per burst</b> — which §01 ranks as the enabling mechanism for common-path enforcement, not merely a concern.</p></div>
+      <div class="concern"><span class="cl">handlers running at the same time</span><p>A different question from arming, and three simplifications rest on it. <b>Within one instance there is no concurrency at all</b> — single-threaded, un-preemptible, run-to-completion — which is <em>why</em> per-core counters need no atomics, one <span class="inlinecode">ctx</span> scratch buffer per core suffices, and a per-core depth guard answers re-entrancy completely. <b>Across instances there is full N-way parallelism</b>: arming a hook arms it everywhere, so N copies run at once on disjoint flows — hence shared state is a real concurrency problem, <span class="inlinecode">STATUS</span> must report per-instance (skew is diagnostic — disaggregation picks the instance), and partial arming is not &ldquo;mostly protected&rdquo;. <b>The one real seam</b> is the loader mutating a slot while that slot&rsquo;s program runs on another core: defined memory ordering on those fields, and epoch-based quiescence before freeing a VM.</p></div>
+      <div class="concern"><span class="cl">many programs armed at once</span><p>The support answer first: <b>different hooks armed at once, yes</b>; <b>two chained on one hook, refused</b>; <b>two handlers at the same instant on one core, impossible</b>. Beyond that, every argument here is written for <b>one program at one hook</b> — arm two and four things appear. <b>(1)</b> One slot per hook, so a second load on an armed hook gets a <b>distinct rejection</b>, not a silent overwrite — which would disarm a live shield and reset its counter, looking exactly like &ldquo;no matches.&rdquo; <b>(2)</b> Chaining is deferred because the blocker is declaring a <b>total order over the outcome set</b>, not plumbing: without one, behaviour follows load order, which is config-sync arrival order and differs across HA peers. <b>(3)</b> Nothing bounds the <b>cumulative armed cost</b>: the budget is <em>per hook</em>, and hooks on a flow&rsquo;s path are not independent, so <b>a flow pays the sum of the hooks it traverses</b>, not the maximum. <b>(4)</b> Worst of them: a shield that <b>safe-returns</b> — the host returning a benign value in place of the whole body — past a body containing another hook silences it, and that hook reads <b>zero fires</b>, indistinguishable from &ldquo;nothing matched.&rdquo; Our own mitigation manufacturing a false success, so a masked hook reports <span class="inlinecode">masked</span>, never zero.</p></div>
+      <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant, and <b>vCMP</b> guests (virtual CMP — hardware-partitioned guests) each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
+      <div class="concern"><span class="cl">ISSU + failover</span><p><b>ISSU</b> (in-service software upgrade) and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
+      <div class="concern"><span class="cl">post-mortem debuggability — it cuts both ways</span><p>The first concern support engineers raise. A <b>backtrace through a hooked function</b> is garbage without correct <b>CFI</b> on the trampoline — the call-frame information an unwinder walks. A <b>PC inside JIT&rsquo;d code</b> lands in anonymous memory with no symbol unless the loader registers the region. And the one rarely listed: <b>a core dump has to record which shields were armed</b>, with hashes, hooks and modes — without that, <b>every future crash on a box that has ever loaded one is ambiguous</b>, a support cost paid even on crashes no shield touched. Patched text also means the dump no longer matches the shipped binary. The flip side: a flight recorder captures the run-up <em>into</em> a fault, which a dump structurally cannot — but it <b>does not replace</b> core dumps, because a probe only answers a question someone already thought to ask.</p></div>
+      <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and similar won't tolerate <em>any</em> added per-packet jitter — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>
     </div>
   </section>
 
@@ -559,13 +582,13 @@
   <section class="beat reveal" id="seq" data-sec="seq">
     <p class="kicker"><span class="num">06</span> sequencing</p>
     <h2>Most of the risk retires on day one. The rest is governed and deferred.</h2>
-    <p class="lede">The engine ships with the conservative half; the powerful-but-riskier half is
-      <em>explicitly</em> later, not accidentally missing.</p>
+    <p class="lede">The engine ships with the conservative half; the riskier half is <em>explicitly</em> later,
+      not accidentally missing.</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Concern</th><th class="d1">Day one</th><th class="df">Deferred / governed</th></tr></thead>
       <tbody>
         <tr><td>Time safety</td><td class="d1">instruction-budget ceiling (static) + a runtime guard, mechanism per §01</td><td class="df">tuned per-hook budgets from field data</td></tr>
-        <tr><td>Interface</td><td class="d1">read-only <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, lookup)</td></tr>
+        <tr><td>Interface</td><td class="d1">scratch-copy <span class="mono">ctx</span> + program-type descriptor</td><td class="df">helper tier (map access, lookup)</td></tr>
         <tr><td>State</td><td class="d1">no maps (base tier); failover via existing mirroring</td><td class="df">shared writable cross-TMM maps</td></tr>
         <tr><td>Execution</td><td class="d1">interpreter or hardened JIT; W^X</td><td class="df">&mdash;</td></tr>
         <tr><td>Trust perimeter</td><td class="d1">signing gate + HSM key protection</td><td class="df">&mdash;</td></tr>
@@ -579,37 +602,35 @@
     <p class="kicker"><span class="num">07</span> the reality</p>
     <div class="callout"><span class="lbl">and the honest size of it</span>
       <p>An earlier draft described this as &ldquo;hundreds of lines, not subsystems.&rdquo; Reviewed against what
-        each item actually requires, a defensible v1 on two CPU architectures is <b>subsystem-scale
-        work, not a feature</b> — plus the TMA and certification engagement. No month or headcount figure is
-        offered here on purpose: this is a proposal, not a plan, and sizing belongs to whoever picks it up. The
-        items that grew most: the safe point (unlisted), the trampoline (a page of assembly, then a long tail of
-        ABI edge cases), arm/disarm (live-text patching, possibly a memory-manager change), and the hook-map
-        generator, which is a <b>parameter classifier over DWARF</b> (the compiler's debug-info format) implementing the platform calling conventions (SysV on x86-64, AAPCS64 on arm64), against an optimised build.</p>
+        each item requires, a defensible v1 on two CPU architectures is <b>subsystem-scale work, not a feature</b>,
+        plus the TMA and certification engagement. No month or headcount figure is offered: a proposal, not a plan. The items that grew most are the safe point (unlisted), arm/disarm (live-text patching), and the
+        hook-map generator — a <b>parameter classifier over DWARF</b> (the compiler's debug-info format) against an
+        optimised build, the <em>least-proven engineering assumption</em> in the package.</p>
       <p style="margin-top:.7rem">The reframe that matters: <b>the subsystem being added is not the VM.</b> It is a
         code-patching, live-text, dynamic-code-loading facility inside the crown-jewel process, with its own
-        build-pipeline toolchain and a permanent per-build ABI. That is worth building — but describing it as
+        build-pipeline toolchain and a permanent per-build ABI. That is a subsystem — but describing it as
         smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine. <b>So this
-        register argues for a sequencing, not a commitment: three questions decide whether any of the rest is
-        worth designing, and none of them requires building the engine.</b> Measure the compiler flag <b>twice</b> — its idle
-        cost with nothing armed, then the armed cost at rate — settle a
-        <span class="inlinecode">ctx</span> model that actually verifies against real TMM debug info,
-        and arm one hook end-to-end in a lab TMM with core dumps still readable.</p></div>
+        register argues for a sequencing, not a commitment: three questions decide whether the rest is worth
+        designing, and none requires building the engine.</b> Measure the compiler flag <b>twice</b> — the idle cost
+        with nothing armed, then the armed cost at rate — settle a <span class="inlinecode">ctx</span> model that
+        verifies against real TMM debug info, and arm one hook end-to-end in a lab TMM with core dumps still
+        readable.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
-    <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, and <b>not</b>
+    <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, <b>not</b>
       immunity from its own bugs. The engine is defensible because the <b>signing gate</b> keeps attacker input
-      away from the verifier and JIT, a <b>budget + watchdog</b> bounds execution time, and a <b>canary</b>
-      bounds the blast radius of a valid-but-bad program. Verification is one layer of several.</p>
-    <div class="tma"><p><b>This design is not self-certifying.</b> Everything here is the engineering input to a
-      formal <b>Threat Model Analysis (TMA)</b> by F5 security — a <b>gating prerequisite</b> before
-      implementation, not a formality. The trust surface (§04) in particular must be threat-modeled and signed
-      off. This register is <em>what to bring to that review</em>, not a substitute for it.</p></div>
+      away from the verifier and JIT, a <b>budget + fuel guard</b> bounds execution time, and a <b>canary</b>
+      bounds a valid-but-bad program. Verification is one layer of several.</p>
+    <div class="tma"><p><b>This design is not self-certifying.</b> Everything here is engineering input to a formal
+      <b>TMA</b> by F5 security — a <b>gating prerequisite</b> before implementation, not a formality. The trust
+      surface (§04) in particular must be threat-modeled and signed off. This register is <em>what to bring to that
+      review</em>, not a substitute for it.</p></div>
     <p class="rlabel">the whole register, one line per problem</p>
     <div class="recap">
-      <div class="rrow"><span class="rn">01</span><span class="rt"><b>Time</b> — termination isn't WCET; a per-hook budget + watchdog protects the un-preemptible poll loop.</span></div>
-      <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%; write the program-type descriptor, don't fork the verifier.</span></div>
-      <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring, not a bolted-on map sync.</span></div>
+      <div class="rrow"><span class="rn">01</span><span class="rt"><b>Time</b> — termination isn't WCET; a per-hook budget + fuel guard protects the un-preemptible loop, and the budget splits <b>three</b> ways.</span></div>
+      <div class="rrow"><span class="rn">02</span><span class="rt"><b>Interface</b> — the <span class="mono">ctx</span>/ABI is the real 90%: write the descriptor, hand over a scratch copy, don't fork the verifier.</span></div>
+      <div class="rrow"><span class="rn">03</span><span class="rt"><b>State</b> — per-CPU first; failover rides TMM's existing mirroring.</span></div>
       <div class="rrow"><span class="rn">04</span><span class="rt"><b>Trust</b> — the signing gate, not the verifier, is the perimeter; a canary catches bad-but-valid programs.</span></div>
-      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — the safe point itself (previously unlisted, and the biggest), certification, verifier-placement, boundary-probe ctx, uBPF-JIT maturity, <b>the optimiser-decided hookable set</b>, invocation granularity, multi-tenancy, ISSU, jitter — each addressable; the safe point and certification shape the first shippable form.</span></div>
+      <div class="rrow"><span class="rn">05</span><span class="rt"><b>Further concerns</b> — the safe point (unlisted, and the biggest), certification, the optimiser-decided hookable set, invocation granularity, concurrency and cumulative armed cost, multi-tenancy, ISSU, post-mortem debuggability, jitter.</span></div>
       <div class="rrow"><span class="rn">06</span><span class="rt"><b>Sequencing</b> — the conservative half ships first; the powerful half is deferred and governed.</span></div>
     </div>
     <p class="foot">

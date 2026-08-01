@@ -12,7 +12,7 @@
  *   - struct shield_binding  <-> what the signature covers (step 9; design §5.3)
  *   - struct shield_sr_policy<-> the per-build safe-return table (step 3; item 7)
  *   - struct hook_slot       <-> one armable patchable entry + its per-core evidence
- *   - shield_jit_fn          <-> uBPF's compiled program (ubpf_compile, step 10)
+ *   - shield_jit_fn          <-> uBPF's compiled program (ubpf_compile_ex, step 10)
  *
  * SCOPE — this is a candidate ABI for review, not TMM source. The uBPF types it
  * names are real; every f5_* / tmm_* touchpoint it declares is a stub. See
@@ -209,9 +209,27 @@ shield_sr_enforce_capable(const struct shield_sr_policy *sr)
     return sr->skippable == SKIP_YES && sr->kind != SR_NONE;
 }
 
-/* uBPF's compiled program. This is uBPF's real JIT signature (mem + mem_len);
- * the walkthrough's trampoline block writes jit_fn(&ctx) and elides mem_len. */
-typedef uint64_t (*shield_jit_fn)(void *mem, size_t mem_len);
+/* uBPF's compiled program.
+ *
+ * This is `ubpf_jit_ex_fn`, uBPF's EXTENDED JIT signature, and the extra two
+ * parameters are the whole point. uBPF offers two modes:
+ *
+ *   BasicJitMode    -> ubpf_jit_fn    = (void *mem, size_t mem_len)
+ *   ExtendedJitMode -> ubpf_jit_ex_fn = (void *mem, size_t mem_len,
+ *                                        uint8_t *stack, size_t stack_len)
+ *
+ * The basic form is the one whose prologue does an unconditional
+ * `sub rsp, UBPF_EBPF_STACK_SIZE` with no stack probe — a 4 KiB frame taken at
+ * arbitrary depth in TMM's call graph, able to step clean over a single guard
+ * page. So the basic form is unusable here, and an earlier version of this
+ * typedef used it anyway while a comment claimed it was "uBPF's real JIT
+ * signature". It is one of two real signatures, and the wrong one.
+ *
+ * The extended form takes the program stack per call, which is what lets the
+ * trampoline hand over a per-core preallocated stack. Obtain it from
+ * `ubpf_compile_ex(vm, &err, ExtendedJitMode)`. See design-review-findings.md O7. */
+typedef uint64_t (*shield_jit_fn)(void *mem, size_t mem_len,
+                                  uint8_t *stack, size_t stack_len);
 
 /* One armable patchable entry, resolved from this build's signed hook map.
  * `fired` is indexed by core: TMM is core-pinned, so each core increments only
