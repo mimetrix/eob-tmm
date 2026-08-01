@@ -107,88 +107,92 @@
 <div class="sheet">
   <p class="eyebrow">F5 · TMM · <b>design proposal</b> · one page</p>
   <h1>Give TMM its own <em>verified</em> eBPF engine.</h1>
-  <p class="thesis">Whoever shortens the distance from <b>code commit to code deployed</b> wins, and TMM is
-    where BIG-IP is furthest from it. Its behaviour already changes at runtime — config, profiles, WAF
-    policy, iRules, an arriving WASM surface — but each of those acts on the <b>curated traffic model the
-    proxy chose to expose</b>. Reaching the code's own internals, where a parser's error branch or the
-    condition behind a crash lives, has one path: a build. <b>So a new metric, a diagnostic probe and a
-    mitigation for a live CVE all cost the same thing.</b> A small userspace eBPF VM — at designed-in hook
-    points and at <em>existing</em> function boundaries — changes the unit of change from <b>a release</b> to
-    <b>a signed artifact</b>: it applies with <b>no restart and no failover</b>, and <span class="mono">REVOKE</span>
-    disarms it without a restart. A static verifier is what makes that safe on the data-plane path. CVE mitigation
+  <p class="thesis">Whoever shortens the distance from <b>code commit to code deployed</b> wins, and BIG-IP is
+    furthest from it inside <b>TMM</b>, its own data-plane microkernel. TMM's behaviour already changes at
+    runtime — config, profiles, WAF policy, iRules, an arriving WebAssembly tier — but each acts on
+    the <b>curated traffic model the proxy chose to expose</b>. Reaching the code's own internals — a parser's
+    error branch, the condition behind a crash — has one path: a build. <b>So a new metric, a diagnostic probe
+    and a mitigation for a live CVE all cost the same thing.</b> A small userspace eBPF VM inside TMM changes
+    the unit of change from <b>a release</b> to <b>a signed artifact</b>: it applies with <b>no restart and no
+    failover</b>, and <span class="mono">REVOKE</span> disarms it by restoring the original bytes at a safe
+    point. A static verifier is what makes that safe on the data path. CVE mitigation
     is the first use case because it is the most <em>urgent</em>, not the only one.</p>
 
   <h2>Why TMM is the right host — and why this isn't a general answer</h2>
   <div class="cols">
     <div class="card have"><p class="ct">◆ a proxy, not a forwarder</p><h3>Three budgets, not one</h3>
       <p><b>Per request</b> — microseconds; a hook is noise. <b>Per packet in the proxy path</b> (TCP reassembly,
-        TLS records, L7 framing) — hundreds of nanoseconds; a hook is a few percent, affordable with measurement.
-        <b>Pure FastL4</b> — tens of nanoseconds; not affordable, and we concede it. A forwarder has only that
-        third budget. The pre-L7 CVEs live in the middle.</p></div>
+        TLS records, L7 framing) — hundreds of nanoseconds; a hook is a few percent, affordable with measurement
+        and sign-off. <b>Pure FastL4</b> — accelerated L4 forwarding — tens of nanoseconds; not affordable, and
+        we concede it. A forwarder has only the third. The pre-L7 CVEs live in the middle.</p></div>
     <div class="card have"><p class="ct">◆ vendor-owned, shipped, closed</p><h3>The proof is required</h3>
-      <p>F5 owns the source, so hooks are <b>designed in</b> and the hook map comes out of the build. And F5
-        can't ship a customer a mitigation that <em>might</em> put the data plane into a repeatable crash-loop — which is why a verifier is
-        the precondition for the artifact existing, not a feature bolted on.</p></div>
+      <p>F5 owns the source, so hooks are <b>designed in</b> and the build emits the hook map. F5 also
+        can't ship a mitigation that <em>might</em> put the data plane into a repeatable crash-loop — which makes
+        the verifier a precondition for the artifact existing, not a bolted-on feature.</p></div>
   </div>
 
   <h2>The mechanism, end to end</h2>
-  <div class="chain">author (a few lines of C) → <b>clang -target bpf</b> → <b>PREVAIL verify</b> → budget pass →
-    <b>sign the binding</b> → load at a named hook → monitor → enforce → auto-retire</div>
-  <p>Two hook kinds cover the <b>anticipated</b> and the <b>unanticipated</b>: designed-in USDT tracepoints with a
-    curated, versioned context, and <b>function-boundary probes</b> at any function the build emitted as its own
-    out-of-line body and listed in its signed hook map — <b>the optimiser decides that set</b>, so an inlined
-    function has no pad of its own and the nearest surviving caller becomes the hook, widening what a
-    safe-return skips. Within that limit, a question nobody planned for needs no new build, once the enabling
-    build ships. A program is a pure function of its context: it
-    reads scalars and returns a verdict. <b>The host owns every outcome</b> (<span class="mono">pass · drop ·
-    reset · safe-return · steer · sample</span>) and applies whichever the hook allows; the program cannot invent
+  <div class="chain">author (a few lines of C) → <b>clang -target bpf</b> → <b>PREVAIL verify</b> (static
+    memory-safety proof) → budget pass → <b>sign the binding</b> → load at a named hook → monitor → enforce →
+    auto-retire</div>
+  <p>Two hook kinds cover the <b>anticipated</b> and the <b>unanticipated</b>: designed-in userland
+    static-tracing (USDT) tracepoints with a curated, versioned context, and <b>function-boundary probes</b> at
+    any function the build emitted as its own out-of-line body and listed in its signed hook map — <b>the
+    optimiser decides that set</b>: an inlined function has no pad, so the hook lands on its nearest surviving
+    caller, widening what a safe-return skips. Within that limit, a question nobody planned for needs no new
+    build, once the enabling build ships. A program is a pure function of its context: it
+    reads scalars, returns a verdict. <b>The host owns every outcome</b> (<span class="mono">pass · drop ·
+    reset · safe-return · steer · sample</span>) and applies whichever the hook allows; a program cannot invent
     control flow, inject a value, or reach memory it wasn't handed.</p>
 
   <div class="box"><p><b>The security perimeter is the signature, not the verifier.</b> Only F5-signed bytecode
-    ever reaches the engine, and verification happens earlier — in F5's pipeline, never on anything an attacker
+    reaches the engine, and verification happens earlier — in F5's pipeline, never on anything an attacker
     supplied. So even a verifier bug is <b>not remotely triggerable</b>: exploiting it would also require
-    compromising the HSM-held signing key. That collapses the risk from <b>traffic-borne RCE</b> — remote code execution triggered purely by sending
-    traffic through the data path, needing no credentials or management-plane access — to
+    compromising the hardware-held signing key. That moves the risk out of <b>traffic-borne RCE</b> — remote code execution triggered purely by sending
+    traffic through the data path, needing no credentials or management-plane access — and into
     supply-chain/insider.
-    What's signed is the whole binding — program hash, the one hook it may attach to, build range, mode ceiling,
+    The signature covers the whole binding — program hash, its one permitted hook, build range, mode ceiling,
     expiry — so a shield can't be replayed elsewhere or escalated to enforce.</p></div>
 
   <h2>What it unlocks</h2>
   <ul>
-    <li><b>Deep observability into a black box</b> — counters, latency across internal stages, a flight recorder
-      that survives a data-plane crash. <em>bpftrace</em> and <em>tcpdump</em>, for TMM.</li>
+    <li><b>Deep observability</b> — counters, latency across internal stages, a flight recorder
+      that survives a TMM crash. <em>bpftrace</em> and <em>tcpdump</em>, for TMM.</li>
     <li><b>Field diagnostics</b> — ship a customer a signed probe, characterise the issue in situ, pull it. No
-      debug build, and often no waiting for a repro — though it complements core-dump analysis rather than
-      replacing it, since a probe only answers what someone already thought to ask.</li>
+      debug build, often no waiting for a repro — and it complements core dumps rather than
+      replacing them, since a probe only answers what someone already thought to ask.</li>
     <li><b>Adaptive control</b> — steer, sample, gate or shed on an internal signal, decided at the hook.</li>
-    <li><b>Runtime CVE mitigation</b> — recognise a bug's precondition and take a safe outcome between patch
-      windows. One application, and the narrowest: it needs the same hooks, verifier and signing gate as
-      everything above it.</li>
+    <li><b>Runtime CVE mitigation</b> — recognise a bug's precondition and take a safe outcome before the
+      patched build is installed. It needs the same hooks, verifier and signing gate as
+      everything above.</li>
   </ul>
 
   <h2>What it is not, stated plainly</h2>
   <div class="box limits"><p><b>Not a hot-patch</b> — a shield stops a crash; it cannot reproduce the fix's
     corrected behaviour, so enforcing costs whatever the skipped work did. <b>Not customer-facing
-    programmability</b> — the ABI is internal; F5 authors, F5 signs. <b>Not free</b> — the engine itself ships in
-    one enabling TMOS release, and coverage follows software: flows handled by hardware offload never enter TMM's
-    software path. <b>Not universal coverage</b> — no bug-specific tracepoint has to be anticipated, which is the real
-    advance, but a shieldable CVE still needs a surviving boundary before the fault that exposes the condition,
-    offers a safe outcome, and fits its budget. Note the timing trap: an entry probe runs <em>before</em> the body,
-    so a condition the body itself constructs is invisible to it. <b>What fraction of real advisories qualify is
-    not known</b> — the retrospective study that would answer it needs no engineering and is the most decisive
-    thing missing here. <b>Not measured yet</b> — the always-on cost of compiling TMM with patchable function
-    entries is the number that decides everything, and nobody has it.</p></div>
+    programmability</b> — the ABI (binary interface) is internal; F5 authors, F5 signs. <b>Not free</b> — the
+    engine rides one enabling BIG-IP release. <b>Not universal coverage</b> — no bug-specific tracepoint has to
+    be anticipated (the real
+    advance), but a shieldable CVE still needs a surviving boundary before the fault that exposes the condition,
+    offers a safe outcome, and fits its budget. The timing trap: an entry probe runs <em>before</em> the body,
+    so a condition the body itself constructs is invisible to it. Coverage follows software: a fully accelerated
+    flow hides its contents, though the offload decision is hookable TMM code — so declining the
+    offload is itself a mitigation. <b>What fraction of real advisories qualify is
+    not known</b>, and the retrospective study that would settle it needs no engineering. <b>And the exposure gap
+    is assumed, not observed</b> — that an operator cannot always install a patched build at once. <b>Not measured
+    yet</b> — nobody has the always-on cost of compiling TMM with patchable function
+    entries, and that number decides everything.</p></div>
 
-  <div class="box ask"><p><b>Nothing here has to be committed to in order to evaluate it.</b> Three questions decide whether the rest is worth designing:
+  <div class="box ask"><p><b>Nothing here has to be committed to in order to evaluate it.</b> Two things settle on paper with no engineering at all — the retrospective study above, and which way the fuel trade-off goes. Then three decide whether the rest is worth designing:
     <b>(1)</b> measure the compiler flag twice — its idle cost with nothing armed, then its armed cost at rate;
     <b>(2)</b> settle a context
-    model that verifies, against real TMM debug info; <b>(3)</b> arm one hook end-to-end in a lab TMM with core
-    dumps still readable. If all three land, what follows is a real programme — subsystem-scale, not a feature. If any
+    model that verifies against real TMM debug info; <b>(3)</b> arm one hook end-to-end in a lab TMM with core
+    dumps still readable. Land all three and what follows is a programme — subsystem-scale, not a feature; if any
     fails, the idea dies early and cheaply.</p></div>
 
   <p class="foot">
-    A design proposal — not a commitment to an implementation. Design docs, a self-review register and a set of
-    self-checking ABI artifacts accompany this page: start with <a href="README.md">the reading map</a>.
+    A design proposal, not a commitment to implement. Design docs, a self-review register and
+    self-checking ABI artifacts accompany it: start with <a href="README.md">the reading map</a>.
   </p>
 </div>
 
