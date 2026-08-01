@@ -346,8 +346,9 @@
       several surfaces</b>: a config push, a profile change, a web-application-firewall (WAF) policy update,
       traffic logic in an iRule, and a WASM extension surface arriving for the same purpose — but each acts
       on the <em>curated traffic model the proxy chose to expose, at the events it chose to fire</em>. A change
-      that has to reach the code's own internals — a parser's error branch, a plugin handoff, the condition
-      behind a crash — has exactly one path, and it is a build.</p>
+      that has to reach the code's own internals — a parser's error branch, a plugin handoff, a counter or
+      steering decision at a stage the model does not expose, the condition behind a crash — has exactly one
+      path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
       verified VM at designed-in hook points <em>and at existing function boundaries</em> — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no

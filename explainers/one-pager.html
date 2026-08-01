@@ -111,25 +111,12 @@
     data-plane microkernel, already changes behaviour at
     runtime — config, profiles, WAF policy, iRules, an arriving WebAssembly tier — but each acts on
     the <b>curated traffic model the proxy chose to expose</b>. Reaching the code's own internals — a parser's
-    error branch, the condition behind a crash — has one path: a build. <b>So a new metric, a diagnostic probe
+    error branch, a counter the model does not expose, the condition behind a crash — has one path: a build. <b>So a new metric, a diagnostic probe
     and a mitigation for a live CVE all cost the same thing.</b> A small userspace eBPF VM inside TMM changes
     the unit of change from <b>a release</b> to <b>a signed artifact</b>: it applies with <b>no restart and no
     failover</b>, and <span class="mono">REVOKE</span> disarms it by restoring the original bytes at a safe
     point. A static verifier is what makes that safe on the data path. CVE mitigation
     is the first use case because it is the most <em>urgent</em>, not the only one.</p>
-
-  <h2>Why TMM is the right host — and why this isn't a general answer</h2>
-  <div class="cols">
-    <div class="card have"><p class="ct">◆ a proxy, not a forwarder</p><h3>Three budgets, not one</h3>
-      <p><b>Per request</b> — microseconds; a hook is noise. <b>Per packet in the proxy path</b> (TCP reassembly,
-        TLS records, L7 framing) — hundreds of nanoseconds; a hook is a few percent, affordable with measurement
-        and sign-off. <b>Pure FastL4</b> — accelerated L4 forwarding — tens of nanoseconds; not affordable, and
-        we concede it. A forwarder has only the third. The pre-L7 CVEs live in the middle.</p></div>
-    <div class="card have"><p class="ct">◆ vendor-owned, shipped, closed</p><h3>The proof is required</h3>
-      <p>F5 owns the source, so hooks are <b>designed in</b> and the build emits the hook map. F5 also
-        can't ship a mitigation that <em>might</em> put the data plane into a repeatable crash-loop — which makes
-        the verifier a precondition for the artifact existing, not a bolted-on feature.</p></div>
-  </div>
 
   <h2>The mechanism, end to end</h2>
   <div class="chain">author (a few lines of C) → <b>clang -target bpf</b> → <b>PREVAIL verify</b> (static
