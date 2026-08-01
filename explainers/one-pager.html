@@ -135,8 +135,10 @@
     <b>sign the binding</b> → load at a named hook → monitor → enforce → auto-retire</div>
   <p>Two hook kinds cover the <b>anticipated</b> and the <b>unanticipated</b>: designed-in USDT tracepoints with a
     curated, versioned context, and <b>function-boundary probes</b> at any function the build emitted as its own
-    out-of-line body and listed in its signed hook map — so a question nobody planned for needs no new
-    build, once the enabling build ships. A program is a pure function of its context: it
+    out-of-line body and listed in its signed hook map — <b>the optimiser decides that set</b>, so an inlined
+    function has no pad of its own and the nearest surviving caller becomes the hook, widening what a
+    safe-return skips. Within that limit, a question nobody planned for needs no new build, once the enabling
+    build ships. A program is a pure function of its context: it
     reads scalars and returns a verdict. <b>The host owns every outcome</b> (<span class="mono">pass · drop ·
     reset · safe-return · steer · sample</span>) and applies whichever the hook allows; the program cannot invent
     control flow, inject a value, or reach memory it wasn't handed.</p>
