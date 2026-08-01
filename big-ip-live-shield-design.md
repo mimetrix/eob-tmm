@@ -38,8 +38,12 @@ productively. Two of the assumptions, if false, end the case — they are marked
 3. The existing runtime surfaces — config, profiles, WAF policy, iRules, and an arriving WASM tier — act
    on **the curated traffic model the proxy chose to expose, at the events it chose to fire** (§2.1,
    §2.4). Reaching the code's own internals is outside all of them.
-4. A shield **applies with no restart and no failover**, and `REVOKE` reverses it in seconds. These are
-   properties of the artifact, not of anyone's process.
+4. A shield **applies with no restart and no failover**, and `REVOKE` disarms it by restoring the original
+   bytes at a safe point — no restart, no failover, no traffic interruption. Those are properties of the
+   artifact rather than of anyone's process. Two limits worth stating in the same breath: the *latency* of
+   a revoke is control-plane delivery plus per-instance fan-out, which is **unmeasured**; and revoking
+   stops the shield acting without undoing what it already did — flows already dropped stay dropped, and
+   a log record the shield skipped is still missing.
 
 **Controlled — F5's decisions, not external facts.**
 
@@ -462,7 +466,7 @@ real answer is defensible.
 |---|---|---|
 | **Test** | **Substantially, but not to zero** | Not the verifier alone — the **bounded outcome set**. A hotfix needs full-image regression because a hotfix *can break anything*; the burden scales with the image. A shield can only select an outcome the host already owns at a hook the build declared, so its blast radius is bounded **by construction**, which is what makes a proportionate test regime defensible rather than a corner cut. What remains is irreducible: does the predicate actually match the exploit, what is its false-positive rate against a legitimate-traffic corpus, and is the chosen outcome safe to *take* (§6.1's skippability gate — a separate obligation from memory safety that no verifier addresses). |
 | **Certify** | **Barely, and it may add a problem** | The verifier is close to irrelevant here: evaluators care about *what code is inside the validated boundary*, and that answer now changes at runtime. What speaks to them is the **signature**, because signed code authenticity is an established construct. This is the program's likeliest productization gate (`engine-hard-problems.md` §5), and the failure mode is a forced dynamic-load-disabled certified mode rather than a refusal. |
-| **Apply** | **Yes — and state it as a property of the artifact** | A build has to be installed, which means a restart or a failover, regression risk across the whole image, and a rollback plan. A signed shield has none of those properties: it applies **with no restart and no failover**, `REVOKE` reverses it in seconds, and expiry retires it unattended. That is the whole of the claim. What any given operator's change process then requires of them is theirs, not ours, and this document does not speculate about it. |
+| **Apply** | **Yes — and state it as a property of the artifact** | A build has to be installed, which means a restart or a failover, regression risk across the whole image, and a rollback plan. A signed shield has none of those properties: it applies **with no restart and no failover**, `REVOKE` disarms it by restoring the original bytes at a safe point, and expiry retires it unattended. That is the whole of the claim. What any given operator's change process then requires of them is theirs, not ours, and this document does not speculate about it. |
 
 So: **the bounded outcome set buys a proportionate test surface; the signature buys the certification
 argument; and being an artifact rather than an image buys the install window.** Three mechanisms doing
@@ -628,7 +632,7 @@ Live Shield narrows the window for most data-plane CVEs; it does not claim to cl
 
 ## 11. Performance
 
-Userspace eBPF is not free, but the embedded model is the cheap end of it. With the **JIT**, a shield invocation is an indirect call into native code plus the program's own handful of instructions. Order **tens of nanoseconds** — which is emphatically *not* "comparable to a C `if`" (that is sub-nanosecond); the invocation overhead, not the program, is what costs. The repo's budget pass makes the point concretely: the three worked predicates price at **6–17 cycles**, far under any plausible hook budget, so the thing to measure first is the trampoline's register save/restore. Crucially there is no syscall and no kernel trap: a designed-in call site is a direct call, and a patched function entry costs one jump into F5's own in-process trampoline — which is why this is far cheaper than injection/uprobe approaches (a published bpftime comparison of an `sslsniff` workload put kernel-uprobe overhead around 58% against roughly 12% for the userspace equivalent — cite the source before using the figure, note it is *that* workload rather than TMM, and note the userspace number still carried attach/trampoline indirection an embedded call does not). A hook point with no shield loaded costs one predictable branch **at runtime** — but the pads are not free in the build: `-fpatchable-function-entry` adds 5–8 bytes to every emitted function, and across O(10^5) functions that is a plausible 3–8% text inflation carried as unconditional i-cache and i-TLB pressure by every customer forever, whether or not a shield ever loads. **Free at runtime; a measured build-time footprint cost** — and measuring it is the first deliverable of the feasibility phase (§12), not an assumption.
+Userspace eBPF is not free, but the embedded model is the cheap end of it. With the **JIT**, a shield invocation is an indirect call into native code plus the program's own handful of instructions. Order **tens of nanoseconds** — which is emphatically *not* "comparable to a C `if`" (that is sub-nanosecond); the invocation overhead, not the program, is what costs. The repo's budget pass makes the point concretely: the three worked predicates price at **6–17 cycles**, far under any plausible hook budget, so the thing to measure first is the trampoline's register save/restore. Crucially there is no syscall and no kernel trap: a designed-in call site is a direct call, and a patched function entry costs one jump into F5's own in-process trampoline — which is why this is far cheaper than injection/uprobe approaches (a published bpftime comparison of an `sslsniff` workload put kernel-uprobe overhead around 58% against roughly 12% for the userspace equivalent — cite the source before using the figure, note it is *that* workload rather than TMM, and note the userspace number still carried attach/trampoline indirection an embedded call does not). A hook point with no shield loaded costs one predictable branch **at runtime** — but the pads are not free in the build: `-fpatchable-function-entry` reserves a few bytes at every emitted function, so the image carries text growth and the instruction-cache and i-TLB pressure that comes with it, whether or not a shield ever loads. **Free at runtime; a build-time footprint cost that has not been measured** — and measuring it is the first thing to do (§12), not something to estimate here.
 
 **First, what `path_class` actually means.** The budget is **per invocation**; what makes an invocation affordable is the *rate* at which it fires, so `path_class` **is** the rate class — `hot` = per packet, `warm` = per connection or request, `cold` = per exceptional event. And it has to be read as **structure ∧ adversarial reachability**, not structure alone. A malformed-input handler is structurally cold and in steady state costs nothing; it is also the branch an attacker drives, and at line rate it is the hottest code on the box. **Anything reachable from unauthenticated input at attacker-controlled rate is budgeted `hot`, wherever it sits in the source.** That correction is what makes the rest of this section honest: the genuinely cheap case is a cold path *an attacker cannot pump*, and it is narrower than "cold" alone suggests. It is also not the only useful case — a CVE whose trigger appears in *ordinary* traffic, and per-flow telemetry or detection, are inherently **hot-path**, and both are legitimately valuable. Hot-path placement is therefore a **measured budget decision, not a prohibition**. Policy:
 
@@ -662,12 +666,13 @@ purpose** — this is a proposal, not a plan.
 
 **None of which has to be committed to in order to evaluate this.** Three questions decide whether the
 rest is worth designing, and the first is a *measurement* rather than a feature — in fact two,
-from the same build. The **dark cost** of compiling TMM with `-fpatchable-function-entry` when nothing is
-armed (throughput, latency distribution, text size, i-cache behaviour), because that is the only cost
-every customer pays forever whether or not a shield ever loads; **kill criterion, stated up front: if the
-padding flag costs more than ~1% of pps, the function-boundary half of this proposal is dead** and only
-designed-in call sites survive. Then the **armed cost at rate**, with one hook live on a per-packet path,
-which is the number that decides whether per-packet shielding is real (`engine-hard-problems.md` §1.1). The other
+from the same build. The **idle cost** of compiling TMM with `-fpatchable-function-entry` when nothing is
+armed — throughput, latency distribution, text size, instruction-fetch behaviour — because that is the
+only cost every customer pays whether or not a shield ever loads. Then the **armed cost at rate**, with
+one hook live on a per-packet path, which is what bounds where hooks can go
+(`engine-hard-problems.md` §1.1). The experiment is specified in
+[`design-review-findings.md`](design-review-findings.md) §4, along with the three forms the mechanism can
+take depending on what it returns. The other
 two are a `ctx` model that actually verifies against real TMM debug info, and one hook armed end-to-end
 in a lab TMM with core dumps still readable. Naming the number that would kill this is what makes the
 rest of it worth taking seriously.

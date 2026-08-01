@@ -115,7 +115,7 @@
     mitigation for a live CVE all cost the same thing.</b> A small userspace eBPF VM — at designed-in hook
     points and at <em>existing</em> function boundaries — changes the unit of change from <b>a release</b> to
     <b>a signed artifact</b>: it applies with <b>no restart and no failover</b>, and <span class="mono">REVOKE</span>
-    reverses it in seconds. A static verifier is what makes that safe on the data-plane path. CVE mitigation
+    disarms it without a restart. A static verifier is what makes that safe on the data-plane path. CVE mitigation
     is the first use case because it is the most <em>urgent</em>, not the only one.</p>
 
   <h2>Why TMM is the right host — and why this isn't a general answer</h2>
@@ -180,8 +180,8 @@
     entries is the number that decides everything, and nobody has it.</p></div>
 
   <div class="box ask"><p><b>Nothing here has to be committed to in order to evaluate it.</b> Three questions decide whether the rest is worth designing:
-    <b>(1)</b> measure the compiler flag twice — dark cost with nothing armed, kill criterion ~1% pps, then the
-    armed cost at rate; <b>(2)</b> settle a context
+    <b>(1)</b> measure the compiler flag twice — its idle cost with nothing armed, then its armed cost at rate;
+    <b>(2)</b> settle a context
     model that verifies, against real TMM debug info; <b>(3)</b> arm one hook end-to-end in a lab TMM with core
     dumps still readable. If all three land, what follows is a real programme — subsystem-scale, not a feature. If any
     fails, the idea dies early and cheaply.</p></div>

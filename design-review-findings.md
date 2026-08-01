@@ -110,15 +110,53 @@ The **Disposition** column was established by grepping the repo for each claim a
 
 ---
 
-## 4 · The measurement that gates everything
+## 4 · The measurement that comes first
 
-All three reviewers independently asked for the same thing first, and one made it their price of admission:
+All three reviewers independently asked for the same thing before anything else, for a reason that has
+nothing to do with approval: **every affordability claim in this package is currently an estimate.** "Free
+when dark," "one predictable branch," "tens of nanoseconds is noise" — none of it has been measured. The
+flag is image-wide, it interacts with ICF and LTO, and it has no runtime opt-out, so until it is measured
+the design cannot choose its own shape.
 
-> Build TMM once with `-fpatchable-function-entry`, **arm nothing**, and report: **pps / CPS / p99.9 latency / text size / i-cache MPKI** deltas on at least one x86-64 and one aarch64 platform. Also: **how many of the functions you would want to hook survived inlining as named symbols**, and **whether TMM's `.text` is shared or private across instances, and whether it is on huge pages**.
+**The experiment.** Build TMM twice from the same source — once normally, once with
+`-fpatchable-function-entry` — and run both under identical traffic on at least one x86-64 and one
+aarch64 platform, with **nothing armed** in either. Hold constant the source revision, optimisation level
+and PGO profile, platform, traffic mix, and connection and request rates.
 
-Why it gates: every affordability claim in the package — "free when dark," "one predictable branch," "tens of nanoseconds is noise," "small, bounded" — is currently unmeasured, and the flag is the **largest irreversible commitment** on the page. It touches every function in the image, interacts with ICF and LTO, and **cannot be opted out of at runtime** by a jitter-sensitive customer (the only true opt-out is a second build variant, with all the release engineering that implies). Estimated cost of the pads alone: 5–8 bytes × O(10⁵) functions, concentrated at entries where the fetch stream is coldest — 3–8% text inflation is plausible, and a 1–3% pps regression is a shippable-product blocker on its own.
+Report the deltas for:
 
-**Kill criterion: >~1% pps.** Above that, the mechanism needs to change (pads on an allowlisted subset of translation units, not the whole binary) and everything downstream changes with it. Two engineer-weeks, and it converts the package from a proposal into a result.
+- **throughput** — packets/sec and connections/sec
+- **latency distribution**, at the tail rather than the mean; a proxy is judged on p99/p99.9
+- **text size**, plus whether `.text` is shared or private across TMM instances and whether it is mapped
+  on huge pages
+- **instruction-fetch behaviour** — i-cache MPKI and i-TLB misses
+
+Two structural questions the same build answers for free:
+
+- **how many of the functions worth hooking survived as their own out-of-line symbols** rather than being
+  inlined, folded by ICF, or cloned by IPA — this is the real hookable set, and it is the optimiser's
+  decision rather than ours
+- **whether pad placement matters** — nops emitted before the entry label can occupy alignment slack that
+  already existed, so measure both placements rather than assuming the cost is the pad width
+
+**Then a second measurement, cheap once that build exists.** Arm one hook, put a program on it, and
+measure the same quantities again at rate. This is a different question: the first tells you what the
+mechanism costs while idle, the second what it costs in use, and only the second bounds which hook rates
+are available.
+
+**What the result decides — the form of the mechanism, not whether to proceed.** Three outcomes, all of
+them viable:
+
+1. **The idle cost is in the noise.** Pad the image; the full function-boundary reach is available.
+2. **It is measurable but concentrated.** Pad an allowlisted subset of translation units instead. Reach is
+   narrower and fixed at build time, and most of the cost goes away.
+3. **It is material even selectively.** Designed-in call sites only. Hooks are placed in source, so an
+   unanticipated bug is out of reach and both the observability and CVE cases narrow to what was
+   anticipated in advance.
+
+The threshold separating those outcomes is not this document's to set. It belongs to whoever owns the
+platform's published performance numbers, and it should be agreed **before** the experiment runs rather
+than argued about afterwards.
 
 ---
 
@@ -216,13 +254,11 @@ rest was never worth designing.
    `-fpatchable-function-entry` and compare throughput, the latency *distribution* (the tail, not the
    mean — that is what a proxy is judged on), text size, and i-cache/i-TLB behaviour. Two numbers, not
    one:
-   - **The dark cost — nothing armed.** This is the one that matters most, because it is the only cost
-     **every customer pays forever**, whether or not a shield is ever loaded. The pads are bytes in the
-     instruction stream, so the mechanism is second-order: text inflation, worse i-cache locality, more
-     i-TLB pressure, and possible perturbation of the optimiser's layout and inlining decisions (which
-     can move performance in *either* direction). Plus the text-mapping determination (§4).
-     **Kill criterion >1% pps** — a business threshold as much as a technical one, since a permanent
-     regression across the product line for a feature most customers never activate is a hard sell.
+   - **The idle cost — nothing armed.** This is the one that matters most, because it is the only cost
+     **every customer pays**, whether or not a shield is ever loaded. The pads are bytes in the
+     instruction stream, so the mechanism is second-order: text growth, instruction-cache locality,
+     i-TLB pressure, and possible perturbation of the optimiser's layout and inlining decisions, which
+     can move performance in *either* direction. Plus the text-mapping determination (§4).
    - **The armed cost, at rate.** Nothing in an earlier version of this list measured **an armed hook on
      a per-packet path**, which is the number that decides whether per-packet shielding is real at all
      (`engine-hard-problems.md` §1.1). It is cheap once the first build exists — same rig, one hook
