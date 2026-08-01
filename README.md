@@ -8,6 +8,15 @@ body (patchable-entry pad → F5 trampoline). Programs either **observe** intern
 tracepoint) or **act** on a verdict the host applies (a datapath control) — each one
 **statically proven safe before it loads**.
 
+**Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
+deployed** wins, and TMM is where BIG-IP is furthest from that. Every change to the data plane's own code
+or behaviour takes one path — a build, a qualification cycle, then an install on the customer's
+maintenance window rather than F5's — so a new metric, a diagnostic probe, a steering decision and a
+mitigation for a live CVE all cost the same thing. This changes the unit of change from **a release** to
+**a signed artifact**, and the verifier is what makes that safe enough to allow on the data-plane path.
+**CVE mitigation is the first use case because it is the most urgent, not because it is the only one** —
+see [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §3–§4 for the rest.
+
 The second hook kind is what makes an *unforeseen* CVE addressable: **no bug-specific tracepoint has to
 have been anticipated**, and no recompile is needed once the enabling build ships. Note carefully that
 this is narrower than "any CVE is shieldable," and deliberately so — a reachable boundary must exist
