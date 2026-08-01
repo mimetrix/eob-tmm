@@ -340,7 +340,7 @@
   <section class="hero" id="hero" data-sec="hero">
     <p class="eyebrow">F5 TMM · design proposal</p>
     <h1>A <em class="sig">runtime, programmable, provably-safe</em> data plane.</h1>
-    <p class="sub"><b>Two clocks, running at very different speeds.</b> Vulnerability discovery and exploit tooling now move at machine speed; a data-plane release train moves in weeks. That is under real pressure to compress, and compressing it is worth doing — but it cannot close this gap, because a build still has to be tested, certified, and then installed on the customer's maintenance window rather than ours. Whatever the train's cadence, a window remains, and the window is the problem.
+    <p class="sub"><b>Two clocks, running at very different speeds.</b> Vulnerability discovery and exploit tooling now move at machine speed; a data-plane release train moves in weeks. That is under real pressure to compress, and compressing it is worth doing — but it cannot close this gap, and the reason is more specific than &ldquo;builds are slow.&rdquo; Qualification compresses. Certification is harder but is a one-time cost for a mechanism. <b>Installation does not compress at all</b>, because a finished build still has to be installed on the customer's maintenance window rather than F5's — someone else's calendar, which no release engineering reaches. Whatever the train's cadence, that window remains, and it is the window that is the problem.
       The data plane already flexes at its edges — a config push, a policy change, traffic logic in an iRule — but
       changing its <b>own code and behavior</b> has exactly one path, and it is a build.</p>
     <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a

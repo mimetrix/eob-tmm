@@ -107,7 +107,7 @@
 <div class="sheet">
   <p class="eyebrow">F5 · TMM · <b>design proposal</b> · one page</p>
   <h1>Give TMM its own <em>verified</em> eBPF engine.</h1>
-  <p class="thesis">Vulnerability discovery and exploit tooling now move at machine speed. A TMOS build moves on a maintenance window. There is real pressure to compress that, and it is being compressed — but a build is still a build: it has to be tested, certified, and then installed on the customer's schedule, not ours. Even a much faster train leaves a window, and the problem is that <b>TMM's own code and behaviour can only change on that same release train</b> — so a new metric, a diagnostic probe, or a mitigation for a live CVE all cost the same
+  <p class="thesis">Vulnerability discovery and exploit tooling now move at machine speed. A TMOS build moves on a maintenance window. There is real pressure to compress that, and it is being compressed — but compression has a floor, and the floor is not qualification. It is that a finished, qualified build still has to be <b>installed</b>, on the customer's maintenance window rather than F5's. That step sits on someone else's calendar, so no amount of release engineering reaches it. Which is the actual argument for a different <em>kind</em> of artifact rather than a faster build — and the problem is that <b>TMM's own code and behaviour can only change on that same release train</b> — so a new metric, a diagnostic probe, or a mitigation for a live CVE all cost the same
     thing: a build. Embedding a small userspace eBPF VM at designed-in hook points changes the unit of change from
     <b>a release</b> to <b>a signed artifact</b> — and a static verifier is what makes that safe enough to allow on
     the data-plane path.</p>

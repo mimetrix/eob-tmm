@@ -258,6 +258,60 @@ buys nothing extra.
   the outcome set. Not needed for CVE mitigation, and it is the piece that turns HA config-sync
   arrival order into observable behaviour, so it should not be taken on casually.
 
+## 3.2 Handlers running at the same time
+
+**The claim to retire:** nothing — this one was never claimed either way, which is the problem. §3.1
+covers what happens when several programs are *armed*. This covers what happens when they *run*, which
+is a different question, and the answer was scattered across these documents as a performance argument
+rather than stated as a concurrency model.
+
+**Within one TMM instance there is no concurrency at all.** The poll loop is single-threaded,
+un-preemptible and run-to-completion, so a handler runs to completion before anything else runs on that
+core. That is worth stating explicitly because three simplifications elsewhere depend on it and read as
+hand-waving without it:
+
+- **Per-core fire counters need no atomics.** Not because atomics are slow — because there is exactly
+  one writer per counter and it cannot be interrupted mid-increment.
+- **One `ctx` scratch buffer per core is enough**, rather than one per invocation. Nothing else on that
+  core can be between the builder and the program.
+- **A handler can only be entered twice by *nesting*, never by parallel entry** — which is why §3.1's
+  per-core depth guard is a sufficient answer to re-entrancy rather than a partial one.
+
+**Across TMM instances there is full N-way parallelism.** Arming a hook arms it on every instance, so N
+copies of the same program execute genuinely simultaneously, on disjoint flows. Three consequences:
+
+- **Anything shared between instances is a real concurrency problem**, which is §3 — and it is the
+  reason the base tier has no maps at all rather than a lock discipline.
+- **`STATUS` must aggregate N counter sets, and a single summed number destroys information.** Skew
+  across instances is *diagnostic*, not noise: disaggregation decides which instance a flow lands on, so
+  an even spread and a spike on one instance mean different things. Report per-instance and let the
+  operator sum.
+- **All-or-nothing arming matters *because* of this.** A partially armed set is not "mostly protected":
+  identical traffic gets different treatment depending on which instance it hashed to, and an attacker
+  only has to reach an unarmed one.
+
+**The one real seam is the loader against a running handler.** The single place where something *does*
+happen concurrently with a handler is the control plane mutating a slot while that slot's program is
+executing on another core — arm, disarm, mode change, unload. `slot->armed`, `slot->mode` and `slot->fn`
+are read on the hot path and written by the loader, so they need a defined memory ordering rather than
+plain accesses, and freeing a VM needs quiescence: disarm, advance a per-core epoch at each safe point,
+free only once every core has passed it. That gap is already recorded in the review register; what §3.1
+and this section add is *why* it is the only such gap — everything else is serialised by the loop.
+
+**And one thing that looks like a concurrency problem and is not.** Two different hooks do not fire "at
+the same time" on one core; run-to-completion serialises them. What they can do is both fire within one
+unit of work, which is the cumulative-cost item in §3.1 — an accounting problem, not a race. Keeping the
+two apart matters, because the fixes are unrelated: one is a global armed-cost ceiling, the other is
+memory ordering and quiescence.
+
+**Day-one vs. deferred:**
+
+- **Day-one:** acquire/release ordering on the slot fields the trampoline reads; the epoch/quiescence
+  scheme before any unload path exists; per-instance `STATUS` rather than a pre-summed total; and
+  all-or-nothing arming with a defined behaviour when one instance fails to arm.
+- **Deferred:** anything that makes state shared *between* instances (§3). The single-writer-per-core
+  property above is doing a lot of work, and a shared writable map is what spends it.
+
 ## 4. Verifier soundness is a data-plane RCE surface
 
 **This is the one a security review will (correctly) fixate on.** uBPF JITs native code into
