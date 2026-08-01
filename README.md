@@ -9,10 +9,12 @@ tracepoint) or **act** on a verdict the host applies (a datapath control) — ea
 **statically proven safe before it loads**.
 
 **Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
-deployed** wins, and TMM is where BIG-IP is furthest from that. Every change to the data plane's own code
-or behaviour takes one path — a build, a qualification cycle, then an install on the customer's
-maintenance window rather than F5's — so a new metric, a diagnostic probe, a steering decision and a
-mitigation for a live CVE all cost the same thing. This changes the unit of change from **a release** to
+deployed** wins, and TMM is where BIG-IP is furthest from that. Its behaviour already changes at runtime
+through config, profiles, WAF policy, iRules and an arriving WASM surface — each acting on the
+**curated traffic model the proxy chose to expose**. A change that has to reach the code's own internals — a parser's error branch, a
+plugin handoff, the condition behind a crash — takes one path: a build, a qualification cycle, then an
+install on the customer's maintenance window rather than F5's. Which is why a new metric, a diagnostic
+probe, a steering decision and a mitigation for a live CVE all cost the same thing. This changes the unit of change from **a release** to
 **a signed artifact**, and the verifier is what makes that safe enough to allow on the data-plane path.
 **CVE mitigation is the first use case because it is the most urgent, not because it is the only one** —
 see [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §3–§4 for the rest.

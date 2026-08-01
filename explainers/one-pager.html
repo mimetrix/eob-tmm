@@ -107,15 +107,16 @@
 <div class="sheet">
   <p class="eyebrow">F5 · TMM · <b>design proposal</b> · one page</p>
   <h1>Give TMM its own <em>verified</em> eBPF engine.</h1>
-  <p class="thesis">Whoever shortens the distance from <b>code commit to code deployed</b> wins. That is the
-    whole game in software, and TMM is where BIG-IP is furthest from it: every change to the data plane's own
-    code or behaviour takes one path — a build, a qualification cycle, then an install on the customer's
-    maintenance window rather than F5's. <b>A new metric, a diagnostic probe, a steering decision and a
-    mitigation for a live CVE all cost the same thing.</b> Embedding a small userspace eBPF VM — at
-    designed-in hook points, and at <em>existing</em> function boundaries — changes the unit of change from
-    <b>a release</b> to <b>a signed artifact</b>. A static verifier is what makes that safe enough to allow on
-    the data-plane path. CVE mitigation is the first use case because it is the most <em>urgent</em>, not
-    because it is the only one.</p>
+  <p class="thesis">Whoever shortens the distance from <b>code commit to code deployed</b> wins, and TMM is
+    where BIG-IP is furthest from it. Its behaviour already changes at runtime — config, profiles, WAF
+    policy, iRules, an arriving WASM surface — but each of those acts on the <b>curated traffic model the
+    proxy chose to expose</b>. Reaching the code's own internals, where a parser's error branch or the
+    condition behind a crash lives, takes one path: a build, then an install on the customer's calendar
+    rather than F5's. <b>So a new metric, a diagnostic probe and a mitigation for a live CVE all cost the
+    same thing.</b> A small userspace eBPF VM — at designed-in hook points and at <em>existing</em> function
+    boundaries — changes the unit of change from <b>a release</b> to <b>a signed artifact</b>, and a static
+    verifier is what makes that safe on the data-plane path. CVE mitigation is the first use case because it
+    is the most <em>urgent</em>, not the only one.</p>
 
   <h2>Why TMM is the right host — and why this isn't a general answer</h2>
   <div class="cols">
