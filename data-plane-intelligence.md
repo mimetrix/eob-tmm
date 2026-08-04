@@ -9,7 +9,7 @@
 
 > ### Read this as an annex, not as a request
 >
-> The ask currently under review is a **feasibility phase**: two questions settled on paper and three proved in a lab — the flag's cost measured, a `ctx` model that verifies against real debug information, and one hook armed end to end on one architecture ([`design-review-findings.md`](design-review-findings.md) §7, §8). **Nothing on this page is being requested, funded, or scheduled by that ask** — no fleet model, no federated training, no data product, no external feed. It is written down for two narrow reasons: so the hook and `ctx` design is not accidentally foreclosed by decisions made for the shield alone, and so the data-governance questions are visible early rather than discovered late.
+> What is being considered is a **feasibility phase**: two questions settled on paper and three proved in a lab — the flag's cost measured, a `ctx` model that verifies against real debug information, and one hook armed end to end on one architecture ([`design-review-findings.md`](design-review-findings.md) §7, §8). **Nothing on this page is being requested, funded, or scheduled by that ask** — no fleet model, no federated training, no data product, no external feed. It is written down for two narrow reasons: so the hook and `ctx` design is not accidentally foreclosed by decisions made for the shield alone, and so the data-governance questions are visible early rather than discovered late.
 >
 > One consequence worth stating outright, since this page names tooling freely: **everything it builds on is proposed and unbuilt** — the hooks, the `ctx` catalog, the egress ring, and the `dptrace` DSL front-end it cites in Tiers 2–3 (a **placeholder name for a proposed utility**; `tmm-usdt-tracepoints.md` §1). Nothing in this repo runs a program, drains a ring, or answers a query.
 >
@@ -239,4 +239,4 @@ Say exactly that and no more. The audit log attests the host's own record of its
 
 **A bounded data plane could make the proxy a sensory organ for AI — turning traffic that only a terminating proxy sees into governed signal that never has to move, and closing the loop by letting models return to the plane as signed, verifier-admitted bytecode.**
 
-**Annex, not ask.** This page is a map of what the same hooks could later reach; every stage of it is a separately-authorized decision, and only two pieces stand on their own today — Tier 1 API discovery (§4, §6) and the OSS/license inventory (§7, §7.1).
+**Annex, and out of scope.** This page is a map of what the same hooks could later reach; every stage of it is a separately-authorized decision, and only two pieces stand on their own today — Tier 1 API discovery (§4, §6) and the OSS/license inventory (§7, §7.1).

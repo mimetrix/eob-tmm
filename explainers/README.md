@@ -2,13 +2,12 @@
 
 | Page | What it covers | Read |
 |---|---|---|
-| [`one-pager.html`](one-pager.html) | The whole proposal on one printable sheet, ending on the questions that would decide it | 3 min |
 | [`programmable-dataplane-engine.html`](programmable-dataplane-engine.html) | The engine as a general capability — hooks, the `ctx` model, safety, form-factor coverage | 15 min |
 | [`cve-mitigation.html`](cve-mitigation.html) | The CVE-mitigation case in plain language, with the perimeter argument and coverage limits | 8 min |
 | [`cve-shield-walkthrough.html`](cve-shield-walkthrough.html) | A real TMM NULL-deref crash class end to end: 4 build steps, 9 runtime steps, the eBPF program line by line | 20 min |
 | [`engine-hard-problems.html`](engine-hard-problems.html) | The engineering register — time safety, the `ctx` ABI, shared state, the trust surface, thirteen further concerns, day-one vs. deferred sequencing, honest scope | 20 min |
 
-Order: one-pager → engine → cve-mitigation → walkthrough → hard-problems. The engine page is
+Order: engine → cve-mitigation → walkthrough → hard-problems. The engine page is
 generic on purpose; **if** read after the CVE pages, it reads as a security feature rather than the
 programmability surface it is.
 

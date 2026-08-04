@@ -429,7 +429,7 @@ input away from the JIT entirely, and the verifier never runs on-box at all.*
 - **Tracked CVE surface** — keep PREVAIL/uBPF current; carry both in the SBOM (software bill of
   materials), which ties to the open-source posture in the shield design §13.
 
-**The open ask: make the verifier auditable, not just trusted.** "How do you know the verifier is
+**The open item: make the verifier auditable, not just trusted.** "How do you know the verifier is
 sound?" has no satisfying answer of the form *"it's widely used."* The answer that does work is
 **inspectability** — tooling that steps through the abstract interpretation so a reviewer can see
 why a program was accepted, and so the verifier itself can be unit-tested against adversarial

@@ -473,7 +473,7 @@ So: **the bounded outcome set buys a proportionate test surface; the signature b
 argument; and being an artifact rather than an image buys the install window.** Three mechanisms doing
 three different jobs, and the verifier is none of the three.
 
-**And the pipeline this belongs in already exists, which reframes the ask.** The instinct is to compare
+**And a pipeline for this artifact class already exists.** The instinct is to compare
 a shield to a **hotfix**, and by that comparison every question above is hard. But F5 already operates a
 vendor-authored, HSM-signed, proportionately-qualified, no-upgrade-required distribution channel for a
 different artifact class: **attack-signature updates, WAF/ASM policy updates, threat feeds.** Those are
