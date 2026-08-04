@@ -489,6 +489,16 @@ of the measurement in [`design-review-findings.md`](design-review-findings.md) �
 along with live-text patching — and so does the rendezvous. What remains is ordered publish, a
 reclamation policy, certification, and the ordinary work.
 
+- **uBPF's own hardening switches, which are per-program and mostly default-off.** `ubpf_create`
+  leaves the bounds check and read-only bytecode on, but **constant blinding off** and the
+  undefined-behaviour check off (`ubpf/vm/ubpf_vm.c`). Blinding is what stops a bytecode immediate from
+  reaching the JIT'd buffer verbatim, i.e. from smuggling native instruction bytes into an executable
+  mapping inside TMM — defence in depth behind the signature. Two consequences: the loader must set
+  these explicitly rather than inherit them, and **blinding is x86-64 only** — `ubpf.h` says ARM64 is
+  *"not yet implemented ... will have no effect"* — so an aarch64 build has no JIT-spray mitigation and
+  the interpreter becomes the stronger high-assurance answer there, the same conclusion item 15's fuel
+  reaches by a different route.
+
 - **Item zero — the safe point itself, and it is three items.** Every in-TMM item above once assumed
   "a safe point between poll-loop iterations that dequeues and processes a load request." Two things
   were wrong with that. First, **nothing needs to be dequeued in the poll loop**: parse, verify, JIT

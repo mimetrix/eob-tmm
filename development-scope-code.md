@@ -494,6 +494,23 @@ static int do_load_prepare(const struct shield_msg *msg, struct shield_state *s)
     s->vm = ubpf_create();
     if (!s->vm)                                       return SHIELD_ERR_NOMEM;
 
+    /* 3a. The runtime-hardening flags are PER-VM state, not global, so they take
+     *     uBPF's defaults unless set here — and an earlier draft of this sketch
+     *     let them. Verified in ubpf/vm/ubpf_vm.c (ubpf_create): bounds check
+     *     ON, read-only bytecode ON, undefined-behaviour check OFF, and
+     *     constant blinding OFF. Blinding is the JIT-spray mitigation: without
+     *     it, an immediate in the bytecode lands verbatim in the JIT'd buffer,
+     *     so a program that PREVAIL admits can still smuggle native
+     *     instruction bytes into an executable mapping inside TMM. That is
+     *     defence in depth behind the signature, which is exactly what should
+     *     not be left to a default.
+     *     TODO(f5): blinding is x86-64 only in uBPF — the header states ARM64
+     *     "not yet implemented ... will have no effect" — so on aarch64 this
+     *     mitigation does not exist and the TMA has to weigh that asymmetry. */
+    ubpf_toggle_bounds_check(s->vm, true);
+    ubpf_toggle_undefined_behavior_check(s->vm, true);
+    ubpf_toggle_constant_blinding(s->vm, true);      /* no-op on aarch64 */
+
     /* The signed artifact is an ELF object, so this is ubpf_load_elf() — the
      * walkthrough's ubpf_load() is the raw-bytecode variant of the same step. */
     if (ubpf_load_elf(s->vm, msg->prog, msg->prog_len, &err) < 0)
@@ -613,7 +630,8 @@ void shield_expire_all(uint32_t new_build)
 }
 ```
 
-**Real:** `ubpf_create`, `ubpf_load_elf`, `ubpf_compile_ex`, `ubpf_destroy` — and the JIT-once-at-load
+**Real:** `ubpf_create`, `ubpf_load_elf`, `ubpf_compile_ex`, `ubpf_destroy`, and the three
+`ubpf_toggle_*` calls — all public API — and the JIT-once-at-load
 property, on which the per-invocation cost claim rests. `ExtendedJitMode` and `ubpf_jit_ex_fn`'s
 `(mem, mem_len, stack, stack_len)` signature are uBPF's real API
 (`ubpf/vm/inc/ubpf.h`); so is the basic JIT's unprobed `sub rsp, 4096` prologue

@@ -29,6 +29,17 @@ And it occupies a unique slot in the *dynamic-configurability* story: **eBPF is 
 
 An embedded verified VM (virtual machine) fits *this* data plane for reasons that are preconditions rather than preferences, and that would not hold elsewhere.
 
+> **First, the term, because uBPF's naming splits it and this document has used one word for both.**
+> **The engine** is one place in memory: ~150 KB of library code — the interpreter loop, the JIT
+> translator, helper dispatch — linked into TMM once and shared by everything. That is what "an embedded
+> VM" means throughout. **`struct ubpf_vm` is not the engine.** It is a per-*program* container holding
+> one program's bytecode (`insts`, `num_insts`), its JIT'd buffer (`jitted`, `jitted_size`), its helper
+> table, and its own policy flags — verified in `ubpf/vm/ubpf_int.h`. uBPF calls it a VM; it behaves as a
+> program handle, and there is one per armed program (`engine-hard-problems.md` §3.1). **And on the JIT
+> path the engine does not run bytecode at all:** it translates once at load and returns a native
+> function pointer, which the trampoline then calls directly. Running bytecode is the *interpreter's*
+> job. So "a VM per hook" implies no per-invocation dispatch cost, and none is paid.
+
 The first two follow from the same fact: **TMM is a proxy, not a packet-forwarding plane.**
 
 - **A proxy's budget makes bytecode nearly free; a forwarder's does not.** A packet-forwarding data plane's unit of work is the packet, with a per-packet budget of a few nanoseconds at line rate — a verified-bytecode invocation is a *meaningful fraction* of that, which is why bytecode struggles in a forwarder. TMM's unit of work is a flow, a connection, a request: it terminates TCP, negotiates TLS, parses L7 (application-layer protocol) and evaluates policy, spending **microseconds where a forwarder spends nanoseconds**. A hook costing tens of nanoseconds is noise against that, because the invocation cost is amortized over work that was already expensive. **That argument describes the cheapest tier rather than the only one.** TMM holds three budgets, not two: per request (microseconds), per packet *inside the proxy path* (TCP reassembly, TLS records, L7 framing — hundreds of nanoseconds, where a hook is a fraction of the budget and needs measurement plus sign-off), and a pure FastL4 fast path (tens of nanoseconds, where the forwarder's objection applies to us too and is conceded). The middle tier is where the **pre-L7 CVE (Common Vulnerabilities and Exposures) classes this substrate exists for fault**, before any request exists. See `engine-hard-problems.md` §1.1 for what is affordable at each rate and the measurement that would settle it.

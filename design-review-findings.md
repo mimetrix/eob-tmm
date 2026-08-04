@@ -102,6 +102,17 @@ The **Disposition** column was established by grepping the repo for each claim a
 - **HA.** Failover to a peer on a different build = failover **into** the unshielded vulnerability.
 - **ISSU.** A new TMM starts with an empty shield set, so there is nothing to "expire"; the real problem is who re-verifies and re-pushes, and **the window where the new instance takes traffic with nothing armed**.
 - **Core dumps / qkview / debuggability.** Zero coverage. Backtraces through the trampoline, PC inside an anonymous JIT mapping, on-disk text ≠ in-memory text (breaking symbolisation and integrity checks), armed-shield inventory in the dump and in qkview. Absent this, support escalates for a global disable after the first field crash.
+- **uBPF's runtime hardening is per-VM and mostly off by default.** Read from
+  `ubpf/vm/ubpf_vm.c` (`ubpf_create`): bounds check **on**, read-only bytecode **on**,
+  undefined-behaviour check **off**, **constant blinding off**. Blinding is the JIT-spray mitigation —
+  without it an immediate in the bytecode reaches the JIT'd buffer verbatim, so a program the verifier
+  admits can still place native instruction bytes in an executable mapping inside TMM. The loader
+  sketch went `ubpf_create()` → `ubpf_load_elf()` and inherited every default silently; it now sets all
+  three explicitly. **And the asymmetry is worse than the default:** `ubpf.h` states blinding is
+  *"ARM64: Not yet implemented — enabling on ARM64 will have no effect,"* so on aarch64 the mitigation
+  does not exist at all. That is a TMA item and an argument for the interpreter on any high-assurance
+  aarch64 build, alongside item 15's fuel — which is enforceable only in the interpreter for the same
+  kind of reason.
 - **Memory accounting.** uBPF `malloc`s and `mmap(PROT_EXEC)`s; TMM has its own preconfigured allocator with strict accounting. `SHIELD_MAX_SHIELDS 64` has no memory model behind it.
 - **Distribution.** Items 9–11 run sign → push → load, all in-box. Nothing covers F5 → customer fleet: versioned distribution, pinning, rollback. (The AWAF attack-signature channel is the obvious analog: signed, versioned, live, fast cadence, established customer trust — and it decouples mitigation cadence from hotfix cadence, which is the point of the exercise.)
 - **Per-build shield multiplication.** A per-build `ctx` means **per-build shields**: one CVE across six supported branches is six verified, budgeted, signed, tested artifacts — with possibly different hookable sets. "A few lines of C per CVE" quietly becomes "a few lines × N builds."
