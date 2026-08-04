@@ -558,7 +558,11 @@
         <span class="inlinecode">text_poke_bp</span> equivalent; and <b>quiescence</b>, to free a program&rsquo;s
         code, from a poll-loop epoch, from per-invocation read-side markers, or by declining to free and capping
         the leak. <b>The poll loop is the cheapest source of the last two, not the only one</b> — every
-        alternative pays in hot-path cycles, a restart, or leaked memory. It was not on the list at all, and when
+        alternative pays in hot-path cycles, a restart, or leaked memory. <b>Exactly one capability has no
+        substitute:</b> an <b>atomic multi-slot change</b>. TMM is run-to-completion per packet, so a checkpoint
+        between iterations is the only point where several slots flip with no core seeing a half-applied set —
+        without one, a packet already past hook A sees old-A/new-B and no hot-path counter can rewind it. That is
+        <em>forfeited rather than blocking</em>, since day one is one program per hook with chaining refused. It was not on the list at all, and when
         added it was added as one item.</p></div>
       <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>An appliance validated under <b>FIPS</b> 140-2/3 (crypto-module validation) or <b>Common Criteria</b> (independent evaluation against a stated target) that also loads data-plane code at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate.</p></div>
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) verifies at <b>build / control-plane time</b>; only the small runtime and a signature check live in TMM. This <em>shrinks</em> the §04 surface.</p></div>

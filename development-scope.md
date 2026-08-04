@@ -83,6 +83,18 @@ are **conditional work**, and the list says so rather than pricing them as settl
    boot. Bounded leak is defensible for a program loaded twice a year and not for one reloaded hourly,
    so this choice belongs to the use case, not to the substrate.
 
+**And one capability has no substitute, which is worth naming because the rest of this section is a list
+of trade-offs.** Everything above can be bought another way at a price. **An atomic multi-slot change
+cannot.** TMM is run-to-completion per packet, so between poll iterations no packet is mid-processing: a
+checkpoint is the only place several slots can be flipped and the loop resumed with no core having
+observed a half-applied set. Without one, slots are stored to independently, and a packet already in
+flight past hook A will see old-A/new-B whatever is done — a generation counter the trampoline consults
+does not fix that, it only moves cost onto the hot path and still cannot rewind a packet already past A.
+**This is forfeited rather than blocking**, because the day-one design is one program per hook with
+chaining refused (`engine-hard-problems.md` §3.1), so nothing currently needs two slots to change
+together. It is the capability to keep in view if coordinated multi-hook policy ever becomes a
+requirement.
+
 1. **The trampoline** *(walkthrough step 2)* — per CPU architecture: save the hooked function's
    argument registers per the ABI, build the `ctx`, call the JIT'd program, bump the fire
    counter, apply the verdict (safe-return vs. fall-through), restore. ≈ a page of code per

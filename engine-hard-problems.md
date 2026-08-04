@@ -513,6 +513,13 @@ reclamation policy, certification, and the ordinary work.
   declining to free and capping the leak. **None of the three is a poll-loop check that does not exist
   today and cannot be avoided.** What is true is that the poll loop is the cheapest place to get the
   last two, and that every alternative pays in hot-path cycles, a restart, or leaked memory.
+  **One capability does have no substitute, and it is worth stating precisely because everything else
+  here is a price:** an **atomic multi-slot change**. TMM is run-to-completion per packet, so a
+  checkpoint between iterations is the only point at which several slots can be flipped with no core
+  having observed a half-applied set. Without one, a packet already past hook A sees old-A/new-B, and a
+  generation counter the trampoline consults does not fix it — it moves cost onto the hot path and still
+  cannot rewind that packet. It is **forfeited rather than blocking**, since day one is one program per
+  hook with chaining refused (§3.1), so nothing currently needs two slots to change together.
   **It was previously not on the list at all**, and when added it was added as one item.
 
 Sections 1–4 are this register's primary items. These are the next tier — each has a stance and none
