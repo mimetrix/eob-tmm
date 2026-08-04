@@ -452,8 +452,15 @@ high-assurance builds — with F5 SIRT sign-off gating implementation, not follo
 ## 5. Further TMM-specific concerns
 
 **Read this list with its severity in mind, because thirteen equal-looking bullets overstate the risk.**
-Exactly one is both unavoidable and hard — **the safe point**, needed for any dynamic load into a running
-TMM whatever the hook kind. Two are not open questions: keeping the verifier out of TMM is a decision
+Exactly one is both unavoidable and hard — **the safe point**, and an earlier draft of this sentence
+overstated it as "needed for any dynamic load into a running TMM whatever the hook kind." It is not.
+"Safe point" was one label over three guarantees, and only the first is unconditional: an **ordered
+publish** into a slot the hot path already reads, which modifies no text and needs no rendezvous. A
+**cross-core rendezvous** is needed only to change live text, which makes it x86-64 work in the
+function-boundary form and nothing at all in the designed-in form. **Quiescence** for reclamation is
+needed in every form, but has three answers — a poll-loop epoch, per-invocation read-side markers, or a
+capped leak. The decomposition and what each form costs is in
+[`development-scope.md`](development-scope.md) §1, items 0 · 0b · 0c. Two are not open questions: keeping the verifier out of TMM is a decision
 already taken, and the concurrency item records a property that is the reason three other things are
 simple. Four are ordinary lifecycle and governance work. One is scope-dependent, biting only on
 per-packet hooks. Certification has the best existing answer, since BIG-IP already runs customer TCL and
@@ -462,16 +469,24 @@ the JIT is novel. And **four exist only because function-boundary probes are on 
 build-specific probe context, the optimiser deciding the hookable set, the unwind information a
 trampoline needs, and the JIT's maturity. Take the narrowest form, designed-in call sites only (outcome 3
 of the measurement in [`design-review-findings.md`](design-review-findings.md) §4), and those four go away
-along with live-text patching: what remains is the safe point, certification, and the ordinary work.
+along with live-text patching — and so does the rendezvous. What remains is ordered publish, a
+reclamation policy, certification, and the ordinary work.
 
-- **Item zero — the safe point itself.** Every in-TMM item above assumes "a safe point between
-  poll-loop iterations that dequeues and processes a load request." That does not exist in TMM today.
-  Building it means a per-instance message queue reachable from the config channel, **a new check in
-  the poll loop** (one load and branch per iteration), and a bounded work budget for the handler —
-  because as first sketched, `do_load` performs an ELF parse and a **JIT compile** *at* the safe
-  point, which is unbounded work during which the loop is not polling: a latency spike, possibly a
-  dropped heartbeat. Move compile and page population off the safe point; leave it publishing a
-  pointer and patching a few bytes. **It was previously not on the list at all.**
+- **Item zero — the safe point itself, and it is three items.** Every in-TMM item above once assumed
+  "a safe point between poll-loop iterations that dequeues and processes a load request." Two things
+  were wrong with that. First, **nothing needs to be dequeued in the poll loop**: parse, verify, JIT
+  and page population all run on a control thread, and as first sketched `do_load` did them *at* the
+  safe point — unbounded work during which the loop is not polling, a latency spike and possibly a
+  dropped heartbeat. What reaches the hot path is a single ordered store. Second, the remaining
+  guarantees are **separable and separately optional**: a cross-core rendezvous, needed only to modify
+  live text (x86-64 only — aarch64's aligned `NOP`↔`B` swap is architecturally safe against concurrent
+  execution), obtainable either from a poll-loop checkpoint or from a userspace `text_poke_bp`
+  equivalent (`SIGTRAP` handler plus `membarrier(…SYNC_CORE)`); and quiescence, needed to free a
+  program's code, obtainable from a poll-loop epoch, from per-invocation read-side markers, or by
+  declining to free and capping the leak. **None of the three is a poll-loop check that does not exist
+  today and cannot be avoided.** What is true is that the poll loop is the cheapest place to get the
+  last two, and that every alternative pays in hot-path cycles, a restart, or leaked memory.
+  **It was previously not on the list at all**, and when added it was added as one item.
 
 Sections 1–4 are this register's primary items. These are the next tier — each has a stance and none
 changes the day-one posture, and the safe point and certification are the two most likely to shape the

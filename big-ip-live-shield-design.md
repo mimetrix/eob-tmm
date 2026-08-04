@@ -286,7 +286,7 @@ Four layers, mechanism-agnostic above the enforcement leaf.
 
 Transport is reused: one message family (`LOAD · SET_MODE · STATUS · REVOKE`) on the existing
 control-plane config channel, applied at a safe point between poll-loop iterations and fanned out per
-core. **That safe point does not exist in TMM today** — it is a new per-iteration check in the poll
+core. **In the live-patching form that safe point does not exist in TMM today** — it is a new per-iteration check in the poll
 loop, and `engine-hard-problems.md` names it (item zero) as the most expensive item on its list, not an
 implementation detail of the transport. It also cannot do the
 work naively sketched here: an ELF (Executable and Linkable Format) parse plus a JIT compile inline at

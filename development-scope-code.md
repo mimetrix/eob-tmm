@@ -98,7 +98,7 @@ approval.
 ## Contents
 
 **§1 In-TMM data-plane code** — [1 trampoline](#item-1--the-trampoline) ·
-[2 arm/disarm](#item-2--armdisarm) · [3 safe-point loader handler](#item-3--the-safe-point-loader-handler) ·
+[2 arm/disarm](#item-2--armdisarm) · [3 loader handler](#item-3--the-loader-handler) ·
 [4 signature verification](#item-4--signature-verification-in-tmm)
 **§2 Build-pipeline tooling** — [5 hook-map generator](#item-5--hook-map-generator) ·
 [6 ctx descriptors for PREVAIL](#item-6--ctx-descriptor-emission-for-prevail) ·
@@ -108,7 +108,7 @@ approval.
 [10 loader daemon](#item-10--loader-daemon-side) ·
 [11 operator front-end](#item-11--operator-front-end) · [12 audit trail](#item-12--audit-trail)
 **Per CVE** — [the shield program](#the-shield-program--the-only-per-cve-code)
-**Staged tiers 13–17** — [noted, not coded](#staged-tiers-1317--deliberately-not-coded) (item 15 is
+**Staged tiers 13–17** — [noted, not coded](#staged-tiers-1317--not-coded-here-except-that-15-is-day-one) (item 15 is
 day one)
 
 ---
@@ -288,7 +288,13 @@ cannot reason across the batch (`engine-hard-problems.md` §5).
 
 ## Item 2 · Arm/disarm
 
-> **step 2** · runs in **TMM, at the safe point** · written **once** · **small**
+> **step 2** · runs in **TMM** · written **once per architecture** · **small** · **conditional —
+> this is form B of three** ([`development-scope.md`](development-scope.md) §1 item 2)
+
+**The skeleton below is the live-patching form.** At a designed-in call site, arming is an ordered word
+store into the slot and none of this code exists; patching once at startup makes arming a flag store and
+moves this code before the threads go hot, where it needs no coordination at all. Read it as the form
+that buys reach into an entry nobody planned for, and as the only one that needs item 0b.
 
 Overwrite the nop pad with a jump to the trampoline; restore the nops to detach. Same discipline
 ftrace has used on live kernel text for years — the difference here is that the pads are in **our own
@@ -376,12 +382,15 @@ per-page in TMM's memory manager at all is a **TMA** (Threat Model Analysis) **q
 implementation detail —
 `engine-hard-problems.md` §5 carries it.
 **The honest hard part:** this is the item where "proven in kernels" stops being an argument and
-becomes work. The safe point makes it far easier than ftrace's general case (no core is mid-prologue),
-but it is still live text in the crown-jewel process.
+becomes work. A rendezvous makes it far easier than ftrace's general case — no core is mid-prologue, so
+the bytes can be written plainly with no breakpoint dance — but it is still live text in the crown-jewel
+process, and without a rendezvous the breakpoint dance comes back as a `SIGTRAP` handler on the
+data-plane threads.
 
-## Item 3 · The safe-point loader handler
+## Item 3 · The loader handler
 
-> **steps 4, 10, 13** · runs in **TMM, at the safe point** · written **once** · **hundreds of lines**
+> **steps 4, 10, 13** · runs in **TMM, on a control thread**; only the publish touches the hot path ·
+> written **once** · **hundreds of lines**
 
 The biggest in-TMM item, and the one whose unglamorous half is the actual work: not the happy path,
 but every error path leaving the hook dark, plus expiry, teardown, and per-shield state.

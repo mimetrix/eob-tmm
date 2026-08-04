@@ -544,16 +544,22 @@
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
     <h2>Thirteen more to get ahead of — and one of them is the biggest item here.</h2>
-    <p class="lede">The four above are the ones the design turns on; these are the next tier. <b>Read the list with its severity in mind, because thirteen equal-looking boxes overstate the risk.</b> Exactly one is both unavoidable and hard — <b>the safe point</b>, needed for any dynamic load into a running TMM whatever the hook kind. Two are not open questions at all: keeping the verifier out of TMM is a decision already taken, and the concurrency item records a property that makes three other things simple. Four are ordinary lifecycle and governance work. And <b>four exist only because function-boundary probes are on the table</b> — the build-specific probe context, the optimiser deciding the hookable set, the unwind information a trampoline needs, and the JIT&rsquo;s maturity. Take the narrowest form of the mechanism, designed-in call sites only (outcome 3 of the measurement), and those four go away along with live-text patching: what remains is the safe point, certification, and the ordinary work.</p>
+    <p class="lede">The four above are the ones the design turns on; these are the next tier. <b>Read the list with its severity in mind, because thirteen equal-looking boxes overstate the risk.</b> Exactly one is both unavoidable and hard — <b>the safe point</b>, and it is not one thing: it is an <b>ordered publish</b> that needs no rendezvous, a <b>rendezvous</b> needed only to change live text, and <b>quiescence</b> that has three answers. Two are not open questions at all: keeping the verifier out of TMM is a decision already taken, and the concurrency item records a property that makes three other things simple. Four are ordinary lifecycle and governance work. And <b>four exist only because function-boundary probes are on the table</b> — the build-specific probe context, the optimiser deciding the hookable set, the unwind information a trampoline needs, and the JIT&rsquo;s maturity. Take the narrowest form of the mechanism, designed-in call sites only (outcome 3 of the measurement), and those four go away along with live-text patching &mdash; and so does the rendezvous. What remains is ordered publish, a reclamation policy, certification, and the ordinary work.</p>
     <div class="concerns">
-      <div class="concern"><span class="cl">item zero · the safe point itself</span><p>Every in-TMM piece assumes
-        &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; <b>That does not exist
-        in TMM today.</b> Building it means a per-instance message queue and <b>a new check in the poll loop</b> —
-        one load and branch per iteration, on the loop this organisation guards hardest. The handler must also be
-        bounded: as first sketched it did an ELF parse and a <b>JIT compile</b> there, milliseconds in which the
-        loop is not polling — a latency spike, possibly a dropped heartbeat. Compile off the safe point; leave it
-        publishing a pointer and patching a few bytes. <b>The most expensive item here, and it was not on the
-        list.</b></p></div>
+      <div class="concern"><span class="cl">item zero · the safe point — which is three items</span><p>Every in-TMM
+        piece once assumed &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; Two
+        things were wrong with that. <b>Nothing needs picking up in the poll loop:</b> parse, verify and
+        <b>JIT compile</b> run on a control thread — as first sketched they ran <em>at</em> the safe point,
+        milliseconds in which the loop is not polling, a latency spike and possibly a dropped heartbeat. What
+        reaches the hot path is <b>one ordered store</b> into a slot it already reads. And the rest is
+        <b>separable</b>: a <b>rendezvous</b>, needed only to modify live text — x86-64 only, since aarch64&rsquo;s
+        aligned <span class="inlinecode">NOP</span>&harr;<span class="inlinecode">B</span> swap is safe against
+        concurrent execution — and available either from the poll loop or from a userspace
+        <span class="inlinecode">text_poke_bp</span> equivalent; and <b>quiescence</b>, to free a program&rsquo;s
+        code, from a poll-loop epoch, from per-invocation read-side markers, or by declining to free and capping
+        the leak. <b>The poll loop is the cheapest source of the last two, not the only one</b> — every
+        alternative pays in hot-path cycles, a restart, or leaked memory. It was not on the list at all, and when
+        added it was added as one item.</p></div>
       <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>An appliance validated under <b>FIPS</b> 140-2/3 (crypto-module validation) or <b>Common Criteria</b> (independent evaluation against a stated target) that also loads data-plane code at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate.</p></div>
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) verifies at <b>build / control-plane time</b>; only the small runtime and a signature check live in TMM. This <em>shrinks</em> the §04 surface.</p></div>
       <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range keep it honest.</p></div>
