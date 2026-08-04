@@ -234,7 +234,13 @@ Conventional engineering — no novel machinery.
     capability and no security
     surface of its own. An earlier revision described it as already-working code, citing a prototype
     front-end since removed; nothing of it survives here, and it is a follow-on like the rest of this
-    tier. Left unnamed deliberately — the removed tool's name read as a shipped TMM component.
+    tier. Referred to elsewhere in this repo as **`dptrace`**, a **placeholder name for a proposed
+    utility** — nothing by that name exists, here or in any product
+    ([`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) has the note on the names, and on `dpdump`,
+    its capture sibling). The prototype's name was `tmmtrace`; what was retired with it was the
+    **`tmm` prefix**, which read as a shipped TMM component, not the naming of the tool. An earlier
+    version of this item said the DSL was "left unnamed deliberately," which was false the moment
+    five other documents named it.
 
 ## 5. Recurring cost — per CVE, forever
 
