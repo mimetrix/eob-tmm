@@ -569,7 +569,7 @@ This is the right-hand-column residual from the §2.1 coverage map. Two things f
    - **A bug *inside* the silicon, or in a pure-L4 vector that stays fully offloaded, does need a
      firmware/FPGA fix** — that part stands.
 
-   **Two consequences follow.** First, **coverage stops being
+   **Four consequences follow** — an earlier revision of this passage stopped at two. First, **coverage stops being
    unknowable and becomes measured**: a hook at the offload decision is what tells you how many flows
    went to silicon, which resolves the ambiguity that otherwise makes a zero count useless — "no
    attempts", "attempts handled in hardware" and "wrong TMM instance" become distinguishable rather
@@ -579,6 +579,26 @@ This is the right-hand-column residual from the §2.1 coverage map. Two things f
    touch, at a real and bounded cost: matching flows lose acceleration for as long as the shield is
    armed. It is a throughput-for-coverage trade, made explicit, and available only because the decision
    was in software to begin with.
+
+   **Third, the two hooks are worth more as a pair than separately, and the catalog already has both**
+   (`tmm:hw:offload_decision` and `tmm:hw:offload_return`,
+   [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) §3). They carry the same `flow_key_hash`, so with
+   a host timestamp on each side they **bracket the black box**: per-flow accelerator residency and
+   latency, the escalation rate with its reason distribution, and the error rate coming back out of
+   silicon. None of that is observable today by any means — the accelerator's own behaviour is currently
+   inferred from aggregate counters, not measured per flow. Note the budget asymmetry, because it decides
+   where each side can do work: the **decision** is `warm` (once per flow) and is therefore a comfortable
+   place to act, while the **return** is `hot`, so what happens there has to stay inside a per-packet
+   budget — recording a timestamp and a key, not computing on them.
+
+   **Fourth, escalation-forcing is an attack surface this would be the first thing to see.** Offload
+   eligibility depends on flow characteristics, so an attacker who crafts traffic that is reliably
+   *ineligible* converts an accelerated appliance into a software-only one — the same shape as using
+   fragmentation to defeat a fast path, and a capacity attack rather than a memory-safety one. Today it
+   is invisible: the box simply gets slow. The decision hook sees it forming, as a shift in the
+   escalate-vs-accelerate ratio and in the *reason* distribution behind it. Whether that traffic is
+   attacker-shaped or organic is exactly the judgement a program at a `warm` hook can make and a static
+   counter cannot.
 
    The high-severity classes this design targets — L7/parser bugs, `bd`/WAF-plugin termination — execute
    in TMM software regardless, since a flow needing L7 inspection is escalated off the offload path
