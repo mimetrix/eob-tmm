@@ -25,3 +25,4 @@ __pycache__/
 
 # send bundles (regenerate with git archive; never commit)
 *.zip
+SEND-NOTE.md
