@@ -59,8 +59,12 @@ The delicate systems work: small, but must be exactly right.
    argument registers per the ABI, build the `ctx`, call the JIT'd program, bump the fire
    counter, apply the verdict (safe-return vs. fall-through), restore. ≈ a page of code per
    architecture, generic across all functions.
-2. **Arm/disarm routine** *(step 2)* — atomic nop-pad patch + instruction-cache flush,
-   coordinated across cores at the safe point. Same discipline the kernel's ftrace has used on
+2. **Arm/disarm routine** *(step 2)* — patch the nop pad, flush the instruction cache,
+   coordinated across cores at the safe point. "Atomic patch" is the wrong shorthand on
+   x86-64, where a 5-byte `JMP rel32` cannot be written by one store: the mechanism is a
+   rendezvous, as in Linux's `text_poke_bp()` (breakpoint → IPI/sync → patch → sync →
+   restore the first byte). aarch64's aligned 4-byte branch *is* a single store, so the two
+   architectures need different code here. Same discipline the kernel's ftrace has used on
    live text for years — proven pattern, not research.
 3. **The safe-point loader handler** *(steps 4, 10, 13)* — processes `shield_msg`
    (`LOAD · SET_MODE · STATUS · REVOKE`). **Every op is authenticated, not only `LOAD`**: the
