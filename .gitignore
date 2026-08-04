@@ -22,3 +22,6 @@ disclosure-figures/
 # python bytecode
 __pycache__/
 *.pyc
+
+# send bundles (regenerate with git archive; never commit)
+*.zip

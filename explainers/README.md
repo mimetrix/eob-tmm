@@ -15,7 +15,7 @@ programmability surface it is.
 
 - [`../development-scope.md`](../development-scope.md) — what F5 builds, item by item, and what is reused as-is.
 - [`../development-scope-code.md`](../development-scope-code.md) — a candidate code skeleton per item, with real/stubbed/TODO marked.
-- [`../design-review-findings.md`](../design-review-findings.md) — three architect reviews and their dispositions, including the findings that changed the design.
+- [`../design-review-findings.md`](../design-review-findings.md) — the author's own adversarial review and its dispositions, including the findings that changed the design.
 - [`../engine-hard-problems.md`](../engine-hard-problems.md) · [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) · [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) — the long-form docs these pages are distilled from.
 - [`../substrate/`](../substrate/) — the candidate ABI artifacts and their checkers: a header whose `_Static_assert`s pin the loader message's wire layout, a hook-map schema, an admission-time budget pass with a self-test, and a check that fails the build if the safe-return two-gate rule regresses. **Not a running prototype — nothing in this repo executes a shield.**
 
