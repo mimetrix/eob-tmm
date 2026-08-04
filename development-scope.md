@@ -234,13 +234,15 @@ Conventional engineering — no novel machinery.
     capability and no security
     surface of its own. An earlier revision described it as already-working code, citing a prototype
     front-end since removed; nothing of it survives here, and it is a follow-on like the rest of this
-    tier. Referred to elsewhere in this repo as **`dptrace`**, a **placeholder name for a proposed
-    utility** — nothing by that name exists, here or in any product
-    ([`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) has the note on the names, and on `dpdump`,
-    its capture sibling). The prototype's name was `tmmtrace`; what was retired with it was the
-    **`tmm` prefix**, which read as a shipped TMM component, not the naming of the tool. An earlier
-    version of this item said the DSL was "left unnamed deliberately," which was false the moment
-    five other documents named it.
+    tier. Called **`tmmtrace`** here and throughout, with **`tmmdump`** as its capture sibling — both
+    **placeholder names for proposed utilities**, nothing by either name existing here or in any product
+    ([`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) carries the note on the names). **The tool is
+    still wanted; what was not ready was a prototype of it**, which is why nothing by that name is in
+    this repo and why an earlier revision of this document was wrong to cite one as working code.
+    Two further corrections in place: this item once said the DSL was "left unnamed deliberately,"
+    false the moment five other documents named it; and the interim name `dptrace` scoped it to the
+    data plane, which is wrong in the other direction — see the explainer, where the `tmm:` half is the
+    net-new one precisely because `bpftrace` already authors for kernel eBPF on the control plane.
 
 ## 5. Recurring cost — per CVE, forever
 

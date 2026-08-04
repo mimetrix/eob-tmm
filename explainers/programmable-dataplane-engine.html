@@ -225,7 +225,7 @@
   .swnote{margin:1rem 0 0; font-size:.9rem; color:var(--muted)}
   .swnote b{color:var(--ink)}
   .mode-obs .swnote .only-enf{display:none} .mode-enf .swnote .only-obs{display:none}
-  /* dptrace DSL grammar template */
+  /* tmmtrace DSL grammar template */
   .dsl{margin:1.4rem 0 0; display:grid; grid-template-columns:auto auto auto; gap:.45rem 1.6rem;
     justify-content:start; align-items:baseline; border:1px solid var(--line-2); border-radius:8px;
     background:var(--surface-2); padding:.9rem 1rem; overflow-x:auto}
@@ -504,13 +504,17 @@
       internal state out to userspace</em> — for discovery, debugging and root-cause analysis (RCA) — or treats
       it as <em class="enf">a decision to act on</em> is its choice, not a different mechanism.</p>
     <p><b>So how would you write one?</b> You write a few lines of C and compile with
-      <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>dptrace</b>, a proposed
+      <span class="inlinecode">clang -target bpf</span> — or, for one-line probes, <b>tmmtrace</b>, a proposed
       authoring front-end that emits the same bytecode: <em>bpftrace for TMM</em>. It <b>compiles</b> the probe to
       bytecode, <b>verifies</b> it and, once <b>signed</b>, <b>attaches</b> it at the named hook — one line or a
       full multi-probe script, same path.</p>
-    <p>And it <b>spans both planes</b> from one grammar: a data-plane hook runs in TMM's embedded VM, a
-      control-plane daemon rides kernel eBPF (§5.2). Each probe is <b>three parts</b>:</p>
-    <div class="dsl" aria-label="dptrace grammar: which hook, when it fires, what to do">
+    <p>One grammar can reach both planes — a <span class="inlinecode">tmm:</span> hook runs in TMM's embedded
+      VM, a <span class="inlinecode">ctl:</span> hook rides kernel eBPF (§5.2) — but <b>only the first half is
+      net-new, and that is why the tool is named for TMM.</b> On the control-plane daemons, kernel eBPF is
+      already shipped and <span class="inlinecode">bpftrace</span> already authors for it, so the
+      <span class="inlinecode">ctl:</span> side is convenience over an existing path. The TMM side is the part
+      nothing in existence can do. Each probe is <b>three parts</b>:</p>
+    <div class="dsl" aria-label="tmmtrace grammar: which hook, when it fires, what to do">
       <span class="dslpart hook">tmm:&lt;stage&gt;:&lt;event&gt;</span>
       <span class="dslpart pred">/predicate/</span>
       <span class="dslpart act">{ action }</span>
@@ -523,7 +527,7 @@
 
     <div class="switchwrap" id="switch">
       <div class="switchhead">
-        <span class="lbl">dptrace · one hook, two modes</span>
+        <span class="lbl">tmmtrace · one hook, two modes</span>
         <div class="seg" role="group" aria-label="Choose mode">
           <button class="obs" id="obsBtn" aria-pressed="true">observe</button>
           <button class="enf" id="enfBtn" aria-pressed="false">act</button>
@@ -564,8 +568,8 @@
       <b>programmability and observability</b> inside a black box:</p>
     <ul class="unlocks">
       <li><b>Deep observability.</b> Counters, latency histograms, and a flight recorder from inside a
-        kernel-bypassed data plane — summarized with <span class="mono">dptrace</span> or captured byte-for-byte
-        with <span class="mono">dpdump</span>: <em>proposed</em> front-ends, bpftrace and tcpdump for TMM.</li>
+        kernel-bypassed data plane — summarized with <span class="mono">tmmtrace</span> or captured byte-for-byte
+        with <span class="mono">tmmdump</span>: <em>proposed</em> front-ends, bpftrace and tcpdump for TMM.</li>
       <li><b>New logic, telemetry &amp; tuning.</b> Behavior and metrics shipped as bytecode, no TMOS rev — a
         metric you didn't think to collect, or reading internal load to nudge a knob.</li>
       <li><b>In-path control.</b> Steer, sample, rate-limit, or gate a flow on an internal signal — the decision
@@ -666,9 +670,11 @@
       </tbody>
     </table></div>
     <p style="margin-top:.9rem">The control plane reuses the kernel's own verifier; the data plane is the crown
-      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end drives both</b>: you author with <span class="inlinecode">dptrace</span>
+      jewel, where an in-process VM is the <em>only</em> thing that can reach inside TMM's own execution affordably, and act on what it finds. Either way, <b>one front-end can drive both</b>: you author with <span class="inlinecode">tmmtrace</span>
       against a hook by name, and its namespace picks the engine — a <span class="mono">ctl:</span> hook compiles to
-      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL).
+      kernel eBPF (kernel verifier), a <span class="mono">tmm:</span> hook to embedded uBPF (PREVAIL). <b>It is named for
+      TMM because that is the half that needs it</b>: <span class="inlinecode">bpftrace</span> already authors for kernel
+      eBPF, so reaching <span class="mono">ctl:</span> from the same grammar is convenience, not capability.
       (Not one binary for both: a different engine means a different
       <span class="inlinecode">ctx</span> and a different verifier, so retargeting is a re-author, not a rename.)</p>
   </div>

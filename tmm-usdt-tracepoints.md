@@ -31,18 +31,22 @@ The engine is generic; the shield is one application on top of it. The reason a 
 - **Incremental.** Each subsystem owner can instrument their own code in a normal release. The surface grows over time; every new `ctx` field widens what can be **observed, enforced, steered, or distilled into signal** (a hook can only act on what its `ctx` exposes).
 
 > **Consuming a hook.** A few lines of C compiled with `clang -target bpf` — or, with a DSL front-end,
-> a one-liner convenience: `dptrace list 'tmm:l7:*'` to discover, then e.g.
-> `dptrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** would author an
+> a one-liner convenience: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
+> `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** would author an
 > acting program — a `filter`/drop shield, a steer, a sampler — by swapping the action verb; observe and act
 > share the machinery (design §6.1, `big-ip-live-shield-design.md`).
 
-**Two companion utilities — both proposed, neither built.** `dptrace` would be the *summary* consumer — bpftrace-for-the-data-plane: counters, histograms, predicates, shields. `dpdump` would be the *capture* consumer — tcpdump-for-the-data-plane: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both would be thin front-ends over the same in-process VM: **`dptrace : bpftrace :: dpdump : tcpdump`**.
+**Two companion utilities — both proposed, neither built.** `tmmtrace` would be the *summary* consumer — bpftrace-for-the-data-plane: counters, histograms, predicates, shields. `tmmdump` would be the *capture* consumer — tcpdump-for-the-data-plane: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both would be thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
 
-> **On the names, and on what exists.** `dptrace` and `dpdump` are **placeholder names for proposed
+> **On the names, and on what exists.** `tmmtrace` and `tmmdump` are **placeholder names for proposed
 > utilities** — nothing by either name exists, here or in any product, and no invocation shown in this
 > document has ever been run. They are written in imperative CLI form because that is the clearest way to
-> specify an interface, not because there is a binary behind it. Names are deliberately kept free of
-> `tmm` so they are not mistaken for existing TMM components; final naming is a product decision. The
+> specify an interface, not because there is a binary behind it. **The `tmm` prefix is deliberate and
+> says what these are for.** An earlier revision named them `dptrace`/`dpdump` to keep them clear of
+> `tmm` so they could not be mistaken for existing TMM components — redundant, because the sentence
+> above already says nothing by either name exists in any product, and inaccurate, because `dp`
+> ("data plane") scopes the name to half of what the grammar reaches. What keeps these from being read
+> as shipped components is this note, not an evasive name. Final naming is a product decision. The
 > tracepoint *namespace* (`tmm:<stage>:<event>`, §2) does keep the `tmm` prefix — it names hooks in TMM,
 > which is exactly what it should say. Every example invocation and every field name below is a **proposal**
 > against a hook-point catalog that is itself proposed.
@@ -201,7 +205,7 @@ A narrowly-scoped observe program targeting the *exact* hook + condition behind 
 ### 10.5 Combined play — enforce **and** capture
 Pair a `filter` shield with a flight recorder on the *same* condition (e.g. `tmm:l7:parse_error`): the malformed frame is **dropped** (data plane survives) *and* the run-up into the blocked attempt is **captured**. Every block becomes an intelligence source for SIRT (F5's Security Incident Response Team). Only half of that is supported, though: a capture of **blocked** attempts is evidence for "are these real attacks?" and no evidence at all for "is it breaking legitimate traffic?" — the second half needs monitor-mode data over a legitimate-traffic corpus, where the predicate runs and is counted without acting. The two questions need two different datasets, and only one of them comes from enforcing. (**Proposed, not demonstrated in this repo**: arming two programs on one condition is a lifecycle-engine behavior nothing here implements.)
 
-### 10.6 Targeted data capture / streaming — `dpdump`
+### 10.6 Targeted data capture / streaming — `tmmdump`
 Sometimes you don't want a summary, you want **the actual bytes** traversing the proxy. What already exists here: BIG-IP implements **its own capture path**, so `tcpdump -i 0.0` works today, the `:p`/`:n`/`:0.0` suffixes give pre- and post-TMM views of the same flow, and `tcpdump --f5 ssl` exports the session secrets needed to decrypt it offline. What a packet tap at the **interface boundary** cannot give you is **post-parse, post-decrypt state at an arbitrary internal hook** — the parser state variable that was set when the frame was rejected, the header-table size, the plugin queue depth — *alongside* the bytes and correlated to them by construction. That tap has to be **in-process, where the VM already sits.** But the single-threaded, core-pinned poll loop forbids bulk work inline, so the division of labor is strict:
 
 > **The VM selects. The host streams. Nothing blocks the poll loop.**
@@ -217,12 +221,12 @@ Levers that keep it tractable: **target** (one flow, not all), **sample** (1-in-
 
 **Payoff:** in-process at L7 means **decrypted** application data — post-TLS content a wire tap can only reach by exporting the session secrets (`tcpdump --f5 ssl`, which the box will do for you today), which is precisely why the in-process path sits at the **strictest authorization tier** instead: signed, RBAC-gated (role-based access control), redact-by-default, time-boxed, one-way audited sink (substrate §6.3). Those controls are properties of the capability, so what the box can be asked to do is bounded by them rather than by policy alone.
 
-The `dpdump` invocations below are an **interface sketch for a tool that does not exist** (§1, placeholder names):
+The `tmmdump` invocations below are an **interface sketch for a tool that does not exist** (§1, placeholder names):
 
 ```
-dpdump --hook tmm:l7:http_request --filter 'args.method == POST' --snap 256 --ttl 5m --sink file
-dpdump --flow 10.0.0.5:443 --decrypted --snap 512      # decrypted L7 — strict authz tier
-dpdump --hook tmm:tls:record --headers-only            # bounded window, no payload
+tmmdump --hook tmm:l7:http_request --filter 'args.method == POST' --snap 256 --ttl 5m --sink file
+tmmdump --flow 10.0.0.5:443 --decrypted --snap 512      # decrypted L7 — strict authz tier
+tmmdump --hook tmm:tls:record --headers-only            # bounded window, no payload
 ```
 
 Two things about that syntax, so it isn't read as more than it is. **`--flow` is a host-side pre-filter, not a
@@ -232,7 +236,7 @@ and the program compares hashes. And a bare symbol like `POST` resolves against 
 `ctx` field in the per-build hook map** — there is no implicit vocabulary; a field with no declared enum is
 compared as a number.
 
-The VM program is the **selector** (verified inline); `dpdump` (the host) owns the bounded copy + off-loop export. It is deliberately distinct from `dptrace`'s scalar summaries — heavier, governed, capture-oriented. *(Proposed. The copy-and-drain path it depends on is specified in [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) and is likewise unbuilt — a written ring protocol, not a measured one.)*
+The VM program is the **selector** (verified inline); `tmmdump` (the host) owns the bounded copy + off-loop export. It is deliberately distinct from `tmmtrace`'s scalar summaries — heavier, governed, capture-oriented. *(Proposed. The copy-and-drain path it depends on is specified in [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) and is likewise unbuilt — a written ring protocol, not a measured one.)*
 
 ---
 

@@ -2,7 +2,7 @@
 
 ### How data leaves the embedded VM: a per-core, single-producer, shared-memory ring — the host emits, the program only signals
 
-**Status:** Proposal / design · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (§10.6 `dpdump` is the behavioral spec this implements), [`data-plane-intelligence.md`](data-plane-intelligence.md) (**strategy annex, not part of the current ask** — its host-owned one-way sink builds on this primitive), [`substrate/`](substrate/) (candidate ABI artifacts + checkers)
+**Status:** Proposal / design · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (§10.6 `tmmdump` is the behavioral spec this implements), [`data-plane-intelligence.md`](data-plane-intelligence.md) (**strategy annex, not part of the current ask** — its host-owned one-way sink builds on this primitive), [`substrate/`](substrate/) (candidate ABI artifacts + checkers)
 **Audience:** TMM core engineering, data-path performance
 
 ---
@@ -14,7 +14,7 @@
 
 ## 1. The problem
 
-The embedded uBPF VM runs **inline in TMM's poll loop** — a core-pinned, single-threaded, kernel-bypass run-to-completion loop that never syscalls for traffic. That is what makes TMM fast, and it is exactly why moving data *out* of it is the hard part. Observability, RCA, and capture all need to get something — a `ctx` sample, an event, a window of actual bytes — from **inside the hot path** to an **out-of-TMM consumer** (`dptrace` summaries, `dpdump` captures — both **proposed** front-ends under placeholder names, `tmm-usdt-tracepoints.md` §1 — off-box export, an in-situ feature sink) **without ever stalling forwarding**.
+The embedded uBPF VM runs **inline in TMM's poll loop** — a core-pinned, single-threaded, kernel-bypass run-to-completion loop that never syscalls for traffic. That is what makes TMM fast, and it is exactly why moving data *out* of it is the hard part. Observability, RCA, and capture all need to get something — a `ctx` sample, an event, a window of actual bytes — from **inside the hot path** to an **out-of-TMM consumer** (`tmmtrace` summaries, `tmmdump` captures — both **proposed** front-ends under placeholder names, `tmm-usdt-tracepoints.md` §1 — off-box export, an in-situ feature sink) **without ever stalling forwarding**.
 
 This document specifies the egress primitive. It deliberately does **not** solve program-directed capture or program-reachable state — those need helpers and are Phase 2 (§7).
 
@@ -71,13 +71,13 @@ TMM is kernel-bypass DNA, so the **nearest idiom is DPDK**, not the kernel-eBPF 
 **Classes** decide how a record is *shaped*:
 
 - **Event ring — fixed-slot.** For `ctx` samples, counter/histogram feeds, small events. One fixed record size per ring, power-of-two slots, `producer_pos` — and, on a `STREAM` ring, `consumer_pos` — as monotonic **slot indices** masked into the slot array. Because the positions count slots rather than bytes, this class is **not** libbpf-drainable (§6).
-- **Capture ring — variable-length.** For `dpdump` byte-windows. Length-prefixed records in the **kernel-ringbuf byte-layout** (8-byte header: `u32 len` + BUSY/DISCARD bits, `u32` reserved/aux; 8-byte-aligned payload; pow2 data area with wraparound by mask), with byte positions. This is the only class for which the libbpf option in §6 arises (§4, §6).
+- **Capture ring — variable-length.** For `tmmdump` byte-windows. Length-prefixed records in the **kernel-ringbuf byte-layout** (8-byte header: `u32 len` + BUSY/DISCARD bits, `u32` reserved/aux; 8-byte-aligned payload; pow2 data area with wraparound by mask), with byte positions. This is the only class for which the libbpf option in §6 arises (§4, §6).
 
 **Policies** decide what happens when the ring is *full*. Policy is a **per-ring property declared at ring creation**, orthogonal to class, and the two policies are mutually exclusive because they want opposite things:
 
 | Policy | On full | Loss reporting | Consumer position | Used by |
 |---|---|---|---|---|
-| **`STREAM`** | **drop the new record and count it** — never overwrite unconsumed data | `drops` / `drop_bytes` (§5.5) | yes — the drainer publishes `consumer_pos` | live drain: `dptrace` feeds, streaming `dpdump` capture, the feature sink |
+| **`STREAM`** | **drop the new record and count it** — never overwrite unconsumed data | `drops` / `drop_bytes` (§5.5) | yes — the drainer publishes `consumer_pos` | live drain: `tmmtrace` feeds, streaming `tmmdump` capture, the feature sink |
 | **`RECORD`** | **overwrite the oldest record** | none — loss is the design, not an anomaly; the ring instead reports the window it holds | none — the producer never consults a reader | the **flight recorder** (`tmm-usdt-tracepoints.md` §10.1): a rolling window of recent records, frozen and dumped on a trigger |
 
 A flight recorder **requires** overwrite-oldest: the reason it exists is that its dump holds the **run-up into the fault**. A recorder that drops-and-counts when full stops recording at the moment it fills, so its dump contains the *oldest* records — the state of the box long before the incident. Conversely a streaming ring must never overwrite, because a consumer draining for export cannot have records pulled out from under it mid-read. Assigning one fixed-slot ring to both roles under one "never overwrite unconsumed data" rule makes the recorder useless, which is why the rule is now stated per policy: **§5.5's drop-and-count applies to `STREAM` only.** §5.4's reserve/commit protocol is shared, with the per-policy differences called out step by step.
@@ -185,7 +185,7 @@ Wakeup is a **`STREAM`** concern only. A `RECORD` ring has no standing drainer t
 
 ## 6. Consumer ABI — the one deliberate compatibility choice
 
-**Capture-ring** records (§5.1) use the **kernel BPF-ringbuf byte-layout** (len+bits header, 8-byte alignment, pow2 data), so a stock libbpf `ring_buffer` consumer can be pointed at those pages if we ever want an off-the-shelf drainer — bpftime proves this works at the byte level. **But we do not adopt libbpf's fd+`epoll` transport**; our drainer maps the shm arena directly. Byte-layout compatible, transport ours. This keeps the ecosystem-reuse option open (fits `dpdump : tcpdump :: dptrace : bpftrace`) at zero hot-path cost.
+**Capture-ring** records (§5.1) use the **kernel BPF-ringbuf byte-layout** (len+bits header, 8-byte alignment, pow2 data), so a stock libbpf `ring_buffer` consumer can be pointed at those pages if we ever want an off-the-shelf drainer — bpftime proves this works at the byte level. **But we do not adopt libbpf's fd+`epoll` transport**; our drainer maps the shm arena directly. Byte-layout compatible, transport ours. This keeps the ecosystem-reuse option open (fits `tmmdump : tcpdump :: tmmtrace : bpftrace`) at zero hot-path cost.
 
 **Scope the compat claim precisely, though.** Our records carry a `seq`+timestamp **preamble inside the payload** (§5.4), because the 8-byte header has no room for it. A stock libbpf consumer therefore *frames* our records correctly — it walks lengths and bits and hands each record to a callback — but the record contents are **opaque** to it: it does not know the preamble is there, so it cannot interpret `seq`, ordering, or the abandon logic. Compatibility is at the **framing level**, not the record level. That is enough for "point an existing tool at these pages and get records out," and not enough for "an existing tool understands our records." §8 keeps the commit-or-not decision open on those terms.
 
