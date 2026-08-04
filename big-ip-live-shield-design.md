@@ -693,6 +693,17 @@ in a lab TMM with core dumps still readable.
 > closed F5 advisory and its actual patch diff — which is the same
 > work the retrospective coverage study needs (§10.1). An invented CVE number is checkable in minutes,
 > and the rest of the document inherits the doubt.
+>
+> **And one of the four §10.1 conditions is asserted here rather than verified.** Conditions 2, 3 and 4
+> are reasoned through below and hold by construction: the condition is derivable from the entry
+> arguments, the body is skippable, and the rate class admits the budget. **Condition 1 — that
+> `fw_log_prot_transfer_emit` still exists as its own out-of-line body in a real optimised build — has
+> not been checked, because that needs a TMM build and this repo has none.** It is precisely the
+> condition §5.3 says belongs to the optimiser rather than to us: at `-O2` a small logging leaf is a
+> natural inlining candidate, and if it is inlined the usable boundary moves outward to a caller and the
+> safe-return discards more than the log record. So read this example as establishing that a real
+> data-plane bug **can** be expressed as a shield — not as evidence that this particular boundary
+> survives. One `nm` over a shipped `tmm` binary settles it.
 
 **The bug.** TMM's protocol-transfer logging path fetches a listener's log profile and reads its name
 with no NULL check:
