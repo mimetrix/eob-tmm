@@ -614,7 +614,7 @@
       <em>planned</em> surface, and it is where the standing value lives: the metrics, histograms and latency
       breakdowns you want on every box, whose meaning holds across releases. But <b>no catalog anticipates every
       question someone will need to ask three years from now</b> — which is what the second kind is for.</p>
-    <p>The second is a <b>function-boundary probe</b>: attach the verified VM at the <em>entry or return of an
+    <p>The second is a <b>function-boundary probe</b>: attach at the <em>entry or return of an
       existing named function</em> — any function that survived the build as its own out-of-line body — reading
       that function's arguments, resolved by the host into the <span class="inlinecode">ctx</span>. It rides the code's <b>existing structure</b> — functions and their
       signatures — so you can instrument a spot <em>nobody thought of ahead of time</em>, with no new

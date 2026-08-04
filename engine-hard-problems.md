@@ -293,6 +293,23 @@ and §3.2 is the concurrency model the fourth and fifth rows rest on.
 Every cost and safety argument in this register is written for **one program at one hook**. The
 moment two are armed, five things appear that no single-hook analysis covers.
 
+**0. What "one VM" and "many VMs" actually mean, because the wording invites a wrong picture.** uBPF's
+`struct ubpf_vm` holds **one program**: `insts`, `num_insts` and `jitted` are all singular
+(`ubpf/vm/ubpf_int.h`). With one program per hook, that means **one VM per armed hook** — not per
+catalogued hook, and not per core. A catalog of two hundred tracepoints with three shields loaded is
+three VMs. What a VM costs is **memory** — the struct, the bytecode, the JIT'd code buffer — not a
+thread, a stack, or a scheduling context, and a VM whose program is never called costs nothing at
+runtime. **Nor is the VM on the hot path at all.** `ubpf_compile` is called once at load and returns a
+native function pointer; `hook_slot` stores that pointer (`shield_jit_fn`,
+[`substrate/shield_abi.h`](substrate/shield_abi.h)) and the trampoline calls it directly. No bytecode is
+walked and no VM object is dereferenced per packet. The JIT'd code is shared read-only across cores;
+what is per-core is the **scratch stack** passed as `ubpf_jit_ex_fn`'s third and fourth arguments —
+which is why the extended JIT form is the required one. **Open:** whether the VM set is per address
+space or per TMM instance, because if instances are separate processes the count and the memory both
+multiply by instance — the same shared-mapping question that selects the arm/disarm form
+([`development-scope.md`](development-scope.md) §1 item 2), and the reason memory accounting is on the
+loader handler's list.
+
 **1. One program per hook, and say so.** `struct hook_slot` holds a single `shield_jit_fn`, so
 overwriting it in `trampoline_arm(slot, fn, mode)` is the structurally easy behaviour and the wrong
 one: it **silently replaces a live shield**, disarming a mitigation an operator believes is running,
