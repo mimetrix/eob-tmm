@@ -602,14 +602,30 @@ four things still have to hold:
    frames, is not reachable from the entry arguments of the function that faults. What you need is a
    boundary *downstream* of where the condition becomes determinable and *upstream* of the fault — and
    that window may contain no function boundary at all.
+   **An earlier version of this condition reasoned only about entry probes, which overstated it.** Hook
+   points are declared at function **entry *and* exit** (§5.1, §6.1), and an exit probe sees what the body
+   produced — so a condition constructed inside body *B* is visible at *B*'s return, and usable if the
+   fault is downstream in a later call. The residue is therefore narrower than "the body constructs it":
+   it is **the condition becoming determinable and the fault occurring inside the same body**, with the
+   condition not derivable from that body's entry arguments. Entry is too early and exit is too late, and
+   only a probe *inside* the body would sit in the window — which is a designed-in tracepoint, and needs
+   the **stage** to have been anticipated, not the bug.
 3. **A safe outcome has to exist there** — the skippability gate of §6.1, or a clean upstream flow reset.
    A boundary that exposes the condition perfectly but cannot be skipped or aborted is not a `filter`
    point.
 4. **The budget has to allow it** at that boundary's rate class, read as structure ∧ adversarial
    reachability (§11). This one is a policy block rather than an impossibility, but it is a real block.
 
-Two whole classes sit outside regardless: **hardware-offloaded flows** (§10, item 2 above), and anything at
-all before **the enabling build ships** — the mechanism itself rides one release train, once.
+Two classes sit outside, and only the second is absolute. **Anything before the enabling build ships** is
+out with no remedy — the mechanism itself rides one release train, once. **Hardware-offloaded flows** are
+out only in the narrow sense: a flow already executing in ePVA/FPGA leaves no software trace and the
+accelerator's own logic has nothing to hook. But the *offload decision* is TMM software, and
+[`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) §3 already declares `tmm:hw:offload_decision` as an
+**act-capable** hook. If that holds, a program there can **decline acceleration** and pull matching flows
+into the software path, where the rest of the mechanism applies — so the exclusion is *flows already in
+silicon*, not offloaded traffic as a class. Two honest limits on that: whether the decision is overridable
+in TMM is an F5 fact this document does not have, and pulling a large share of traffic off the accelerator
+has a capacity cost that could itself be the outage, so it is a targeted move rather than a broad one.
 
 **And the honest position on coverage is that we do not know the fraction.** Nobody has taken a set of
 real, published F5 data-plane advisories and asked, per CVE, whether conditions 1–4 hold — which is why
