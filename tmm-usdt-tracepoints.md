@@ -70,8 +70,8 @@ The engine is generic; the shield is one application on top of it. The reason a 
 |---|---|---|---|---|
 | `tmm:nic:ring` | `dir, ring_id, ring_full_events, no_buf, hsb_backpressure` | ingress/egress ring occupancy and no-buffer events | **the first question on any drop report** — were the drops in the ring, in HSB (high-speed bridge) backpressure, or in software? | hot (sampled per *K* iterations) |
 | `tmm:cmp:disagg` | `hash_inputs, chosen_tmm, redirected, reselect_reason` | DAG hash distribution across instances | uneven per-instance counts (the reason every aggregate here is per-instance); redirect/reselect storms | hot |
-| `tmm:hw:offload_return` | `outcome (completed/escalated/error), err, flow_key_hash` | what came back from the accelerator, and why a flow was handed back | escalation storms, accelerator error paths — where crash bugs concentrate — and reconciling a flow's software-visible history with its accelerated span | hot |
 | `tmm:hw:offload_decision` ◆ | `decision (accelerate/escalate/reject), reason, flow_key_hash` | share of flows accelerated vs. escalated to software | **what the rest of this catalog didn't see** — an accelerated flow leaves no further software trace; also why a shield's counters can read zero | warm |
+| `tmm:hw:offload_return` | `outcome (completed/escalated/error), err, accel_us, flow_key_hash` | what came back from the accelerator, and why a flow was handed back | escalation storms, accelerator error paths — where crash bugs concentrate — and reconciling a flow's software-visible history with its accelerated span | hot |
 | `tmm:l4:conn_new` | `saddr_hash, dport, proto, flags` | new-flow rate, PPS, port spread | SYN-flood onset; scan/`saddr` fan-out; conn-table fill rate before exhaustion | *warm* (per connection) → **hot** (unauthenticated SYN rate) |
 | `tmm:l4:conn_state` ◆ | `old_state, new_state, dport` | TCP-state distribution | state-machine anomalies; half-open growth | *warm* (per transition) → **hot** (the first transition fires at unauthenticated SYN rate, as `conn_new` does) |
 | `tmm:l4:rst_send` / `tmm:l4:rst_recv` | `rst_reason (send only), dir, old_state, dport, flow_key_hash` | RST rate by enumerated internal cause | **"why is BIG-IP resetting my connection?"** — the enumerated cause is only knowable inside TMM | *cold* → **hot** (RST storms are attacker-driven) |
@@ -194,7 +194,7 @@ A host-owned per-CPU **ring** of recent `ctx` records at a hook, **frozen and du
 - **Global tripwire** — cross-cutting state (poll jitter, pool pressure), dumped on `tmm:rt:poll_stall` / `tmm:rt:watchdog`.
 
 ### 10.2 Per-flow latency breakdown
-Timestamp fields (`ms_elapsed`, `latency_us`, `rtt_us`, `elapsed_us`, `duration_us`) across ordered stage hooks — `tmm:l4:conn_new` → `tmm:tls:handshake_done` → `tmm:l7:http_request` → `tmm:bd:ipc_request`/`ipc_verdict` → `tmm:lb:member_select` → `tmm:srv:response`. The host differences them into a **per-stage latency profile** for a target flow/tenant, on demand — answering "where did the latency go?" *inside* TMM, per stage. The named stages above are the readable default; `tmm:rt:filter_enter`/`filter_exit` (§9) generalize the same breakdown to **every** filter in the stack, so the profile is not limited to a hardcoded list.
+Timestamp fields (`ms_elapsed`, `latency_us`, `rtt_us`, `elapsed_us`, `duration_us`, `accel_us`) across ordered stage hooks — `tmm:l4:conn_new` → `tmm:tls:handshake_done` → `tmm:l7:http_request` → `tmm:bd:ipc_request`/`ipc_verdict` → `tmm:lb:member_select` → `tmm:srv:response`. The host differences them into a **per-stage latency profile** for a target flow/tenant, on demand — answering "where did the latency go?" *inside* TMM, per stage. The named stages above are the readable default; `tmm:rt:filter_enter`/`filter_exit` (§9) generalize the same breakdown to **every** filter in the stack, so the profile is not limited to a hardcoded list.
 
 ### 10.3 Error-branch tripwire
 Arm `tmm:l7:parse_error` / `tmm:tls:decrypt_err` / `tmm:plugin:degrade` as **conditional recorders**: they begin capturing once a leading indicator appears, and freeze on the fault. This is the "record only when something is starting to go wrong" discipline — but note what it does *not* buy. On benign traffic these branches are quiet, so the standing cost is near zero; under the attack they exist to catch, the same branches run at attacker rate, which is exactly when the recorder is armed. So the program at an error-branch hook is budgeted **`hot`** (§2), the capture carries a sampling divisor, and the recorder degrades by dropping samples rather than by borrowing cycles from the poll loop.
@@ -240,9 +240,52 @@ The VM program is the **selector** (verified inline); `tmmdump` (the host) owns 
 
 ---
 
+### 10.7 Bracketing the accelerator — the one play that needs *both* sides of a hook pair
+
+`tmm:hw:offload_decision` and `tmm:hw:offload_return` are the only entry in this catalog whose value
+comes from the **pair** rather than from either row. They sit on opposite sides of hardware
+(ePVA / FPGA / TurboFlex) that software otherwise cannot see into at all, they carry the same
+`flow_key_hash`, and differencing the host's timestamps across them follows exactly the §10.2
+convention — which is why the return row carries `accel_us`.
+
+**What the pair yields, none of which is available today by any means.** The accelerator's behaviour is
+currently inferred from aggregate counters, never measured per flow:
+
+| | From the pair |
+|---|---|
+| **Residency** | how long a given flow actually spent in silicon, per flow rather than per box |
+| **Escalation rate *with reasons*** | not just how many flows came back, but the `reason` distribution behind the decision — which is what makes an escalation rise diagnosable rather than merely visible |
+| **Error rate out of silicon** | the `err` field on return. Accelerator error and completion paths are where crash bugs concentrate, and they are software |
+| **A denominator for every other hook** | how much traffic went to hardware is what makes a zero count elsewhere in this catalog interpretable — "no attempts", "handled in hardware" and "wrong TMM instance" stop being conflated (design §10) |
+
+**The two sides have different rate classes, and that decides where work may happen.** The **decision**
+is `warm` — once per flow — so it can afford a predicate, and it is marked ◆ because it sits at a clean
+decision point. The **return** is `hot`, so what belongs there is recording a timestamp and a key, not
+computing on them. A play that tries to reason on the return side has misread the budget.
+
+**Two things the decision side can do that observation cannot.**
+
+- **Decline acceleration to buy inspection.** `STEER` at the decision means *do not accelerate this
+  flow*, which pushes a chosen flow class onto the software path where every other hook in this catalog
+  applies. That is how a flow that was structurally invisible becomes shieldable — a
+  throughput-for-visibility trade, priced per flow class rather than taken globally (design §10).
+- **See escalation-forcing while it is forming.** Offload eligibility depends on flow characteristics, so
+  an attacker who crafts reliably *ineligible* traffic converts an accelerated appliance into a
+  software-only one. That is a **capacity** attack rather than a memory-safety one, the same shape as
+  using fragmentation to defeat a fast path (`tmm:l4:frag`), and today it is invisible — the box simply
+  gets slow with nothing to say why. The shift shows up here as a moving escalate-vs-accelerate ratio
+  *and* a moving reason distribution, which is a judgement a `warm` program can make and a static
+  counter cannot.
+
+**What this does not reach, stated so the pair is not over-read.** A flow's **contents** while it is in
+silicon stay invisible: bracketing the box measures the box, it does not look inside. A bug **in** the
+silicon, or in a pure-L4 vector that stays fully offloaded, still needs a firmware/FPGA fix. Whether the
+offload decision is overridable in TMM at all is an F5 fact this document does not have. And declining
+acceleration broadly would itself be the outage, so it is a targeted instrument, not a switch.
+
 ## 11. Suggested first set (highest leverage, with the exposure stated per item)
 
-If the team lands a handful first, these give the most RCA value for the least exposure. All five are
+If the team lands a handful first, these give the most RCA value for the least exposure. All six are
 **observe-mode** to begin with; the mix of rate classes is stated rather than smoothed over, because it decides
 what runtime machinery each one needs:
 
@@ -251,6 +294,13 @@ what runtime machinery each one needs:
 3. `tmm:bd:ipc_verdict` — `bd` round-trip latency and verdict mix at the IPC boundary, `warm`. Note this is **telemetry, not a shield target** (§6).
 4. `tmm:tls:clienthello` — fingerprint clustering plus malformed-ClientHello detection ahead of the earliest iRule event, `warm`.
 5. `tmm:l7:http2_frame` — HTTP/2 stream/frame stats covering the Rapid-Reset-style abuse family. This one is **`hot` (per frame)** and therefore the one that carries a measured per-invocation budget and the runtime guard; it is in the first set because the abuse family justifies it, not because it is cheap. Drop it if the guard is not ready.
+
+6. `tmm:hw:offload_decision` + `tmm:hw:offload_return` — the accelerator bracket (§10.7). `warm` on the
+   decision side, `hot` on the return, where the work is a timestamp and a key rather than a computation.
+   **It is in this list for a reason that is not its own RCA value:** on offload-capable hardware, a zero
+   count from any of items 1–5 is ambiguous until something says how much traffic went to silicon, so this
+   pair conditions the interpretability of the other five rather than merely adding to them. On BIG-IP VE,
+   with no offload, that argument does not apply and this drops to last.
 
 Each is a `ctx` definition plus a call site — no verifier *extension* (stock PREVAIL under its existing
 `tracing` type), no helper ABI; the `ctx` descriptor is the real, bounded work. **"No VM change" holds only for
