@@ -451,6 +451,19 @@ high-assurance builds — with F5 SIRT sign-off gating implementation, not follo
 
 ## 5. Further TMM-specific concerns
 
+**Read this list with its severity in mind, because thirteen equal-looking bullets overstate the risk.**
+Exactly one is both unavoidable and hard — **the safe point**, needed for any dynamic load into a running
+TMM whatever the hook kind. Two are not open questions: keeping the verifier out of TMM is a decision
+already taken, and the concurrency item records a property that is the reason three other things are
+simple. Four are ordinary lifecycle and governance work. One is scope-dependent, biting only on
+per-packet hooks. Certification has the best existing answer, since BIG-IP already runs customer TCL and
+WASM inline on evaluated appliances, so code outside the validated image is not a new question and only
+the JIT is novel. And **four exist only because function-boundary probes are on the table** — the
+build-specific probe context, the optimiser deciding the hookable set, the unwind information a
+trampoline needs, and the JIT's maturity. Take the narrowest form, designed-in call sites only (outcome 3
+of the measurement in [`design-review-findings.md`](design-review-findings.md) §4), and those four go away
+along with live-text patching: what remains is the safe point, certification, and the ordinary work.
+
 - **Item zero — the safe point itself.** Every in-TMM item above assumes "a safe point between
   poll-loop iterations that dequeues and processes a load request." That does not exist in TMM today.
   Building it means a per-instance message queue reachable from the config channel, **a new check in
