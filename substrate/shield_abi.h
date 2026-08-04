@@ -94,6 +94,7 @@ enum shield_err {
     SHIELD_ERR_MASKED   = -13, /* would be unreachable behind another armed hook */
     SHIELD_ERR_ARMEDCOST= -14, /* global armed-cost ceiling would be exceeded    */
     SHIELD_ERR_TRUNC    = -11, /* prog_len disagrees with the received length   */
+    SHIELD_ERR_WX       = -15, /* text left WRITABLE — re-protect failed        */
 };
 
 /* What the signature covers — the binding, not just the bytecode (step 9). A

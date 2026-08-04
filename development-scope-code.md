@@ -341,11 +341,27 @@ int trampoline_arm(struct hook_slot *slot, shield_jit_fn fn, int mode)
 
     int rc = encode_jump(slot->entry, slot->pad_len, (void *)tramp_entry_for(slot));
 
-    tmm_text_make_writable(slot->entry, SHIELD_PAD_MAX, 0);
+    /* Re-protect, and DO NOT swallow the result. An earlier draft dropped this
+     * return value on both paths. A failed re-protect leaves TMM's text
+     * writable for the life of the process — a permanent W^X hole in the
+     * crown-jewel process, and a worse outcome than never arming at all. It
+     * also cannot be reported by returning failure alone: by this point the
+     * bytes have landed and the hook IS armed, so an error return would be a
+     * lie about the machine's state. Hence a distinct code, and an escalation
+     * the caller cannot ignore.
+     * TODO(f5): whether that escalation is a fatal abort or a loud audit record
+     * plus a degraded-mode flag is a TMA decision, not this sketch's. */
+    int wx = tmm_text_make_writable(slot->entry, SHIELD_PAD_MAX, 0);
 
     if (rc != 0) {
         slot->fn = NULL;                        /* leave it DARK — never half-armed */
-        return SHIELD_ERR_HOOK;
+        return wx != 0 ? SHIELD_ERR_WX : SHIELD_ERR_HOOK;
+    }
+    if (wx != 0) {
+        /* Armed, and the page is still writable. Report the page, not the arm. */
+        tmm_broadcast_isb();
+        slot->armed = 1;
+        return SHIELD_ERR_WX;
     }
 
     tmm_broadcast_isb();                        /* every core sees the new text */
@@ -363,10 +379,12 @@ int trampoline_disarm(struct hook_slot *slot)
     if (tmm_text_make_writable(slot->entry, SHIELD_PAD_MAX, 1) != 0)
         return SHIELD_ERR_HOOK;
     restore_nops(slot->entry, slot->pad_len);   /* TODO(f5): per-arch nop fill */
-    tmm_text_make_writable(slot->entry, SHIELD_PAD_MAX, 0);
+    int wx = tmm_text_make_writable(slot->entry, SHIELD_PAD_MAX, 0);
 
     tmm_broadcast_isb();
     slot->fn = NULL;
+    if (wx != 0)
+        return SHIELD_ERR_WX;                   /* detached, but text still writable */
     /* fired[] is deliberately NOT cleared: the evidence outlives the shield. */
     return SHIELD_OK;
 }
@@ -375,6 +393,9 @@ int trampoline_disarm(struct hook_slot *slot)
 **Real:** the ordering discipline (publish payload → patch → sync → mark armed; and its exact
 reverse), and the fail-dark rule.
 **Stubbed:** `tmm_broadcast_isb`, `tmm_text_make_writable`, `tramp_entry_for`, `restore_nops`.
+**`SHIELD_ERR_WX` is a real code** ([`shield_abi.h`](substrate/shield_abi.h)), so "armed but the page
+is still writable" is distinguishable from "failed to arm" — two conditions an earlier draft of this
+sketch collapsed by discarding both re-protect return values.
 **TODO(f5):** the per-arch encoders, and calibrating `SHIELD_PAD_MAX` — it is declared in
 `shield_abi.h` with a placeholder, and the per-hook truth is `patchable_pad_bytes` in the signed hook
 map. Whether W^X can be relaxed
