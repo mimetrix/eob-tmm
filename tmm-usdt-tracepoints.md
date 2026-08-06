@@ -173,47 +173,43 @@ view exists in no other surface on the box.
 | `tmm:rt:filter_enter` / `tmm:rt:filter_exit` | `filter_id, flow_key_hash, elapsed_us (exit only)` | per-filter occupancy of the stack | **per-filter latency attribution** — TMM *is* a filter stack, and without these the §10.2 stage breakdown is hardcoded to a handful of named hooks | hot |
 | `tmm:rt:mem_pool` | `pool_id, in_use, high_watermark` | memory-pool pressure | leak run-up; pre-OOM forensics | warm (a **periodic sample** at a stated interval, not an event) |
 | `tmm:rt:alloc_fail` | `subsystem, pool_id, obj_class (packet buffer / connflow / handle), size, in_use` | allocation-failure rate by requester | the data-plane-relevant failure: *which* subsystem failed to get *which* object, not just that some pool had failures | *cold* (per failure) → **hot** (under a resource-exhaustion flood, failing is the steady state) |
-| `tmm:rt:loop_budget` | `iter_us, work_units, deferred_queue_depth, idle_us` | where an iteration's time went | starvation, a stage monopolising the loop, deferred work backing up | hot per iteration — emit under a stated sampling divisor |
+| `tmm:rt:loop_budget` | `iter_us, work_units, idle_us, source_id, ready_remaining, deferred_queue_depth, deferred_oldest_us` | where an iteration's time went, **by source** | starvation, a stage monopolising the loop, deferred work backing up. `ready_remaining` is the part a total hides: work that was ready and did not get serviced this pass. And `deferred_oldest_us` beside the depth, because depth alone misleads — a queue serviced unfairly holds a flat depth while its oldest item ages without bound | hot per iteration — emit under a stated sampling divisor |
 | `tmm:rt:watchdog` ◆ | `subsystem, elapsed_ms, reason` | watchdog events | **emergency-mode trigger** — freeze the flight recorder on watchdog fire | cold |
 | `tmm:rt:tclvm` | `rule_id, event_id, depth, exec_us` | TCL-VM execution stats per rule and event | **attribute a stall to a specific iRule** — the runaway-rule case the proposal cites as an argument needs the rule and event identity, not just an aggregate; also shield a CVE in the TCL VM itself | warm |
 
-### 9.1 The scheduler itself — four things the rows above cannot answer
+### 9.1 The scheduler — two emissions the rows above cannot carry
 
-`tmm:rt:loop_budget` says an iteration took *n* microseconds and did *m* work units. That is a scalar where
-the interesting shape is a **decomposition**, and the four gaps below are all cases where a total and a
-distribution differ in the only way that matters. TMM's poll loop is **run-to-completion and
-non-preemptive**, which is what makes it fast and is also why a single long work unit is not a slow request
-but an outage for everything sharing that core. A total cannot see that coming; a distribution can.
+Most of what observing the scheduler needs is **fields on `tmm:rt:loop_budget`**, and they have been added
+to it above rather than given hooks of their own: a `source_id` breakdown, `ready_remaining`, and
+`deferred_oldest_us` beside the depth. An earlier revision of this section proposed separate
+`tmm:sched:source` and `tmm:sched:defer_age` tracepoints for exactly those, which was wrong in the way this
+catalog is most easily wrong — two hooks carrying one signal at one rate class, the mirror of the
+`mem_pool.fails` conflation noted at the end of this section.
+
+What genuinely cannot ride `loop_budget` is anything at a **different rate class**, and there are two. The
+poll loop is **run-to-completion and non-preemptive**, which is what makes it fast and also why a single
+long work unit is not a slow request but an outage for everything sharing that core — and a per-iteration
+total cannot see that coming.
 
 | Tracepoint | `ctx` (typed fields) | Observe | Debug / RCA | path_class |
 |---|---|---|---|---|
-| `tmm:sched:source` | `source_id, work_units, elapsed_us, ready_remaining` | which **source** consumed the iteration — rings, timers, IPC, config, deferred queue | "the loop is busy" becomes "the loop is busy *doing what*". `ready_remaining` is the part that matters: work that was ready and did not get serviced this pass | *hot* per source per iteration — emit under a stated sampling divisor |
 | `tmm:sched:work_unit` | `kind, elapsed_us, flow_key_hash` | the **distribution** of single work-unit durations | the tail is the risk under run-to-completion, and it grows long before it crosses `poll_stall`'s threshold. A p99.9 that is drifting is the early warning a threshold cannot give | *hot* — sampled |
-| `tmm:sched:defer_age` | `oldest_wait_us, queue_depth, drained_this_iter` | how long deferred work has actually **waited** | depth alone is misleading: a queue serviced unfairly holds a flat depth while its oldest item ages without bound. Age is the honest metric, depth is the convenient one | *warm* (once per iteration) |
 | `tmm:sched:hook_cost` ◆ | `hook_id, invocations, cycles, iter_us` | the **engine's own cost** as a fraction of the iteration it runs in | the measurement every budget in this proposal is currently an assumption about — see §9.2 | *hot* — sampled, and see the observer-effect note |
 
-### 9.2 Why the last one is different: the engine can measure the loop it runs in
+### 9.2 The observer effect, which applies here and nowhere else in this catalog
 
-Every per-hook budget in this proposal — `hot` at hundreds of nanoseconds, `warm` per connection, `cold` per
-exceptional event — is **an assumption until someone measures an iteration's time decomposition on real
-traffic**. That decomposition exists in exactly one place: inside the poll loop, at a point that knows both
-how long the iteration took and how much of it a given hook consumed. No external tool can produce it,
-because from outside the loop there is no iteration boundary to measure against.
+That the engine ends up instrumenting the loop it runs in, and that this makes the budgets measurable rather
+than guessed, is argued in [`engine-hard-problems.md`](engine-hard-problems.md) §1 and not restated here.
+`tmm:sched:hook_cost` is the hook that claim needs and previously lacked a name for. What is worth adding is
+the cost of *this* measurement specifically, because it is the one case where instrumentation is **not**
+conditional.
 
-So `tmm:sched:hook_cost` closes a loop the rest of this document leaves open: the engine's cost stops being
-a number the proposal asserts and becomes a number the box reports. It also inverts the usual objection.
-"You cannot add a hook without knowing what it costs" is correct — and the hook is what tells you.
-
-**Two honesty notes, because this is the one place instrumentation is not conditional.**
-
-- **The observer effect is real here and nowhere else in this catalog.** Every other hook is dark until
-  armed. A hook *at the iteration boundary* is measuring the thing it is part of, so its own cost is inside
-  the number it reports. That is manageable — measure the empty iteration first, subtract, and state the
-  residual — but it must be stated rather than assumed away, and it is why these rows carry a **sampling
-  divisor** rather than firing every iteration.
-- **A sampling divisor is fine here for the same reason it is useless for enforcement** (§1): a cost
-  distribution is exactly the kind of claim sampling supports, whereas you cannot block one in N instances
-  of an exploit. The two uses of the same lever are not comparable, and this is the use it suits.
+Every other hook here is dark until armed. A hook *at the iteration boundary* is measuring the thing it is
+part of, so its own cost sits inside the number it reports. That is manageable — measure the empty iteration
+first, subtract, state the residual — but it has to be stated rather than assumed away, and it is why both
+rows above carry a **sampling divisor** instead of firing every iteration. A divisor is the right lever for
+a cost distribution and the wrong one for enforcement, for the reasons given in
+[`engine-hard-problems.md`](engine-hard-problems.md) §1.
 
 Splitting the old `mem_pool.fails` field out into `tmm:rt:alloc_fail` also fixes a rate conflation: `in_use`
 and `high_watermark` only make sense as a **periodic sample**, while a failure is a **per-event** emission.
