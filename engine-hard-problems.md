@@ -110,7 +110,11 @@ ahead of time, but *how long* they take is not.
 **And the budgets are measurable rather than guessed.** Setting a per-hook budget, and catching one at
 risk, is itself an *observability* task, and it is what a few **designed-in USDTs** (user
 statically-defined tracepoints) would expose: per-iteration poll-loop duration (`tmm:rt:poll_iter`),
-per-hook execution cost, and a stall/overrun tripwire (`tmm:rt:poll_stall`). The engine ends up
+per-hook execution cost (`tmm:sched:hook_cost`), and a stall/overrun tripwire (`tmm:rt:poll_stall`) —
+and note that the middle one is the measurement every budget in this document is currently an
+*assumption* about. An iteration's time decomposition exists only inside the poll loop, because from
+outside it there is no iteration boundary to measure against, which is why the hook is what tells you
+what the hook costs ([`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) §9.2). The engine ends up
 **instrumenting the loop it runs in** — the same surface that makes this problem tractable is the
 observability capability the engine exists to provide.
 
