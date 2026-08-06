@@ -10,9 +10,11 @@
 CC     ?= cc
 PYTHON ?= python3
 
-.PHONY: check check-header check-schema check-offsets check-budget check-gates clean
+.PHONY: check check-header check-schema check-offsets check-budget check-gates \
+        check-skeletons check-geometry gate clean
 
-check: check-header check-schema check-offsets check-budget check-gates
+check: check-header check-schema check-offsets check-budget check-gates \
+       check-skeletons check-geometry
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -45,5 +47,26 @@ check-budget:
 check-gates:
 	@$(CC) -I. -o .gates.out check_sr_gates.c && ./.gates.out; rc=$$?; rm -f .gates.out; exit $$rc
 
+# The skeletons in ../development-scope-code.md, actually handed to a compiler.
+# They are the exemplar an engineer reads for the shape of each item, and until
+# this target existed no compiler had read them — which is how the JIT typedef
+# came to be the 2-arg basic form while the design needs the 4-arg extended one.
+# A block may opt out with a `not-compiled:` reason, and opting out is reported,
+# never silent.
+check-skeletons:
+	@$(PYTHON) ./check_skeletons.py
+
+# Item 6a: does the verifier's model of the runtime match the runtime? Parsed
+# from the two vendored trees at run time rather than transcribed. Reports;
+# `make gate` is the same check with the exit code a build pipeline needs.
+check-geometry:
+	@$(PYTHON) ./check_vm_geometry.py
+
+# Everything in `check`, plus the standing findings turned fatal. This is what a
+# real admission pipeline would run. It FAILS today, on purpose: item 6a is open.
+gate: check
+	@$(PYTHON) ./check_vm_geometry.py --gate
+
 clean:
 	@rm -f .guard.c .guard.out .gates.out tmp*.c
+	@rm -rf __pycache__

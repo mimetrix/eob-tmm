@@ -1723,6 +1723,10 @@ mode-handling divergence noted below. The form looked like this — now **illust
 and verified by nothing in this repo**:
 
 ```c
+/* not-compiled: the RETIRED form, kept for contrast. It consults ctx->mode and
+ * uses the prototype's LS_* spelling, both of which the product shape rejects
+ * (see the divergence note below). Compiling it would mean defining retired
+ * names, which would undermine the point of showing it. */
 uint64_t ls_decision(void *data)
 {
     struct ls_ctx *ctx = data;
