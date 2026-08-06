@@ -180,8 +180,22 @@
   .bd-brk{stroke:var(--line-2); stroke-width:1; fill:none}
   .bd-blbl{fill:var(--muted); font-family:var(--mono); font-size:9.5px}
   .bd-blbl.hot{fill:var(--warn-ink)}
-  .bd-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:62ch}
+  .bd-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:64ch}
   .bd-cap b{color:var(--ink); font-weight:600}
+  .bd-h{fill:var(--faint); font-family:var(--mono); font-size:9px; letter-spacing:.09em; text-transform:uppercase}
+  .bd-row{fill:var(--surface); stroke:var(--line-2); stroke-width:1.2}
+  .bd-row.hot{stroke:var(--warn); fill:var(--warn-bg)}
+  .bd-div{stroke:var(--line); stroke-width:1; stroke-dasharray:2 3}
+  .bd-fl{fill:var(--ink); font-family:var(--mono); font-size:10px}
+  .bd-fl .off{fill:var(--warn-ink); font-weight:700}
+  .bd-fl .on{fill:var(--ok-ink); font-weight:700}
+  .bd-zl{fill:var(--faint); font-family:var(--mono); font-size:8.5px; letter-spacing:.08em; text-transform:uppercase}
+  .bd-zl.hot{fill:var(--warn-ink)}
+  .bd-rail{stroke:var(--faint); stroke-width:1.2; fill:none}
+  .bd-tick{stroke:var(--line-2); stroke-width:1}
+  .bd-ann{fill:var(--muted); font-family:var(--mono); font-size:9.5px}
+  .bd-ann .k{fill:var(--accent-ink); font-weight:700}
+  .bd-ann .bad{fill:var(--warn-ink); font-weight:700}
 
   /* perimeter schematic */
   .schematic{margin:1.5rem 0 0; font-family:var(--mono); font-size:clamp(.74rem,1.5vw,.88rem); display:grid; gap:.45rem}
@@ -389,50 +403,94 @@
         path</b> is computable: cost it, gate on the budget, load or reject.</figcaption>
     </figure>
     <figure class="bdd">
-      <svg viewBox="0 0 720 154" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline from source to hot path: compile in dev/CI, then verify, budget pass and sign in F5's off-box pipeline, then load on the control plane, then run per packet in the TMM data plane. Only run is per-packet in the poll loop; everything before it is amortized off the data path.">
+      <svg viewBox="0 0 720 458" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The pipeline from source to hot path as six stages, each showing the flags or configuration it is driven by and the artifact it emits. Compile with clang at -O2 targeting bpf emits an ELF object whose SEC name and BTF types matter downstream. Verify with PREVAIL, which assumes a per-subprogram stack of 512 bytes and at most 8 call frames, and whose program type comes from the --section name. Three of its checks are off by default: termination, strict mode, and division-by-zero rejection. It emits a proof of memory safety, and of termination only when asked. The budget pass, driven by a budget of 800 cycles and a per-architecture cost model, emits a worst-case cycle estimate and a fail-closed verdict. Signing, driven by the binding of program hash, hook, build range, mode ceiling, expiry and epoch, emits the signed program, which is the perimeter. Load, driven by op and epoch with the signature checked on the box, emits an armed hook. Run, on uBPF defaults where bounds checking is on but constant blinding and the undefined-behaviour check are off, with a total stack of 8 frames of 512 bytes but a local function frame of 256, emits one outcome from the host&apos;s set, with fuel enforcing the sealed bound. Two cross-stage contracts are called out: the SEC name is the only thing that picks PREVAIL&apos;s program type, and PREVAIL&apos;s assumed 512-byte subprogram stack does not match uBPF&apos;s 256-byte local frame.">
         <defs>
           <marker id="bdah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bd-head"/></marker>
         </defs>
-        <rect class="bd-hot-bg" x="598" y="6" width="118" height="114" rx="6"/>
-        <line class="bd-sep" x1="125" y1="8" x2="125" y2="118"/>
-        <line class="bd-sep" x1="479" y1="8" x2="479" y2="118"/>
-        <line class="bd-hot-line" x1="598" y1="6" x2="598" y2="120"/>
-        <text class="bd-zone" x="66" y="16" text-anchor="middle">dev / CI</text>
-        <text class="bd-zone" x="302" y="16" text-anchor="middle">F5 build + sign · per program</text>
-        <text class="bd-zone" x="538" y="16" text-anchor="middle">control plane · on-box</text>
-        <text class="bd-zone hot" x="657" y="16" text-anchor="middle">data plane · runtime</text>
-        <rect class="bd-node" x="14" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="66" y="53" text-anchor="middle">compile</text><text class="bd-ns" x="66" y="68" text-anchor="middle">author · clang</text>
-        <rect class="bd-node" x="132" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="184" y="53" text-anchor="middle">verify</text><text class="bd-ns" x="184" y="68" text-anchor="middle">PREVAIL</text>
-        <rect class="bd-node" x="250" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="302" y="53" text-anchor="middle">budget pass</text><text class="bd-ns" x="302" y="68" text-anchor="middle">static</text>
-        <rect class="bd-node" x="368" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="420" y="53" text-anchor="middle">sign</text><text class="bd-ns" x="420" y="68" text-anchor="middle">HSM key</text>
-        <rect class="bd-node" x="486" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="538" y="53" text-anchor="middle">load</text><text class="bd-ns" x="538" y="68" text-anchor="middle">attach</text>
-        <rect class="bd-node hot" x="604" y="32" width="104" height="48" rx="8"/>
-        <text class="bd-nt" x="656" y="53" text-anchor="middle">run</text><text class="bd-ns" x="656" y="68" text-anchor="middle">per packet</text>
-        <path class="bd-edge" d="M118,56 L129,56" marker-end="url(#bdah)"/>
-        <path class="bd-edge" d="M236,56 L247,56" marker-end="url(#bdah)"/>
-        <path class="bd-edge" d="M354,56 L365,56" marker-end="url(#bdah)"/>
-        <path class="bd-edge" d="M472,56 L483,56" marker-end="url(#bdah)"/>
-        <path class="bd-edge" d="M590,56 L601,56" marker-end="url(#bdah)"/>
-        <rect class="bd-chip" x="14" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="66" y="102" text-anchor="middle">bytecode</text>
-        <rect class="bd-chip" x="132" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="184" y="102" text-anchor="middle">verified</text>
-        <rect class="bd-chip" x="250" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="302" y="102" text-anchor="middle">+ budget bound</text>
-        <rect class="bd-chip key" x="368" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="420" y="102" text-anchor="middle">signed program</text>
-        <rect class="bd-chip" x="486" y="88" width="104" height="20" rx="5"/><text class="bd-ct" x="538" y="102" text-anchor="middle">on a hook</text>
-        <path class="bd-brk" d="M14,131 L14,126 L590,126 L590,131"/>
-        <text class="bd-blbl" x="302" y="145" text-anchor="middle">amortized — once per program / per build · off the data path</text>
-        <path class="bd-brk" d="M604,131 L604,126 L708,126 L708,131"/>
-        <text class="bd-blbl hot" x="656" y="145" text-anchor="middle">per packet · poll loop</text>
+        <text class="bd-h" x="76" y="32">stage</text>
+        <text class="bd-h" x="212" y="32">flags / configuration &#8212; what drives it</text>
+        <text class="bd-h" x="492" y="32">emits</text>
+        <path class="bd-rail" d="M56,44 L56,414" marker-end="url(#bdah)"/>
+        <rect class="bd-row" x="66" y="44" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="66">compile</text>
+        <text class="bd-ns" x="78" y="83">clang &#183; author</text>
+        <text class="bd-fl" x="212" y="66">-O2  -target bpf  -c  -g</text>
+        <rect class="bd-chip" x="492" y="53" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="67" text-anchor="middle">ELF object</text>
+        <text class="bd-ns" x="599" y="89" text-anchor="middle">SEC() name &#183; BTF types</text>
+        <rect class="bd-row" x="66" y="106" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="128">verify</text>
+        <text class="bd-ns" x="78" y="145">PREVAIL</text>
+        <text class="bd-fl" x="212" y="126">--section &lt;SEC&gt;  --stack-size 512  frames 8</text>
+        <text class="bd-fl" x="212" y="143"><tspan class="off">off:</tspan> --termination  --strict  --no-div-0</text>
+        <rect class="bd-chip" x="492" y="115" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="129" text-anchor="middle">proof: memory-safe</text>
+        <text class="bd-ns" x="599" y="151" text-anchor="middle">terminating only if asked</text>
+        <rect class="bd-row" x="66" y="168" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="190">budget pass</text>
+        <text class="bd-ns" x="78" y="207">static, off-box</text>
+        <text class="bd-fl" x="212" y="188">--budget 800</text>
+        <text class="bd-fl" x="212" y="205">cost model &#183; per architecture</text>
+        <rect class="bd-chip" x="492" y="177" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="191" text-anchor="middle">worst-case cycle estimate</text>
+        <text class="bd-ns" x="599" y="213" text-anchor="middle">pass / fail, closed</text>
+        <rect class="bd-row" x="66" y="230" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="252">sign</text>
+        <text class="bd-ns" x="78" y="269">HSM key</text>
+        <text class="bd-fl" x="212" y="250">binding: prog hash &#183; hook &#183; build range</text>
+        <text class="bd-fl" x="212" y="267">mode ceiling &#183; expiry &#183; epoch</text>
+        <rect class="bd-chip key" x="492" y="239" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="253" text-anchor="middle">signed program</text>
+        <text class="bd-ns" x="599" y="275" text-anchor="middle">the perimeter</text>
+        <rect class="bd-row" x="66" y="292" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="314">load</text>
+        <text class="bd-ns" x="78" y="331">control plane</text>
+        <text class="bd-fl" x="212" y="312">op + epoch, signature checked on box</text>
+        <text class="bd-fl" x="212" y="329">mode: monitor | enforce</text>
+        <rect class="bd-chip" x="492" y="301" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="315" text-anchor="middle">armed hook</text>
+        <text class="bd-ns" x="599" y="337" text-anchor="middle">one program per hook</text>
+        <rect class="bd-row hot" x="66" y="354" width="648" height="54" rx="7"/>
+        <text class="bd-nt" x="78" y="376">run</text>
+        <text class="bd-ns" x="78" y="393">uBPF defaults</text>
+        <text class="bd-fl" x="212" y="374">bounds <tspan class="on">on</tspan> &#183; blinding <tspan class="off">off</tspan> &#183; UB <tspan class="off">off</tspan></text>
+        <text class="bd-fl" x="212" y="391">stack 8&#215;512 &#183; local frame 256 &#183; ext JIT</text>
+        <rect class="bd-chip" x="492" y="363" width="214" height="20" rx="5"/>
+        <text class="bd-ct" x="599" y="377" text-anchor="middle">one outcome from the host&#8217;s set</text>
+        <text class="bd-ns" x="599" y="399" text-anchor="middle">fuel enforces the sealed bound</text>
+        <line class="bd-div" x1="200" y1="44" x2="200" y2="408"/>
+        <line class="bd-div" x1="482" y1="44" x2="482" y2="408"/>
+        <line class="bd-tick" x1="50" y1="44" x2="62" y2="44"/>
+        <text class="bd-zl" x="40" y="69.0" text-anchor="middle" transform="rotate(-90 40 69.0)">dev / CI</text>
+        <line class="bd-tick" x1="50" y1="106" x2="62" y2="106"/>
+        <text class="bd-zl" x="40" y="193.0" text-anchor="middle" transform="rotate(-90 40 193.0)">F5 build + sign &#183; per program</text>
+        <line class="bd-tick" x1="50" y1="292" x2="62" y2="292"/>
+        <text class="bd-zl" x="40" y="317.0" text-anchor="middle" transform="rotate(-90 40 317.0)">control plane</text>
+        <line class="bd-tick" x1="50" y1="354" x2="62" y2="354"/>
+        <text class="bd-zl hot" x="40" y="379.0" text-anchor="middle" transform="rotate(-90 40 379.0)">data plane &#183; per packet</text>
+        <text class="bd-ann" x="66" y="430"><tspan class="k">contract</tspan>  the <tspan class="k">SEC()</tspan> name is the only thing that picks PREVAIL&#8217;s program type &#8212; there is no --program-type flag.</text>
+        <text class="bd-ann" x="66" y="448"><tspan class="bad">contract</tspan>  --stack-size <tspan class="bad">512</tspan> is what the proof assumes; uBPF gives a local function <tspan class="bad">256</tspan>. The two have to agree.</text>
       </svg>
-      <figcaption class="bd-cap"><b>From source to hot path.</b> Everything
-        left of the divider is <b>amortized</b> and off the data path; only <b>run</b> executes per packet, in the
-        poll loop. Separately, each <b>TMOS build</b> emits
-        the config the pipeline consumes: the signed hook-point map, the <span class="mono">ctx</span>/<b>BTF</b>
-        (BPF Type Format) descriptors, the per-hook budget table, the cost model.</figcaption>
+      <figcaption class="bd-cap"><b>From source to hot path &#8212; each stage with the switches that drive it and
+        the artifact it hands on.</b> Only <b>run</b> executes per packet, in the poll loop; everything above it is
+        <b>amortized</b>, once per program or per build, off the data path. Reading the middle column is the point:
+        <b>these are not neutral defaults.</b> PREVAIL ignores termination unless asked, runs without strict mode, and
+        <em>permits</em> division by zero; uBPF ships with constant blinding and the undefined-behaviour check off. So
+        &#8220;verified, JIT&#8221; names a <em>configuration</em>, not a property &#8212; and a configuration has to be
+        stated to be a claim. Every value in that column was read out of
+        <span class="inlinecode">config.hpp</span> and <span class="inlinecode">ubpf.h</span>, not assumed.
+        <p style="margin-top:.6rem">The two <b>contracts</b> at the bottom are where a flag at one stage is an
+        assumption at another. The first is benign and easy to get wrong: with no
+        <span class="inlinecode">--program-type</span> option, the compiler&#8217;s section name is the whole of how the
+        verifier learns what <span class="mono">ctx</span> is. <b>The second is not benign.</b> PREVAIL proves safety
+        against a <b>512-byte</b> per-subprogram stack by default, while uBPF sizes a local function frame at
+        <b>256</b>. Where those two notions line up, a program admitted under the default may use twice the stack the
+        runtime provides &#8212; a proof about a different machine. Whether the notions correspond exactly is worth
+        confirming before anything is built; that the numbers differ is checkable in a minute, and is the kind of seam
+        this diagram exists to make visible.</p>
+        <p style="margin-top:.6rem">Separately, each <b>TMOS build</b> emits the config the pipeline consumes: the
+        signed hook-point map, the <span class="mono">ctx</span>/<b>BTF</b> (BPF Type Format) descriptors, the
+        per-hook budget table, and the cost model the budget pass prices against.</p></figcaption>
     </figure>
     <div class="callout accent"><span class="lbl">the problem is also the pitch</span>
       <p>Setting those budgets is itself an <b>observability</b> problem — exactly what a few <b>designed-in
