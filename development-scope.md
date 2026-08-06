@@ -137,6 +137,20 @@ requirement.
    item** — an earlier draft listed "VM teardown on unload" here, which reads as a call this handler can
    simply make; it cannot, until something establishes that no core is still inside the code being
    freed.
+3a. **VM hardening configuration** *(step 4)* — **small, and it was missing from this list rather than
+   from the design.** uBPF's runtime checks are **per-VM state**, so they take the library's defaults
+   unless the loader sets them. Read from `ubpf/vm/ubpf_vm.c` (`ubpf_create`): bounds check **on**,
+   read-only bytecode **on**, undefined-behaviour check **off**, **constant blinding off**. Blinding is
+   the JIT-spray mitigation — without it a bytecode immediate reaches the JIT'd buffer verbatim, so a
+   program the verifier admits can still place native instruction bytes into an executable mapping
+   inside TMM. Three `ubpf_toggle_*` calls, all real public API, plus the policy decision about what the
+   settings must be and a guard that no VM is ever created without them. **The architecture asymmetry is
+   the real content:** `ubpf.h` states blinding is *"ARM64: Not yet implemented … will have no effect,"*
+   so an aarch64 build has no JIT-spray mitigation at all. That converges with item 15 — fuel is
+   enforceable only in the interpreter — on the same answer: an **interpreter-only high-assurance build**
+   is the stronger aarch64 posture, and choosing it is a build-configuration deliverable rather than a
+   code one.
+
 4. **Signature verification in TMM** *(steps 3, 10)* — checking the signed binding against the
    baked-in public key before any bytecode is touched. Possibly reusable from F5's existing
    signed-artifact verification; net-new integration either way.
@@ -160,6 +174,23 @@ Written once; their *outputs* regenerate automatically every build (maintenance-
    existing `tracing` type (twelve u64 argument slots, nothing dereferenceable) or F5 owns a patch
    set registering a TMM type, with a per-release rebase cost on the one reused component the trust
    story wants unforked.
+6a. **Verifier/runtime geometry reconciliation** *(steps 3, 7)* — **net-new, and the same class of
+   problem as item 6: the verifier's model of the host has to match the host, or the proof is about a
+   different machine.** PREVAIL proves memory safety against a *declared* stack geometry; uBPF provides
+   an *actual* one; they do not presently agree. From `ebpf-verifier/src/config.hpp`:
+   `subprogram_stack_size = 512`, `max_call_stack_frames = 8`. From `ubpf/vm/inc/ubpf.h`:
+   `UBPF_MAX_CALL_DEPTH 8` and `UBPF_EBPF_STACK_SIZE = depth × 512`, but
+   `UBPF_EBPF_LOCAL_FUNCTION_STACK_SIZE 256`. Where PREVAIL's "subprogram" and uBPF's "local function"
+   denote the same frame, a program admitted under the defaults may use **twice the stack the runtime
+   provides** — and that is the one failure mode a signature cannot catch, because the artifact is
+   authentic and the proof is valid; it is just a proof about different hardware. The work: establish
+   whether the two notions correspond, pin both sides to one number, pass it explicitly on each side
+   (`--stack-size`, and the compile-time constant), and add a **build-time assertion that fails if they
+   diverge** rather than trusting two upstreams to keep agreeing. The same reasoning applies to the rest
+   of PREVAIL's defaults — `check_for_termination = false`, `strict = false`,
+   `allow_division_by_zero = true` — which makes the admission pipeline's verifier invocation a
+   **specification to be reviewed**, not a command line someone types.
+
 7. **Safe-return policy table** *(steps 3, 12)* — **two gates, in this order, and the order is the
    whole point.** *Gate 1 — skippability:* may this body be skipped at all? Closed by default; any
    lock held across it, refcount moved, flow state advanced, input consumed, out-param written or
@@ -274,10 +305,12 @@ new mitigation. Nothing else on this list is ever written again.
 | 1b | asm trampoline, patched entry | TMM hot path (when armed) | once per arch | ~1 page of asm — **conditional on form B** |
 | 2 | arm/disarm | depends on form (A · B · C) | once per arch in form B | store · patch · flag |
 | 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines |
+| 3a | VM hardening config (`ubpf_toggle_*`) | TMM, at load | once + a build-variant decision | small |
 | 4 | sig verify in TMM | TMM, at load | once (or reused) | small |
 | 5 | hook-map generator | build pipeline | once | tool — DWARF half conditional |
 | — | **USDT tracepoint catalog** | build pipeline + annotation | once + per entry | **day one in form A/C** |
 | 6 | ctx descriptors for PREVAIL | build pipeline | once + **ongoing discipline** (§2) | tool + process |
+| 6a | verifier/runtime geometry reconciliation | build pipeline | once + a build-time assertion | small, and load-bearing |
 | 7 | safe-return table | build pipeline | once + annotations | tool + process |
 | 8 | budget pass | admission (at F5) | once | tool |
 | 9 | signing integration | F5 infra | once | integration |
@@ -292,6 +325,12 @@ The **Size class** column is *shape*, not effort: it says how much code an item 
 takes to get right. Items 1–4: delicate, small, must be exactly right. Items 5–7: tooling with one
 hard design decision (§2). Items 8–12: conventional control-plane engineering. Items 13, 14, 16, 17:
 staged follow-ons; **item 15 is day one**.
+
+**Items 3a and 6a were added late, and how they were found is worth recording.** Neither came from
+reviewing this list. Both came from reading the vendored sources of the two components the proposal
+reuses — and both are cases where a **default is the defect**: uBPF ships its JIT-spray mitigation off,
+and PREVAIL's assumed stack geometry does not match uBPF's. Nothing in a document review would have
+surfaced either, which is the argument for doing that reading before, not after, anything is designed.
 
 **What the fork does and does not touch.** Unaffected either way: items 4, 6, 8–12, and 15 — signature
 verification, the `ctx`/program-type ABI, the budget pass, the whole control plane, and back-edge fuel
