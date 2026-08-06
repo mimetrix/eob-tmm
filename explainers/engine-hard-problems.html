@@ -128,7 +128,7 @@
 
   /* budget-pass CFG diagram */
   .bp{margin:1.5rem 0 0}
-  .bp svg{width:100%; height:auto; max-width:41rem; display:block; margin:0 auto}
+  .bp svg{width:100%; height:auto; max-width:44rem; display:block; margin:0 auto}
   .bp-node{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5}
   .bp-t{fill:var(--ink); font-family:var(--sans); font-weight:640; font-size:13px}
   .bp-s{fill:var(--muted); font-family:var(--mono); font-size:10px}
@@ -143,8 +143,18 @@
   .bp-warn{fill:var(--warn-bg); stroke:var(--warn); stroke-width:1.5}
   .bp-ok-t{fill:var(--ok-ink); font-family:var(--mono); font-size:11px; font-weight:600}
   .bp-warn-t{fill:var(--warn-ink); font-family:var(--mono); font-size:11px; font-weight:600}
-  .bp-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:60ch}
+  .bp-cap{margin:.75rem 0 0; font-size:.9rem; color:var(--muted); line-height:1.5; max-width:64ch}
   .bp-cap b{color:var(--ink); font-weight:600}
+  .bp-tier{fill:var(--faint); font-family:var(--mono); font-size:9px; letter-spacing:.09em; text-transform:uppercase}
+  .bp-in{fill:none; stroke:var(--line-2); stroke-width:1.2; stroke-dasharray:4 3}
+  .bp-in-t{fill:var(--muted); font-family:var(--mono); font-size:9.5px}
+  .bp-art{fill:var(--accent-bg); stroke:none}
+  .bp-art-t{fill:var(--accent-ink); font-family:var(--mono); font-size:9.5px}
+  .bp-art.est{fill:none; stroke:var(--line-2); stroke-width:1.2; stroke-dasharray:3 2}
+  .bp-art-t.est{fill:var(--muted)}
+  .bp-note{fill:var(--warn-ink); font-family:var(--mono); font-size:9px}
+  .bp-sep{stroke:var(--line); stroke-width:1; stroke-dasharray:2 3}
+  .bp-hand{fill:var(--muted); font-family:var(--mono); font-size:10px}
 
   /* two-layer time-safety cards */
   .layers{margin:1.4rem 0 0; display:grid; grid-template-columns:1fr 1fr; gap:.9rem}
@@ -359,34 +369,84 @@
         itself an <em>assumption</em> about operator behaviour: that a patched build cannot always be installed at
         once.</p></div>
     <figure class="bp">
-      <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A verified control-flow graph with a proven loop bound of 64: worst case 652 instructions, about 800 cycles, compared to the hook's budget — load if under, reject if over.">
+      <svg viewBox="0 0 700 368" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The admission-time budget chain as a sequence of artifacts. Verification hands over a control-flow graph of blocks and edges with a proven loop bound of 64 times. The longest-path step consumes that and emits a worst-case instruction count of 652, which is derived; it refuses if any loop cannot be bounded. The price step consumes an external per-architecture cost model, an assumption rather than a derivation, and emits an estimate of about 908 cycles at roughly 14 cycles per iteration. The gate step consumes the per-hook budget of 800 cycles for a cold hook and emits a verdict plus a sealed bound. This worked program exceeds its budget and is rejected fail-closed. On the load branch the sealed bound becomes the runtime layer's fuel limit.">
         <defs>
           <marker id="bpah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head"/></marker>
           <marker id="bpaha" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bp-head-a"/></marker>
         </defs>
-        <rect class="bp-node" x="25" y="55" width="150" height="50" rx="8"/>
-        <text class="bp-t" x="100" y="79" text-anchor="middle">entry</text>
-        <text class="bp-s" x="100" y="95" text-anchor="middle">prologue · 8 instr</text>
-        <rect class="bp-node" x="245" y="55" width="150" height="50" rx="8"/>
-        <text class="bp-t" x="320" y="79" text-anchor="middle">loop body</text>
-        <text class="bp-s" x="320" y="95" text-anchor="middle">10 instr</text>
-        <rect class="bp-node" x="465" y="55" width="150" height="50" rx="8"/>
-        <text class="bp-t" x="540" y="79" text-anchor="middle">exit</text>
-        <text class="bp-s" x="540" y="95" text-anchor="middle">epilogue · 4 instr</text>
-        <path class="bp-edge" d="M175,80 L241,80" marker-end="url(#bpah)"/>
-        <path class="bp-edge" d="M395,80 L461,80" marker-end="url(#bpah)"/>
-        <path class="bp-loop" d="M360,55 C378,16 262,16 280,55" marker-end="url(#bpaha)"/>
-        <text class="bp-loop-lbl" x="320" y="12" text-anchor="middle">≤ 64× · proven bound</text>
-        <text class="bp-math" x="320" y="142" text-anchor="middle">worst case = 8 + <tspan class="n">10×64</tspan> + 4 = <tspan class="n">652 instr</tspan> ≈ 800 cycles</text>
-        <text class="bp-glbl" x="320" y="171" text-anchor="middle">compare to the hook's budget</text>
-        <rect class="bp-ok" x="70" y="186" width="230" height="38" rx="7"/>
-        <text class="bp-ok-t" x="185" y="210" text-anchor="middle">≤ budget → load ✓</text>
-        <rect class="bp-warn" x="340" y="186" width="230" height="38" rx="7"/>
-        <text class="bp-warn-t" x="455" y="210" text-anchor="middle">&gt; budget → reject (fail closed)</text>
+
+        <text class="bp-tier" x="8" y="16">what verification hands over</text>
+        <text class="bp-loop-lbl" x="186" y="36" text-anchor="middle">&#8804; 64&#215; &#183; proven bound</text>
+        <path class="bp-loop" d="M210,56 C222,40 150,40 162,56" marker-end="url(#bpaha)"/>
+        <rect class="bp-node" x="14" y="56" width="96" height="40" rx="8"/>
+        <text class="bp-t" x="62" y="74" text-anchor="middle">entry</text>
+        <text class="bp-s" x="62" y="88" text-anchor="middle">8 instr</text>
+        <rect class="bp-node" x="138" y="56" width="96" height="40" rx="8"/>
+        <text class="bp-t" x="186" y="74" text-anchor="middle">loop body</text>
+        <text class="bp-s" x="186" y="88" text-anchor="middle">10 instr</text>
+        <rect class="bp-node" x="262" y="56" width="96" height="40" rx="8"/>
+        <text class="bp-t" x="310" y="74" text-anchor="middle">exit</text>
+        <text class="bp-s" x="310" y="88" text-anchor="middle">4 instr</text>
+        <path class="bp-edge" d="M110,76 L134,76" marker-end="url(#bpah)"/>
+        <path class="bp-edge" d="M234,76 L258,76" marker-end="url(#bpah)"/>
+        <path class="bp-edge" d="M358,76 L390,76" marker-end="url(#bpah)"/>
+        <rect class="bp-art" x="394" y="65" width="212" height="22" rx="5"/>
+        <text class="bp-art-t" x="500" y="80" text-anchor="middle">CFG &#183; blocks, edges, loop bound</text>
+
+        <text class="bp-tier" x="8" y="126">the budget pass &#8212; each step consumes the last</text>
+        <rect class="bp-in" x="252" y="146" width="176" height="22" rx="5"/>
+        <text class="bp-in-t" x="340" y="161" text-anchor="middle">cost model &#183; per arch</text>
+        <rect class="bp-in" x="478" y="146" width="176" height="22" rx="5"/>
+        <text class="bp-in-t" x="566" y="161" text-anchor="middle">per-hook budget &#183; 800, a cold hook</text>
+        <path class="bp-edge" d="M340,168 L340,180" marker-end="url(#bpah)"/>
+        <path class="bp-edge" d="M566,168 L566,180" marker-end="url(#bpah)"/>
+
+        <rect class="bp-node" x="26" y="182" width="176" height="48" rx="8"/>
+        <text class="bp-t" x="114" y="203" text-anchor="middle">longest path</text>
+        <text class="bp-s" x="114" y="219" text-anchor="middle">8 + 10&#215;64 + 4</text>
+        <rect class="bp-node" x="252" y="182" width="176" height="48" rx="8"/>
+        <text class="bp-t" x="340" y="203" text-anchor="middle">price</text>
+        <text class="bp-s" x="340" y="219" text-anchor="middle">&#8776; 14 cycles / iteration</text>
+        <rect class="bp-node" x="478" y="182" width="176" height="48" rx="8"/>
+        <text class="bp-t" x="566" y="203" text-anchor="middle">gate</text>
+        <text class="bp-s" x="566" y="219" text-anchor="middle">compare &#183; fail closed</text>
+        <path class="bp-edge" d="M202,206 L248,206" marker-end="url(#bpah)"/>
+        <path class="bp-edge" d="M428,206 L474,206" marker-end="url(#bpah)"/>
+
+        <rect class="bp-art" x="26" y="240" width="176" height="22" rx="5"/>
+        <text class="bp-art-t" x="114" y="255" text-anchor="middle">652 instr &#183; derived</text>
+        <rect class="bp-art est" x="252" y="240" width="176" height="22" rx="5"/>
+        <text class="bp-art-t est" x="340" y="255" text-anchor="middle">&#8776; 908 cycles &#183; estimate</text>
+        <rect class="bp-art" x="478" y="240" width="176" height="22" rx="5"/>
+        <text class="bp-art-t" x="566" y="255" text-anchor="middle">verdict + sealed bound</text>
+        <text class="bp-note" x="114" y="276" text-anchor="middle">no proven bound &#8594; refuse</text>
+
+        <path class="bp-edge" d="M566,264 L566,300" marker-end="url(#bpah)"/>
+        <text class="bp-note" x="600" y="284">this program</text>
+        <line class="bp-sep" x1="14" y1="292" x2="686" y2="292"/>
+        <rect class="bp-ok" x="40" y="302" width="290" height="34" rx="7"/>
+        <text class="bp-ok-t" x="185" y="324" text-anchor="middle">&#8804; budget &#8594; load &#10003;</text>
+        <rect class="bp-warn" x="370" y="302" width="290" height="34" rx="7"/>
+        <text class="bp-warn-t" x="515" y="324" text-anchor="middle">&gt; budget &#8594; reject (fail closed)</text>
+        <text class="bp-hand" x="350" y="357" text-anchor="middle">on the load branch, the sealed bound becomes layer &#9313;'s fuel limit</text>
       </svg>
-      <figcaption class="bp-cap"><b>Layer ①, on one program.</b> Because the <b>control-flow graph (CFG)</b> —
-        basic blocks and branches — is <em>verified</em>, every loop carries a proven bound, so the <b>worst-case
-        path</b> is computable: cost it, gate on the budget, load or reject.</figcaption>
+      <figcaption class="bp-cap"><b>Layer &#9312;, as a chain of artifacts &#8212; each step consumes what the last one
+        emitted.</b> The point of separating them is that they do not have equal standing. The <b>instruction count
+        is derived</b>: because the <b>control-flow graph (CFG)</b> is verified, every loop carries a proven bound,
+        so 652 is a fact about the program. The <b>cycle figure is an estimate</b> &#8212; it needs a
+        per-architecture <b>cost model</b>, and that model is an <em>input</em>, not a derivation, which is why it
+        and the per-hook budget are drawn feeding in from outside rather than as steps of the chain. Collapse those
+        two and you get a number that looks proven and is not.
+        <p style="margin-top:.6rem"><b>Note that the worked program fails.</b> Priced against the cost table the
+        real pass actually uses, a ten-instruction body holding one load and one back-edge costs about 14 cycles an
+        iteration, so 652 instructions is roughly <b>908 cycles against a cold hook's 800</b> &#8212; over budget,
+        rejected, fail-closed. That is the honest outcome and a more useful one to show than a pass: an earlier
+        version of this figure asserted the same program loaded comfortably, which it does not.</p>
+        <p style="margin-top:.6rem">Two things to read off the ends of the chain. The proven bound is what makes a
+        longest path finite at all, so a program whose loops could not be bounded has nothing to price and is
+        <b>refused</b> rather than guessed at. And the chain does not stop at the verdict: on the load branch the
+        accepted bound is sealed into the signed binding, which is how a static estimate becomes the <b>runtime fuel
+        limit</b> of layer &#9313;.</p></figcaption>
     </figure>
     <figure class="bdd">
       <svg viewBox="0 0 720 154" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline from source to hot path: compile in dev/CI, then verify, budget pass and sign in F5's off-box pipeline, then load on the control plane, then run per packet in the TMM data plane. Only run is per-packet in the poll loop; everything before it is amortized off the data path.">
