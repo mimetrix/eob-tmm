@@ -25,7 +25,19 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DOC = os.path.join(os.path.dirname(HERE), "development-scope-code.md")
+ROOT = os.path.dirname(HERE)
+DOC = os.path.join(ROOT, "development-scope-code.md")
+# The REAL vendored uBPF headers, not a stub of them. A skeleton that says
+# `#include "ubpf.h"` should be checked against the library it names — that is
+# the whole drift class this target exists for, and it is the one that already
+# bit us once (ubpf_jit_fn's 2-argument basic form vs the 4-argument extended
+# form the design requires).
+UBPF_INC = os.path.join(ROOT, "ubpf", "vm", "inc")
+# ubpf.h opens with `#include <ubpf_config.h>`, which uBPF's build generates.
+# The vendored tree carries one, so point at it rather than writing a stub: a
+# hand-written config could disagree with the library's own and turn this check
+# into a source of drift instead of a guard against it.
+UBPF_CFG = os.path.join(ROOT, "ubpf", "vm")
 CC = os.environ.get("CC", "cc")
 
 PROLOGUE = '#include "platform_stub.h"\n#include "example_hook_ctx.h"\n'
@@ -87,10 +99,17 @@ def main(argv):
                 fh.write(src)
             r = subprocess.run(
                 [CC, "-fsyntax-only", "-std=c11",
-                 "-Wimplicit-function-declaration", "-I", HERE, path],
+                 "-Wimplicit-function-declaration",
+                 "-I", HERE, "-I", UBPF_INC, "-I", UBPF_CFG, path],
                 capture_output=True, text=True)
-            errs = [l for l in r.stderr.splitlines() if ": error:" in l]
-            if errs:
+            # Trust the exit code, not a grep for ": error:". A missing include
+            # is reported as ": fatal error:", so grepping alone reported a
+            # PASS for blocks the preprocessor had refused to read at all —
+            # which is how `#include "ubpf.h"` went unnoticed until the include
+            # path below was added.
+            errs = [l for l in r.stderr.splitlines()
+                    if ": error:" in l or ": fatal error:" in l]
+            if r.returncode != 0 or errs:
                 failed += 1
                 print("FAIL  block %d (line %d, %s) — %d error(s)%s"
                       % (n, line, heading_for(line), len(errs),

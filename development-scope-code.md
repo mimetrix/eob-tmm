@@ -97,11 +97,15 @@ approval.
 
 ## Contents
 
-**§1 In-TMM data-plane code** — [1 trampoline](#item-1--the-trampoline) ·
+**§1 In-TMM data-plane code** — [0 publish protocol](#item-0--the-publish-protocol) ·
+[0b cross-core rendezvous](#item-0b--a-cross-core-rendezvous) ·
+[0c reclamation](#item-0c--reclamation) · [1 trampoline](#item-1--the-trampoline) ·
 [2 arm/disarm](#item-2--armdisarm) · [3 loader handler](#item-3--the-loader-handler) ·
+[3a VM hardening](#item-3a--vm-hardening-configuration) ·
 [4 signature verification](#item-4--signature-verification-in-tmm)
 **§2 Build-pipeline tooling** — [5 hook-map generator](#item-5--hook-map-generator) ·
 [6 ctx descriptors for PREVAIL](#item-6--ctx-descriptor-emission-for-prevail) ·
+[6a verifier/runtime geometry](#item-6a--verifierruntime-geometry-reconciliation) ·
 [7 safe-return policy table](#item-7--safe-return-policy-table)
 **§3 Control plane** — [8 budget pass](#item-8--budget-pass) ·
 [9 signing integration](#item-9--signing-service-integration) ·
@@ -117,6 +121,189 @@ day one)
 
 Ships in the substrate build. Small, delicate, and the only code here that ever touches the hot
 path.
+
+## Item 0 · The publish protocol
+
+> **step 4** · runs in **TMM, per publish** · written **once** · **small** · **unconditional**
+
+The one piece of "the safe point" that every variant needs. A designed-in call site already exists in the
+compiled text and the hot path already loads the slot per invocation, so publishing is a store and `REVOKE`
+is a store of zero. No text changes; no rendezvous is involved. What is net-new is the **ordering**.
+
+```c
+/*
+ * substrate/publish.c — item 0. Arming at a designed-in call site.
+ *
+ * The whole content of this item is that a core must never observe `armed`
+ * before the payload arming refers to. Two plain stores and a flag, in the
+ * wrong order, is a core dispatching to a stale or null fn.
+ */
+#include <stdatomic.h>
+#include "shield_abi.h"
+
+/* Payload first, then the flag that publishes it. The release fence is what
+ * makes the stores above it visible to any core that sees the store below it. */
+int slot_publish(struct hook_slot *slot, shield_jit_fn fn, uint8_t mode)
+{
+    if (!slot || !fn)               return SHIELD_ERR_HOOK;
+    if (slot->armed)                return SHIELD_ERR_BUSY;    /* never overwrite */
+    if (mode > slot->mode_ceiling)  return SHIELD_ERR_CEILING;
+
+    slot->fn   = fn;
+    slot->mode = mode;
+    atomic_thread_fence(memory_order_release);
+    slot->armed = 1;
+    return SHIELD_OK;
+}
+
+/* REVOKE — and note what it does NOT do. It stops new dispatches and leaves
+ * `fn` intact, because a core already past the armed check may still be inside
+ * the program. Freeing is item 0c and cannot happen here. */
+int slot_revoke(struct hook_slot *slot)
+{
+    if (!slot) return SHIELD_ERR_HOOK;
+    slot->armed = 0;
+    atomic_thread_fence(memory_order_release);
+    return SHIELD_OK;
+}
+
+/* The hot-path read, for symmetry: this acquire pairs with that release. */
+shield_jit_fn slot_consume(const struct hook_slot *slot, uint8_t *mode)
+{
+    if (!slot->armed) return 0;
+    atomic_thread_fence(memory_order_acquire);
+    *mode = slot->mode;
+    return slot->fn;
+}
+```
+
+**Real:** the ordering discipline, and `SHIELD_ERR_BUSY` as the refusal that stops a second `LOAD` silently
+replacing a live shield.
+**Stubbed:** nothing — this item has no platform dependency, which is why it is the unconditional one.
+**TODO(f5):** `armed` is a plain `uint8_t` in [`shield_abi.h`](substrate/shield_abi.h), so a compiler may
+hoist the hot-path read out of a loop and the fence pattern above is doing more work than the type admits.
+A real build makes it `_Atomic uint8_t` and drops to a plain acquire load. Left as-is here because changing
+it changes the published ABI header, and that is a decision rather than a tidy-up — the register carries it
+as an open item.
+
+## Item 0b · A cross-core rendezvous
+
+> **step 2** · runs in **TMM** · written **once** · **conditional — needed only to modify live text,
+> therefore x86-64 only**
+
+On aarch64 an aligned `NOP`↔`B` swap is inside the architecture's concurrent-modification set, so this file
+is empty there. **Neither form below exists in TMM today.** Form A is cheap and needs a checkpoint in the
+poll loop; form B needs no poll-loop change and pays for it with a `SIGTRAP` handler on the data-plane
+threads.
+
+```c
+/*
+ * substrate/rendezvous.c — item 0b, form A: a checkpoint in the poll loop.
+ */
+#include <stdatomic.h>
+#include "shield_abi.h"
+
+static _Atomic uint32_t g_generation;                /* control side bumps this */
+static _Atomic uint32_t g_ack[SHIELD_MAX_CORES];     /* each core echoes it     */
+
+/* Called by each core once per poll iteration, between packets. This is the
+ * entire new hot-path cost of the item: one acquire load, one compare, and a
+ * store only when they differ. It is also the only line of TMM it changes. */
+void poll_checkpoint(unsigned core)
+{
+    uint32_t g = atomic_load_explicit(&g_generation, memory_order_acquire);
+    if (atomic_load_explicit(&g_ack[core], memory_order_relaxed) != g)
+        atomic_store_explicit(&g_ack[core], g, memory_order_release);
+}
+
+/* Control side. Once every core has acknowledged a generation issued after the
+ * last dispatch could have begun, no core is inside the hooked function and the
+ * bytes can be written plainly — no breakpoint dance, which is the whole reason
+ * form A is cheaper than form B. */
+int rendezvous(unsigned ncores, unsigned spins)
+{
+    uint32_t g = atomic_fetch_add_explicit(&g_generation, 1u,
+                                          memory_order_release) + 1u;
+    for (unsigned s = 0; s < spins; s++) {
+        unsigned seen = 0;
+        for (unsigned c = 0; c < ncores && c < SHIELD_MAX_CORES; c++)
+            if (atomic_load_explicit(&g_ack[c], memory_order_acquire) == g)
+                seen++;
+        if (seen == ncores) return SHIELD_OK;
+        /* TODO(f5): yield. A busy control-plane spin against a core that is
+         * mid-iteration is affordable; against a core that is descheduled or
+         * wedged it is not. */
+    }
+    return SHIELD_ERR_BUSY;   /* a core did not arrive — arm NOTHING */
+}
+```
+
+**Real:** the generation/acknowledge protocol, and the fail-closed return when a core does not arrive.
+**Stubbed:** form B entirely. It is `int3` into the first byte, `membarrier(MEMBARRIER_CMD_PRIVATE_
+EXPEDITED_SYNC_CORE)`, patch the rest, sync, restore the first byte — plus a `SIGTRAP` handler on the
+data-plane threads that knows where a trapped core should resume. Sketching it here would imply a decision
+about installing a signal handler on those threads that is not this document's to make.
+**TODO(f5):** the timeout above is a spin count, which is not a deadline. A core that never acknowledges
+needs a defined action, and "the control plane waits forever" is not one.
+
+## Item 0c · Reclamation
+
+> **step 13** · runs in **TMM** · written **once** · **three forms, pick one**
+
+Disarming is easy; knowing the last core has *left* a program's JIT'd code is a different problem. The
+epoch form below is nearly free because it amortizes over a whole packet batch, and it needs the poll loop.
+
+```c
+/*
+ * substrate/reclaim.c — item 0c, epoch form. Depends on item 0b's checkpoint.
+ */
+#include <stdatomic.h>
+#include "shield_abi.h"
+
+static _Atomic uint64_t g_epoch[SHIELD_MAX_CORES];   /* bumped at the checkpoint */
+
+/* One plain increment per poll iteration, per core. No atomics are needed for
+ * correctness within an instance — TMM is core-pinned and run-to-completion, so
+ * each core is the only writer of its own slot — but the READER is the control
+ * thread, so the store is released and the load acquired. */
+void epoch_tick(unsigned core)
+{
+    atomic_fetch_add_explicit(&g_epoch[core], 1u, memory_order_release);
+}
+
+struct retired { void *code; size_t len; uint64_t at[SHIELD_MAX_CORES]; };
+
+/* Record the epoch each core was at when the program was disarmed. */
+void retire_note(struct retired *r, void *code, size_t len, unsigned ncores)
+{
+    r->code = code;
+    r->len  = len;
+    for (unsigned c = 0; c < ncores && c < SHIELD_MAX_CORES; c++)
+        r->at[c] = atomic_load_explicit(&g_epoch[c], memory_order_acquire);
+}
+
+/* Safe to free once every core has passed the epoch it was at when we
+ * disarmed: a core cannot be inside code it could no longer reach when it
+ * began its current iteration. Returns 0 while any core is still behind. */
+int retire_ready(const struct retired *r, unsigned ncores)
+{
+    for (unsigned c = 0; c < ncores && c < SHIELD_MAX_CORES; c++)
+        if (atomic_load_explicit(&g_epoch[c], memory_order_acquire) <= r->at[c])
+            return 0;
+    return 1;
+}
+```
+
+**Real:** the epoch/quiescence protocol — the standard pattern, and the one the register asks for by name.
+**Stubbed:** the two alternatives, both of which are a *policy* choice rather than different code here.
+**Read-side markers** move the cost onto the hot path: the trampoline sets a per-core in-use marker with a
+fence before it reads the slot, and the control side waits for the marker to clear. That is a store and a
+fence per invocation, against one plain increment per iteration for the form above. **Capped leak** declines
+to free at all, and then the deliverable is the accounting rather than the reclamation: a per-hook cap, a
+counter, and a documented ceiling on loads per boot, so that "we leak" is a bounded statement instead of a
+hope. Defensible for a shield loaded twice a year; not for one reloaded hourly.
+**TODO(f5):** which form is a use-case decision, not a substrate decision, and it belongs to whoever owns
+the reload cadence.
 
 ## Item 1 · The trampoline
 
@@ -661,6 +848,59 @@ equivalent was ~25 lines, because it had no signature, no binding, no map and no
 — the contrast is still the point, but it is now a recollection rather than a diff a reviewer can
 run.
 
+## Item 3a · VM hardening configuration
+
+> **step 4** · runs in **TMM, at load** · written **once** · **small**, plus a build-variant decision
+
+uBPF's runtime checks are **per-VM state**, so they take the library's defaults unless the loader sets them.
+This item exists because those defaults are not the ones this design wants.
+
+```c
+/*
+ * substrate/harden.c — item 3a. Called between ubpf_create() and ubpf_load_elf().
+ *
+ * Read out of ubpf/vm/ubpf_vm.c (ubpf_create): bounds check ON, read-only
+ * bytecode ON, undefined-behaviour check OFF, constant blinding OFF. Two of
+ * those four are not what we want, and inheriting them silently is how a
+ * security posture becomes an accident.
+ */
+#include "ubpf.h"
+#include "shield_abi.h"
+
+int vm_harden(struct ubpf_vm *vm)
+{
+    if (!vm) return SHIELD_ERR_NOMEM;
+
+    /* On by default; asserted anyway, so a future upstream change to the
+     * default is a visible diff here rather than a silent regression. */
+    ubpf_toggle_bounds_check(vm, true);
+
+    /* Off by default. */
+    ubpf_toggle_undefined_behavior_check(vm, true);
+
+    /* Off by default, and the important one: without blinding, an immediate in
+     * the bytecode reaches the JIT'd buffer verbatim, so a program PREVAIL
+     * admits can still place native instruction bytes into an executable
+     * mapping inside TMM. Defence in depth behind the signature.
+     *
+     * ubpf.h states this is x86-64 only — "ARM64: Not yet implemented ... will
+     * have no effect" — so on aarch64 the call succeeds and mitigates nothing.
+     * That is not a bug to work around here; it is the reason the aarch64
+     * high-assurance build should be interpreter-only, which is also where
+     * item 15's fuel is enforceable. Same conclusion, two routes. */
+    ubpf_toggle_constant_blinding(vm, true);
+
+    return SHIELD_OK;
+}
+```
+
+**Real:** all three `ubpf_toggle_*` calls are the library's public API, and this block is compiled against
+uBPF's own headers by `make check-skeletons`.
+**Stubbed:** nothing.
+**TODO(f5):** two decisions rather than code. Whether a VM may ever be created without passing through this
+function — a guard is worth more than a convention — and whether the aarch64 build is interpreter-only,
+which the TMA has to weigh given blinding is unavailable there.
+
 ## Item 4 · Signature verification in TMM
 
 > **steps 3, 10** · runs in **TMM, at load** · written **once (or reused)** · **small**
@@ -1010,6 +1250,59 @@ range stops matching, so they stop loading — by design).
 be written, too many and the surface is over-exposed and versioning it becomes a permanent tax. Every
 field added here is a contract F5 carries for as long as the hook exists. That judgement is not
 automatable, and it is the substrate's largest ongoing engineering surface.
+
+## Item 6a · Verifier/runtime geometry reconciliation
+
+> **steps 3, 7** · runs in the **build pipeline** · written **once** · **small, and load-bearing**
+
+Item 6 is the verifier's model of the host's *data*. This is the verifier's model of the host's *machine*,
+and it is the same class of problem: PREVAIL proves memory safety against a **declared** stack geometry,
+uBPF provides an **actual** one, and nothing makes them agree. A divergence is silent — the artifact is
+authentic and the theorem is valid, just about different hardware — which is the one failure mode a signing
+gate cannot catch.
+
+```c
+/*
+ * substrate/geometry.h — item 6a, the C half. Pins the runtime side at build
+ * time; check_vm_geometry.py pins the verifier side by parsing config.hpp.
+ */
+#include "ubpf.h"
+
+/* The single number both sides must use. Set to uBPF's local-function frame,
+ * because that is the one that is not merely a default: PREVAIL's --stack-size
+ * is a command-line argument we control, uBPF's is a compile-time constant of
+ * the library. So the verifier is told to match the runtime, not the reverse. */
+#define SHIELD_SUBPROGRAM_STACK 256
+
+/* If uBPF's constant ever moves, this fails the build instead of quietly
+ * invalidating every proof already signed against the old number. */
+_Static_assert(SHIELD_SUBPROGRAM_STACK == UBPF_EBPF_LOCAL_FUNCTION_STACK_SIZE,
+               "item 6a: uBPF's local-function frame no longer matches the value "
+               "the verifier is invoked with — every signed proof is now about a "
+               "machine that does not exist");
+
+/* And the total, so a mismatch in depth cannot hide behind a matching total —
+ * which is exactly how this went unnoticed: PREVAIL's 512x8 and uBPF's 8x512
+ * both come to 4096. */
+_Static_assert(UBPF_EBPF_STACK_SIZE == UBPF_MAX_CALL_DEPTH * 512,
+               "item 6a: uBPF's total stack is no longer depth x 512");
+```
+
+The verifier side is not C and cannot be asserted here — it is an argument to the admission pipeline's
+invocation, and the point is that it stops being a default:
+
+```
+check --section <SEC> --stack-size 256 --max-call-stack-frames 8 \
+      --termination --strict --no-division-by-zero  <prog.o>
+```
+
+**Real:** [`check_vm_geometry.py`](substrate/check_vm_geometry.py) parses both trees and reports the
+divergence today; `make gate` fails on it. The `_Static_assert`s above are the build-time half.
+**Stubbed:** nothing.
+**TODO(f5):** confirm that PREVAIL's "subprogram" and uBPF's "local function" denote the same frame. The
+numbers differing is checkable in a minute and is done; that the two *notions* correspond is an upstream
+semantics question, and if they do not, the reconciliation is a different and larger piece of work than the
+constant above suggests.
 
 ## Item 7 · Safe-return policy table
 
