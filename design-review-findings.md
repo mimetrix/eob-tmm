@@ -113,6 +113,17 @@ The **Disposition** column was established by grepping the repo for each claim a
   does not exist at all. That is a TMA item and an argument for the interpreter on any high-assurance
   aarch64 build, alongside item 15's fuel — which is enforceable only in the interpreter for the same
   kind of reason.
+- **45 tracepoints, no consumer.** The catalog defines 41 tracepoints in its tables with typed `ctx` fields and the scope
+  list covers **transport** for their records (item 13's log line, item 14's ring and drain agent), but no
+  item and no document specifies a **sink, a view, or a metric schema**. Both sinks are explicitly
+  undecided in their own items. The two named consumers, `tmmtrace` and `tmmdump`, are placeholder names
+  for unbuilt utilities. So the day-one visible surface is item 11's `status` — mode, armed, epoch,
+  per-core fire counters — which answers "is the shield working" and nothing more. **The asymmetry is the
+  finding**: TMM's existing poll-loop and pool counters already reach `tmctl`/`tmstat` and every qkview
+  (T15 above), and new tracepoints inherit none of that, so a signal with no sink is indistinguishable
+  from one never collected. It lands hardest on the catalog's *primary* stated lens — observability,
+  debug and RCA — while the shield use case, a peer consumer by that document's own framing, is the one
+  with a console. Filed as [`development-scope.md`](development-scope.md) item 14a.
 - **Memory accounting.** uBPF `malloc`s and `mmap(PROT_EXEC)`s; TMM has its own preconfigured allocator with strict accounting. `SHIELD_MAX_SHIELDS 64` has no memory model behind it.
 - **Distribution.** Items 9–11 run sign → push → load, all in-box. Nothing covers F5 → customer fleet: versioned distribution, pinning, rollback. (The AWAF attack-signature channel is the obvious analog: signed, versioned, live, fast cadence, established customer trust — and it decouples mitigation cadence from hotfix cadence, which is the point of the exercise.)
 - **Per-build shield multiplication.** A per-build `ctx` means **per-build shields**: one CVE across six supported branches is six verified, budgeted, signed, tested artifacts — with possibly different hookable sets. "A few lines of C per CVE" quietly becomes "a few lines × N builds."

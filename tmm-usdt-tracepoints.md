@@ -38,6 +38,15 @@ The engine is generic; the shield is one application on top of it. The reason a 
 
 **Two companion utilities — both proposed, neither built.** `tmmtrace` would be the *summary* consumer — bpftrace-for-the-data-plane: counters, histograms, predicates, shields. `tmmdump` would be the *capture* consumer — tcpdump-for-the-data-plane: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both would be thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
 
+> **On what consumes any of this, which is nothing yet.** This document defines hooks and their `ctx`; it
+> does **not** define a sink, a view, or a metric schema, and neither does any other document here. The
+> scope list covers transport for these records — a rate-limited log line, a per-core ring drained off the
+> hot path — and both are staged follow-ons whose destination is an open question in their own items. So
+> the day-one visible surface is the shield console (mode, armed, epoch, per-core fire counters) and not
+> one field from any row below. Recorded as a gap in
+> [`development-scope.md`](development-scope.md) item 14a rather than left to be noticed; it matters
+> most here, because observability is this document's primary lens.
+
 > **On the names, and on what exists.** `tmmtrace` and `tmmdump` are **placeholder names for proposed
 > utilities** — nothing by either name exists, here or in any product, and no invocation shown in this
 > document has ever been run. They are written in imperative CLI form because that is the clearest way to

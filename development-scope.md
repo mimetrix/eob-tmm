@@ -258,6 +258,25 @@ Conventional engineering — no novel machinery.
     out-of-band synthesis of a
     suppressed log entry. Already designed:
     [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md).
+14a. **The sink and the view — not covered by any item above, and the gap is worth stating in the list
+    rather than discovered later.** Items 13 and 14 are **transport**: a rate-limited log line, and a
+    per-core ring drained off the hot path. Neither says where a record *lands* or what *renders* it, and
+    nothing else here does either. Concretely, as this repo stands:
+    [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) defines **41 tracepoints** in its tables (45 names appear if prose mentions are counted, which they should not be) with typed `ctx` fields;
+    **no dashboard, view, or metric schema is specified anywhere**; both sinks are open questions in their
+    own items (*"identify the existing TMOS audit sink"*, *"a decision about which sink"*); and the two
+    consumers named — `tmmtrace` and `tmmdump` — are **placeholder names for proposed utilities**, so the
+    consumer side is proposed rather than specified.
+    **What that leaves visible on day one is item 11's `status` and nothing else**: per-hook mode, armed
+    state, epoch, and per-core fire counters with their total. That is enough to answer *"is the shield
+    working"* and nothing else — it is a kill-switch console, not observability.
+    Note the asymmetry it creates. TMM's **existing** poll-loop and memory-pool counters already land in
+    `tmctl`/`tmstat` and every qkview (`design-review-findings.md` T15). New tracepoints inherit none of
+    that: a signal that has no sink and no view is, from an operator's seat, indistinguishable from a
+    signal that was never collected. **And this bites the catalog's primary stated use case**, since that
+    document leads with observability, debug and RCA as its lens, and CVE shields as a peer consumer. The
+    shield half has a console; the observability half does not.
+
 15. **Back-edge fuel — a uBPF JIT patch. Day one, not optional.** The runtime half of time safety
     (hard-problems §1), and the one item in this section that is not a follow-on. **Fuel is the
     mechanism**: uBPF's own API states that `ubpf_set_instruction_limit` *"has no effect on JIT'd
@@ -319,6 +338,7 @@ new mitigation. Nothing else on this list is ever written again.
 | 12 | audit trail | control plane | once | conventional |
 | 15 | back-edge fuel (uBPF JIT patch) | TMM, per program invocation | **day one** | small patch, owned fork |
 | 13, 14, 16, 17 | staged tiers | various | staged | staged |
+| 14a | **the sink and the view** | control plane / off-box | *unspecified — see §4* | **gap, not an estimate** |
 | — | **shield program** | TMM, via VM | **per CVE** | **a few lines of C** |
 
 The **Size class** column is *shape*, not effort: it says how much code an item is, not how long it
