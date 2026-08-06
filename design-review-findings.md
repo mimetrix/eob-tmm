@@ -113,7 +113,7 @@ The **Disposition** column was established by grepping the repo for each claim a
   does not exist at all. That is a TMA item and an argument for the interpreter on any high-assurance
   aarch64 build, alongside item 15's fuel — which is enforceable only in the interpreter for the same
   kind of reason.
-- **45 tracepoints, no consumer.** The catalog defines 41 tracepoints in its tables with typed `ctx` fields and the scope
+- **41 tracepoints, no consumer.** The catalog defines 41 tracepoints in its tables with typed `ctx` fields and the scope
   list covers **transport** for their records (item 13's log line, item 14's ring and drain agent), but no
   item and no document specifies a **sink, a view, or a metric schema**. Both sinks are explicitly
   undecided in their own items. The two named consumers, `tmmtrace` and `tmmdump`, are placeholder names
