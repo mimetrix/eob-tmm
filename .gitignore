@@ -16,6 +16,19 @@ ebpf-verifier/
 # AI-authored-shield-pipeline invention disclosure figures (IP — never in shared repo)
 disclosure-figures/
 
+# Credentials — must never enter a shared repo. Defensive only: the rule is to
+# keep secrets outside the working tree entirely (OpenStack application
+# credentials belong in ~/.config/openstack/clouds.yaml, mode 600), not to rely
+# on these patterns. See env/README.md.
+clouds.yaml
+clouds.yml
+*-clouds.yaml
+*openrc*
+*.pem
+*.key
+app-cred*
+application-credential*
+
 # macOS
 .DS_Store
 
