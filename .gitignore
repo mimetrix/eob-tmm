@@ -20,9 +20,7 @@ disclosure-figures/
 # keep secrets outside the working tree entirely (OpenStack application
 # credentials belong in ~/.config/openstack/clouds.yaml, mode 600), not to rely
 # on these patterns. See env/README.md.
-clouds.yaml
-clouds.yml
-*-clouds.yaml
+*clouds*.y*ml
 *openrc*
 *.pem
 *.key
