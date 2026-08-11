@@ -3,6 +3,11 @@
 Two files preserved **verbatim** from `eob-bigip/docs` when that repo was
 retired on 2026-08-11. Kept for provenance, **not** as current guidance.
 
+"Verbatim" means as-of retirement, not as-of July: `00-project-goals.md`
+includes status edits made on 2026-08-11 shortly before the move (a "current
+push" bullet and links to the then-`05`/`06`), which is why it references
+files that never existed under these names.
+
 | File | Why it's here and not promoted |
 |---|---|
 | `00-project-goals.md` | The retired repo's own goals/status page. Its roadmap is superseded — this repo's design docs and `env/tmm-build-environment.md` carry the live picture. |
