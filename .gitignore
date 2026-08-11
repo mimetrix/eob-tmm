@@ -37,3 +37,11 @@ __pycache__/
 # send bundles (regenerate with git archive; never commit)
 *.zip
 SEND-NOTE.md
+
+# Internal-document exports (Confluence PDF/Word downloads and the like).
+# These carry internal hostnames, IPs, usernames and internal URLs, and this
+# repo pushes to GitHub — off F5 infrastructure. Read them locally, write the
+# operational facts into env/ in our own words, and let the export stay out.
+*.pdf
+*.docx
+*Confluence*
