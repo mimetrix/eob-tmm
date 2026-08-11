@@ -778,6 +778,114 @@ credential. Those test artifacts were deleted.
 | `Missing value auth-url required for auth plugin` | `OS_CLOUD` unset or naming a cloud not in the file |
 | `You are not authorized to perform the requested action` | Credential inherited too few roles — recreate while scoped to the right project |
 
+## Decision: BNK / MBIP is the route — 2026-08-11
+
+**BIG-IP on a VM (CBIP) is a follow-on effort.** All work targets the containerized
+data plane: source from GitSwarm, built in the `toolchain_container`, run as a pod in a
+Datkube `kind` cluster. The consequence for this file is that the Perforce material
+above is background rather than a blocker, and the CBIP-only questions — §14's worked
+CVE among them — wait for that follow-on.
+
+## Getting access — all three 401s are one identity
+
+GitSwarm's sign-in page says it outright: *"Sign in using your **olympus(ldap)**
+credentials. Do not use email as username."* Artifactory and Confluence sit behind the
+same directory, so **there is one authentication problem, not three** — and the network
+path to all of them already worked.
+
+Two layers, and only the second needs a human:
+
+1. **Authentication** — an olympus LDAP session. A browser session already existed, so
+   this was never the obstacle.
+2. **Authorization** — project membership. In GitLab a project you cannot see returns
+   **404, not 403**, so "repo not found" and "you lack membership" look identical. Check
+   by loading the project page while signed in. Membership on `tmm/tmm`,
+   `koenning/spk-devmachine` and `datkube/datkube` was already held.
+
+**What actually unblocked it:** an SSH key registered against the account, at
+`https://gitswarm.f5net.com/-/user_settings/ssh_keys`. Generate on the box, paste the
+public half, and `ssh -T git@gitswarm.f5net.com` answers `Welcome to GitLab, @starin!`
+instead of `Permission denied (publickey)`. A Personal Access Token with
+`read_repository` works too, but the key is better here: the private half never leaves
+the VM, and revoking it is one click.
+
+**Keep the LDAP password out of this environment entirely.** Tokens and keys are
+per-service and revocable; the account password is not.
+
+### What that opened
+
+| repo | size / state |
+|---|---|
+| `tmm/tmm` | **2.5 GB**, HEAD current (`d5fdb0a8c8`, dated the day of the clone) |
+| `koenning/spk-devmachine` | 116 KB of Ansible — the dev-machine provisioner, see below |
+| `datkube/datkube` | the on-image clone was **658 commits behind** — local 2025-08-18, origin 2026-08-07 |
+
+That last number is the cost of relying on a snapshot: Berge's image froze datkube at
+whatever was current the day it was taken.
+
+## Provisioning properly — `koenning/spk-devmachine`
+
+**Use this instead of hand-installing, and instead of snapshotting our own image.** It
+is Ansible that provisions an OpenStack VM from **`Ubuntu2404-server-pristine`** — the
+curated base — with roles for common packages, docker, golang, git, ssh (including
+GitLab key registration via API), shell, security hardening, NFS, and repo cloning.
+Playbooks: `provision-machine.yml`, `setup-dev-machine-slim.yml`, `deploy-complete.yml`,
+`destroy-machine.yml`, plus standalone `install-falcon.yml` / `install-qualys.yml`.
+
+This is the reproducible artifact the earlier "should we build our own image?" question
+was really asking for. A snapshot has no provenance; this is a diffable recipe, and it
+already exists.
+
+### Running it from this sandbox — five things that bite
+
+The control machine needs Ansible + `openstacksdk`; both go in the existing
+`~/.venvs/openstack`. Then:
+
+1. **It expects a venv named `senf` inside the playbook directory** — its tasks call
+   `{{ playbook_dir }}/senf/bin/openstack` literally. `ln -sfn ~/.venvs/openstack senf`.
+2. **It expects `clouds.yaml` in the playbook directory**, not `~/.config/openstack/`.
+   Copy it there; the repo's `.gitignore` already covers `clouds.yaml` and `vars.yml`.
+3. **`--check` cannot work.** The VM is created by shell tasks, which check mode skips,
+   so the next task parses empty output and dies in `from_json`. Run it for real.
+4. **A pre-existing OpenStack keypair of the same name fails the upload** with *"key
+   hash not the same as offered"*. `openstack keypair create NAME > file.pem` generates
+   server-side and the derived public half will not match; delete the keypair and let
+   the playbook upload ours.
+5. **The generated inventory picks the wrong address on SEA.** It takes the *first*
+   address, and SEA's AdminNetwork is dual-stack, so it writes the **IPv6** one — which
+   this sandbox cannot route, and the playbook then fails "SSH port not available after
+   300 seconds" on a VM that is up and answering on IPv4. Rewrite `ansible_host` to the
+   `10.145.x` address.
+
+### Variables it requires
+
+`vars.yml` (from `vars.yml.template`, gitignored) must define `olympus_user`,
+`olympus_email`, `artifactory_token`, `root_password`, `user_password`. Worth knowing
+what they are actually for before hunting for real values:
+
+- **`artifactory_token`** is only ever exported as `$ARTIFACTORY_TOKEN` into the shell
+  profile. Nothing authenticates with it, and Artifactory docker pulls work anonymously,
+  so a marked placeholder is enough to pass validation and blocks nothing.
+- **`root_password` / `user_password`** set account passwords via `password_hash`.
+  Access is key-based, so these are console/sudo fallback — generate random ones.
+
+**Falcon and Qualys default to `true` and need more than a variable.** The Falcon role
+copies the sensor from `{{ playbook_dir }}/pkgs/falcon-sensor_*.deb`, and `pkgs/` is
+**gitignored** — so the package is not in the repo and the role fails at the copy step.
+It also wants a `falcon_customer_id` (one value org-wide) for
+`falconctl -s -f --cid=…`; without it the role installs the sensor but skips enrolment,
+leaving an agent that reports to nothing. Both toggles are therefore set `false` here
+until the package and CID are in hand — and `install-falcon.yml` exists standalone
+precisely so it can be added to an already-provisioned machine without a rebuild.
+
+### The instance this produced
+
+`eob-tmm-dev` on SEA — `Ubuntu2404-server-pristine`, flavor `datkube-dev-large`
+(**16 vCPU / 31 GB / 242 GB**, overriding the template's `m1.dev-large` at 8 GB, which
+is too small for a TMM build plus a kind cluster plus an 18 GB toolchain image),
+one NIC on AdminNetwork, `auto_ip: false` since AdminNetwork is directly reachable from
+this sandbox and a floating IP is needless exposure.
+
 ## Access matrix — what is actually gated, verified 2026-08-11
 
 The single most useful thing learned this session: **"we need access" is four different
