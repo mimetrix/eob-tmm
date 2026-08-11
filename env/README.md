@@ -36,6 +36,25 @@ vendored libbpf headers, and git history were **never** captured here and do
 not exist in this repo. Where inherited documents reference paths like
 `bpf/headers/`, those refer to that retired repo and are historical.
 
+## TLS interception — set the CA before anything does HTTPS
+
+This sandbox sits behind a **Netskope TLS-intercepting proxy**. Without trusting its CA,
+HTTPS to the public internet fails in confusing ways: `curl` returns nothing, `git clone`
+fails, and CMake `FetchContent` reports *"Failed to clone repository"* as though the
+remote were down. The CA is at **`/home/claude/netskope-ca.pem`**:
+
+```bash
+export CURL_CA_BUNDLE=/home/claude/netskope-ca.pem
+export GIT_SSL_CAINFO=/home/claude/netskope-ca.pem
+export SSL_CERT_FILE=/home/claude/netskope-ca.pem
+export REQUESTS_CA_BUNDLE=/home/claude/netskope-ca.pem
+```
+
+`github.com` goes from `http=000` to `http=200` with it set. This is **separate** from
+the F5-internal CA issue that makes `merge-clouds-yaml.py` force `verify: false` — that
+one is F5's own issuing CA, this one is the corporate egress proxy. Both bite, for
+different reasons, and neither is obvious from the error message.
+
 ## Two standing cautions
 
 **Durability.** When this repo is a clone inside the Claude sandbox

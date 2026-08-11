@@ -49,14 +49,40 @@ DEFAULT_BUDGET = 800             # cycles; a cold hook. Hot hooks are far tighte
 
 
 # ---------------------------------------------------------------- ELF, minimally
-def elf_section(path, want=".text"):
-    """Return the bytes of `want` from a 64-bit little-endian ELF. No deps."""
+def elf_section(path, want=None):
+    """Return the program bytes from a 64-bit little-endian ELF. No deps.
+
+    `want=None` means "find the program section", which is NOT `.text` for a
+    real clang-produced eBPF object. clang emits the program into its `SEC()`
+    section — `socket_filter`, `tracing/...`, and so on — and leaves a `.text`
+    that is present and ZERO BYTES.
+
+    That mattered more than it sounds. This function used to default to
+    `.text`, so against the first real object it was ever handed it read 0
+    bytes, priced 0 instructions, and returned "ok, under budget" for a
+    program it had not looked at. A fail-OPEN in the one component whose
+    entire job is to fail closed. The self-test never caught it because the
+    synthesized ELFs it builds put their payload in `.text`, which is exactly
+    the shape real objects do not have.
+    """
     with open(path, "rb") as f:
         blob = f.read()
     return elf_section_bytes(blob, want, path)
 
 
-def elf_section_bytes(blob, want=".text", path="<bytes>"):
+def _exec_progbits(blob, shdr, e_shnum, stroff):
+    """Executable PROGBITS sections, by name, excluding an empty `.text`."""
+    out = []
+    for i in range(e_shnum):
+        name, typ, flags, offset, size = shdr(i)
+        end = blob.index(b"\0", stroff + name)
+        nm = blob[stroff + name:end].decode(errors="replace")
+        if typ == 1 and (flags & 0x4) and size:      # PROGBITS + SHF_EXECINSTR
+            out.append((nm, offset, size))
+    return out
+
+
+def elf_section_bytes(blob, want=None, path="<bytes>"):
     """Same, over a buffer — so the self-test needs no files on disk."""
     if blob[:4] != b"\x7fELF":
         raise ValueError("%s: not an ELF object" % path)
@@ -67,16 +93,37 @@ def elf_section_bytes(blob, want=".text", path="<bytes>"):
 
     def shdr(i):
         off = e_shoff + i * e_shentsize
-        name, _typ, _flags, _addr, offset, size = struct.unpack_from("<IIQQQQ", blob, off)
-        return name, offset, size
+        name, typ, flags, _addr, offset, size = struct.unpack_from("<IIQQQQ", blob, off)
+        return name, typ, flags, offset, size
 
-    _n, stroff, _sz = shdr(e_shstrndx)
-    for i in range(e_shnum):
-        name, offset, size = shdr(i)
-        end = blob.index(b"\0", stroff + name)
-        if blob[stroff + name:end].decode() == want:
-            return blob[offset:offset + size]
-    raise ValueError("%s: no %s section" % (path, want))
+    _n, _t, _f, stroff, _sz = shdr(e_shstrndx)
+
+    if want is not None:
+        for i in range(e_shnum):
+            name, _typ, _flags, offset, size = shdr(i)
+            end = blob.index(b"\0", stroff + name)
+            if blob[stroff + name:end].decode(errors="replace") == want:
+                if not size:
+                    raise ValueError("%s: section %s is empty — refusing to "
+                                     "price a program with no instructions"
+                                     % (path, want))
+                return blob[offset:offset + size]
+        raise ValueError("%s: no %s section" % (path, want))
+
+    cands = _exec_progbits(blob, shdr, e_shnum, stroff)
+    if not cands:
+        raise ValueError("%s: no non-empty executable section — nothing to "
+                         "price, and an unpriced program is not an admitted "
+                         "one" % path)
+    if len(cands) > 1:
+        # Refuse rather than guess. Picking one silently would price a
+        # different program from the one the verifier was pointed at, and the
+        # two answers would look equally authoritative.
+        raise ValueError("%s: %d executable sections (%s) — name one with "
+                         "--section, as PREVAIL requires"
+                         % (path, len(cands), ", ".join(c[0] for c in cands)))
+    _nm, offset, size = cands[0]
+    return blob[offset:offset + size]
 
 
 # ------------------------------------------------------------------- the decoder
@@ -220,14 +267,14 @@ def _elf(text):
     struct.pack_into("<H", eh, 60, 3)          # e_shnum: null, .text, .shstrtab
     struct.pack_into("<H", eh, 62, 2)          # e_shstrndx
 
-    def shdr(name_off, typ, off, size):
+    def shdr(name_off, typ, off, size, flags=0):
         b = bytearray(sh_sz)
-        struct.pack_into("<IIQQQQ", b, 0, name_off, typ, 0, 0, off, size)
+        struct.pack_into("<IIQQQQ", b, 0, name_off, typ, flags, 0, off, size)
         return bytes(b)
 
     return (bytes(eh) + text + shstr
             + shdr(0, 0, 0, 0)                            # SHT_NULL
-            + shdr(1, 1, text_off, len(text))             # .text, PROGBITS
+            + shdr(1, 1, text_off, len(text), 0x6)        # .text, ALLOC|EXECINSTR
             + shdr(8, 3, shstr_off, len(shstr)))          # .shstrtab, STRTAB
 
 
@@ -299,8 +346,8 @@ def selftest():
 
 
 # --------------------------------------------------------------------- the gate
-def gate(path, budget):
-    return gate_text(os.path.basename(path), elf_section(path), budget)
+def gate(path, budget, section=None):
+    return gate_text(os.path.basename(path), elf_section(path, section), budget)
 
 
 def gate_text(name, text, budget, quiet=False):
@@ -328,10 +375,12 @@ def gate_text(name, text, budget, quiet=False):
 
 def main(argv):
     budget = DEFAULT_BUDGET
+    section = None
     args = []
     it = iter(argv[1:])
     for a in it:
         if a == "--budget": budget = int(next(it))
+        elif a == "--section": section = next(it)
         elif a == "--selftest": pass
         else: args.append(a)
     if not args:
@@ -339,7 +388,7 @@ def main(argv):
     rc = 0
     for p in args:
         try:
-            verdict = gate(p, budget)[0]
+            verdict = gate(p, budget, section)[0]
             if verdict != "ok": rc = 1
         except Exception as e:
             print("ERROR   %-26s %s" % (os.path.basename(p), e)); rc = 1

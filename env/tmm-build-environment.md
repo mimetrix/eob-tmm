@@ -99,6 +99,109 @@ artifacts in personal tenancy.
 whichever project was selected at creation time. Switching projects later
 means **recreating the credential** — it does not follow you.
 
+## CBIP vs MBIP — the fork that reorganises this whole document
+
+**Read this before anything below it.** There are two TMMs and two build worlds, and
+most of the confusion in earlier revisions of this file came from not separating them.
+The distinguishing sentence is in F5's own "Build f5-tmm container image" page:
+
+> *"In the same way in **CBIP** we use **seadev** to build TMM, in **MBIP** the
+> toolchain_container is equivalent to the seadev server in CBIP."*
+
+| | **CBIP** — classic BIG-IP | **MBIP** — containerized (BNK / SPK / CNF) |
+|---|---|---|
+| source | **Perforce** | **GitSwarm** — `gitswarm.f5net.com/tmm/tmm.git` |
+| build machine | the **`seadev`** server | **`toolchain_container`** — a container, pulled from Artifactory |
+| TMM runs as | TMOS appliance / VE | a **Kubernetes pod** (`deploy/f5-tmm`, label `app=f5-tmm`) |
+| dev environment | — | **Datkube** — a `kind` cluster |
+
+**So "you will need Perforce" is true for CBIP and false for MBIP.** If the target is
+classic BIG-IP, Perforce and `seadev` are the path. If it is the containerized data
+plane, source is git and the build machine is a container you pull. Everything else in
+this file, and both Confluence pages this work drew on, is the **MBIP** branch.
+
+**Which branch answers which question.** The worked CVE in
+[`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §14 is a TMOS
+logging path, so condition 1 of §10.1 for *that function* needs a CBIP build. The
+general engineering questions — hookable-set size, whether
+`-fpatchable-function-entry` applies cleanly, whether a trampoline works, whether
+backtraces survive it — are answerable from MBIP, and MBIP is reachable today while
+CBIP is not.
+
+## How a BNK build actually works
+
+BNK is not one program. It is a product **assembled** from dozens of independently
+built components, each with its own repo and CI. The pipeline is an assembly line for
+combining separately-built things — closest analogy is a Linux distribution, where
+each package builds alone, publishes to a repository, and a manifest names the exact
+versions that constitute a release.
+
+```
+f5ingress/…            L1 — components build themselves, publish artifacts to Artifactory
+      |
+helm chart repos       packaging — k8s deploys charts, not binaries
+      |
+f5-mbip-build          ASSEMBLY — input-manifest.yml is the bill of materials;
+      |                            first point everything coexists, so integration tests run here
+f5-stage5-build        FINAL PACKAGING (note: on gitlab.f5net.com, a different host)
+      |
+test candidate / release artifact
+```
+
+TMM's path through it: `tmm` (core engine) → build artifact → `f5-tmm-helm-charts` →
+referenced in f5ingress's `input-manifest.yml` → `f5-mbip-build` → `f5-stage5-build`.
+
+**`input-manifest.yml` is the injection point, and that is the useful part.** A change
+can be tested in a full BNK build *without merging it*: build your component, its
+artifact lands in Artifactory as a **user build**, override that component's version in
+the manifest, and assembly runs integration tests against your build. After merge a
+"stage bot" propagates versions downstream.
+
+**Three tiers, and we want the first two.**
+
+| goal | what you run |
+|---|---|
+| iterate on TMM | `make start && make tmm && make unittest` |
+| see it running | Datkube fast-cycle — build, `kind load`, delete the pod. **Bypasses the pipeline entirely**, which is its stated purpose |
+| a full product build | publish artifact → override in `input-manifest.yml` → assembly |
+
+## The TMM dev loop, and the one target that matters here
+
+```bash
+git clone https://gitswarm.f5net.com/tmm/tmm.git   # ← the only blocked step
+cd tmm && git checkout -b my-change
+make start        # pulls toolchain_container (18.1 GB) from Artifactory, runs it
+                  # …edit source, e.g. src/base/flow_table.c : flow_input()…
+make tmm          # builds the binary INSIDE the toolchain container
+make unittest     # the docs call this mandatory before integration
+make container    # → docker image tmm:local
+```
+
+Before `make container`, **delete prior artifacts or your change is silently absent**
+from the new image — it builds, deploys, and runs the old code:
+
+```bash
+sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_* docker_build/tmm-runtime.*
+```
+
+**`make tmm-gdb` is the target this project needs**, because everything we want comes
+from what stripping removes:
+
+```
+tmm-gdb: make tmm && make clean_rpms &&          make GDB_INCLUDE=true INSTALL_DEBUG_TMM=TRUE container
+```
+
+Deploy on a single box (no `scp`, no `datpush` — those exist because build host and
+Datkube host are normally different machines):
+
+```bash
+kind load docker-image tmm:local --name datkube
+kubectl delete pod -l app=f5-tmm
+```
+
+One-time, so the deployment stops pulling from Artifactory:
+`kubectl edit deploy/f5-tmm` → `image: tmm:local`, `imagePullPolicy: Never`.
+
 ## Stack reachability — verified 2026-08-11
 
 Both stacks answer on Keystone v3. Naming pattern is identical, just
@@ -675,11 +778,139 @@ credential. Those test artifacts were deleted.
 | `Missing value auth-url required for auth plugin` | `OS_CLOUD` unset or naming a cloud not in the file |
 | `You are not authorized to perform the requested action` | Credential inherited too few roles — recreate while scoped to the right project |
 
+## Access matrix — what is actually gated, verified 2026-08-11
+
+The single most useful thing learned this session: **"we need access" is four different
+questions, and three of them are already answered.**
+
+| what | endpoint | status |
+|---|---|---|
+| `kind` node images, Calico, Multus | public / cached | works |
+| **`docker pull` from Artifactory** | `artifactory.f5net.com` | **works ANONYMOUSLY** — pulled `toolchain_container:v2.1.0` (18.1 GB) and `tmm-img:v0.950.0-0.1.0` |
+| Artifactory REST API | `/artifactory/api/…` | 401 — cannot *list* repos or discover current versions |
+| GitSwarm HTTPS | `gitswarm.f5net.com` | 401 → `/users/sign_in` |
+| GitSwarm SSH | `git@gitswarm.f5net.com` | publickey denied for all five keys on this box |
+| Confluence | `docs.f5net.com` | `permissionViolation=true`; REST 401 |
+
+**The registry/API split is the important one.** Images are obtainable if you know the
+exact tag; you just cannot browse to discover tags. So a current `input-manifest.yml`
+(which maps profile → component versions) would be enough to pull a current stack
+without any credential — that one *file* is worth more than broad access.
+
+**And the whole TMM exercise reduces to one credential:** GitSwarm access to `tmm/tmm`.
+Not Perforce (that is CBIP), not Artifactory (anonymous pulls work), not a build host
+(the toolchain is a container, already downloaded). F5's own page says how: *"if you do
+not have access to f5-tmm repo, please talk to your manager."*
+
+## The Datkube devbox — booted and verified 2026-08-11
+
+Instance `eob-datkube-01`, SEA, image `Datkube-Devbox-Berge`, flavor
+`datkube-dev-large` (16 vCPU / 32 GB / 250 GB), **one NIC on AdminNetwork** — one
+deliberately, because a second DHCP-enabled NIC creates the two-default-route problem
+documented above, and MBIP source is GitSwarm not Perforce, so `PerforceAccessNet` is
+not needed.
+
+```bash
+openstack --os-cloud sea keypair create eob-datkube > ~/.config/openstack/keys/eob-datkube.pem
+chmod 600 ~/.config/openstack/keys/eob-datkube.pem
+openstack --os-cloud sea server create \
+  --flavor datkube-dev-large --image abecfaf0-4fa1-4519-a1a7-fcd316506f1c \
+  --nic net-id=AdminNetwork --no-security-group --key-name eob-datkube eob-datkube-01
+```
+
+**What was learned booting it:**
+
+- **Login is `ubuntu`** (and `root`). Cloud-init keypair injection works — the snapshot
+  had not consumed cloud-init. `dev` and `berge` are not accounts.
+- **SSH is reachable DIRECTLY from the sandbox**, no jump host: the box came up on
+  `10.145.38.232`, and `10.145/16` routes from here. `jump-eob` was not needed.
+- **AdminNetwork on SEA is dual-stack** — the instance also got
+  `2620:128:e008:4806::e0`. SJC's is IPv4 only.
+- Ubuntu **24.04.3 LTS**, from base `Ubuntu2404-server-pristine`.
+- **The datkube CLI and repo are on the image**: `/usr/local/bin/datkube` (a bash
+  wrapper around `datkube.py`) and a real git clone at `~/code/datkube`, ~60 profiles
+  including `bnk-core`, with its own `input-manifest.yml`.
+- **`datkube create-cluster` works with no credentials** — kind, Kubernetes **v1.32.0**,
+  control-plane + worker, Calico and Multus all Ready in about 90 seconds.
+- **But the clone is 12 months stale**: HEAD `99deb0a7`, 2025-08-18, datkube 1.21.11.
+  It updates by `git pull` from GitSwarm, so it is frozen until that is unblocked.
+- Tools present: docker 28.3.3, kind 0.26.0, kubectl, helm, gcc 13.3.0, gdb 15.0.50,
+  go, make, git, yq, jq. **No `p4`** — consistent with MBIP not needing it.
+
+**Cluster access.** On the box, `kubectl` just works (context `kind-datkube`). From
+elsewhere, kind's API server binds `127.0.0.1:<port>` on the host and its certificate is
+issued for `127.0.0.1`, so tunnel the *same* port to keep TLS valid:
+
+```bash
+ssh -L 39481:127.0.0.1:39481 ubuntu@<devbox>      # port from: kubectl config view --minify
+```
+
+## The shipped TMM binary is stripped — and that is why we must build our own
+
+Extracted `/usr/bin/tmm` from `tmm-img:v0.950.0-0.1.0`. It is a symlink chain —
+`tmm` → `tmm.default` → **`tmm64.no_pgo`** — ending at a 56 MB x86-64 executable.
+
+- **No `.symtab`, no `.debug_*`.** `nm` returns nothing.
+- **`.gnu_debuglink` names `tmm64.no_pgo.debug`** — the symbols exist, split into a
+  separate file that is not in the runtime image. Finding that file would make the
+  hookable-set analysis answerable without source.
+- **Only `.dynsym` survives: 4,648 defined symbols, overwhelmingly OpenSSL exports**
+  (`ACCESS_DESCRIPTION_*`, `ADMISSIONS_*`). `flow_input`, `fw_log_prot_transfer_emit`,
+  `http2`, `tmm_poll` — **zero hits**.
+
+**That last point is evidence for a design decision rather than an obstacle to one.**
+TMM's internal functions are not exported, so the hook map cannot be derived from a
+shipped artifact — not by us, not on the box, not by a customer. It must be generated
+**at build time inside F5 from DWARF/BTF and shipped signed alongside the build**, which
+is exactly what [`../development-scope.md`](../development-scope.md) item 5 specifies.
+The proposal asserted it; this demonstrates it.
+
+It also settles why `make tmm-gdb` is the required target: the hookable set, DWARF
+argument layouts, `-fpatchable-function-entry` cost, and the integration itself all need
+what stripping removes.
+
 ## Build log
 
 Nothing built yet. Append dated entries below as work happens — one entry
 per attempt, including failures and their exact error text, since those
 are the parts worth not rediscovering.
+
+### 2026-08-11 — first Datkube cluster, and the local verification toolchain
+
+Not a TMM build — still blocked on source. But everything *around* it now stands, and
+two things were built locally that did not exist before.
+
+**On SEA:** booted `eob-datkube-01`, brought up a `kind` cluster with
+`datkube create-cluster` (Kubernetes v1.32.0, Calico + Multus, ~90 s, no credentials),
+and pulled `toolchain_container:v2.1.0` (18.1 GB) and `tmm-img:v0.950.0-0.1.0`
+anonymously from Artifactory. So `make start` will not re-pull, and there is a reference
+TMM image to compare against. Details in the two sections above.
+
+**In this sandbox:** built **PREVAIL** from the vendored tree and ran the whole authoring
+chain end to end for the first time — `clang -O2 -g -target bpf` → `prevail` →
+`budget_pass.py`. Two things that cost time and are worth not rediscovering:
+
+- The build needs the Netskope CA set (see [`README.md`](README.md)) or `FetchContent`
+  fails to clone GSL with a misleading error, **and** Boost headers, which are not
+  installed and cannot be apt-installed here. Download the 1.87.0 source tarball,
+  extract only `boost_1_87_0/boost`, and pass `-DBOOST_HEADERS_DIR=…`.
+- Binaries land in `ebpf-verifier/bin/` **inside the repo tree**, not the build dir.
+  That directory is gitignored, so they stay out of git — but do not be surprised by an
+  11 MB `bin/` appearing under a vendored tree.
+
+`prevail --help` confirms from the shipped binary what
+[`../development-scope.md`](../development-scope.md) item 3a records from source:
+`--termination` *"Default: ignore"*, `--allow-division-by-zero` *"Default: allow"*,
+`--strict` off, `--stack-size`, `--max-call-stack-frames`.
+
+**And running the chain on a real object immediately found a fail-open in our own
+budget pass.** It defaulted to reading `.text`, but clang emits an eBPF program into its
+`SEC()` section and leaves `.text` present and **zero bytes** — so it priced 0
+instructions and returned "ok, under budget" for a program it had never looked at, in
+the one component whose entire job is to fail closed. The self-test never caught it
+because the ELFs it synthesizes put their payload in `.text`, which is exactly the shape
+real objects do not have. Fixed: it now locates the executable section, refuses when
+there is none or when several are ambiguous, and takes `--section` as PREVAIL does.
 
 ### 2026-08-11 — cold-start reproduction of the whole runbook, both stacks
 
