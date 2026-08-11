@@ -189,9 +189,112 @@ Treat that as the working hypothesis, to be confirmed against the guidance:
 - If not → we install/configure `p4` on the VM ourselves, and need a
   Perforce credential + client spec (and the depot path for TMM).
 - Since the network exists on both stacks, Perforce access does **not**
-  discriminate between SJC and SEA. **Still unverified either way:** that the
-  network actually routes to `192.168.13.205` from an instance. Test with a
-  NIC on it before assuming.
+  discriminate between SJC and SEA.
+
+### What `PerforceAccessNet` actually is — inspected 2026-08-11
+
+The hypothesis above survives, but "attach a NIC and sync" is **necessary and
+not sufficient**, and the reason is worth having before the first boot rather
+than after it.
+
+| | SJC | SEA |
+|---|---|---|
+| subnet | `PerforceSub-2731` | `PerforceSub-2867` |
+| CIDR | `10.197.72.0/22` | `10.145.160.0/22` |
+| gateway | `10.197.75.254` | `10.145.163.254` |
+| DHCP | on | on |
+| `host_routes` | **empty** | **empty** |
+| DNS pushed | `10.196.1.1`, **`192.168.180.15`** | `172.27.1.1`, **`192.168.180.15`** |
+
+Three things follow.
+
+1. **Perforce is not on-link.** `192.168.13.205` falls inside neither CIDR, so
+   an instance on this network reaches it only by **routing through the subnet
+   gateway**. Being attached is not being connected.
+2. **DHCP will not give you the route.** `host_routes` is empty on both, so
+   nothing pushes a route for the Perforce prefix. It has to come from the
+   **default route** going out this NIC — which is the gotcha, because a build
+   host wants a management NIC too, `AdminNetwork` is also DHCP-enabled and also
+   offers a gateway (`10.197.63.254` / `10.145.63.254`), and a two-NIC instance
+   therefore boots with **two default-route candidates**. Whichever wins decides
+   whether Perforce traffic leaves by the right interface. A "the NIC is attached
+   but p4 times out" symptom is this, not a firewall.
+   *Fix deterministically rather than hoping:* either make `PerforceAccessNet`
+   the default route, or add an explicit static route for the Perforce prefix via
+   that subnet's gateway. Do not rely on NIC ordering.
+3. **The real discriminator is DNS, not routing.** Both networks are ordinary
+   internal `shared` networks with a gateway; what makes this one *the Perforce
+   network* is that it pushes an **extra resolver, `192.168.180.15`**, which
+   `AdminNetwork` does not. That address is in the same `192.168/16` space as
+   Perforce itself, so it is very likely the resolver that knows that estate.
+   Consequence: **resolving `perforce.f5net.com` may itself depend on being on
+   this network**, so DNS and reachability both hinge on the NIC, and a host that
+   can route there but resolves via `AdminNetwork`'s server alone may still fail.
+
+**Also noticed while looking:** SEA's `AdminNetwork` is **dual-stack** — an IPv6
+`2620:128:e008:4806::/64` alongside the IPv4 `10.145.32.0/19`. SJC's is IPv4 only.
+Not in the comparison table above, and it matters at boot: a dual-stack NIC changes
+default-route selection and which address SSH lands on.
+
+**Still unverified, and still needs a boot:** that traffic actually reaches
+`192.168.13.205:1666` from an instance, and whether any image ships `p4`.
+
+## Image inventory — what is and is not a build environment (2026-08-11)
+
+Checked because the natural assumption is that the image catalogue contains a
+ready-to-build TMM environment. **It does not**, and the two families you would
+reach for first are opposite ends of what a build needs.
+
+SEA's 220 images, by family:
+
+| family | count | what it is |
+|---|---|---|
+| `BIGIP-…` | **75** | BIG-IP VE **appliance** images — the shipped product |
+| `FN-License-Proxy-…` | ~57 | a licensing component, unrelated |
+| `Ubuntu*-pristine`, `Rocky*-pristine` | ~19 | *pristine* means clean OS, no F5 tooling |
+| BIG-IQ, Windows, Cirros, `bnk-…` | ~16 | unrelated |
+| **`ite-el{6,7,8}-chroot`** | **3** | the only build-shaped images present |
+
+- **`BIGIP-tmos-rocky-22.0.0-0.0.570` runs TMM; it cannot build it.** Locked-down
+  TMOS: no compiler, no source tree, no `p4`.
+- **`RockyLinux8.10-pristine` is a blank OS.** A starting point, not an
+  environment.
+- **Nothing is named `build`, `devel`, `sdk` or `toolchain`** on either stack. The
+  only hits on that search were `Cirros`, matching on "**Ci**rros".
+
+**`ite-el*-chroot` is the candidate.** EL6 / EL7 / EL8, 3.44 / 4.06 / 6.34 GB
+qcow2, `visibility: public`, owned by project `b5139c56d5be4d5fab0ae834d900ae0c`
+(not ours), created 2025-06 and 2026-04. Image IDs on SEA:
+
+| image | id |
+|---|---|
+| `ite-el6-chroot` | `0dc96a6a-dc2d-4625-979e-c32384bae36b` |
+| `ite-el7-chroot` | `b4e16837-b352-4c04-aad3-ffb20848220e` |
+| `ite-el8-chroot` | `6013a7c4-be93-4c71-9148-db597a69eebf` |
+
+"chroot" plus a per-EL-generation split is the shape of an **RPM build root**, which
+is how a product like TMOS is built — inside a versioned chroot so the toolchain is
+pinned to the target's base OS, not on the host. The EL6→EL7→EL8 progression tracks
+TMOS's own base-OS progression and 6.34 GB is a populated root rather than a minimal
+OS. **All of that is inference from name, size and generation.** Unconfirmed: what is
+inside one, what `ite` expands to, whether it is meant to be booted or attached and
+`chroot`'d into, and whether `p4` is present anywhere.
+
+**Cheap decisive test, not yet run:** boot or attach `ite-el8-chroot` and look for
+`gcc`, `rpmbuild` and F5 build macros. If it is the build root, the build-host
+question changes from "provision a toolchain" to "boot the one F5 already ships."
+
+### The authoritative source for this is a Confluence page we cannot read
+
+`DEV TMM Compile and Debug` — `docs.f5net.com/spaces/~garlapati/pages/936700918/`
+— is presumably the real answer to compile-and-debug, and it is **blocked on the
+same Confluence auth wall already recorded** for the MCP Server page: reachable at
+`172.25.8.129`, redirects to `/login.action?…permissionViolation=true`, and
+`/rest/api/content/936700918` returns a clean `401`. See
+[`bigip-mcp-server.md`](bigip-mcp-server.md) for the blocker and the
+personal-access-token route rather than a second copy of it here. Until that page is
+readable, everything in this section is inference and should be replaced by whatever
+it says.
 
 ## Can we create instances on either stack?
 

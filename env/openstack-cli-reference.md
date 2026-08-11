@@ -195,6 +195,21 @@ Notes:
   security groups (beyond empty `default`), or servers — nothing to
   reuse, everything below was created from scratch.
 
+## Two-NIC default route — read before launching with `PerforceAccessNet`
+
+The launch recipe above attaches two NICs. Both `AdminNetwork` and
+`PerforceAccessNet` run DHCP and both offer a gateway, so the instance boots with
+**two default-route candidates** and the winner is not something to leave to NIC
+ordering. Perforce (`192.168.13.205`) is **not** on the `PerforceAccessNet` subnet
+and that subnet pushes **no** `host_routes`, so if the default route goes out the
+management NIC, `p4` fails with a timeout that looks like a firewall and is not.
+
+Set it explicitly — make `PerforceAccessNet` the default route, or add a static
+route for the Perforce prefix via that subnet's gateway (`10.197.75.254` on sjc,
+`10.145.163.254` on sea). See
+[`tmm-build-environment.md`](tmm-build-environment.md#what-perforceaccessnet-actually-is--inspected-2026-08-11)
+for the subnets and the DNS consequence, which is the less obvious half.
+
 ## Security groups
 
 Only needed for networks where `port_security_enabled: True` (i.e. not
