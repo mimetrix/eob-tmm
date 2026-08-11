@@ -332,7 +332,22 @@ makes the bootstrap possible without root.
 
 ## Credentials — two clouds
 
-**In place as of 2026-08-11.** `clouds.yaml` holds **both** stacks so
+**In place as of 2026-08-11.** One credential per stack, both named
+`tmm-build-sandbox`, **both expiring `2026-11-11`** — auth will start failing
+that day with a 404-style rejection, which is easy to misread as a config
+problem. Confirm what exists at any time (this lists the credentials
+themselves, not their secrets):
+
+```bash
+OS_CLOUD=sjc openstack application credential list
+```
+
+| Stack | Credential ID | Expires |
+|---|---|---|
+| `sjc` | `529ef27c73e54b4895b69342423654e9` | 2026-11-11 |
+| `sea` | `cdea13fdf7bf42d58defc8191798fc89` | 2026-11-11 |
+
+`clouds.yaml` holds **both** stacks so
 commands select by `OS_CLOUD=sjc` / `OS_CLOUD=sea`:
 
 ```yaml
