@@ -454,3 +454,43 @@ credential. Those test artifacts were deleted.
 Nothing built yet. Append dated entries below as work happens — one entry
 per attempt, including failures and their exact error text, since those
 are the parts worth not rediscovering.
+
+### 2026-08-11 — cold-start reproduction of the whole runbook, both stacks
+
+Not a build. A check that the documented path works from an empty sandbox,
+which is the claim this file makes and had not itself been tested end to end
+in one pass. It does.
+
+From nothing — no venv, no `~/.config/openstack/clouds.yaml`:
+
+1. `bash env/scripts/bootstrap-openstack-cli.sh` → `openstack 10.2.1`. PyPI
+   and `bootstrap.pypa.io` both reachable; no pin needed yet, and 10.2.1 is
+   the same version recorded above, so the unpinned `pip install` has not
+   drifted.
+2. `python3 env/scripts/merge-clouds-yaml.py sea=clouds-sea.yaml
+   sjc=clouds-sjc.yaml` → `~/.config/openstack/clouds.yaml`, mode 600, both
+   clouds present, `verify: false`. The script reported key *names* only, so
+   no secret reached the terminal.
+3. Authenticated against both. Project IDs match the comparison table:
+   sjc `c0007f99…`, sea `fc383461…`.
+
+Elapsed: a few minutes, nearly all of it `pip install`.
+
+**Two things worth recording beyond "it worked."**
+
+- **Neither stack has any instances running** (`server list` empty on both),
+  so anything to be tested starts with a boot. The quota lines above are
+  therefore fully available, not partly consumed.
+- **`keystone` on tcp/443 is open on both** (`10.145.23.16`,
+  `10.197.12.17`). Not in tension with the *refused* result recorded under
+  SSH access above — that was port **22** on the same addresses. Different
+  port, different answer, and the distinction is easy to lose when skimming.
+
+**And a caution about where the credentials sit.** `clouds-sea.yaml` and
+`clouds-sjc.yaml` were in the repo working directory for this, which is the
+arrangement the standing caution in [`README.md`](README.md) says not to
+rely on. `.gitignore` line 23 (`*clouds*.y*ml`) held — repeated `git add -A`
+across a long session never staged either file, and `git log --all` over
+`*clouds*` is empty. But that is the ignore list doing the work, which is
+the fallback and not the rule. Move them out of the tree once merged;
+`merge-clouds-yaml.py` has already copied what it needs.

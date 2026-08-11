@@ -1,7 +1,16 @@
-# OpenStack CLI reference (sjc-stack)
+# OpenStack CLI reference (sjc-stack and sea-stack)
 
-Everything needed to talk to the F5 `sjc-stack` OpenStack environment from
-this (or any similarly bare) sandbox.
+Everything needed to talk to F5's internal OpenStack environments from this
+(or any similarly bare) sandbox. **Both stacks are configured**, selected by
+`OS_CLOUD=sjc` / `OS_CLOUD=sea`; this document was written against
+`sjc-stack` and every command in it works unchanged against `sea-stack`,
+because the only difference is which cloud `OS_CLOUD` names.
+
+Where a *result* below is stack-specific — the image list, the network list,
+the flavor names — read it as sjc's and take the side-by-side comparison from
+[`tmm-build-environment.md`](tmm-build-environment.md#sjc-vs-sea--differences)
+instead. SEA is not a subset: it carries `CustomerConfig` and `LB-VIP-Net`
+that sjc does not, and roughly twice the images.
 
 ## One-time setup
 
