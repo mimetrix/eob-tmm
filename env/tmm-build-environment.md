@@ -22,24 +22,37 @@ Awaiting internal guidance on the build procedure. Confirmed so far:
 
 - Both OpenStack stacks are network-reachable from this sandbox (below).
 - `python-openstackclient` rebuilt in this sandbox (below).
-- **No credentials present** for either stack — sandbox was reset since
-  2026-07-17 and `clouds.yaml` did not survive. Blocked on application
-  credentials before any `openstack` command can run.
+- **Credentials live on both stacks.** Application credentials merged into
+  `~/.config/openstack/clouds.yaml` (mode 600) as clouds `sjc` and `sea`;
+  `openstack project list` succeeds against both. Both projects are named
+  `starin` but are distinct projects, one per stack.
+- **Both stacks inventoried** — quota, flavors, images, networks. See the
+  comparison below. **Rocky-based TMOS images exist on both**, which
+  resolves the July image blocker in principle.
+- Nothing launched yet.
 
 ## Open questions (waiting on guidance)
 
-1. **Which stack** — SJC or SEA? Differences not yet known; see the
-   comparison table below, which is deliberately unfilled.
-2. **Kernel version / image** for the build host — not yet recommended.
+1. ~~**Which stack**~~ — answered by measurement, not guidance: **SEA** has
+   2× the usable quota ceiling. See the comparison table. Still worth
+   confirming against the recommendation when it arrives, in case the
+   build procedure assumes a particular site.
+2. **Kernel version / image** for the build host — not yet recommended. Note
+   the distinction: an image *name* containing `rocky` is not proof of
+   kernel version or BTF support; verify with `uname -r` and
+   `/sys/kernel/btf/vmlinux` after first boot.
 3. **Specialized VM?** There may be a purpose-built build image or flavor
-   rather than a generic Linux one. Unknown.
+   rather than a generic Linux one. Unknown. Neither stack's image list has
+   an obvious `*build*` image, so if one exists it is either named
+   unexpectedly or lives outside these two catalogs.
 4. **Build → ship workflow** — current understanding is: build on the VM,
    then `scp` the app elsewhere. Destination, artifact layout, and
    whether anything else (deps, licensing, a specific runtime) has to
    travel with it are all unconfirmed.
-5. Where the TMM **source** comes from on the build host (Perforce? note
-   that `PerforceAccessNet` exists as a network on the SJC stack — see
-   [03](openstack-cli-reference.md#networks-available-this-project)).
+5. Where the TMM **source** comes from on the build host (Perforce?
+   `PerforceAccessNet` exists on **both** stacks — see the comparison
+   table and
+   [`openstack-cli-reference.md`](openstack-cli-reference.md#networks-available-this-project)).
 
 ## Decision: don't create a dedicated project yet — 2026-08-11
 
@@ -164,9 +177,10 @@ known from here:
   443. DNS resolves but nothing routes.
 
 That last point is consistent with Perforce access being a property of the
-**build VM**, not this sandbox: the SJC stack has a dedicated
-`PerforceAccessNet` network (see
-[03](openstack-cli-reference.md#networks-available-this-project)),
+**build VM**, not this sandbox: **both** stacks carry a dedicated
+`PerforceAccessNet` network (confirmed 2026-08-11 — see the comparison table
+and
+[`openstack-cli-reference.md`](openstack-cli-reference.md#networks-available-this-project)),
 which strongly suggests the build host needs a NIC on it to sync source.
 Treat that as the working hypothesis, to be confirmed against the guidance:
 
@@ -174,37 +188,114 @@ Treat that as the working hypothesis, to be confirmed against the guidance:
   attach a `PerforceAccessNet` NIC at launch and sync on the VM.
 - If not → we install/configure `p4` on the VM ourselves, and need a
   Perforce credential + client spec (and the depot path for TMM).
-- Either way, **whether SEA has an equivalent Perforce path is unknown** —
-  another entry for the SJC-vs-SEA table below.
+- Since the network exists on both stacks, Perforce access does **not**
+  discriminate between SJC and SEA. **Still unverified either way:** that the
+  network actually routes to `192.168.13.205` from an instance. Test with a
+  NIC on it before assuming.
 
 ## Can we create instances on either stack?
 
-**Not yet — blocked solely on credentials.** Everything else is in place:
-CLI installed, both Keystone endpoints answering, SSH path proven, keypair
-storage location known, and the launch recipe (flavor/image/`--nic`/
-`--no-security-group` gotcha) already written up in
-[03](openstack-cli-reference.md#launching-an-instance-big-ip-ve-example).
+**Yes — as of 2026-08-11 nothing technical blocks it.** Credentials work on
+both stacks, the CLI is installed, both Keystone endpoints answer, the SSH
+path is proven, keypair storage is settled, and the launch recipe
+(flavor/image/`--nic`/`--no-security-group` gotcha) is written up in
+[`openstack-cli-reference.md`](openstack-cli-reference.md#launching-an-instance-big-ip-ve-example).
+Quota on both projects shows **0 instances used**, so the full allowance is
+available.
 
-The moment `clouds.yaml` has an application credential per stack, instance
-creation is a single command per stack. Until then every `openstack`
-call fails at auth.
+What's deliberately *not* done: nothing has been launched, because the
+build-host **kernel/image recommendation is still outstanding** (open
+question 2). Launching a guessed image would burn quota and produce a box we
+might have to discard. The one cheap, informative exception worth doing early
+is booting a Rocky-based TMOS image purely to **read its kernel version and
+check for BTF** — that answers the July blocker directly and can be deleted
+immediately after.
+
+First step when resuming, on SEA, using an image **ID** not a name:
+
+```bash
+export OS_CLOUD=sea
+mkdir -p ~/.config/openstack/keys
+openstack keypair create tmm-build > ~/.config/openstack/keys/tmm-build.pem
+chmod 600 ~/.config/openstack/keys/tmm-build.pem
+# kernel/BTF probe — BIGIP-tmos-rocky-22.0.0-0.0.570 on SEA
+openstack server create --flavor F5-BIGIP-large \
+  --image d5030127-bed3-480c-8f51-6e1a5a703ec0 \
+  --nic net-id=AdminNetwork --no-security-group \
+  --key-name tmm-build tmm-kernel-probe
+openstack console log show tmm-kernel-probe | grep -i kernel
+```
+
+Expect the same first-boot credential problem as
+[`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md) documents — the
+console log may answer the kernel question without a shell at all, which is
+why it's the cheapest probe available.
 
 ## SJC vs SEA — differences
 
-**Not yet determined.** Fill in once authenticated against both. The
-things that actually matter for picking a build host:
+**Measured 2026-08-11**, authenticated against both. Recommendation: **SEA
+for the build host**, on quota headroom — see below.
 
 | Dimension | SJC | SEA |
 |---|---|---|
-| Project/tenant available to `starin` | `starin` (id `c0007f99321f4db98b168b1d17f7d7c2`) | ? |
-| Images — TMM/BIG-IP build images present | see [03](openstack-cli-reference.md#picking-a-big-ip-image); newest release image is RHEL7/kernel-3.10 | ? |
-| Rocky Linux 8.10-based image available | not found as of 2026-07-17 | ? — **worth checking, this was the July blocker** |
-| Flavors (esp. large enough to build TMM) | `F5-BIGIP-{small,medium,large,xlarge}`; largest seen 32GB/8vCPU | ? |
-| Networks | `AdminNetwork`, `AllTestVLANs`, `QuarantineNetwork`, `PerforceAccessNet`, `k8s-ext`, `public` | ? |
-| Perforce access path | `PerforceAccessNet` network exists | ? |
-| Quota headroom | ? | ? |
+| Project | `starin` (`c0007f99321f4db98b168b1d17f7d7c2`) | `starin` (`fc383461f577439f84bf4cc4301c43a8`) — same name, **different project** |
+| **Quota: cores** | **20** | **40** |
+| **Quota: RAM** | **51200 MB (50 GB)** | **81920 MB (80 GB)** |
+| Quota: instances | 10 (0 used) | 10 (0 used) |
+| Largest flavor that **fits** quota | 16 vCPU / 32 GB (`datkube-dev-large`) | 32 vCPU / 64 GB (`F5-XCIAB-xlarge`) |
+| Flavors defined | 43 | 40 |
+| Images | 97 | 220 |
+| Rocky-based TMOS | `BIGIP-tmos-rocky-22.0.0-0.0.{569,570}` | `…-0.0.{568,569,570}` |
+| Rocky Linux base images | `RockyLinux8.10-pristine`, `RockyLinux10-pristine`, `rocky8-cloud`, `rocky9-cloud` | `RockyLinux8.10-pristine`, `RockyLinux9-pristine`, `RockyLinux10-pristine`, `rockylinux_9.2-pristine` |
+| BNK images | none | `bnk-Ubuntu22.04.3LTS-pristine`, `bnk-latest-Ubuntu22.04.3LTS-pristine` |
+| Networks | `AdminNetwork`, `AllTestVLANs`, `QuarantineNetwork`, `PerforceAccessNet`, `k8s-ext` | same **plus** `CustomerConfig`, `LB-VIP-Net` |
+| `PerforceAccessNet` | ✅ | ✅ |
 
-Commands to fill that in, per stack (read-only, safe):
+### What follows from this
+
+**The July blocker is resolved — on both stacks.**
+`BIGIP-tmos-rocky-22.0.0-0.0.570` is a **Rocky-based TMOS image**, which is
+exactly what [`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md)
+was waiting for. **Unverified:** its actual kernel version and whether
+`CONFIG_DEBUG_INFO_BTF` is set — that needs a boot and
+`uname -r` / `ls /sys/kernel/btf/vmlinux`, which is the first thing to do
+once a build host exists. Image *name* is not proof of kernel version.
+
+**Quota is the real differentiator, and it favors SEA.** SJC's 50 GB RAM cap
+means the 64 GB flavors cannot run there at all, and its 20-core cap rules
+out anything above 16 vCPU. SEA's 40 cores / 80 GB admits 32 vCPU / 64 GB.
+For a compile-heavy TMM build, cores and RAM are the binding constraint, so
+SEA has roughly **2× the usable ceiling**.
+
+**Do we need both stacks?** Strictly no — one is enough to build on. Keeping
+both is still worth it: it cost one extra application credential, SEA is
+measurably the better build host, SJC holds all the prior groundwork and is
+the documented fallback, and SEA additionally carries BNK images relevant to
+this project's third form factor. If build and run targets end up on
+*different* stacks, note they are separate L3 islands
+(`10.197.x` vs `10.145.x`) — cross-stack `scp` would need a routable path,
+so prefer keeping both roles on one stack unless there's a reason not to.
+
+**Duplicate image names persist on SJC** — two distinct image IDs both named
+`BIGIP-tmos-rocky-22.0.0-0.0.570`
+(`f397ba2a-…`, `dfb8e164-…`). This is the same gotcha recorded in
+[`openstack-cli-reference.md`](openstack-cli-reference.md#picking-a-big-ip-image):
+`--image <name>` fails with "More than one Image exists with the name …".
+**Always launch with `--image <id>`.** SEA has a single `0.0.570`
+(`d5030127-…`).
+
+### Image IDs, recorded 2026-08-11
+
+| Image | SJC | SEA |
+|---|---|---|
+| `BIGIP-tmos-rocky-22.0.0-0.0.570` | `f397ba2a-cc04-4879-bcde-2e7d885673b0` **and** `dfb8e164-3191-4843-bb37-dc7ad00e80de` | `d5030127-bed3-480c-8f51-6e1a5a703ec0` |
+| `BIGIP-tmos-rocky-22.0.0-0.0.569` | `f9c2d4b1-a30c-44f7-9014-dd260938ad1f` | `57a9942b-933e-48f5-9b1d-f7d89d4075e5` |
+| `RockyLinux8.10-pristine` | `f7c34529-5494-43f8-b586-824d60066417` | `3eee4eec-6a45-42a7-8c94-46bed36ecb28` |
+
+IDs are stack-local and can change if images are re-uploaded — re-resolve by
+name before relying on them.
+
+Commands used, per stack (read-only, safe):
 
 ```bash
 export OS_CLOUD=sjc   # or: sea
@@ -241,7 +332,7 @@ makes the bootstrap possible without root.
 
 ## Credentials — two clouds
 
-Once app credentials exist, `clouds.yaml` holds **both** stacks so
+**In place as of 2026-08-11.** `clouds.yaml` holds **both** stacks so
 commands select by `OS_CLOUD=sjc` / `OS_CLOUD=sea`:
 
 ```yaml
