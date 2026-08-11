@@ -259,8 +259,32 @@ SEA's 220 images, by family:
   TMOS: no compiler, no source tree, no `p4`.
 - **`RockyLinux8.10-pristine` is a blank OS.** A starting point, not an
   environment.
-- **Nothing is named `build`, `devel`, `sdk` or `toolchain`** on either stack. The
-  only hits on that search were `Cirros`, matching on "**Ci**rros".
+- **Corrected 2026-08-11, same day.** An earlier revision of this section concluded
+  "no build environment exists in the catalogue." That was wrong, and both reasons
+  are worth keeping. The search pattern was `devel`, so **`Datkube-Devbox-*` slipped
+  straight through** — `dev` would have caught it. And the search was over image
+  *names*, when the manifest is in an image **property**: `Datkube-Devbox-Berge`
+  carries its own `description` listing what is installed. Searching names alone
+  cannot find that.
+
+| `Datkube-Devbox-…` | SEA | what its own `description` property says |
+|---|---|---|
+| `Datkube-Devbox-Berge` | `abecfaf0-4fa1-4519-a1a7-fcd316506f1c` | Creator: Michael Berge. **Installed Tools:** Datkube, Docker, GCC, GDB, Go, Helm, iproute2, Kind, Kubectl, net-tools, yq |
+| `Datkube-Devbox-050323-Ahanchi` | `1792cb21-9197-46f3-b875-31c769edacaa` | 0.88 GB, `min_disk 0` — too thin to hold much; older |
+
+`Datkube-Devbox-Berge` is 3.74 GB, `min_disk 40 GB`, created 2025-08-20, public,
+owned by project `b5139c56…`. **It is a snapshot, not a curated image** —
+`image_type: snapshot`, `owner_user_name: berge`, with a `base_image_ref` to
+something else. That is "what one engineer had installed on that date", captured.
+Nobody owns keeping it current.
+
+**Tools, not source, and not a complete build machine.** The property says
+*Installed Tools* and lists no source tree, and — the gap that matters — **no `p4`**.
+3.74 GB is consistent with Ubuntu + Docker + Go + k8s tooling; a TMOS source tree
+would make it far larger. So the three pieces stay separate: the devbox supplies the
+**runtime target** (kind/kubectl/helm/docker) and a **toolchain** (gcc/gdb/go), while
+**source still comes from Perforce** and needs a client, a credential, a client spec
+and a depot path, none of which are settled.
 
 **`ite-el*-chroot` is the candidate.** EL6 / EL7 / EL8, 3.44 / 4.06 / 6.34 GB
 qcow2, `visibility: public`, owned by project `b5139c56d5be4d5fab0ae834d900ae0c`
@@ -284,7 +308,106 @@ inside one, what `ite` expands to, whether it is meant to be booted or attached 
 `gcc`, `rpmbuild` and F5 build macros. If it is the build root, the build-host
 question changes from "provision a toolchain" to "boot the one F5 already ships."
 
-### The authoritative source for this is a Confluence page we cannot read
+## The build procedure — from "Fast cycling tmm builds in a Datkube environment"
+
+Source: internal Confluence page `~smccarthy` / `1162662642`, read from a PDF export
+on 2026-08-11. The export is **deliberately not committed** (`.gitignore` covers
+`*.pdf`) — it carries internal hostnames and usernames and this repo pushes to
+GitHub. What follows is the operational content in our own words.
+
+**The shape, which is the part worth understanding first: TMM builds into a
+container image and runs as a Kubernetes pod.** Not an appliance boot. Two machines
+are involved and the loop between them is entirely SSH-driven. The page is explicit
+that this **deliberately bypasses CI/CD** — "too slow, bloated, error prone" — so it
+is the fast path, not the sanctioned one.
+
+### One-time setup
+
+1. **SSH private-key auth from the build machine to the Datkube machine.** Not
+   optional: every deploy step runs over `ssh`/`scp`.
+2. **On the Datkube machine**, point the deployment at a local image instead of the
+   registry — `kubectl edit deploy/f5-tmm`, then set
+
+       image: tmm:local
+       imagePullPolicy: Never
+
+   Without this it keeps pulling from Artifactory and your build is ignored.
+
+### The cycle
+
+On the **build machine**:
+
+```bash
+# Delete prior build artifacts FIRST. They may be root-owned, and if they
+# survive, your changes silently will NOT be in the new container — it builds,
+# deploys and runs the old code. This is the failure mode to remember.
+sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_* docker_build/tmm-runtime.*
+
+make tmm container                      # -> docker image 'tmm:local'
+docker save tmm:local -o /tmp/tmm-local.tar
+scp /tmp/tmm-local.tar dev@<datkube-host>:/tmp
+```
+
+On the **Datkube machine**:
+
+```bash
+kind load image-archive /tmp/tmm-local.tar --name datkube
+kubectl delete $(kubectl get pods -l app=f5-tmm -o name)   # k8s restarts on the new image
+```
+
+A `datpush` script chains the save / scp / `kind load` / pod-delete steps, so the
+whole cycle is one line:
+
+```bash
+sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_* docker_build/tmm-runtime.* \
+  && make tmm container && datpush
+```
+
+Its default `DATHOST=10.145.35.215` sits inside **SEA's** `AdminNetwork`
+(`10.145.32.0/19`, verified), so Datkube boxes live on SEA — consistent with SEA
+being the recommendation on quota.
+
+### A second path, aimed at debugging
+
+Christian Koenning, `gitswarm.f5net.com/koenning/k8s_tmm_gdb` — take a
+locally-built TMM **binary** into a Datkube container, with the emphasis on running
+it under **gdb**. Not read yet; more directly relevant to this repo's work than the
+container-cycling path, because the questions here are about TMM's internals.
+
+### What this does NOT tell us
+
+- **Where the source comes from.** `make tmm` presumes a tree; Perforce is still the
+  unresolved half (client, credential, client spec, depot path).
+- **What `make tmm` runs inside.** Whether the build happens on the devbox directly
+  or inside a chroot — which is where `ite-el*-chroot` may fit, since the Makefile
+  clearly produces `RPMS`/`SRPMS`. The page never mentions the chroots, so that
+  remains inference.
+- **Whether `Datkube-Devbox-Berge` is the build box, the Datkube box, or both.** It
+  has the tools for either.
+
+### Where our validation diverges from this loop — and stops earlier
+
+For the questions this repo actually needs answered, **the procedure stops at
+`make tmm`.** Everything after it — `container`, `docker save`, `scp`,
+`kind load`, `kubectl delete` — exists to *run* TMM in Datkube, and the two cheapest
+validations do not need it running at all:
+
+1. **`nm` over the built binary.** How many functions survive `-O2` as their own
+   out-of-line body is the real size of the hookable set, and it is what item 5's
+   known `hookable()` bug turns on. It also settles whether the worked example's
+   `fw_log_prot_transfer_emit` survives — **condition 1 of
+   [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §10.1, the
+   one condition that example asserts rather than establishes.** A built binary and
+   `nm`. No k8s, no running TMM.
+2. **The `-fpatchable-function-entry` build comparison.** Build twice, with and
+   without, and compare. The *build* half is cheap and answers whether the flag even
+   applies cleanly to this codebase and what it does to size; only the dark-cost
+   measurement at rate needs a running TMM.
+
+Both still need source. So Perforce, not Datkube, is the real gate on validating
+anything here.
+
+### The authoritative source for compile/debug is a Confluence page we cannot read
 
 `DEV TMM Compile and Debug` — `docs.f5net.com/spaces/~garlapati/pages/936700918/`
 — is presumably the real answer to compile-and-debug, and it is **blocked on the
