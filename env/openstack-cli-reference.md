@@ -8,7 +8,7 @@ because the only difference is which cloud `OS_CLOUD` names.
 
 Where a *result* below is stack-specific — the image list, the network list,
 the flavor names — read it as sjc's and take the side-by-side comparison from
-[`tmm-build-environment.md`](tmm-build-environment.md#sjc-vs-sea--differences)
+[`tmm-build-environment.md`](tmm-build-environment.md#the-stacks--sea-and-sjc)
 instead. SEA is not a subset: it carries `CustomerConfig` and `LB-VIP-Net`
 that sjc does not, and roughly twice the images.
 
@@ -207,7 +207,7 @@ management NIC, `p4` fails with a timeout that looks like a firewall and is not.
 Set it explicitly — make `PerforceAccessNet` the default route, or add a static
 route for the Perforce prefix via that subnet's gateway (`10.197.75.254` on sjc,
 `10.145.163.254` on sea). See
-[`tmm-build-environment.md`](tmm-build-environment.md#what-perforceaccessnet-actually-is--inspected-2026-08-11)
+[`tmm-build-environment.md`](tmm-build-environment.md#follow-on-cbip-and-what-is-known-about-perforce)
 for the subnets and the DNS consequence, which is the less obvious half.
 
 ## Security groups

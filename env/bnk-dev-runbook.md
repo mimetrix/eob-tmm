@@ -11,7 +11,7 @@ bites, the reason is stated inline rather than left as folklore. Companion docum
 
 **Two boxes, deliberately.** Building is not running. The proposal's open questions are
 about TMM's *runtime* cost, and measuring that on a machine simultaneously compiling
-2,039 `.c` files inside an 18 GB toolchain gives numbers worth nothing. It is also F5's
+2,039 `.c` files inside the toolchain container gives numbers worth nothing. It is also F5's
 own topology — the fast-cycling page assumes a build machine and a Datkube machine with
 `scp` between them, which is why `datpush` exists.
 
@@ -359,7 +359,7 @@ printf 'ARTIFACTORY_USER=%s\nARTIFACTORY_TOKEN=%s\n' "<ldap-user>" "<token>" > .
 # EVERY docker exec in the Makefile is `docker exec -it`, so the build CANNOT run
 # without a pty. Overriding DOCKER_EXEC does not help: a Makefile `export VAR = …`
 # beats an environment variable on recursion, and line 185 hardcodes another -it.
-script -qec "make start" /dev/null          # pulls tc-tmm (~18 GB), runs it, install-libs
+script -qec "make start" /dev/null          # pulls tc-tmm (2.5 GB), runs it, install-libs
 script -qec "make tmm-gdb" /dev/null        # build WITH debug symbols
 ```
 
@@ -493,7 +493,7 @@ collapse to `kind load docker-image tmm:local --name datkube` with no tarball.
 openstack --os-cloud sea server delete eob-bnk-build-01 eob-bnk-datkube-01 --wait
 ```
 
-Deleting the build box costs the 2.5 GB clone and the 18 GB toolchain image, so keep it
+Deleting the build box costs the 2.2 GB clone and the 2.5 GB toolchain image, so keep it
 if you will be back soon.
 
 ---
