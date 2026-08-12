@@ -111,8 +111,11 @@ Edit `vars.yml`:
 ```yaml
 olympus_user: "<your-ldap-username>"
 olympus_email: "<you>@f5.com"
-artifactory_token: "PLACEHOLDER-not-a-real-token"   # only exported to the shell profile;
-                                                    # nothing authenticates with it
+artifactory_token: "PLACEHOLDER-not-a-real-token"   # THIS one authenticates nothing — the
+                                                    # playbook only exports it to a shell
+                                                    # profile. The real token goes in
+                                                    # ~/code/tmm/.env at step 8, where the
+                                                    # build genuinely needs it.
 root_password: "<random>"        # console/sudo fallback only — access is key-based
 user_password: "<random>"
 
@@ -319,9 +322,12 @@ ssh -i $KEY <ldap-user>@$IP \
   'echo "<token>" | docker login artifactory.f5net.com -u <ldap-user> --password-stdin'
 ```
 
-**Note the asymmetry:** `docker pull` from `artifactory.f5net.com/f5-tmm-docker/…` works
-**anonymously**, but `dockerhub-remote` (where kind's node image lives) and the whole
-REST API require auth.
+**Note the asymmetry, and do not read it as "the token is optional."** `docker pull` of
+F5-published images works **anonymously** — the toolchain container comes down with no
+credential. But the build itself `wget`s three RPMs (`tmstat`, `libbigpacket`, `tcpdump`)
+from Artifactory with `--user`/`--password`, and those return **401 anonymous, 200 with
+the token**. `dockerhub-remote` (kind's node image) needs it too, and the REST API stays
+401 regardless. So `make tmm` will die partway through without a real token in `.env`.
 
 ## 8 · Build TMM
 

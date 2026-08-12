@@ -200,22 +200,46 @@ other use of that field is NULL-checked (`listener.c:1161`, `listener.c:1519`,
 `fw_log_profile.c:4551`, `db_fw_log.c:1663`). The example's mechanism stands; its symbol
 name was a placeholder and is labelled as one everywhere it appears.
 
-## What is gated, and what is not
+## What Artifactory supplies, and what is gated
 
-**"We need access" is four questions, and three answer themselves.**
+`artifactory.f5net.com` is F5's binary repository, and the build depends on it four
+separate ways — worth enumerating, because "Artifactory" is otherwise a single word
+standing in for four different dependencies. All four are named in `input-manifest.yml`.
+
+| role | what comes from it |
+|---|---|
+| **the build machine itself** | `f5-f5dev-docker/tc-tmm` — the MBIP equivalent of `seadev`. Plus `tc-alien` (RPM→DEB), `clang-style-check`, `product-gatekeepr`, and a `tao` test image |
+| **prebuilt binary dependencies** | `tmstat`, `libbigpacket`, `tcpdump` RPMs, `wget`-ed mid-build (`Makefile:343-345`) and alien-converted. TMM does not compile these — which is why `tmm:local` ships with tmstat and tcpdump in it |
+| **generic / npm tarballs** | the protobuf API definitions (`mbip-apis-pb`, `internal-apis-pb`) and `f5auth` |
+| **a publish target** | `Makefile:379` logs into `DOCKER_PUBLISH_REGISTRY`; your component's artifact lands there as a *user build*, which is what lets `input-manifest.yml` name your version for assembly without merging |
+
+### Three tiers of access, not two
+
+| tier | what it gets you |
+|---|---|
+| **anonymous** | `docker pull` of F5-published images — the 18.1 GB `toolchain_container:v2.1.0` and `tmm-img` came down with no credential at all |
+| **an identity token** | the RPM and tarball dependencies above, `dockerhub-remote` (where kind's node image lives), and publishing |
+| **the REST API** | still **401** — you cannot *list* repos or discover versions at any tier we hold |
+
+**The token is load-bearing for the build, and an earlier note here said otherwise.** It is
+true that the toolchain image pulls anonymously, and true that `spk-devmachine`'s
+`artifactory_token` variable authenticates nothing (it is only exported into a shell
+profile). Neither generalises: probed directly,
+`f5-tm_lib-rpm/tmstat/tmstat-1.0.0-0.x86_64.rpm` returns **401 anonymous, 200 with the
+token**. So `~/code/tmm/.env` is not optional plumbing — without it `make tmm` dies partway
+through on an RPM fetch.
+
+**The registry/API split is still the useful observation.** Images are obtainable if you
+know the exact tag; you cannot browse to discover tags. So a current `input-manifest.yml`
+is worth more than broad read access — that one *file* names every version.
+
+### The other walls
 
 | what | endpoint | status |
 |---|---|---|
 | `kind` node images, Calico, Multus | public / cached | works |
-| **`docker pull` from Artifactory** | `artifactory.f5net.com` | **works anonymously** — pulled the 18.1 GB `toolchain_container:v2.1.0` and `tmm-img` with no credential |
-| Artifactory REST API | `/artifactory/api/…` | 401 — cannot *list* repos or discover versions |
-| `dockerhub-remote` (kind's node image) | `artifactory.f5net.com` | needs auth |
 | GitSwarm HTTPS / SSH | `gitswarm.f5net.com` | needs an account and a registered key |
 | Confluence | `docs.f5net.com` | `permissionViolation=true`; REST 401 |
-
-**The registry/API split is the important one.** Images are obtainable if you know the
-exact tag; you cannot browse to discover tags. So a current `input-manifest.yml` is worth
-more than broad access — that one *file* names every version.
 
 **All the 401s are one identity: olympus LDAP.** GitSwarm's sign-in page says it outright
 — *"Sign in using your olympus(ldap) credentials. Do not use email as username."*
@@ -233,9 +257,9 @@ too, but the key is better: the private half never leaves the box and revoking i
 click. **Keep the LDAP password out of the environment entirely** — tokens and keys are
 per-service and revocable; the account password is not.
 
-So the whole exercise reduces to **one credential: GitSwarm access to `tmm/tmm`.** Not
-Perforce (that is CBIP), not Artifactory (anonymous pulls work), not a build host (the
-toolchain is a container).
+So the exercise needs **two credentials, and neither is Perforce or a build host**: a
+GitSwarm key for `tmm/tmm`, and an Artifactory identity token for the build's own RPM
+dependencies. Perforce is CBIP; the build host is a container you pull.
 
 **One caution.** TMM's Makefile echoes its full `docker run` line, `-e
 ARTIFACTORY_TOKEN=…` included, so the token lands in every build log. Filter it out of
