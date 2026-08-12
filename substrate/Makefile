@@ -11,10 +11,10 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm gate clean
+        check-skeletons check-geometry check-shields check-stack check-vm check-tramp gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm
+       check-skeletons check-geometry check-shields check-stack check-vm check-tramp
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -82,6 +82,21 @@ check-vm:
 	  && echo "ok    ls_vm_config.c  (stands alone, no uBPF headers needed)"
 	@$(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I../ubpf/vm ls_vm_load.c \
 	  && echo "ok    ls_vm_load.c  (runtime load path; compiles against the real ABI)"
+
+# The patched-entry trampoline. The .S is x86-64 only, so it is assembled where
+# the assembler can take it and skipped loudly elsewhere --- this sandbox is
+# aarch64, which is exactly the kind of thing that otherwise reports success by
+# never running.
+check-tramp:
+	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_tramp.c \
+	  && echo "ok    ls_tramp.c  (the per-hook C half; arch-generic)"
+	@if [ "$$(uname -m)" = "x86_64" ]; then \
+	  $(CC) -c trampoline_x86_64.S -o .tramp.o && \
+	  echo "ok    trampoline_x86_64.S  (assembles; endbr64 entry, CFI emitted)" && \
+	  rm -f .tramp.o; \
+	else \
+	  echo "skip  trampoline_x86_64.S  (host is $$(uname -m), not x86_64)"; \
+	fi
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
 # asserted. A rejection program that starts passing is the dangerous direction, so both
