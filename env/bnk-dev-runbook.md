@@ -576,6 +576,168 @@ kubectl delete $(kubectl get pods -l app=f5-tmm -o name)
 The fast-cycling page's `datpush` script chains the last four steps. On a single box they
 collapse to `kind load docker-image tmm:local --name datkube` with no tarball.
 
+## 12b · Embed the VM in TMM
+
+Everything above builds *stock* TMM. This is the part that puts a verified eBPF VM inside it.
+Four places, about 30 lines, and the traps are all in *how the build finds things* rather than
+in the code.
+
+**First, build uBPF with the same compiler as TMM.** Linking needs a matching C library, and
+the toolchain container is the only place that guarantees it:
+
+```bash
+cp -r <ubpf-source> ~/code/tmm/.ubpf            # inside the tree, so /tmm/.ubpf in the container
+C=$(docker ps --format '{{.Names}}' | head -1)
+script -qec "docker exec -i $C bash -c '
+  cd /tmm/.ubpf &&
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUBPF_ENABLE_TESTS=OFF \
+        -DUBPF_SKIP_EXTERNAL=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON &&
+  cmake --build build -j8'" /dev/null
+#  -> .ubpf/build/lib/libubpf.a, built by the same gcc 11.4 that builds TMM
+```
+
+**Then the four changes.** Copy `substrate/ls_vm*.{c,h}`, `vm_stack_policy.h` and the generated
+`ls_ctx_*.h` into `src/base/`, embed the verified shield as a byte array, and:
+
+```bash
+# 1. Makefile.overrides at the repo root --- the library only
+cat > ~/code/tmm/Makefile.overrides <<'MK'
+DEVFS_LIBS  += $(TOPDIR)/.ubpf/build/lib/libubpf.a
+MK
+
+# 2. src/compile/filelist --- register the sources AND carry the include paths.
+#    A global `CFLAGS +=` in Makefile.overrides does NOT reach these files (below).
+#    Add next to the other user-defined options:
+#      UBPF = CFLAGS += -I$(TOPDIR)/.ubpf/vm/inc -I$(TOPDIR)/.ubpf/build/vm
+#    then one line per source, tagged with it:
+#      base/ls_vm.c            STDINC UBPF
+#      base/ls_vm_config.c     STDINC UBPF
+#      base/ls_vm_load.c       STDINC UBPF
+rm -f ~/code/tmm/src/compile/filelist.mk     # it is GENERATED; delete to regenerate
+
+# 3 + 4. in the hooked module: arm at per-instance init, call at the fault site
+```
+
+**The include path is the trap that costs a build.** A global `CFLAGS +=` in
+`Makefile.overrides` reached 344 compile lines and **not** the one file that needed it.
+`filelist` line 14 is `INSTRUMENT = CFLAGS +=`, which every file inherits, so `filelist.mk`
+emits a **target-specific** `CFLAGS` for essentially every object and the global addition is
+invisible in that scope. Use a `filelist` option, as above. Two paths are needed: `vm/inc` for
+`ubpf.h`, and `build/vm` for **`ubpf_config.h`, which cmake generates** and which therefore
+does not exist until uBPF is configured.
+
+**Cross-directory includes use `local/`.** `src/compile/local` is a symlink to `..`, so a module
+file reaches `src/base` as `#include <local/base/ls_vm.h>`, never a relative path. Getting this
+wrong fails only in the *consuming* file, after the new file has already compiled clean.
+
+### The gate nobody expects: TMM whitelists mutable global state
+
+`src/compile/Makefile:1626` runs `bin/diff-globals` against a per-architecture, per-build-type
+list. `bin/print-globals` extracts `.data`, `.bss` and COMMON symbols — deliberately **not**
+functions. It is an allowlist of **global mutable state**, and any new entry fails the link.
+
+```bash
+# after a failed link, the diff names the new symbols; add them deliberately
+cd ~/code/tmm/src/compile
+printf '%s\n' g_cfg g_origin g_slots g_ready ... >> debug_whitelist_x86_64
+sort -u debug_whitelist_x86_64 -o debug_whitelist_x86_64
+# repeat for default_whitelist_x86_64
+```
+
+Two things follow. **Predict the symbols and pre-add them** — it saves a 12-minute cycle. And
+**give every static a unique name**: `print-globals` truncates at the first dot, so a
+`static ... buf[]` enters the permanent allowlist as the entirely generic `buf`.
+
+**Then build normally:** `script -qec "make tmm-gdb" /dev/null`.
+
+## 12c · Load it into the cluster and run it
+
+**Create the cluster on the deploy box.** `datkube` is already installed on it:
+
+```bash
+sudo sysctl -w fs.inotify.max_user_instances=8192
+datkube create-cluster                  # kind: control-plane + worker, Calico, Multus, ~90 s
+printf 'export AF_USERNAME=%s\nexport AF_TOKEN=%s\n' "$U" "$T" > ~/.af_env && chmod 600 ~/.af_env
+. ~/.af_env && bash ~/code/datkube/scripts/setup-auth.sh
+datkube set-profile bnk-core && datkube install     # ~10 min; creates deploy/f5-tmm
+```
+
+`datkube get-profiles` lists them — **not** `list-profiles`, which is not a verb.
+
+**Ship the image. `kind load` does not work here:**
+
+```bash
+docker save tmm:local -o /tmp/tmm-local.tar
+scp -i ~/.ssh/id_datpush /tmp/tmm-local.tar starin@<deploy>:/tmp/
+
+# kind load image-archive fails: "ERROR: failed to detect containerd snapshotter"
+# so do what it does underneath --- and do it for EVERY node
+for n in datkube-control-plane datkube-worker; do
+  docker exec -i $n ctr --namespace=k8s.io images import - < /tmp/tmm-local.tar
+done
+```
+
+**Why per node, and why not `docker load`:** there are **two image stores**. `docker images` on
+the VM shows only the `kindest/node` image, because docker runs the *nodes*; every workload runs
+one level down under each node's own containerd. `docker exec <node> crictl images` is where the
+25 real images live. The kubelet asks its node's containerd, so an image in the VM's docker is
+invisible to Kubernetes.
+
+**Point the deployment at it and roll:**
+
+```bash
+kubectl set image deploy/f5-tmm f5-tmm=docker.io/library/tmm:local
+kubectl patch deploy f5-tmm --type=json \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}]'
+kubectl rollout status deploy/f5-tmm --timeout=240s
+```
+
+**Verify the running binary is yours — and not with `strings` inside the container**, which is
+absent there and silently returns zero for everything:
+
+```bash
+kubectl cp <pod>:/usr/bin/tmm64.debug /tmp/pod_tmm -c f5-tmm
+strings -a /tmp/pod_tmm | grep -c 'does not live in section'    # expect >= 1
+```
+
+`nm` will report **zero** uBPF symbols: the shipped binary is stripped, not un-integrated.
+
+## 12d · Turn it on, and measure
+
+Nothing is enabled by default — an unset environment behaves exactly like stock TMM. Everything
+below is a `kubectl set env` and a pod restart, roughly ten seconds, versus twenty minutes for a
+rebuild:
+
+```bash
+kubectl set env deploy/f5-tmm -c f5-tmm \
+  LS_VM_VERBOSE=1 \        # arm confirmation, build stamp, first invocation
+  LS_VM_BENCH=100000 \     # cycle floor at init, without needing traffic
+  LS_VM_TIMING=1 \         # accumulate cycles on the real call path
+  LS_LOAD_SOCKET=/tmp/ls_load.sock   # runtime load path (UNVERIFIED --- see below)
+```
+
+Others: `LS_SHIELD_ENABLE`, `LS_SHIELD_MODE` (disable|monitor|enforce), `LS_SHIELD_PATH` (load
+the program from a file instead of the built-in blob), `LS_SHIELD_SECTION`/`LS_SHIELD_FUNCTION`
+(O14's two identities), `LS_VM_FUEL`, `LS_VM_JIT`, `LS_VM_REPORT_EVERY`.
+
+What it prints:
+
+```
+ls_vm: init  build=<stamp>  jit=0 fuel=0 timing=1
+ls_vm: ARMED slot=0 section=fentry/<hook> function=shield mode=2 bytes=4320
+ls_vm: bench slot=0 path=interp iters=100000 min=126 mean=287 max=1403200 cycles
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock --- accepts UNVERIFIED programs
+```
+
+**`LS_LOAD_SOCKET` has no signature verification** (scope item 4, deferred). It is off unless
+set, the socket is 0600, and every load says so. Do not leave it enabled in anything shared.
+
+### Reading the numbers honestly
+
+`min` is the cleanest estimate; `mean` is 2–3× it even on an idle box with no traffic, and `max`
+is scheduler preemption rather than the program. It measures the program **only** — no `ctx`
+build, no trampoline, no poll loop — so it is a **floor**, for the smallest useful program.
+
 ## 13 · Teardown
 
 ```bash
@@ -601,6 +763,15 @@ if you will be back soon.
 | build: "the input device is not a TTY" | every `docker exec` is `-it`; use `script -qec`. Step 8. |
 | build: missing `/usr/include/errdefs/product_codes.h` | `install-libs` never ran because `_start` failed. Step 8. |
 | build: "sed: can't read .env" / "username is empty" | TMM needs its own `.env`. Step 8. |
+| `kind load` fails: "failed to detect containerd snapshotter" | use `docker exec <node> ctr --namespace=k8s.io images import -` per node. Step 12c. |
+| a header is missing on exactly ONE file while hundreds compile | a global `CFLAGS +=` does not reach files that `filelist.mk` gives target-specific flags to — which is nearly all of them. Use a `filelist` option. Step 12b. |
+| link fails with a diff of symbol names | TMM whitelists mutable global state (`.data`/`.bss`/COMMON, not functions). Add them deliberately. Step 12b. |
+| `strings` inside the f5-tmm container returns 0 for everything | it is not installed there; `kubectl cp` the binary out first. Step 12c. |
+| `nm` shows zero `ubpf_*` symbols in the running binary | it is stripped, not un-integrated. Step 12c. |
+| `docker images` on the deploy VM shows only `kindest/node` | two image stores; workloads live in each node's containerd. Step 12c. |
+| a backgrounded process in `kubectl exec` dies when the exec ends | use something that daemonises, or a long-lived pod command. |
+| `F5VirtualServer` rejected: "Unsupported value: round-robin" | the enums are upper-case (`ROUND_ROBIN`); `snat.type` is lower-case (`automap`). |
+| virtual server accepted but connections refuse | check TMM's own log for `Proxy initialization failed ... Defaulting to DENY`, and for `address conflict detected` — the VIP may already be taken. |
 | `git clone`/`FetchContent` fail as though the remote is down | Netskope CA not trusted. Step 0. |
 | apt: "certificate is NOT trusted" | image carries an HTTPS third-party repo; disable it. Step 11. |
 | GitLab project returns 404 while signed in | no membership — it is not a missing repo. Step 0. |
