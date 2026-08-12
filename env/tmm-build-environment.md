@@ -775,6 +775,52 @@ script did `cp /tmp/harness.c src/base/`, silently reverting the edit immediatel
 compiling it. A pipeline that hides an exit status, and a build step that overwrites its own
 input, produce the same symptom: a fix that appears not to work.
 
+### Nothing is packaged and nothing is deployed
+
+Worth stating plainly, because "TMM builds with the VM in it" invites the assumption that
+something somewhere is running it. **No container image carries this code, and no cluster
+exists.**
+
+- `make tmm` links `obj_x86_64.no_pgo/tmm.no_pgo`. It does **not** produce an image.
+  `make container` / `make tmm-gdb` do that, and neither has been run since the integration.
+- The earlier `tmm:local`, `tmm:local_img` and `tmm_gdb:latest` images are **gone** — the
+  integration script's `sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_*` cleared the
+  artifacts they were built from, and they predated the VM anyway.
+- The only image on the build box is the toolchain (`tc-tmm:v2.3.1`); the only running
+  container is that toolchain.
+- `eob-bnk-datkube-01` has kind, kubectl and helm installed but **no cluster created**.
+
+So the chain from here to a running TMM is: `make tmm-gdb` → `docker save` → `scp` →
+`kind load image-archive` → `kubectl delete pod`. None of it done. Every cost question waits
+on that, and no performance claim can be made before it.
+
+### Can arbitrary bytecode be loaded? Not today, and the reason is not reassuring
+
+**No external path exists.** The program is a byte array compiled into the binary
+(`ls_shield_blob.h`); the only caller in TMM is `http_psm_init`. No message handler, no file
+read, no socket. Changing the program means rebuilding TMM.
+
+**But the loader would accept anything handed to it**, and that is the part to be honest about:
+
+| gate | present |
+|---|---|
+| signature check against a baked-in key | **no** — scope item 4, unwritten |
+| any evidence in TMM that these bytes were verified | **no** |
+| section-vs-symbol identity check | yes (O14) |
+| uBPF structural validation — opcodes, registers, jump targets in range, no jump into a `lddw`, calls resolve, self-loop rejected | yes |
+| interpreter runtime bounds checks | yes |
+| instruction fuel | yes — 10,000 |
+
+An unverified program today would therefore be **contained but not proven**: it cannot corrupt
+memory (the interpreter traps first), cannot run away (fuel), cannot jump outside its own code
+— but nothing establishes it is the program someone verified, or that anyone verified it.
+PREVAIL ran off-box, and **no artifact ties "these bytes" to "were proved safe."** Closing that
+is scope items 3 and 4, and `ls_vm.h` says outright that `ls_vm_arm` trusts its input.
+
+**And the containment above is partly an artefact of the slow choice.** Fuel and bounds checks
+are *interpreter* properties; the native-code path drops the instruction limit entirely
+(finding O6), so switching for speed removes one of the three.
+
 ### What this establishes, and what it does not
 
 It establishes that the VM links into TMM's build, instantiates per instance, and is callable
