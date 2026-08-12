@@ -307,6 +307,67 @@ non-interactive shell**, and every `ssh host 'go build …'` reports `go: comman
 on a box where `~/go/bin/go` works fine. Either use `.profile` as above or call the
 absolute path in automation.
 
+### 6b · A shell from your own workstation
+
+The provisioning key lives wherever you ran the playbook, which is not necessarily where
+you want to work. **Install your workstation's own public key rather than moving the
+provisioning private key around** — the private half never transits, and revoking it is
+one line on the box.
+
+From the control machine, with your workstation's `.ssh` visible (in this sandbox it is a
+read-only virtiofs mount of the operator's real `~/.ssh`, so their public keys are already
+present):
+
+```bash
+PUB=$(cat ~/.ssh/id_ed25519.pub)          # the workstation's own key, not the provisioning one
+ssh -i $KEY <ldap-user>@$IP \
+  "grep -qF '$PUB' ~/.ssh/authorized_keys || echo '$PUB' >> ~/.ssh/authorized_keys"
+```
+
+Then, from the workstation, with **no `-i`** — `id_ed25519` is a name ssh offers by
+default:
+
+```bash
+ssh <ldap-user>@<ip>
+```
+
+Two things that will look broken and are not:
+
+- **You must be on the F5 network or VPN.** These are `10.145.x` on SEA's AdminNetwork,
+  routable internally, with no floating IP by design.
+- **The username flips partway through provisioning.** A pristine box takes `ubuntu`; once
+  `setup-dev-machine-slim.yml` has run, `ubuntu` is *disabled* and the LDAP-named user
+  works instead. So mid-playbook you will find exactly one of the two accounts answering,
+  which reads as a broken key and is just the box changing hands:
+
+  | | before the playbook | after |
+  |---|---|---|
+  | `ubuntu` | works | **refused** |
+  | `<ldap-user>` | doesn't exist | works |
+
+  Seed the key into `ubuntu` *before* the playbook and it carries across on its own — the
+  `common` role's "Copy SSH authorized keys from ubuntu user" task does it. Seeding after
+  means doing both accounts by hand.
+
+Worth keeping a `~/.ssh/config` block so the addresses stop being something to look up:
+
+```
+Host bnk-build
+    HostName 10.145.42.119
+    User <ldap-user>
+Host bnk-datkube
+    HostName 10.145.35.70
+    User <ldap-user>
+```
+
+IPs are assigned at boot and change if a box is rebuilt. Re-resolve with:
+
+```bash
+openstack --os-cloud sea server list -f value -c Name -c Networks
+```
+
+and take the **IPv4** address — SEA's AdminNetwork is dual-stack and lists IPv6 first.
+
 ## 7 · Credentials on the box
 
 ```bash
@@ -514,6 +575,7 @@ if you will be back soon.
 | no dev user; later "chown failed: failed to look up user" | a `- role:` line was commented out, orphaning its `when:` onto `common`. Step 2. |
 | `--check` dies in `from_json` | VM is created by shell tasks, which check mode skips. Step 4. |
 | yq missing → `docker: invalid reference format` / `docker run … :v` | Makefile resolves image names from `input-manifest.yml` via `yq`; install mikefarah's. Step 8. |
+| ssh refused as `ubuntu` on a configured box, or as `<ldap-user>` on a pristine one | the playbook disables `ubuntu` and creates the LDAP user; exactly one answers at a time. Step 6b. |
 | build: "the input device is not a TTY" | every `docker exec` is `-it`; use `script -qec`. Step 8. |
 | build: missing `/usr/include/errdefs/product_codes.h` | `install-libs` never ran because `_start` failed. Step 8. |
 | build: "sed: can't read .env" / "username is empty" | TMM needs its own `.env`. Step 8. |
