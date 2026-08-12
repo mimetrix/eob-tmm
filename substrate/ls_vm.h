@@ -56,6 +56,10 @@ enum ls_mode {
  * fixed because allocating on the call path is not acceptable. */
 struct ls_slot {
     void        *vm;        /* struct ubpf_vm *, opaque here          */
+    void        *jit_fn;    /* ubpf_jit_fn when JIT'd; NULL = interpret.
+                             * Held separately because ubpf_exec never
+                             * dispatches to compiled code --- the pointer IS
+                             * the only route to it. */
     enum ls_mode mode;
     bool         armed;
     uint64_t     fired;         /* per-instance; a box-wide sum is wrong */

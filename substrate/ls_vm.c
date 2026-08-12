@@ -70,6 +70,26 @@
 
 #define LS_MAX_SLOTS 8
 
+/*
+ * Per-instance program stack, allocated once.
+ *
+ * ubpf_exec() declares `uint64_t stack[UBPF_EBPF_STACK_SIZE/8]` --- 4 KB --- as a
+ * local, so every invocation pushes and touches a 4 KB frame at whatever depth
+ * TMM's call graph happens to be at. That is the same hazard finding O7 raised
+ * against the JIT prologue, present on the interpreter path as well, and it is
+ * paid per call rather than once.
+ *
+ * ubpf_exec_ex() takes the stack from the caller, so we allocate it once per TMM
+ * instance and hand the same one to every invocation. Safe here for the reason
+ * the rest of this file is lock-free: one VM per instance, run-to-completion, so
+ * two invocations never overlap on a core. It would NOT be safe if a hook could
+ * be re-entered --- a shield that somehow triggered the hooked path again would
+ * corrupt its own stack, which is why re-entrancy is on the trampoline's
+ * requirement list (scope item 1) rather than assumed away.
+ */
+static uint8_t *g_prog_stack;
+#define LS_PROG_STACK_SIZE 4096
+
 /* Per TMM instance. Not shared, not locked --- see the header. `static` because
  * each TMM instance is its own process. */
 static struct ls_slot g_slots[LS_MAX_SLOTS];
@@ -249,6 +269,11 @@ ls_vm_init(void)
 {
     memset(g_slots, 0, sizeof g_slots);
     ls_vm_config_load(&g_cfg);
+    if (g_prog_stack == NULL) {
+        g_prog_stack = calloc(1, LS_PROG_STACK_SIZE);
+        if (g_prog_stack == NULL)
+            return false;
+    }
     if (!g_cfg.enable) {
         /* A shield that misbehaves must be switchable off without reverting the
          * integration and without a rebuild. */
@@ -321,12 +346,17 @@ ls_vm_bench(int slot, uint32_t iters)
         return;
     memset(ctx, 0, sizeof ctx);        /* the NULL case: the shield's hot branch */
 
+    ubpf_jit_ex_fn jf = (ubpf_jit_ex_fn)s->jit_fn;
+
     for (uint32_t i = 0; i < 100 && i < iters; i++)   /* warm */
-        (void)ubpf_exec(s->vm, ctx, sizeof ctx, &ret);
+        if (jf) (void)jf(ctx, sizeof ctx, g_prog_stack, LS_PROG_STACK_SIZE);
+        else    (void)ubpf_exec_ex(s->vm, ctx, sizeof ctx, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
 
     for (uint32_t i = 0; i < iters; i++) {
         uint64_t t0 = ls_cycles();
-        int rc = ubpf_exec(s->vm, ctx, sizeof ctx, &ret);
+        int rc = 0;
+        if (jf) ret = jf(ctx, sizeof ctx, g_prog_stack, LS_PROG_STACK_SIZE);
+        else    rc  = ubpf_exec_ex(s->vm, ctx, sizeof ctx, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
         uint64_t d = ls_cycles() - t0;
         if (rc != 0) { fprintf(stderr, "ls_vm: bench exec fault at %u\n", i); return; }
         total += d;
@@ -334,10 +364,10 @@ ls_vm_bench(int slot, uint32_t iters)
         if (d > worst) worst = d;
     }
     fprintf(stderr,
-            "ls_vm: bench slot=%d iters=%u min=%llu mean=%llu max=%llu cycles"
+            "ls_vm: bench slot=%d path=%s iters=%u min=%llu mean=%llu max=%llu cycles"
             "  (floor: warm cache, no contention, ubpf_exec only --- NOT a"
             " per-packet cost)\n",
-            slot, iters, (unsigned long long)best,
+            slot, jf ? "JIT" : "interp", iters, (unsigned long long)best,
             (unsigned long long)(total / iters), (unsigned long long)worst);
 }
 
@@ -392,7 +422,20 @@ ls_vm_arm(const void *elf, size_t elf_len,
 
     if (g_cfg.jit) {
         char *jerr = NULL;
-        if (ubpf_compile(vm, &jerr) == NULL) {
+        /* ubpf_exec/_ex ALWAYS interpret --- they never dispatch to compiled
+         * code. A JIT'd program is reached only through the function pointer
+         * ubpf_compile returns, so storing it is what makes the JIT do anything
+         * at all. Compiling and then calling ubpf_exec, as an earlier version of
+         * this file did, JITs the program and throws the result away: the
+         * measurement showed jit=1 and jit=0 within noise of each other, which
+         * was the tell. */
+        /* EXTENDED mode, not basic. Basic mode's generated prologue allocates
+         * its own stack --- ubpf.h: "automatically allocates a stack" --- which
+         * is the unprobed 4 KB frame finding O7 is about. Extended mode takes the
+         * stack as an argument, so the same per-instance buffer serves both the
+         * interpreter and the compiled path. */
+        g_slots[slot].jit_fn = (void *)ubpf_compile_ex(vm, &jerr, ExtendedJitMode);
+        if (g_slots[slot].jit_fn == NULL) {
             fprintf(stderr, "ls_vm: JIT requested but failed: %s\n", jerr ? jerr : "?");
             free(jerr);
             goto fail;
@@ -483,7 +526,17 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * shield that cannot run must not take the flow with it. Counted, because a
      * silent fail-open is indistinguishable from a shield that never matched. */
     uint64_t t0 = g_cfg.timing ? ls_cycles() : 0;
-    int rc = ubpf_exec(vm, ctx, ctx_len, &ret);
+    /* Compiled path if we have one, interpreter otherwise. Both take the stack
+     * from us: ubpf_exec would allocate and touch 4 KB of C stack on every packet
+     * reaching this hook, and basic-mode JIT code would do the same in its
+     * prologue without a guard-page probe (O7). */
+    int rc = 0;
+    void *jf = __atomic_load_n(&s->jit_fn, __ATOMIC_ACQUIRE);
+    if (jf != NULL) {
+        ret = ((ubpf_jit_ex_fn)jf)(ctx, ctx_len, g_prog_stack, LS_PROG_STACK_SIZE);
+    } else {
+        rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
+    }
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;
         s->cycles += d;
