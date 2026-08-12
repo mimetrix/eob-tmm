@@ -700,7 +700,7 @@ All ten were added to both x86_64 whitelists (283→293, 276→286), with `.pre-
 so the delta stays recoverable. Using the whitelist is the mechanism's intended purpose:
 adding global state should be a deliberate act.
 
-### It builds, and the data-path function calls the VM
+### It builds and links, and the call site is in the machine code
 
 `make tmm` **rc=0**. Verified in `obj_x86_64.no_pgo/tmm.no_pgo` rather than inferred from the
 exit code:
@@ -717,8 +717,63 @@ objdump   http_psm_profile_name_lookup at 0xcbd940:
             call *%rbp                      <- append_fn, the original path
 ```
 
-So: **TMM has its own eBPF VM, instantiated per instance, called from a real data-path
-function, running a program that PREVAIL verified.** That sentence is now true and checkable.
+**State the claim exactly, because it is easy to inflate.** What is true: the VM's code and a
+PREVAIL-verified program are **inside the TMM binary**, and a data-path function contains a
+`call` to the VM entry point. What is **not** true, and was briefly written here as though it
+were: nothing has **run**. `make tmm` compiles and links; it does not execute TMM.
+
+| claim | status |
+|---|---|
+| uBPF's code is in the TMM binary | verified — 45 functions |
+| the verified shield's bytes are in the binary | verified — `ls_shield_blob` |
+| a `call ls_vm_call` exists inside a data-path function | verified — `0xcbd9ba` |
+| `ubpf_create` / `ubpf_load_elf_ex` ever called | **no** |
+| one eBPF instruction executed | **no** |
+| the TMM process ever started | **no** |
+
+So the honest sentence is: **TMM now links its own eBPF VM and carries a verified program, with
+the call site present in machine code.** Executing it needs TMM running — the pod on the
+Datkube box — and that has not been done. A linked call is not an executed one.
+
+### Bytecode actually ran — and what blocked it is a design gap
+
+Building and linking is not running. `make tmm` compiles; it never executes TMM. To get real
+execution without the pod, a harness on the build box links **the same `ls_vm.c`** that is
+compiled into TMM, the **same `libubpf.a`**, and the **same verified object**, built by the
+same gcc. Not TMM, but the same code path.
+
+It failed, and the failure is worth more than the run:
+
+```
+ls_vm: arm failed: fentry/http_psm_profile_name_lookup function not found.
+```
+
+**PREVAIL selects a program by ELF section name. uBPF selects it by function symbol name.**
+`ubpf_loader.c:271` does `strcmp(rf.name, main_function_name)` where `rf.name` comes from the
+symbol table — while uBPF's header calls that parameter `main_section_name`, which is exactly
+how the mistake gets made. Our object carries section `fentry/http_psm_profile_name_lookup`
+and function `shield`: two identities for one artifact, with nothing relating them. Filed as
+**O14**; `ls_vm_arm()` now takes both and reads the object's symbol table to refuse unless the
+named function is defined in the named section.
+
+With that fixed, the shield's instructions execute:
+
+```
+ls_vm_arm -> slot 0
+  ptlp==NULL -> SAFE_RETURN (the CVE case)                      ok
+  ptlp!=NULL, name==NULL -> SAFE_RETURN                         ok
+  name_len==0 -> SAFE_RETURN                                    ok
+  all present -> FALLTHROUGH (TMM's own body runs)              ok
+  monitor mode: CVE case -> FALLTHROUGH (counted, not applied)  ok
+  unarmed slot / out-of-range slot -> FALLTHROUGH               ok
+  wrong section, absent symbol, truncated object -> refuse      ok
+```
+
+**Two self-inflicted errors in that loop, both of which reported a fixed bug as still broken.**
+`gcc … | head -12` masked the compiler's exit status, so a stale binary ran. And the rebuild
+script did `cp /tmp/harness.c src/base/`, silently reverting the edit immediately before
+compiling it. A pipeline that hides an exit status, and a build step that overwrites its own
+input, produce the same symptom: a fix that appears not to work.
 
 ### What this establishes, and what it does not
 

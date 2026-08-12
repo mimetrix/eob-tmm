@@ -68,12 +68,24 @@ struct ls_slot {
 bool ls_vm_init(void);
 
 /* Load a VERIFIED, SIGNED program object into a slot and arm it. Off the data
- * path (admission time). Verification and signature checking happen BEFORE this
- * --- this function trusts its input, which is why nothing may call it with
- * bytes that did not come through the signing chain.
+ * path (admission time). Signature checking happens BEFORE this.
+ *
+ * BOTH names are required, and that is not redundancy --- the verifier and the
+ * runtime identify a program differently:
+ *
+ *   PREVAIL  selects by ELF SECTION name   ("fentry/<hook>")
+ *   uBPF     selects by FUNCTION SYMBOL    ("shield")   [ubpf_loader.c:271,
+ *            despite its header calling the parameter `main_section_name`]
+ *
+ * So "PREVAIL verified this object" and "uBPF is about to run this program" are
+ * statements about two different identities, and in an object carrying several
+ * functions they can denote different code. This function refuses unless the
+ * named symbol actually lives in the named section --- see finding O14. Passing
+ * one name and hoping is how a verified-but-not-the-verified-one program loads.
  *
  * Returns the slot index, or -1. */
-int ls_vm_arm(const void *elf, size_t elf_len, const char *section, enum ls_mode m);
+int ls_vm_arm(const void *elf, size_t elf_len,
+              const char *section, const char *function, enum ls_mode m);
 
 /* THE CALL PATH. Everything above is setup; this is the part that runs per
  * invocation and the only part whose cost is in the poll loop.

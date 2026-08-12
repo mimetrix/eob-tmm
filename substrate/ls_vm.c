@@ -31,8 +31,13 @@
  *     +            .ptlp_name = ptlp ? (uint64_t)(uintptr_t)ptlp->name : 0,
  *     +            .name_len  = (ptlp && ptlp->name) ? (uint32_t)strlen(ptlp->name) : 0,
  *     +        };
- *     +        if (ls_vm_call(LS_SLOT_PTLOG, &c, sizeof c) == LS_SAFE_RETURN)
+ *     +        if (ls_vm_call(ls_ptlog_slot, &c, sizeof c) == LS_SAFE_RETURN)
  *     +            return false;                             // the declared safe value
+ *
+ *     and at init, passing BOTH identities (O14):
+ *     +        ls_ptlog_slot = ls_vm_arm(blob, sizeof blob,
+ *     +                                  "fentry/http_psm_profile_name_lookup",
+ *     +                                  "shield", LS_MODE_ENFORCE);
  *
  *              const char *str = ptlp->name;
  *              return append_fn(str, strlen(str), dest);
@@ -55,6 +60,7 @@
 #include "ls_vm.h"
 #include "vm_stack_policy.h"
 
+#include <elf.h>
 #include <stdio.h>
 #include <stdlib.h>   /* free() for uBPF's error strings */
 #include <string.h>
@@ -85,6 +91,90 @@ ls_stack_usage(const struct ubpf_vm *vm, uint16_t pc, void *cookie)
     return vm_stack_usage((const void *)vm, pc, cookie);
 }
 
+
+/*
+ * Does `function` live in `section` within this object? (Finding O14.)
+ *
+ * PREVAIL is told a SECTION and proves the program there. uBPF is told a FUNCTION
+ * SYMBOL and runs that. Nothing in either tool relates the two, so an object with
+ * more than one function can be verified as one program and executed as another.
+ * This closes that by reading the object's own symbol table.
+ *
+ * Written defensively on purpose: `elf_len` is attacker-influenced in the real
+ * loader path, so every offset is bounds-checked against it before use. Returns
+ * 1 only when the relationship is positively established --- unknown is a refusal,
+ * not a pass.
+ */
+static int
+ls_symbol_is_in_section(const void *elf, size_t elf_len,
+                        const char *section, const char *function)
+{
+    const unsigned char *base = (const unsigned char *)elf;
+
+    if (elf == NULL || section == NULL || function == NULL)
+        return 0;
+    if (elf_len < sizeof(Elf64_Ehdr))
+        return 0;
+
+    Elf64_Ehdr eh;
+    memcpy(&eh, base, sizeof eh);
+    if (memcmp(eh.e_ident, ELFMAG, SELFMAG) != 0 || eh.e_ident[EI_CLASS] != ELFCLASS64)
+        return 0;
+    if (eh.e_shentsize != sizeof(Elf64_Shdr) || eh.e_shnum == 0)
+        return 0;
+    /* section header table must lie wholly inside the object */
+    if (eh.e_shoff > elf_len ||
+        (size_t)eh.e_shnum * sizeof(Elf64_Shdr) > elf_len - (size_t)eh.e_shoff)
+        return 0;
+    if (eh.e_shstrndx >= eh.e_shnum)
+        return 0;
+
+    const Elf64_Shdr *sh = (const Elf64_Shdr *)(const void *)(base + eh.e_shoff);
+
+    /* section-name string table */
+    const Elf64_Shdr *shstr = &sh[eh.e_shstrndx];
+    if (shstr->sh_offset > elf_len || shstr->sh_size > elf_len - shstr->sh_offset)
+        return 0;
+    const char *shstrtab = (const char *)(base + shstr->sh_offset);
+
+    /* find the symbol table and its string table */
+    const Elf64_Shdr *symtab = NULL;
+    for (unsigned i = 0; i < eh.e_shnum; i++) {
+        if (sh[i].sh_type == SHT_SYMTAB) { symtab = &sh[i]; break; }
+    }
+    if (symtab == NULL || symtab->sh_entsize != sizeof(Elf64_Sym))
+        return 0;
+    if (symtab->sh_offset > elf_len || symtab->sh_size > elf_len - symtab->sh_offset)
+        return 0;
+    if (symtab->sh_link >= eh.e_shnum)
+        return 0;
+
+    const Elf64_Shdr *strh = &sh[symtab->sh_link];
+    if (strh->sh_offset > elf_len || strh->sh_size > elf_len - strh->sh_offset)
+        return 0;
+    const char *strtab = (const char *)(base + strh->sh_offset);
+
+    const Elf64_Sym *sym = (const Elf64_Sym *)(const void *)(base + symtab->sh_offset);
+    size_t nsyms = (size_t)(symtab->sh_size / sizeof(Elf64_Sym));
+
+    for (size_t i = 0; i < nsyms; i++) {
+        if (sym[i].st_name >= strh->sh_size)
+            continue;                       /* name would run off the string table */
+        if (strcmp(strtab + sym[i].st_name, function) != 0)
+            continue;
+        if (ELF64_ST_TYPE(sym[i].st_info) != STT_FUNC)
+            continue;                       /* a data symbol of the same name is not it */
+        if (sym[i].st_shndx >= eh.e_shnum)
+            return 0;                       /* SHN_UNDEF / ABS: not defined here */
+
+        const Elf64_Shdr *owner = &sh[sym[i].st_shndx];
+        if (owner->sh_name >= shstr->sh_size)
+            return 0;
+        return strcmp(shstrtab + owner->sh_name, section) == 0;
+    }
+    return 0;                               /* no such function: refuse */
+}
+
 bool
 ls_vm_init(void)
 {
@@ -94,13 +184,23 @@ ls_vm_init(void)
 }
 
 int
-ls_vm_arm(const void *elf, size_t elf_len, const char *section, enum ls_mode m)
+ls_vm_arm(const void *elf, size_t elf_len,
+          const char *section, const char *function, enum ls_mode m)
 {
     int slot = -1;
     char *err = NULL;
 
-    if (!g_ready || elf == NULL || section == NULL)
+    if (!g_ready || elf == NULL || section == NULL || function == NULL)
         return -1;
+
+    /* O14: the verifier proved the program in `section`; uBPF is about to run the
+     * one named `function`. Refuse unless they are the same program. */
+    if (!ls_symbol_is_in_section(elf, elf_len, section, function)) {
+        fprintf(stderr, "ls_vm: refusing --- '%s' does not live in section '%s'; "
+                        "the verified program and the loaded one may differ\n",
+                function, section);
+        return -1;
+    }
 
     for (int i = 0; i < LS_MAX_SLOTS; i++) {
         if (!g_slots[i].armed) { slot = i; break; }
@@ -120,7 +220,9 @@ ls_vm_arm(const void *elf, size_t elf_len, const char *section, enum ls_mode m)
         goto fail;
 
     /* Interpreter path. No ubpf_compile() here on purpose --- O6/O7. */
-    if (ubpf_load_elf_ex(vm, elf, elf_len, section, &err) < 0)
+    /* uBPF selects by FUNCTION SYMBOL here, not section --- see O14 and the
+     * check above, which is what makes passing `function` safe. */
+    if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
         goto fail;
 
     /* Fuel. Works in the interpreter; documented as having no effect once
