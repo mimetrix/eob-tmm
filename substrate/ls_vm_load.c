@@ -84,15 +84,17 @@ reply(int fd, const char *fmt, ...)
 static void
 handle(int fd)
 {
-    static unsigned char buf[LS_LOAD_MAX];
-    ssize_t n = read(fd, buf, sizeof buf);
+    static unsigned char g_load_buf[LS_LOAD_MAX];   /* uniquely named: the global-state
+                                                     * allowlist truncates at the dot, so "buf"
+                                                     * would be ambiguous forever */
+    ssize_t n = read(fd, g_load_buf, sizeof g_load_buf);
 
     if (n < (ssize_t)sizeof(struct shield_msg)) {
         reply(fd, "ERR short message (%zd bytes)\n", n);
         return;
     }
 
-    struct shield_msg *m = (struct shield_msg *)buf;
+    struct shield_msg *m = (struct shield_msg *)g_load_buf;
 
     /* O8: prog_len is attacker-influenced and is read before authentication.
      * There is no authentication here at all, so the length check is the only

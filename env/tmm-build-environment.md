@@ -871,3 +871,56 @@ ship:
   once compiled (finding O6), and the native prologue opens a 4 KB frame with no guard-page
   probe (O7).
 - **Nothing is measured.** A call in a build is not a cost at rate.
+
+## First measured invocation cost — 2026-08-12
+
+The VM is armed in a running TMM pod and a program has been priced. Both were open
+questions this morning.
+
+```
+ls_vm: init  build=Aug 12 2026 18:30:51  jit=0 fuel=0 timing=1
+ls_vm: ARMED slot=0 section=fentry/http_psm_profile_name_lookup function=shield
+             mode=2 bytes=4320 origin=builtin
+ls_vm: bench slot=0 iters=100000 min=138 mean=375 max=1560772 cycles
+ls_vm: bench slot=0 iters=100000 min=126 mean=287 max=1403200 cycles
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock
+```
+
+Two TMM instances, each armed and each benchmarked. Host: Intel Xeon Gold 6348 @ 2.60 GHz.
+
+| | cycles | ns @ 2.6 GHz |
+|---|---|---|
+| **min** — the cleanest estimate | 126–138 | **48–53** |
+| mean | 287–375 | 110–144 |
+| max | ~1.5M | scheduler preemption, not the program |
+
+**What must travel with the number:** interpreter (not JIT), a **9-instruction** program, warm
+cache, no contention, `ubpf_exec` only — no `ctx` build, no trampoline, no poll loop. It is a
+**floor**, and a floor for the smallest useful program.
+
+### Three things it settles
+
+**The "tens of nanoseconds" claim holds.** `big-ip-live-shield-design.md` §11 says an
+invocation is *"order tens of nanoseconds — which is emphatically not 'comparable to a C
+`if`'"*. Measured ~50 ns. Both halves survive: it is tens of ns, and against a sub-nanosecond
+C `if` it is **roughly two orders of magnitude** more expensive.
+
+**`budget_pass.py` under-predicts by ~6×.** It priced this exact program at **~21 cycles**;
+it costs **126–138**. The tool's own docstring already says it is uncalibrated and orders
+programs rather than predicting nanoseconds — but "we know it is uncalibrated" and "it is
+wrong by 6× on the first real program" are different statements, and only the second is
+evidence. This is also the **first calibration point that tool has ever had**, and it should
+be recorded as one rather than used to justify the tool.
+
+**Variance is the finding the headline hides.** Mean is 2–3× min *with no traffic*, in a tight
+loop on an idle box. A p99 argument has to survive that, and the tail here is not the
+program — it is the scheduler. Which is the same observation `engine-hard-problems.md` §1
+makes about termination not being a time bound, arriving from the measurement side.
+
+### A defect worth knowing: `%zu` does not work in TMM
+
+The arm line reads `origin=builtin(10e0u)` where it should read `builtin(4320)` — 4320 is
+0x10E0, so the format rendered hex and left the `u` behind. TMM builds with
+`-fno-builtin-printf` and `-Wno-format`, so **`%zu` is not safe in this codebase**; cast to
+`unsigned long` and use `%lu`. Cosmetic here, and the kind of thing that silently corrupts a
+number in a log someone later trusts.
