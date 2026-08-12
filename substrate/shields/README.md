@@ -110,8 +110,8 @@ Then verify and price. Both gates explicit — the defaults are not enough:
 
 ```bash
 ../../ebpf-verifier/bin/prevail ls_2026_http_psm.bpf.o \
-    filter/http_psm_profile_name_lookup --termination --no-division-by-zero --strict
-python3 ../budget_pass.py --section filter/http_psm_profile_name_lookup ls_2026_http_psm.bpf.o
+    fentry/http_psm_profile_name_lookup --termination --no-division-by-zero --strict
+python3 ../budget_pass.py --section fentry/http_psm_profile_name_lookup ls_2026_http_psm.bpf.o
 ```
 
 Pass `--section` explicitly. clang leaves a **present but zero-length `.text`** alongside

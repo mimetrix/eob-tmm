@@ -334,7 +334,7 @@ This is the least-proven engineering item in the package (§1.1, assumption 11).
     "conditions": "listener with no protocol-transfer log profile configured"
   },
   "mechanism": "tmm_hook",            // irule | waf_policy | afm_rule | ctrl_uprobe | ctrl_jvm | ctrl_node | tmm_hook
-  "hook_point": "fw_log_prot_transfer_emit",
+  "hook_point": "http_psm_profile_name_lookup",
   "attach_mode": "filter",            // observe | filter  (see §6.1)
   "payload_ref": "blobs/LS-TMM-PTLOG-01.bpf.o",
   "mode": "enforce",                  // monitor | enforce | disable — the INITIAL mode.
@@ -635,11 +635,13 @@ four things still have to hold:
    warning about the optimiser complicating name-to-address mapping is likewise now a number rather
    than a caution — nearly 300 cloned symbols in one build.
 
-   **What this does not settle.** `fw_log_prot_transfer_emit`, the function in §14's worked example,
-   returns **zero** hits — and that is *not* evidence it was inlined. §14's bug is a **TMOS** logging
-   path, i.e. CBIP, so its absence from a BNK build is expected and says nothing either way about
-   condition 1 for that example. Settling that specific case needs a CBIP build. Present and healthy in
-   this one: `flow_input` (4), `tmm_poll` (3), `hud_*` (3,568), `http2*` (365).
+   **What this settles.** §14's worked example hooks
+   **`http_psm_profile_name_lookup`** (`src/modules/hudfilter/http/http_psm.c:800`), and it is
+   **present as symbol type `t`** in this build. It is a `static bool`, which is the shape most likely
+   to be inlined away, so condition 1 holds here in the unfavourable case. Also present and healthy:
+   `flow_input` (4), `tmm_poll` (3), `hud_*` (3,568), `http2*` (365). (An earlier revision looked for
+   `fw_log_prot_transfer_emit` and read its absence as a BNK-versus-TMOS artifact; that symbol was
+   invented and never existed in any build — see §14.)
 2. **The condition has to be derivable from that boundary's arguments**, through the declared bounded
    walk the host's ctx-builder performs. **And note the timing, which is the constraint people miss:** an
    entry probe fires *before the body runs*, so a condition the body itself constructs is not visible to
@@ -755,31 +757,35 @@ in a lab TMM with core dumps still readable.
 > work the retrospective coverage study needs (§10.1). An invented CVE number is checkable in minutes,
 > and the rest of the document inherits the doubt.
 >
-> **And one of the four §10.1 conditions is asserted here rather than verified.** Conditions 2, 3 and 4
-> are reasoned through below and hold by construction: the condition is derivable from the entry
-> arguments, the body is skippable, and the rate class admits the budget. **Condition 1 — that
-> `fw_log_prot_transfer_emit` still exists as its own out-of-line body in a real optimised build —
-> remains unverified.** It is precisely the condition §5.3 says belongs to the optimiser rather than to
-> us: at `-O2` a small logging leaf is a natural inlining candidate, and if it is inlined the usable
-> boundary moves outward to a caller and the safe-return discards more than the log record.
+> **Condition 1 was asserted here rather than verified. It is now verified — and the symbol this
+> example used to name did not exist.**
 >
-> **A BNK build now exists (§10.1) and it does NOT settle this, for a reason worth stating precisely.**
-> Searching that build's 119,555 out-of-line functions for `fw_log_prot_transfer_emit` returns zero — and
-> that result is **uninformative in three distinct ways**, which is why it must not be reported as
-> evidence:
+> Conditions 2, 3 and 4 are reasoned through below and hold by construction. Condition 1 — that the
+> hooked function still exists as its own out-of-line body after `-O2` — belongs to the optimiser
+> rather than to us, and a small logging leaf is a natural inlining candidate, so it was the one worth
+> checking rather than arguing.
 >
-> 1. **The code path may not be in BNK at all.** This bug is a TMOS protocol-transfer logging path, and
->    BNK is a trimmed containerized data plane. If the feature is not compiled into it, the symbol's
->    absence says nothing about any optimiser decision.
-> 2. **It may be present under a different name** — renamed, or emitted as a `.constprop`/`.isra` clone
->    (that build has 92 and 76 of those respectively).
-> 3. **It may have been inlined** — the original concern, and the only one of the three that would
->    actually bear on condition 1.
+> **Two corrections came out of checking it.** First, `fw_log_prot_transfer_emit` is **fictional** — it
+> was invented as a plausible-sounding hook target, and searching a real build's 119,555 out-of-line
+> functions returns zero for the simplest possible reason. An earlier revision of this passage explained
+> that zero as a BNK-versus-TMOS artifact, which was a plausible wrong answer dressed as a careful one.
 >
-> A zero cannot distinguish these. So this example still establishes that a real data-plane bug **can**
-> be expressed as a shield, and still does not establish that this particular boundary survives.
-> Settling it needs a **CBIP** build — appliance/VE, from Perforce via `seadev` — where the code
-> actually lives, and that is deferred to the follow-on effort.
+> Second, the *mechanism* the example describes is real and locatable. The unchecked dereference is at
+> **`src/modules/hudfilter/http/http_psm.c:806-808`**, inside
+> **`http_psm_profile_name_lookup`** — and the struct
+> (`fw_log_profile_protocol_transfer`) and field (`prot_transfer_log_profile`) are exactly as described,
+> with every *other* use of that field in the tree NULL-checked (`listener.c:1161`, `listener.c:1519`,
+> `fw_log_profile.c:4551`, `db_fw_log.c:1663`).
+>
+> **And that function survives `-O2` as symbol type `t`.** It is declared `static bool` — the shape most
+> likely to be dissolved into its caller — so condition 1 holds in the unfavourable case rather than the
+> easy one. That is the first verification of condition 1 in this package.
+>
+> **What this does and does not extend to.** The BNK tree is a Perforce sync carrying the appliance and
+> VE sources too (`env/tmm-build-environment.md`), so the *pattern* is present in all three form
+> factors. The *symbol survival* result is a property of one compilation and does not transfer: an
+> appliance or VE build, from Perforce via `seadev`, needs its own check. That is deferred to the
+> follow-on effort — but it is now a confirmation to repeat, not a question to answer.
 
 **The bug.** TMM's protocol-transfer logging path fetches a listener's log profile and reads its name
 with no NULL check:
@@ -797,7 +803,9 @@ trigger it, so it is remotely reachable without authentication.
 **Shield concept (pseudocode):**
 
 ```c
-// Sanctioned FILTER hook point: fw_log_prot_transfer_emit  (attach_mode: filter)
+// Sanctioned FILTER hook point: http_psm_profile_name_lookup  (attach_mode: filter)
+//   Real symbol, verified present as type 't' in an -O2 build. (An earlier draft
+//   named fw_log_prot_transfer_emit here, which does not exist -- see §10.1.)
 // Enumerated outcomes owned by the host:  LS_PASS | LS_SAFE_RETURN
 // path_class: warm  (once per request on this listener — structurally the
 //   logging path, but reachable by anyone who can open a flow, so it is
@@ -806,7 +814,13 @@ trigger it, so it is remotely reachable without authentication.
 // record, so the skip is analysable: no lock is held across it, no refcount
 // moves, no flow state advances, nothing downstream consumes an out-param.
 // That is what earns it a safe-return entry — not the fact that it is void.
-SEC("tracing/fw_log_prot_transfer_emit")
+// The section name is not a label: PREVAIL selects the program type -- and with it
+//   the ctx descriptor it verifies against -- by matching this prefix against a
+//   compiled-in table, falling through to socket_filter when nothing matches.
+//   "tracing/" matches NOTHING; "fentry/" selects the tracing type (96-byte ctx,
+//   no pointer slots), which is what an entry hook receiving argument values is.
+//   Keep this distinct from attach_mode above, which is about the return value.
+SEC("fentry/http_psm_profile_name_lookup")
 int ls_ptlog_nullderef(struct ctx *c) {
     /* The program does NOT consult the mode. It always selects the outcome its
        predicate implies; the host applies it in enforce and merely counts it in
