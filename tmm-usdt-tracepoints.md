@@ -73,6 +73,45 @@ The engine is generic; the shield is one application on top of it. The reason a 
 
 ---
 
+## 2.0 What TMM already has — measured, 2026-08-12
+
+Checked against the source tree and the shipped binary, because "add tracepoints" is a
+different proposition depending on what is there already.
+
+**USDT tracepoints today: zero.** No `DTRACE_PROBE`, `STAP_PROBE` or `sys/sdt.h` anywhere in
+the tree, and — the test that settles it — **zero `.note.stapsdt` entries in the shipped
+binary**. Every tracepoint in this catalog is net-new. The `-DCO_TRACE`/`-DGPA_TRACE` build
+flags are a red herring: the macros are defined in headers and have **0 call sites**.
+
+**But TMM is not unobservable — it has a large incumbent, and it is not logging:**
+
+| mechanism | call sites | what it is |
+|---|---|---|
+| **`tmstat_*`** | **1,621** | shared-memory statistics tables — the dominant idiom by a wide margin |
+| `errdefs_*` | 500 | structured records; the source of the `01010007:7`-style codes in TMM's output |
+| `logger()` / `logger_binary()` | 274 / 136 | the logging path |
+| `TRACE_*` | 71 | — |
+
+**Two things follow, and the second is a question this catalog does not currently ask.**
+
+**Counters belong in `tmstat`.** It is already everywhere in this codebase and already linked
+into the runtime image. Any new counter surface that bypasses it is a second observability
+stack beside a mature one, which is the first thing a reviewer will say. That applies directly
+to the embedded VM's own `fired` / `safe_returns` / `errors` counters
+(`development-scope.md` item 14).
+
+**Should these hooks emit through USDT at all, or through `tmstat`/`errdefs`?** This catalog
+assumes USDT-style probes without arguing the case against the incumbent. The trade is real:
+USDT buys **external attachability** — `perf`, `bpftrace`, anything that reads ELF notes, with
+no F5-specific consumer — while `tmstat`/`errdefs` buys **native integration** with tooling
+customers already have. The honest answer is likely *both, for different rows*: a hot per-packet
+counter wants `tmstat`; a `ctx`-carrying event that an engineer attaches to during an incident
+wants USDT. **Decide it per row rather than by default**, and record the reason.
+
+*(A detail worth keeping: the CVE this proposal shields is itself inside the `errdefs`
+machinery — `http_psm_profile_name_lookup` takes an `errdefs_key` and an `errdefs_append`
+callback. The bug is in the observability path.)*
+
 ## 2.1 The catalog is build-scoped — the surface is set by *which build*, per component
 
 Every hook in this catalog is a **designed-in call site in TMM-owned source**, so where it goes

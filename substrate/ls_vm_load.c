@@ -1,0 +1,213 @@
+/*
+ * ls_vm_load.c --- load a program into a RUNNING TMM.
+ *
+ * This is the step that separates the demonstration from a patch. Rungs:
+ *
+ *   1. compiled in                 -> rebuild, repackage, redeploy
+ *   2. LS_SHIELD_PATH at startup   -> no rebuild, but a restart
+ *   3. THIS FILE                   -> no rebuild, no restart, no window
+ *
+ * =====================================================================
+ *  WHAT THIS DELIBERATELY DOES NOT DO --- read before enabling it
+ * =====================================================================
+ *
+ *  NO SIGNATURE VERIFICATION. `sig_verify()` is declared in shield_abi.h and
+ *  has no implementation (scope item 4, deferred by decision). Anything that can
+ *  reach this socket can put executable content into the data plane. That is why
+ *  it is OFF unless LS_LOAD_SOCKET is set, why the socket is created 0600, and
+ *  why every accepted load logs the fact that it was not verified. Do not let
+ *  this reach a build anyone else runs.
+ *
+ *  NO RECLAMATION. A swapped-out VM is never freed. Freeing it requires knowing
+ *  that no core is still executing it, which is the cross-core rendezvous of
+ *  development-scope.md items 0b/0c and is not written. Leaking is the honest
+ *  choice here: bounded by the number of loads, and it cannot corrupt anything.
+ *  A load loop would eventually exhaust memory --- that is a real limit, stated
+ *  rather than hidden.
+ *
+ *  NO SAFE POINT. The swap is a single atomic pointer store, which is why it is
+ *  safe *enough* without one: a call in flight keeps using the VM it loaded at
+ *  entry, and the next call picks up the new one. That gives atomic-per-call
+ *  replacement, NOT the ordered cross-core publish item 0 specifies. For one
+ *  hook and one program it is sufficient; for a multi-hook coordinated update it
+ *  is not, and the difference is exactly item 0.
+ *
+ * The thread is a real design choice, not laziness: preparation --- create the
+ * VM, read the ELF, check the O14 identity, JIT if asked --- is unbounded work
+ * that must never happen on the poll loop. It happens here, and the poll loop
+ * only ever sees a pointer that is either the old program or the new one.
+ */
+
+#include "ls_vm.h"
+#include "ls_vm_config.h"
+#include "shield_abi.h"
+
+#include <errno.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+/* Bounded so a malformed length field cannot make us allocate arbitrarily.
+ * prog_len arrives from outside and is read before anything authenticates it,
+ * which is the exact shape finding O8 was filed about --- so it is checked
+ * against the bytes actually received, not trusted. */
+#define LS_LOAD_MAX (1u << 20)
+
+static pthread_t g_loader;
+static int       g_loader_running;
+static char      g_sock_path[108];
+
+/* Provided by ls_vm.c: prepare a program into a spare slot and publish it over
+ * an existing one with a single atomic store. */
+extern int  ls_vm_reload(int slot, const void *elf, size_t elf_len,
+                         const char *section, const char *function, enum ls_mode m);
+extern void ls_vm_set_mode(int slot, enum ls_mode m);
+
+static void
+reply(int fd, const char *fmt, ...)
+{
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (n > 0)
+        (void)!write(fd, buf, (size_t)n);
+}
+
+static void
+handle(int fd)
+{
+    static unsigned char buf[LS_LOAD_MAX];
+    ssize_t n = read(fd, buf, sizeof buf);
+
+    if (n < (ssize_t)sizeof(struct shield_msg)) {
+        reply(fd, "ERR short message (%zd bytes)\n", n);
+        return;
+    }
+
+    struct shield_msg *m = (struct shield_msg *)buf;
+
+    /* O8: prog_len is attacker-influenced and is read before authentication.
+     * There is no authentication here at all, so the length check is the only
+     * thing standing between a bad field and a bad read. Check it against what
+     * actually arrived. */
+    size_t hdr = sizeof(struct shield_msg);
+    if (m->prog_len > (size_t)n - hdr) {
+        reply(fd, "ERR prog_len %u exceeds received payload %zu\n",
+              m->prog_len, (size_t)n - hdr);
+        return;
+    }
+
+    switch (m->op) {
+    case SHIELD_OP_LOAD: {
+        fprintf(stderr,
+                "ls_vm: LOAD accepted on %s --- NOT SIGNATURE VERIFIED "
+                "(scope item 4 deferred); hook=%.63s bytes=%u\n",
+                g_sock_path, m->hook, m->prog_len);
+        int slot = ls_vm_reload(0, m->prog, m->prog_len,
+                                m->hook, "shield", (enum ls_mode)m->mode);
+        if (slot < 0)
+            reply(fd, "ERR load refused (identity mismatch, malformed ELF, or "
+                      "uBPF rejected it)\n");
+        else
+            reply(fd, "OK loaded slot=%d mode=%d unverified=yes\n", slot, m->mode);
+        break;
+    }
+    case SHIELD_OP_SET_MODE:
+        ls_vm_set_mode(0, (enum ls_mode)m->mode);
+        reply(fd, "OK mode=%d\n", m->mode);
+        break;
+
+    case SHIELD_OP_STATUS: {
+        struct ls_stats st;
+        if (!ls_vm_stats(0, &st)) { reply(fd, "ERR no such slot\n"); break; }
+        reply(fd, "OK armed=%d mode=%d fired=%llu safe_returns=%llu errors=%llu "
+                  "cycles=%llu cycles_max=%llu\n",
+              (int)st.armed, st.mode,
+              (unsigned long long)st.fired, (unsigned long long)st.safe_returns,
+              (unsigned long long)st.errors, (unsigned long long)st.cycles,
+              (unsigned long long)st.cycles_max);
+        break;
+    }
+    case SHIELD_OP_REVOKE:
+        /* Disarm is the honest half of revocation. The other half --- reclaiming
+         * the program's memory --- needs item 0c. Mode DISABLE stops it running;
+         * it does not remove it. */
+        ls_vm_set_mode(0, LS_MODE_DISABLE);
+        reply(fd, "OK disabled (not reclaimed --- see item 0c)\n");
+        break;
+
+    default:
+        reply(fd, "ERR unknown op %d\n", m->op);
+    }
+}
+
+static void *
+loader_thread(void *arg)
+{
+    (void)arg;
+    int srv = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (srv < 0) {
+        fprintf(stderr, "ls_vm: loader socket(): %s\n", strerror(errno));
+        return NULL;
+    }
+
+    struct sockaddr_un sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sun_family = AF_UNIX;
+    snprintf(sa.sun_path, sizeof sa.sun_path, "%s", g_sock_path);
+    unlink(g_sock_path);
+
+    /* 0600 before anyone can connect: the bind inherits the umask, so set it
+     * rather than assume it. This is containment, not authentication --- it
+     * limits who can reach an unauthenticated load path to whoever shares the
+     * uid, which in this container is root. */
+    mode_t old = umask(0177);
+    int rc = bind(srv, (struct sockaddr *)&sa, sizeof sa);
+    umask(old);
+    if (rc < 0 || listen(srv, 4) < 0) {
+        fprintf(stderr, "ls_vm: loader bind/listen %s: %s\n", g_sock_path, strerror(errno));
+        close(srv);
+        return NULL;
+    }
+
+    fprintf(stderr,
+            "ls_vm: LOADER LISTENING on %s --- accepts UNVERIFIED programs. "
+            "This must not exist in a build anyone else runs.\n", g_sock_path);
+
+    for (;;) {
+        int fd = accept(srv, NULL, NULL);
+        if (fd < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        handle(fd);
+        close(fd);
+    }
+    close(srv);
+    return NULL;
+}
+
+/* Called from init, off the data path. No socket unless asked for. */
+void
+ls_vm_loader_start(void)
+{
+    const char *p = getenv("LS_LOAD_SOCKET");
+    if (p == NULL || *p == '\0')
+        return;                      /* default: no load path at all */
+    if (g_loader_running)
+        return;
+    snprintf(g_sock_path, sizeof g_sock_path, "%s", p);
+    if (pthread_create(&g_loader, NULL, loader_thread, NULL) != 0) {
+        fprintf(stderr, "ls_vm: could not start loader thread\n");
+        return;
+    }
+    pthread_detach(g_loader);
+    g_loader_running = 1;
+}
