@@ -87,10 +87,17 @@ vm_stack_policy_valid(const struct vm_stack_policy *p)
 }
 
 /*
- * The calculator, matching uBPF's stack_usage_calculator_t:
+ * The calculator. uBPF's typedef is:
  *
  *     typedef int (*stack_usage_calculator_t)(const struct ubpf_vm *vm,
  *                                            uint16_t pc, void *cookie);
+ *
+ * This one takes `const void *` for the first parameter, because this header
+ * must stay checkable without uBPF's headers present. That makes it a DIFFERENT
+ * function pointer type, NOT assignable to the typedef --- the host writes a
+ * one-line forwarding function (see ls_vm.c). Do not convert the pointer to fit:
+ * calling through a converted incompatible function pointer is undefined
+ * behaviour, and gcc will warn about exactly this if you try.
  *
  * Deliberately uniform: every local function gets the frame the verifier proved
  * against, because that is the only bound the proof covers. Per-function

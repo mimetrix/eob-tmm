@@ -1,0 +1,89 @@
+/*
+ * ls_vm.h --- the embedded eBPF VM, as TMM would see it.
+ *
+ * This is the smallest interface that makes "TMM has its own BPF VM" a true
+ * statement: a VM instance owned by TMM, created at startup, holding verified
+ * programs, callable from a TMM code path, with its result acted on.
+ *
+ * Four calls. Everything else in development-scope.md --- the trampoline, pad
+ * rewriting, the safe point, the signing chain --- exists to hook functions
+ * NOBODY PLANNED FOR. None of it is needed to embed the VM itself, which is why
+ * this is the first increment rather than the last.
+ *
+ * Shape follows TMM's, and the reasons matter:
+ *
+ *   - ONE VM PER TMM INSTANCE, never shared. TMM is core-pinned and
+ *     run-to-completion, so a per-instance VM needs no lock on the call path.
+ *     A shared VM would need one, and a lock in the poll loop is the thing this
+ *     design cannot afford.
+ *   - INTERPRETER, not the native-code path, for the first cut. uBPF's
+ *     instruction limit "has no effect on JIT'd programs" (ubpf.h) but does work
+ *     in the interpreter, and the native path's prologue opens a 4KB frame with
+ *     no guard-page probe at arbitrary call depth (findings O6, O7). Switching
+ *     later is one call, once those are addressed.
+ *   - THE CTX IS A COPY. PREVAIL cannot express a read-only region, so a verified
+ *     program can write every byte of what it is handed (finding O1). Handing it
+ *     a live view of TMM state would make the safety mechanism deliver a
+ *     state-injection primitive. The caller fills a per-instance scratch struct.
+ *
+ * Status: candidate artifact. It compiles against the real uBPF headers. It is
+ * not wired into TMM here --- see ls_vm.c for exactly which lines would be the
+ * TMM-side change.
+ */
+
+#ifndef LS_VM_H
+#define LS_VM_H
+
+#include <stdbool.h>
+#include <stddef.h>   /* size_t --- this header must stand alone */
+#include <stdint.h>
+
+/* Outcomes the host owns. The program SELECTS one; the host APPLIES it. In
+ * observe mode the host counts the selection and applies nothing --- observe is
+ * not a seventh outcome (substrate §2). */
+enum ls_verdict {
+    LS_FALLTHROUGH = 0,   /* run the original function body                */
+    LS_SAFE_RETURN = 1,   /* skip the body, return the declared safe value */
+};
+
+enum ls_mode {
+    LS_MODE_DISABLE = 0,
+    LS_MODE_MONITOR = 1,  /* evaluate and count; do not apply */
+    LS_MODE_ENFORCE = 2,
+};
+
+/* One armed program. TMM holds a small fixed array of these per instance ---
+ * fixed because allocating on the call path is not acceptable. */
+struct ls_slot {
+    void        *vm;        /* struct ubpf_vm *, opaque here          */
+    enum ls_mode mode;
+    bool         armed;
+    uint64_t     fired;     /* per-instance; a box-wide sum is wrong  */
+    uint64_t     safe_returns;
+};
+
+/* Create this instance's VM state. Called once per TMM instance at startup,
+ * off the data path. Returns false and leaves nothing armed on any failure ---
+ * a TMM that cannot bring up the VM must run exactly as it does today. */
+bool ls_vm_init(void);
+
+/* Load a VERIFIED, SIGNED program object into a slot and arm it. Off the data
+ * path (admission time). Verification and signature checking happen BEFORE this
+ * --- this function trusts its input, which is why nothing may call it with
+ * bytes that did not come through the signing chain.
+ *
+ * Returns the slot index, or -1. */
+int ls_vm_arm(const void *elf, size_t elf_len, const char *section, enum ls_mode m);
+
+/* THE CALL PATH. Everything above is setup; this is the part that runs per
+ * invocation and the only part whose cost is in the poll loop.
+ *
+ * ctx points at the caller's scratch copy of the fields the program needs.
+ * Returns the verdict the host must apply, or LS_FALLTHROUGH on any error ---
+ * fail-open is correct HERE and only here: a shield that cannot run must not
+ * take TMM down with it. Admission fails closed; invocation fails open. */
+enum ls_verdict ls_vm_call(int slot, void *ctx, size_t ctx_len);
+
+void ls_vm_fini(void);
+
+#endif /* LS_VM_H */
