@@ -87,6 +87,10 @@
  * corrupt its own stack, which is why re-entrancy is on the trampoline's
  * requirement list (scope item 1) rather than assumed away.
  */
+/* Defined below ls_vm_call, which it uses; declared here because ls_vm_arm
+ * invokes it. */
+static void ls_vm_selftest(int slot, unsigned level);
+
 static uint8_t *g_prog_stack;
 #define LS_PROG_STACK_SIZE 4096
 
@@ -455,12 +459,78 @@ ls_vm_arm(const void *elf, size_t elf_len,
     if (g_cfg.bench)
         ls_vm_bench(slot, g_cfg.bench);
 
+    if (g_cfg.selftest)
+        ls_vm_selftest(slot, g_cfg.selftest);
+
     return slot;
 
 fail:
     if (err) { fprintf(stderr, "ls_vm: arm failed: %s\n", err); free(err); }
     ubpf_destroy(vm);
     return -1;
+}
+
+/*
+ * Reproduce the CVE condition against the armed shield --- LS_VM_SELFTEST.
+ *
+ * WHAT THIS DEMONSTRATES: the real verified program, in the real VM, inside the
+ * real TMM binary, deciding on the exact input the vulnerable call site would
+ * hand it --- a NULL protocol-transfer log profile. And, at level 2, that the
+ * dereference which follows a FALLTHROUGH verdict really is fatal.
+ *
+ * WHAT IT DOES NOT DEMONSTRATE, and must not be reported as: that the hook is
+ * correctly placed in http_psm_profile_name_lookup, or that live traffic reaches
+ * it. Those are separate claims needing a configured listener and a security log
+ * profile whose format string contains ${profile_name}. This synthesises the
+ * condition; it does not drive the path.
+ *
+ * Deliberately not built from fake TMM structures. Walking
+ * log_data->scb->uf -> connflow -> listener would mean synthesising four internal
+ * types, and a crash inside flow_get_listener() would prove nothing about this
+ * bug. The ctx is what the shield actually sees, so the ctx is what is reproduced.
+ *
+ *   LS_VM_SELFTEST=1  evaluate and report. Never crashes.
+ *   LS_VM_SELFTEST=2  evaluate, and on FALLTHROUGH perform the real dereference.
+ *                     With the shield armed this survives; with LS_SHIELD_ENABLE=0
+ *                     it is a segfault. That difference is the whole demonstration.
+ */
+static void
+ls_vm_selftest(int slot, unsigned level)
+{
+    /* Exactly the ctx the call site builds when the listener has no profile. */
+    struct { uint64_t ptlp, ptlp_name; uint32_t key, name_len; } c;
+    memset(&c, 0, sizeof c);          /* ptlp == NULL --- the CVE condition */
+
+    enum ls_verdict v = ls_vm_call(slot, &c, sizeof c);
+
+    fprintf(stderr,
+            "ls_vm: SELFTEST cve-condition ptlp=NULL -> verdict=%s  (%s)\n",
+            v == LS_SAFE_RETURN ? "SAFE_RETURN" : "FALLTHROUGH",
+            v == LS_SAFE_RETURN
+              ? "the shield would skip the body --- no dereference, no crash"
+              : "the body would run --- the NULL dereference happens next");
+
+    if (level < 2)
+        return;
+
+    if (v == LS_SAFE_RETURN) {
+        fprintf(stderr, "ls_vm: SELFTEST survived --- shield prevented the "
+                        "dereference. Re-run with LS_SHIELD_ENABLE=0 to see the "
+                        "same binary crash.\n");
+        return;
+    }
+
+    /* No shield, or it declined. Do what the vulnerable line does. */
+    fprintf(stderr, "ls_vm: SELFTEST performing the unshielded dereference --- "
+                    "this is expected to be fatal\n");
+    fflush(stderr);
+    {
+        volatile const char *const *pp = (volatile const char *const *)(uintptr_t)c.ptlp;
+        volatile char sink = *(*pp);      /* ptlp->name, with ptlp == NULL */
+        (void)sink;
+    }
+    fprintf(stderr, "ls_vm: SELFTEST did NOT crash --- unexpected; the platform "
+                    "may be mapping page zero\n");
 }
 
 int

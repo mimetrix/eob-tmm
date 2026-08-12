@@ -61,6 +61,11 @@ struct ls_vm_config {
                              * the shipped path are the same unless asked.      */
     uint32_t report_every;  /* LS_VM_REPORT_EVERY=N --- log counters every N
                              * invocations. 0 = only at fini.                   */
+    uint32_t selftest;      /* LS_VM_SELFTEST --- reproduce the CVE condition against
+                             * the armed shield. 1 = evaluate and report, 2 = also
+                             * perform the dereference if the shield declines, which
+                             * is fatal. Off by default; a data plane should not
+                             * segfault because a variable was left set. */
     bool     verbose;       /* LS_VM_VERBOSE=1 --- log arm success, the build
                              * stamp, and the first invocation. Without this the
                              * only observable state is failure, which is
