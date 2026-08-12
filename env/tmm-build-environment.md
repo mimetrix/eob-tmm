@@ -662,6 +662,64 @@ and `http_psm_init` is at 5126, so declaring the slot handle beside the init fun
 declaration 4,300 lines *after* its first use. In a 5,000-line file, "next to the thing it
 belongs with" and "before the thing that uses it" are different places.
 
+### The gate nobody had hit: TMM whitelists mutable global state
+
+`make tmm` linked successfully on the first attempt that got the include paths right — and
+then **failed a check**, which is where the useful finding is. `src/compile/Makefile:1626`
+runs `bin/diff-globals` against a per-architecture, per-build-type whitelist
+(`debug_whitelist_x86_64`, 283 entries; `default_whitelist_x86_64`, 276).
+
+Read `bin/print-globals` before assuming what it guards: it extracts symbols from **`.data`,
+`.bss` and COMMON** and deliberately **not** functions. This is not an export or ABI check —
+it is an allowlist of **mutable global state**, and any new entry fails the link.
+
+That is the right guard for a core-pinned, run-to-completion data plane, where new
+process-global mutable state is precisely what breaks per-instance independence. It also
+turns a vague design question into a countable one.
+
+**Embedding the VM adds exactly ten pieces of global state — three ours, seven uBPF's:**
+
+| symbol | whose | what it is |
+|---|---|---|
+| `g_slots`, `g_ready` | ours | the slot table and its init flag |
+| `ls_ptlog_slot` | ours | which slot holds this hook's shield |
+| `_initialized`, `register_map` | uBPF | lazily-initialised process-global tables |
+| `_ubpf_instruction_filter`, `_ubpf_filter_instruction_lookup_table` | uBPF | the instruction filter |
+| `ebpf_atomic_store_immediate_enumerated`, `ebpf_movsx_alu{,64}_offset_enumerated` | uBPF | opcode tables |
+
+**Two consequences for the design, not just for the whitelist.**
+
+1. **Our three should not be file-scope statics.** Per-instance VM state belongs in TMM's
+   existing per-instance structure, which is exactly what this gate is nudging toward. The
+   statics were the shortest path to a working link, not the right shape.
+2. **uBPF's `_initialized` and `register_map` are process-global and lazily filled.** Benign
+   while each TMM instance is its own process — but a reviewer should be told that rather
+   than find it, and it is a constraint on any future move to threads.
+
+All ten were added to both x86_64 whitelists (283→293, 276→286), with `.pre-ubpf` copies kept
+so the delta stays recoverable. Using the whitelist is the mechanism's intended purpose:
+adding global state should be a deliberate act.
+
+### It builds, and the data-path function calls the VM
+
+`make tmm` **rc=0**. Verified in `obj_x86_64.no_pgo/tmm.no_pgo` rather than inferred from the
+exit code:
+
+```
+nm:       ls_vm_init  ls_vm_arm  ls_vm_call  ls_vm_fini  ls_stack_usage
+          45 ubpf_* functions, incl. ubpf_create, ubpf_exec, ubpf_load_elf_ex,
+          ubpf_register_stack_usage_calculator
+          ls_shield_blob present
+
+objdump   http_psm_profile_name_lookup at 0xcbd940:
+            call 488680 <flow_get_listener>
+            call 4297c0 <ls_vm_call>        <- the data-path function calls the VM
+            call *%rbp                      <- append_fn, the original path
+```
+
+So: **TMM has its own eBPF VM, instantiated per instance, called from a real data-path
+function, running a program that PREVAIL verified.** That sentence is now true and checkable.
+
 ### What this establishes, and what it does not
 
 It establishes that the VM links into TMM's build, instantiates per instance, and is callable
