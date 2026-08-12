@@ -558,6 +558,14 @@ first shippable form.
   perf cost — so "no source modification" holds for the mechanism, not for a guarantee about any
   particular target. Day one: publish the hookable set as a build artifact and treat it as the
   contract, rather than implying every named function qualifies.
+  **Measured 2026-08-12, on the BNK form factor only** — the containerized TMM from
+  `gitswarm.f5net.com/tmm/tmm`, version `10.207.3-main`, built with `make tmm-gdb`: **119,555**
+  out-of-line functions (42,215 global, 77,340 local; ~113,604 excluding obvious statically-linked
+  third party), with **92 `.constprop`, 76 `.isra` and 126 `.part` clones** — so the folding and
+  cloning warned about just above is real and countable rather than hypothetical. This is the first
+  hookable-set measurement in this proposal. Appliance and VE are **CBIP** builds, from Perforce via
+  `seadev`, and remain unmeasured — the three form factors are separate builds and a count from one
+  does not transfer. See [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) §10.1.
 - **Invocation granularity — per-packet bytecode on a partly batched data plane.** eBPF's calling
   convention takes **one `ctx`, once**: it cannot express "here is a vector of 256 packets." A data
   plane whose performance comes from a stage seeing an entire batch at once — so it can loop and

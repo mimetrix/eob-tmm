@@ -615,6 +615,31 @@ four things still have to hold:
    as its own out-of-line body (§5.3). Inlining does not remove reach, but it pushes the usable boundary
    *outward* to a caller — and the further out it goes, the more a safe-return discards along with the
    bug. Past some radius the only honest answer is that the boundary is too coarse to use.
+
+   **Measured 2026-08-12, and note carefully which TMM this is.** There are three form factors —
+   appliance, VE, and **BIG-IP Next for Kubernetes (BNK)** — and while §11's *mechanism* claim spans all
+   three, this measurement covers **BNK only**. It is the containerized TMM built from
+   `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, via `make tmm-gdb`. The
+   appliance and VE builds are CBIP, come from Perforce by way of `seadev`, and are **not measured here**.
+
+   | | BNK TMM, `10.207.3-main` |
+   |---|---|
+   | out-of-line functions (`nm` type `T`+`t`) | **119,555** — 42,215 global, 77,340 local |
+   | excluding obvious statically-linked third party | **~113,604** |
+   | `.constprop` / `.isra` / `.part` clones | **92 / 76 / 126** |
+   | DWARF | present, 10 `.debug_*` sections |
+
+   So the hookable set on this form factor is **six figures**, against a designed-in catalog of 41
+   tracepoints. That is the first evidence for this condition rather than an assertion of it: a
+   function-boundary probe reaching "a spot nobody anticipated" is supported by a count. And §5.3's
+   warning about the optimiser complicating name-to-address mapping is likewise now a number rather
+   than a caution — nearly 300 cloned symbols in one build.
+
+   **What this does not settle.** `fw_log_prot_transfer_emit`, the function in §14's worked example,
+   returns **zero** hits — and that is *not* evidence it was inlined. §14's bug is a **TMOS** logging
+   path, i.e. CBIP, so its absence from a BNK build is expected and says nothing either way about
+   condition 1 for that example. Settling that specific case needs a CBIP build. Present and healthy in
+   this one: `flow_input` (4), `tmm_poll` (3), `hud_*` (3,568), `http2*` (365).
 2. **The condition has to be derivable from that boundary's arguments**, through the declared bounded
    walk the host's ctx-builder performs. **And note the timing, which is the constraint people miss:** an
    entry probe fires *before the body runs*, so a condition the body itself constructs is not visible to
@@ -733,13 +758,28 @@ in a lab TMM with core dumps still readable.
 > **And one of the four §10.1 conditions is asserted here rather than verified.** Conditions 2, 3 and 4
 > are reasoned through below and hold by construction: the condition is derivable from the entry
 > arguments, the body is skippable, and the rate class admits the budget. **Condition 1 — that
-> `fw_log_prot_transfer_emit` still exists as its own out-of-line body in a real optimised build — has
-> not been checked, because that needs a TMM build and this repo has none.** It is precisely the
-> condition §5.3 says belongs to the optimiser rather than to us: at `-O2` a small logging leaf is a
-> natural inlining candidate, and if it is inlined the usable boundary moves outward to a caller and the
-> safe-return discards more than the log record. So read this example as establishing that a real
-> data-plane bug **can** be expressed as a shield — not as evidence that this particular boundary
-> survives. One `nm` over a shipped `tmm` binary settles it.
+> `fw_log_prot_transfer_emit` still exists as its own out-of-line body in a real optimised build —
+> remains unverified.** It is precisely the condition §5.3 says belongs to the optimiser rather than to
+> us: at `-O2` a small logging leaf is a natural inlining candidate, and if it is inlined the usable
+> boundary moves outward to a caller and the safe-return discards more than the log record.
+>
+> **A BNK build now exists (§10.1) and it does NOT settle this, for a reason worth stating precisely.**
+> Searching that build's 119,555 out-of-line functions for `fw_log_prot_transfer_emit` returns zero — and
+> that result is **uninformative in three distinct ways**, which is why it must not be reported as
+> evidence:
+>
+> 1. **The code path may not be in BNK at all.** This bug is a TMOS protocol-transfer logging path, and
+>    BNK is a trimmed containerized data plane. If the feature is not compiled into it, the symbol's
+>    absence says nothing about any optimiser decision.
+> 2. **It may be present under a different name** — renamed, or emitted as a `.constprop`/`.isra` clone
+>    (that build has 92 and 76 of those respectively).
+> 3. **It may have been inlined** — the original concern, and the only one of the three that would
+>    actually bear on condition 1.
+>
+> A zero cannot distinguish these. So this example still establishes that a real data-plane bug **can**
+> be expressed as a shield, and still does not establish that this particular boundary survives.
+> Settling it needs a **CBIP** build — appliance/VE, from Perforce via `seadev` — where the code
+> actually lives, and that is deferred to the follow-on effort.
 
 **The bug.** TMM's protocol-transfer logging path fetches a listener's log profile and reads its name
 with no NULL check:
