@@ -52,6 +52,28 @@ enum ls_mode {
     LS_MODE_ENFORCE = 2,
 };
 
+/* The last few ctx values the hook was called with.
+ *
+ * Move-4 instrument: when the hook starts firing, `fired > 0` with
+ * `safe_returns == 0` is ambiguous --- the shield may be wrong, or the CVE
+ * condition may simply never have arrived. Without a sample there is no way to
+ * tell those apart, and they call for opposite responses.
+ *
+ * Deliberately tiny and fixed: 8 entries of 32 bytes, in the slot, overwritten
+ * oldest-first. This is development-scope.md item 14's ring at a scale that
+ * needs no allocator, no drain agent and no backpressure policy --- the real one
+ * is per-core shared memory with a consumer ABI. Sized to answer one question,
+ * not to be that. */
+#define LS_CTX_SAMPLES 8
+#define LS_CTX_SAMPLE_BYTES 32
+
+struct ls_ctx_sample {
+    uint64_t seq;                              /* which invocation this was  */
+    uint32_t len;                              /* the ctx's real length      */
+    uint32_t verdict;
+    uint8_t  bytes[LS_CTX_SAMPLE_BYTES];       /* truncated, deliberately    */
+};
+
 /* One armed program. TMM holds a small fixed array of these per instance ---
  * fixed because allocating on the call path is not acceptable. */
 struct ls_slot {
@@ -67,6 +89,8 @@ struct ls_slot {
     uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
     uint64_t     cycles;        /* only when timing is enabled          */
     uint64_t     cycles_max;    /* the tail is what bounds a hot hook   */
+    struct ls_ctx_sample samples[LS_CTX_SAMPLES];
+    uint32_t     sample_next;
 };
 
 /* A snapshot of one slot, for whatever eventually reports these. Copied rather
@@ -96,6 +120,19 @@ int ls_vm_arm_configured(const void *blob, size_t blob_len,
 
 /* Off the data path. Returns false for an out-of-range slot. */
 bool ls_vm_stats(int slot, struct ls_stats *out);
+
+/* Copy out the recent ctx samples. Off the data path. Returns how many were
+ * written, up to LS_CTX_SAMPLES. */
+unsigned ls_vm_samples(int slot, struct ls_ctx_sample *out, unsigned max);
+
+/* Benchmark an ARBITRARY program without arming it onto a hook --- move-3
+ * instrument. Loading a program, benching it and discarding it is what turns
+ * budget-pass calibration from one restart per data point into one message per
+ * data point. Returns 0 on success and fills min/mean/max. */
+int ls_vm_bench_program(const void *elf, size_t elf_len,
+                        const char *section, const char *function,
+                        uint32_t iters,
+                        uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out);
 
 /* Log the current counters for every armed slot. Called at fini, every
  * LS_VM_REPORT_EVERY invocations, and on demand. */

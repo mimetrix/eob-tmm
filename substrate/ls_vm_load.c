@@ -158,6 +158,41 @@ handle(int fd)
               (unsigned long long)st.cycles_max);
         break;
     }
+    /* Ops beyond the ABI's four. shield_msg.op is a uint32 and the enum uses the
+     * low values, so these sit well clear --- and they are DEVELOPMENT ops, not
+     * proposed additions to the protocol. A real control plane would not expose
+     * "benchmark this" or "show me recent inputs" on the load path. */
+    case 0x1001: {   /* BENCH: load, measure, discard --- never touches a live slot */
+        uint64_t mn = 0, me = 0, mx = 0;
+        char section[96];
+        snprintf(section, sizeof section, "fentry/%.63s", m->binding.hook);
+        uint32_t iters = m->epoch ? m->epoch : 10000;   /* epoch reused as count */
+        if (ls_vm_bench_program(m->prog, m->prog_len, section, "shield",
+                                iters, &mn, &me, &mx) != 0) {
+            reply(fd, "ERR bench failed (identity mismatch, bad ELF, or exec fault)\n");
+        } else {
+            reply(fd, "OK bench iters=%u min=%llu mean=%llu max=%llu cycles bytes=%u\n",
+                  iters, (unsigned long long)mn, (unsigned long long)me,
+                  (unsigned long long)mx, m->prog_len);
+        }
+        break;
+    }
+    case 0x1002: {   /* SAMPLES: the last few ctx values the hook actually saw */
+        struct ls_ctx_sample sm[LS_CTX_SAMPLES];
+        unsigned n2 = ls_vm_samples(0, sm, LS_CTX_SAMPLES);
+        if (n2 == 0) { reply(fd, "OK no samples (hook not fired, or LS_VM_SAMPLES unset)\n"); break; }
+        for (unsigned i = 0; i < n2; i++) {
+            char hex[2 * LS_CTX_SAMPLE_BYTES + 1];
+            unsigned k = sm[i].len < LS_CTX_SAMPLE_BYTES ? sm[i].len : LS_CTX_SAMPLE_BYTES;
+            for (unsigned j = 0; j < k; j++)
+                snprintf(hex + 2 * j, 3, "%02x", sm[i].bytes[j]);
+            hex[2 * k] = 0;
+            reply(fd, "OK sample seq=%llu len=%u verdict=%u ctx=%s\n",
+                  (unsigned long long)sm[i].seq, sm[i].len, sm[i].verdict, hex);
+        }
+        break;
+    }
+
     case SHIELD_OP_REVOKE:
         /* Disarm is the honest half of revocation. The other half --- reclaiming
          * the program's memory --- needs item 0c. Mode DISABLE stops it running;

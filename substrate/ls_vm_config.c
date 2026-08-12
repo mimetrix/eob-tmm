@@ -76,6 +76,7 @@ ls_vm_config_load(struct ls_vm_config *c)
     c->bench        = env_u32 ("LS_VM_BENCH", 0);
     c->timing       = env_bool("LS_VM_TIMING", false);
     c->report_every = env_u32 ("LS_VM_REPORT_EVERY", 0);
+    c->samples      = env_bool("LS_VM_SAMPLES", false);
     c->selftest     = env_u32 ("LS_VM_SELFTEST", 0);
     c->verbose      = env_bool("LS_VM_VERBOSE", false);
 }

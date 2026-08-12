@@ -61,6 +61,11 @@ struct ls_vm_config {
                              * the shipped path are the same unless asked.      */
     uint32_t report_every;  /* LS_VM_REPORT_EVERY=N --- log counters every N
                              * invocations. 0 = only at fini.                   */
+    bool     samples;       /* LS_VM_SAMPLES=1 --- keep the last few ctx values the
+                             * hook saw. Answers the question `fired>0,
+                             * safe_returns==0` cannot: is the shield wrong, or did
+                             * the condition never arrive? Those want opposite
+                             * responses. Off by default. */
     uint32_t selftest;      /* LS_VM_SELFTEST --- reproduce the CVE condition against
                              * the armed shield. 1 = evaluate and report, 2 = also
                              * perform the dereference if the shield declines, which

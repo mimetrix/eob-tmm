@@ -307,6 +307,87 @@ ls_vm_stats(int slot, struct ls_stats *out)
     return true;
 }
 
+unsigned
+ls_vm_samples(int slot, struct ls_ctx_sample *out, unsigned max)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS || out == NULL)
+        return 0;
+    struct ls_slot *s = &g_slots[slot];
+    unsigned have = s->sample_next < LS_CTX_SAMPLES ? (unsigned)s->sample_next
+                                                    : LS_CTX_SAMPLES;
+    if (have > max)
+        have = max;
+    for (unsigned i = 0; i < have; i++)
+        out[i] = s->samples[i];
+    return have;
+}
+
+/*
+ * Load a program, benchmark it, throw it away --- WITHOUT arming it onto a hook.
+ *
+ * Move-3 instrument. Calibrating the budget pass needs the measured cost of many
+ * programs of varying length and opcode mix. Doing that through LS_SHIELD_PATH
+ * costs a pod restart per data point; doing it here costs a message. That is the
+ * difference between fitting a model and sampling twice and guessing.
+ *
+ * Runs on the loader thread, off the data path, and never touches a live slot.
+ */
+int
+ls_vm_bench_program(const void *elf, size_t elf_len,
+                    const char *section, const char *function,
+                    uint32_t iters,
+                    uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out)
+{
+    char *err = NULL;
+    struct ubpf_vm *vm = NULL;
+    uint8_t *stack = NULL;
+    unsigned char ctx[64];
+    uint64_t ret = 0, best = ~0ull, worst = 0, total = 0;
+    int rc = -1;
+
+    if (elf == NULL || iters == 0)
+        return -1;
+    if (!ls_symbol_is_in_section(elf, elf_len, section, function))
+        return -1;                          /* same O14 gate as the real path */
+
+    vm = ubpf_create();
+    if (vm == NULL)
+        return -1;
+    if (ubpf_register_stack_usage_calculator(vm, ls_stack_usage, (void *)&g_policy) != 0)
+        goto out;
+    if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
+        goto out;
+
+    /* Its own stack: the shared one belongs to the data path, and this runs on
+     * the loader thread. */
+    stack = calloc(1, LS_PROG_STACK_SIZE);
+    if (stack == NULL)
+        goto out;
+
+    memset(ctx, 0, sizeof ctx);
+    for (uint32_t i = 0; i < 100 && i < iters; i++)
+        (void)ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE);
+
+    for (uint32_t i = 0; i < iters; i++) {
+        uint64_t t0 = ls_cycles();
+        if (ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE) != 0)
+            goto out;
+        uint64_t d = ls_cycles() - t0;
+        total += d;
+        if (d < best)  best = d;
+        if (d > worst) worst = d;
+    }
+    if (min_out)  *min_out  = best;
+    if (mean_out) *mean_out = total / iters;
+    if (max_out)  *max_out  = worst;
+    rc = 0;
+out:
+    free(err);
+    free(stack);
+    if (vm) ubpf_destroy(vm);
+    return rc;
+}
+
 void
 ls_vm_report(void)
 {
@@ -452,8 +533,8 @@ ls_vm_arm(const void *elf, size_t elf_len,
 
     if (g_cfg.verbose)
         fprintf(stderr, "ls_vm: ARMED slot=%d section=%s function=%s mode=%d"
-                        " bytes=%zu origin=%s jit=%d\n",
-                slot, section, function, (int)m, elf_len,
+                        " bytes=%lu origin=%s jit=%d\n",
+                slot, section, function, (int)m, (unsigned long)elf_len,
                 g_origin[0] ? g_origin : "builtin", (int)g_cfg.jit);
 
     if (g_cfg.bench)
@@ -559,9 +640,9 @@ ls_vm_arm_configured(const void *blob, size_t blob_len,
         /* uBPF copies the program during load, so this buffer is dead after
          * ls_vm_arm returns --- freed below rather than held for the process
          * lifetime. */
-        snprintf(g_origin, sizeof g_origin, "file:%s(%zu)", g_cfg.path, n);
+        snprintf(g_origin, sizeof g_origin, "file:%s(%lu)", g_cfg.path, (unsigned long)n);
     } else {
-        snprintf(g_origin, sizeof g_origin, "builtin(%zu)", len);
+        snprintf(g_origin, sizeof g_origin, "builtin(%lu)", (unsigned long)len);
     }
 
     int slot = ls_vm_arm(prog, len,
@@ -616,6 +697,19 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     if (rc != 0) {
         s->errors++;
         return LS_FALLTHROUGH;
+    }
+
+    /* Sample the ctx. A fixed-size memcpy into a slot-resident ring: no
+     * allocation, no lock, no syscall. Gated so the shipped path is untouched
+     * unless asked --- same discipline as timing. */
+    if (g_cfg.samples) {
+        struct ls_ctx_sample *sm = &s->samples[s->sample_next % LS_CTX_SAMPLES];
+        size_t n = ctx_len < LS_CTX_SAMPLE_BYTES ? ctx_len : LS_CTX_SAMPLE_BYTES;
+        sm->seq = s->fired;
+        sm->len = (uint32_t)ctx_len;
+        sm->verdict = (uint32_t)ret;
+        memcpy(sm->bytes, ctx, n);
+        s->sample_next++;
     }
 
     if (s->fired == 0 && g_cfg.verbose)
@@ -679,9 +773,9 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     new->armed = false;                   /* the staging slot goes back */
     new->vm = NULL;
 
-    fprintf(stderr, "ls_vm: RELOADED slot=%d mode=%d bytes=%zu "
+    fprintf(stderr, "ls_vm: RELOADED slot=%d mode=%d bytes=%lu "
                     "(previous VM leaked --- reclamation is item 0c)\n",
-            slot, (int)m, elf_len);
+            slot, (int)m, (unsigned long)elf_len);
     return slot;
 }
 
