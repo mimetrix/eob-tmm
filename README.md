@@ -143,7 +143,19 @@ able to take an outcome.
 ## The mechanism
 
 The substrate spans **two eBPF execution engines, chosen by what the kernel can see** —
-under one signed catalog and lifecycle (design §5):
+under one signed catalog and lifecycle (design §5).
+
+**Current scope: the proxy data plane only.** Work targets **TMM**, and the second bullet below is
+where it lands. The control/management plane in the first bullet — and, in the containerized form
+factor, the companion microservices that make up a BIG-IP Next deployment alongside the `f5-tmm` pod —
+are **deferred, not dismissed**: they are a different engine (kernel eBPF via uprobes), a different
+verifier (the kernel's), and in the JVM and Node cases a different probe surface again, so each is its
+own effort with its own trust story. Keeping them out of scope for now is what makes the data-plane
+argument testable: one engine, one verifier, one binary we build ourselves. The catalog in
+[`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) is scoped to the data plane for the same reason
+(§2.1). The first bullet is retained because the *lifecycle* — one signed catalog, one revocation
+path — has to span both eventually, and designing it as if TMM were the only consumer would be a
+mistake to unpick later.
 
 - **Control / management plane — three runtimes, so three implementations.** The resident native C
   daemons (httpd, MCPD, logging, SNMP) are ordinary processes, so shields there are **kernel-space

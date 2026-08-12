@@ -195,6 +195,14 @@ than argued about afterwards.
 
 ## 5 · Scope, restated honestly
 
+**Scope boundary, stated first: the proxy data plane.** Everything scoped below concerns **TMM**.
+The control/management-plane daemons, and in the containerized form factor the companion
+microservices deployed alongside the `f5-tmm` pod, come **later** — each is a separate engine and
+verifier (kernel eBPF via uprobes; JVMTI or Node probes for the two managed runtimes), so folding them
+into this scope would multiply the trust story before the first one is proven. What must still be
+designed to span both from day one is the **lifecycle** — one signed catalog, one revocation path —
+because retrofitting that is the expensive kind of mistake. See README, *The mechanism*.
+
 **No effort figure is offered here, deliberately.** This is a design proposal, not a plan, and
 converting these items into months or people is the job of whoever picks the work up — with their own
 team, their own build system, and their own idea of "done". What this section *does* establish is the
