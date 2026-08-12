@@ -73,6 +73,64 @@ The engine is generic; the shield is one application on top of it. The reason a 
 
 ---
 
+## 2.1 The catalog is build-scoped — the surface is set by *which build*, per component
+
+Every hook in this catalog is a **designed-in call site in TMM-owned source**, so where it goes
+is a design choice. That is worth stating explicitly, because the *other* placement mechanism —
+patching an existing function's entry, which is what makes "hook any function" attractive — is
+bounded by something outside this document's control: whether the compiler that emitted that
+function was given `-fpatchable-function-entry`.
+
+**Measured on the BNK form factor, x86-64** (method and caveats in
+[`env/tmm-build-environment.md`](env/tmm-build-environment.md)): the flag reaches **48.9%** of
+the 73,906 out-of-line functions in the shipped TMM binary.
+
+| where the function came from | entries padded |
+|---|---|
+| `src/compile` — the TMM tree | **82%** |
+| the TMM RPM's own build | **97%** |
+| `src/tm_lib` | **78%** |
+| ~two dozen separately-built F5 components (`dedup`, `mcplib`, `crypto`, `errdefs`, `tmjail`, `aclparser`, `f5util`, `ha_table`, `nxdomain`, `ports`, `afm`, …) | **0%** |
+| vendored third party (OpenSSL, the regex engine, json-c) | **0%** |
+
+TMM's binary is **assembled**, not compiled: roughly half its functions arrive from component
+builds that never saw the TMM build's flags, and three of them — `tmstat`, `libbigpacket`,
+`tcpdump` — arrive from Artifactory as **prebuilt RPMs** and are not compiled on the build host
+at all. `input-manifest.yml` versions each component independently.
+
+**Three consequences, in the order they bite.**
+
+**1 · This catalog is unaffected; the "any function" claim is what narrows.** Designed-in call
+sites live where F5 writes code, so §3–§10 stand as specified. What is bounded is the ad-hoc
+case — arming a hook on a function nobody planned for — and it is bounded by component, not by
+the optimiser alone. Both mechanisms remain available; they now have different reach, and the
+catalog is the mechanism with the guarantee.
+
+**2 · Unreachable interiors are coarser coverage, not absent coverage — hook the boundary.**
+Design §10.1 already makes this argument for inlining: when a function has no entry of its own,
+the usable boundary moves **outward to the nearest surviving caller**, giving a wider skip radius
+rather than lost reachability. The same logic covers an unpaddable component, and it lands
+favourably: the caller of a component function is almost always **in the TMM tree**, which is the
+82–97% bucket. A shield cannot sit inside OpenSSL's record parser, but it can sit on the TMM
+function that calls into it — which is where `tmm:tls:record` and `tmm:tls:decrypt_err` in §4
+already are. The cost is granularity: the boundary observes the call, not the interior state.
+
+**3 · The hookable set must be keyed to a component version set, not one TMM version.** Whether
+a hook exists, and what its `ctx` layout is, are properties of *this build of this component*.
+Publishing the hookable set as a signed per-build artifact (`development-scope.md` item 5) is
+therefore load-bearing rather than convenient — and the artifact's identity has to cover the
+manifest, since a component can move underneath a fixed TMOS version. That has a concrete ABI
+consequence, filed as **O12** in
+[`design-review-findings.md`](design-review-findings.md) §1.2.
+
+**Widening the reach is coordination, not research**, and it comes in three tiers of increasing
+cost: F5-owned component builds can take the same `Makefile.overrides`-style flag their own
+builds already support; the prebuilt RPMs need their producing team to rebuild, or to be built
+from source in the TMM build; vendored third party is either rebuilt by whoever wraps it or
+handled at the boundary per consequence 2.
+
+---
+
 ## 3. The ingress edge — NIC rings, CMP disaggregation, offload, L3/L4 and the connection table
 
 | Tracepoint | `ctx` (typed fields) | Observe | Debug / RCA | path_class |

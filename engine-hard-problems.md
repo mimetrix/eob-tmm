@@ -235,7 +235,7 @@ different maintenance stories and the phrase "stock PREVAIL" hides the differenc
 **Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook,
 each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes**
 read. Together they are the ceiling on what the engine can observe or enforce: the USDT catalog bounds the
-*anticipated* surface; function-boundary probes extend reach to any function that survived the build as its own out-of-line body and whose arguments expose the
+*anticipated* surface; function-boundary probes extend reach to any function that survived the build as its own out-of-line body, was emitted by a build that reserved the pad (§2.1 of `tmm-usdt-tracepoints.md` — about half the shipped binary comes from component builds that did not), and whose arguments expose the
 fault. Getting both right *is* the project.
 
 **Day-one vs. deferred:**

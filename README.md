@@ -3,7 +3,7 @@
 A **verified, dynamic, in-data-plane programmability surface** for F5 BIG-IP: embed a
 userspace eBPF VM ([uBPF](https://github.com/iovisor/ubpf)) inside TMM and attach small
 programs at **two kinds of hook** — a curated set of designed-in **hook points**, and
-**function-boundary probes** at any function that survived the build as its own out-of-line
+**function-boundary probes** at any padded function that survived the build as its own out-of-line
 body (patchable-entry pad → F5 trampoline). Programs either **observe** internal state (a
 tracepoint) or **act** on a verdict the host applies (a datapath control) — each one
 **statically proven safe before it loads**.
@@ -85,7 +85,7 @@ failover, regression risk, a rollback plan. Full argument in
 
 ## What the substrate enables
 
-A verified VM at designed-in hook points — and, via function-boundary probes, at any function the
+A verified VM at designed-in hook points — and, via function-boundary probes, at any padded function the
 build emitted as its own out-of-line body and listed in its hook map — opens several use-case
 families (substrate §3–§4),
 of which CVE shielding is only one:

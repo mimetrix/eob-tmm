@@ -105,6 +105,17 @@ struct shield_binding {
     char     hook[SHIELD_HOOK_NAME_MAX];       /* valid at this named symbol only  */
     uint32_t build_min;                        /* on these TMOS builds only ...    */
     uint32_t build_max;                        /* ... inclusive                    */
+    /* NOTE (O12): a TMOS range cannot express the thing that actually determines
+     * whether this hook exists. TMM is ASSEMBLED from ~two dozen independently
+     * versioned components (input-manifest.yml) plus vendored third party, and
+     * ~half its functions come from builds that never saw the TMM build's flags
+     * (measured: 48.9% entry-padding reach; 82-97% in the TMM tree, 0% in the
+     * component builds). A component can move underneath a fixed TMOS version and
+     * leave a bound shield's ctx offsets stale. The fix is to carry the digest of
+     * the signed per-build hook map (development-scope.md item 5) and gate on that;
+     * this range then degrades to a human-readable guard. Not yet in the wire
+     * layout -- adding it moves every offset below, so it is a deliberate decision
+     * rather than a silent edit. */
     uint8_t  mode_ceiling;                     /* enum shield_mode: may it enforce?*/
     uint32_t expires_with;                     /* encoded build id -> auto-retire  */
 };
