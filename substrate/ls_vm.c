@@ -118,7 +118,12 @@ ls_cycles(void)
  * does not fit the cap is refused rather than truncated, because a truncated
  * ELF that happens to parse is worse than no program. */
 #define LS_MAX_PROG 262144
-static unsigned char g_filebuf[LS_MAX_PROG];
+
+/* Allocated for the file's actual size, at init, and freed once the program is
+ * loaded into the VM. A static buffer here is permanently-resident .bss in every
+ * TMM instance --- one per core --- holding a copy of something uBPF has already
+ * copied. Measured: the static version cost 256 KB per instance for nothing. */
+static unsigned char *g_filebuf;
 
 static size_t
 ls_read_program(const char *path)
@@ -126,15 +131,21 @@ ls_read_program(const char *path)
     FILE *f = fopen(path, "rb");
     if (f == NULL)
         return 0;
-    size_t n = fread(g_filebuf, 1, sizeof g_filebuf, f);
-    int too_big = (n == sizeof g_filebuf) && (fgetc(f) != EOF);
-    fclose(f);
-    if (too_big) {
-        fprintf(stderr, "ls_vm: %s exceeds %d bytes --- refusing rather than truncating\n",
-                path, LS_MAX_PROG);
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return 0; }
+    long sz = ftell(f);
+    rewind(f);
+    if (sz <= 0 || sz > LS_MAX_PROG) {
+        fprintf(stderr, "ls_vm: %s is %ld bytes; limit is %d --- refusing rather "
+                        "than truncating\n", path, sz, LS_MAX_PROG);
+        fclose(f);
         return 0;
     }
-    return n;
+    free(g_filebuf);
+    g_filebuf = malloc((size_t)sz);
+    if (g_filebuf == NULL) { fclose(f); return 0; }
+    size_t n = fread(g_filebuf, 1, (size_t)sz, f);
+    fclose(f);
+    return (n == (size_t)sz) ? n : 0;
 }
 
 /* Adapter, not a cast. vm_stack_policy.h deliberately does not include uBPF's
@@ -432,15 +443,21 @@ ls_vm_arm_configured(const void *blob, size_t blob_len,
         }
         prog = g_filebuf;
         len  = n;
+        /* uBPF copies the program during load, so this buffer is dead after
+         * ls_vm_arm returns --- freed below rather than held for the process
+         * lifetime. */
         snprintf(g_origin, sizeof g_origin, "file:%s(%zu)", g_cfg.path, n);
     } else {
         snprintf(g_origin, sizeof g_origin, "builtin(%zu)", len);
     }
 
-    return ls_vm_arm(prog, len,
-                     g_cfg.section  ? g_cfg.section  : section,
-                     g_cfg.function ? g_cfg.function : function,
-                     (enum ls_mode)g_cfg.mode);
+    int slot = ls_vm_arm(prog, len,
+                         g_cfg.section  ? g_cfg.section  : section,
+                         g_cfg.function ? g_cfg.function : function,
+                         (enum ls_mode)g_cfg.mode);
+    free(g_filebuf);
+    g_filebuf = NULL;
+    return slot;
 }
 
 enum ls_verdict

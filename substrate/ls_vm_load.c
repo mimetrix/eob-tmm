@@ -84,13 +84,21 @@ reply(int fd, const char *fmt, ...)
 static void
 handle(int fd)
 {
-    static unsigned char g_load_buf[LS_LOAD_MAX];   /* uniquely named: the global-state
-                                                     * allowlist truncates at the dot, so "buf"
-                                                     * would be ambiguous forever */
-    ssize_t n = read(fd, g_load_buf, sizeof g_load_buf);
+    /* Allocated per connection, not statically. A 1 MB static buffer is 1 MB of
+     * permanently-resident .bss in EVERY TMM instance --- one per core --- to
+     * receive a control message that arrives approximately never. Measured: the
+     * static version grew .bss by 15.6%. The load path is off the data path, so
+     * a malloc here costs nothing that matters. */
+    unsigned char *g_load_buf = malloc(LS_LOAD_MAX);
+    if (g_load_buf == NULL) {
+        reply(fd, "ERR out of memory\n");
+        return;
+    }
+    ssize_t n = read(fd, g_load_buf, LS_LOAD_MAX);
 
     if (n < (ssize_t)sizeof(struct shield_msg)) {
-        reply(fd, "ERR short message (%zd bytes)\n", n);
+        reply(fd, "ERR short message (%ld bytes)\n", (long)n);
+        free(g_load_buf);
         return;
     }
 
@@ -102,8 +110,9 @@ handle(int fd)
      * actually arrived. */
     size_t hdr = sizeof(struct shield_msg);
     if (m->prog_len > (size_t)n - hdr) {
-        reply(fd, "ERR prog_len %u exceeds received payload %zu\n",
-              m->prog_len, (size_t)n - hdr);
+        reply(fd, "ERR prog_len %u exceeds received payload %lu\n",
+              m->prog_len, (unsigned long)((size_t)n - hdr));
+        free(g_load_buf);
         return;
     }
 
@@ -160,6 +169,7 @@ handle(int fd)
     default:
         reply(fd, "ERR unknown op %d\n", m->op);
     }
+    free(g_load_buf);
 }
 
 static void *

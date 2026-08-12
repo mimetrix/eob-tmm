@@ -924,3 +924,53 @@ The arm line reads `origin=builtin(10e0u)` where it should read `builtin(4320)` 
 `-fno-builtin-printf` and `-Wno-format`, so **`%zu` is not safe in this codebase**; cast to
 `unsigned long` and use `%lu`. Cosmetic here, and the kind of thing that silently corrupts a
 number in a log someone later trusts.
+
+## Resource footprint of the embedded VM — measured
+
+Like-for-like: both binaries are `tmm64.no_pgo`, both plain `-O2`, one before the VM and one
+after. (A first attempt compared `no_pgo` against `debug` and produced deltas of +11 MB of
+`.text` — build-type differences, not the VM. Compare the same build type or the numbers are
+noise.)
+
+```
+baseline 56,449,248  ->  with VM 56,558,560      +109,312   (+0.19% of the binary)
+
+  .text      +81,920   +0.27%
+  .rodata    +14,464   +0.13%
+  .data       +6,912   +5.55%
+  .bss    +1,313,600  +15.62%
+```
+
+### The `.text` number is the one that matters, and it is good
+
+**The entire embedded VM — uBPF's interpreter, ELF loader, relocation, our integration, the
+config reader and the load path — costs +81,920 bytes of `.text`, +0.27%.**
+
+For scale, that is *less than the entry-padding flag*, measured earlier at +0.476% for
+`-fpatchable-function-entry=5,0` at 48.9% coverage. **The engine is cheaper in code than the
+mechanism for attaching to it.** Both are well under one percent, which is the useful headline:
+the objection to embedding a VM in TMM is not going to be image size.
+
+### The `.bss` number was a self-inflicted mistake, now fixed
+
+`.bss` grew **1.31 MB, 15.6%**, and the arithmetic is unambiguous: a 1 MB static receive buffer
+in the loader plus a 256 KB static file buffer come to 1,310,720 of the 1,313,600.
+
+Two statically-sized worst-case buffers, permanently resident, for memory used **only at load
+time** — in a process that runs **one instance per core**. On a 16-core box that is ~21 MB of
+zero-filled pages to receive a control message that arrives approximately never.
+
+Both now allocate on demand and free after use. The load path is off the data path, so a
+`malloc` there costs nothing that matters, and the file buffer is dead the moment `ls_vm_arm`
+returns because uBPF has already copied the program.
+
+**The general rule this is an instance of:** in a per-core process, every static buffer is
+multiplied by the core count, and a data plane is exactly where that multiplication is least
+affordable. `.bss` is demand-zero so untouched pages may never be resident — but the load
+buffer *is* touched on the first load, which makes it real rather than theoretical.
+
+### Still unmeasured
+
+Instruction-cache and i-TLB pressure, for both the VM's `.text` and the padding — the part of
+`design-review-findings.md` §4 that needs a running TMM under load. And per-instance heap: each
+`ubpf_create` plus its stack, which is small but has not been counted.
