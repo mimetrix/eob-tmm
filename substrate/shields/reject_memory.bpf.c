@@ -1,5 +1,5 @@
 #include "ls_ctx_http_psm.h"
-__attribute__((section("filter/reject_memory"), used))
+__attribute__((section("fentry/reject_memory"), used))
 unsigned long long shield(struct ls_ctx_http_psm *c)
 {
     unsigned long long s = 0;

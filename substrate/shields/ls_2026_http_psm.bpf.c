@@ -7,7 +7,7 @@
  * Every other use of that field in the tree NULL-checks it.
  * The shield restores the missing check and asks for the safe return.
  */
-__attribute__((section("filter/http_psm_profile_name_lookup"), used))
+__attribute__((section("fentry/http_psm_profile_name_lookup"), used))
 unsigned long long shield(struct ls_ctx_http_psm *c)
 {
     if (c->ptlp == 0)

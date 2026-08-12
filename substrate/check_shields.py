@@ -11,6 +11,7 @@ are environment-dependent -- but says so rather than reporting silent success.
 """
 
 import os
+import re
 import subprocess
 import sys
 
@@ -25,15 +26,65 @@ GATES = ["--termination", "--no-division-by-zero", "--strict"]
 
 CASES = [
     # (source, section, expect_pass_with_gates, note)
-    ("ls_2026_http_psm.bpf.c", "filter/http_psm_profile_name_lookup", True,
+    ("ls_2026_http_psm.bpf.c", "fentry/http_psm_profile_name_lookup", True,
      "the CVE shield: restores the NULL check missing at http_psm.c:806"),
-    ("reject_memory.bpf.c", "filter/reject_memory", False,
+    ("reject_memory.bpf.c", "fentry/reject_memory", False,
      "chases a raw pointer -- must fail the memory-safety gate"),
-    ("reject_termination.bpf.c", "filter/reject_termination", False,
+    ("reject_termination.bpf.c", "fentry/reject_termination", False,
      "unbounded trip count, body -O2 cannot fold -- must fail the termination gate"),
-    ("folded_loop.bpf.c", "filter/folded_loop", True,
+    ("folded_loop.bpf.c", "fentry/folded_loop", True,
      "PASSES because -O2 folded its loop to closed form -- verify the object, not the source"),
 ]
+
+
+def fallback_prefix_guard():
+    """The ELF section name is not a label -- it SELECTS the program type, and with it the
+    ctx descriptor PREVAIL verifies against.
+
+    PREVAIL matches the section name against a compiled-in prefix table and, when nothing
+    matches, silently `return linux_socket_filter_program_type` -- whose descriptor is
+    __sk_buff: 192 bytes with pointer slots at 76/80/140. Any ctx smaller than 192 bytes
+    then verifies clean while touching none of those slots, which demonstrates a small
+    struct fitting inside a big one and nothing else (finding O3).
+
+    These shields use `fentry/`, which selects `tracing`: a 96-byte ctx with NO pointer
+    slots -- the fentry model, and an honest description of a TMM entry hook that receives
+    argument values. This guard fails if a section name stops matching a real prefix, so
+    a rename cannot quietly drop the shields back onto the fallback.
+    """
+    plat = os.path.join(HERE, os.pardir, "ebpf-verifier", "src", "linux", "linux_platform.cpp")
+    if not os.path.exists(plat):
+        print("skip  section-prefix guard  (PREVAIL sources not present)")
+        return 0
+    with open(plat, encoding="utf-8", errors="replace") as fh:
+        src = fh.read()
+
+    # Prefixes live in the brace list of each PTYPE entry, and NOT all of them end in "/"
+    # -- socket_filter's is bare "socket", kprobe's is "kprobe/". Matching only
+    # slash-terminated literals would call a valid prefix unmatched.
+    prefixes = set()
+    for block in re.findall(r"PTYPE[_A-Z]*\([^{]*\{([^}]*)\}", src):
+        prefixes.update(re.findall(r'"([^"]+)"', block))
+    if not prefixes:
+        print("skip  section-prefix guard  (could not parse PREVAIL's prefix table)")
+        return 0
+
+    # PREVAIL's own rule, from get_program_type(): section.find(prefix) == 0, first match
+    # wins, and no match falls through to socket_filter.
+    FALLBACK_PREFIXES = {"socket"}  # these select socket_filter *deliberately*
+    sec = CASES[0][1]               # all cases share one prefix; one report is enough
+    matched = sorted((p for p in prefixes if sec.startswith(p)), key=len, reverse=True)
+
+    if matched and matched[0] not in FALLBACK_PREFIXES:
+        print(f"ok    section prefix {matched[0]!r} selects a real program type "
+              f"(not the socket_filter fallback)")
+        return 0
+    why = ("selects socket_filter explicitly" if matched
+           else "matches no program type, so PREVAIL falls through to socket_filter")
+    print(f"FAIL  section {sec!r} {why} — its 192-byte __sk_buff descriptor has pointer "
+          f"slots at 76/80/140, so a ctx smaller than that verifies while touching none "
+          f"of them. That is a small struct fitting inside a big one, not evidence (O3).")
+    return 1
 
 
 def have_bpf_clang():
@@ -52,7 +103,7 @@ def main():
         print("skip  check_shields  (ebpf-verifier/bin/prevail not built)")
         return 0
 
-    rc = 0
+    rc = fallback_prefix_guard()
     for src, sec, expect_pass, note in CASES:
         srcp = os.path.join(SHIELDS, src)
         objp = os.path.join(SHIELDS, src.replace(".bpf.c", ".bpf.o"))
@@ -79,7 +130,7 @@ def main():
     # it must pass without it. If both verdicts agree, the flag is not the thing rejecting.
     obj = os.path.join(SHIELDS, "reject_termination.bpf.o")
     if os.path.exists(obj):
-        loose = subprocess.run([PREVAIL, obj, "filter/reject_termination",
+        loose = subprocess.run([PREVAIL, obj, "fentry/reject_termination",
                                 "--no-division-by-zero", "--strict"],
                                capture_output=True, text=True)
         if loose.stdout.startswith("PASS"):

@@ -40,15 +40,39 @@ chain and hands the shield the fields it needs.
 
 | file | section | verdict |
 |---|---|---|
-| `ls_2026_http_psm.bpf.c` | `filter/http_psm_profile_name_lookup` | **PASS** — 9 instructions, 5 blocks, ~21 cycles against a budget of 800 |
-| `reject_memory.bpf.c` | `filter/reject_memory` | **FAIL** — `Invalid type (r4.type in {ctx, stack, packet, shared})` |
-| `reject_termination.bpf.c` | `filter/reject_termination` | **FAIL** with `--termination`, **PASS** without it |
-| `folded_loop.bpf.c` | `filter/folded_loop` | **PASS** — and that is the point; see below |
+| `ls_2026_http_psm.bpf.c` | `fentry/http_psm_profile_name_lookup` | **PASS** — 9 instructions, 5 blocks, ~21 cycles against a budget of 800 |
+| `reject_memory.bpf.c` | `fentry/reject_memory` | **FAIL** — `Invalid type (r4.type in {ctx, stack, packet, shared})` |
+| `reject_termination.bpf.c` | `fentry/reject_termination` | **FAIL** with `--termination`, **PASS** without it |
+| `folded_loop.bpf.c` | `fentry/folded_loop` | **PASS** — and that is the point; see below |
 
 `ls_2026_http_psm.bpf.c` restores the NULL check missing at
 `src/modules/hudfilter/http/http_psm.c:806-808`, where `ptlp` is dereferenced without one
 and every other use of that field in the tree checks it
 (`listener.c:1161`, `listener.c:1519`, `fw_log_profile.c:4551`, `db_fw_log.c:1663`).
+
+## The section name is the program type, not a label
+
+`fentry/` is not decoration and not the design's `attach_mode`. PREVAIL derives the program
+type — and with it the `ctx` descriptor it verifies against — by matching the **ELF section
+name** against a compiled-in prefix table, and when nothing matches it silently falls through
+to `socket_filter` (`src/linux/linux_platform.cpp:188-198`).
+
+That fallback's descriptor is `__sk_buff`: **192 bytes with pointer slots at 76/80/140**. Any
+`ctx` smaller than 192 bytes therefore verifies clean while touching none of those slots — which
+demonstrates a small struct fitting inside a big one and nothing else. This is finding **O3**,
+and these programs were originally written with a `filter/` prefix, which matches nothing, so
+their first verdicts were obtained under exactly that fallback.
+
+`fentry/` selects `tracing`, whose descriptor is `{96, -1, -1, -1}` — 96 bytes and **no pointer
+slots at all**. That is the fentry model, and an honest description of what a TMM entry hook
+is: it receives argument values, and dereferencing is the host's job, not the program's. All
+four verdicts are unchanged under it, which is what makes them worth quoting.
+
+**Keep the two vocabularies apart.** `attach_mode: filter` in the hook map describes what the
+host does with the return value. The section prefix describes what the verifier models. They are
+different concerns and naming them alike invites exactly the substitution that happened here.
+`check_shields.py`'s `fallback_prefix_guard()` fails the build if a section name stops matching a
+real prefix, or selects `socket_filter` on purpose.
 
 ## Three things these programs establish
 
