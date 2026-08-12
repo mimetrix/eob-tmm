@@ -1101,3 +1101,66 @@ That is the honest scale of the *integration*. It is not the scale of the mechan
 trampoline, pad rewriting and the safe point (scope items 0–2) exist to reach functions nobody
 edited, and none of them are in this delta. What 39 lines buys is the **designed-in** form — a
 deliberate call site in source F5 owns.
+
+## What a merge request would actually require
+
+`CONTRIBUTING.md` in `tmm/tmm` sets hard conventions, several enforced by CI
+(`clang-style-check` runs on MR pipelines). Measured against them, the integration written
+today is a **working prototype, not a submittable change** — and the gap is architectural in
+places, not cosmetic.
+
+### Measured violations
+
+| file | lines > 76 cols | raw C types | system `#include`s | `return` statements |
+|---|---|---|---|---|
+| `ls_vm.c` | 159 | 92 | 4 | 55 |
+| `ls_vm_config.c` | 5 | 7 | 2 | 11 |
+| `ls_vm_load.c` | 56 | 20 | 10 | 9 |
+
+Against the stated rules:
+
+- **76-column limit** — 220 lines over. Mechanical, but it is every file.
+- **Primitive typedefs.** `UINT8/UINT32/UINT64/BOOL/BYTE` from `src/sys/types.h` are required;
+  raw `uint64_t`, `size_t`, `bool` are not. ~119 uses to convert.
+- **Single return point**, with the exit label named `out`. 75 `return` statements across three
+  files, most of them early exits. This is a real restructuring, not a search-and-replace.
+- **One header per source file.** `ls_vm_load.c` has none.
+- **No system headers, no new libraries, without explicit approval** — *"use the TMM shim layer
+  in `src/kern/`"*. This is the big one: `stdio.h`, `stdlib.h`, `string.h`, `pthread.h`,
+  `sys/socket.h`, `sys/un.h`, `unistd.h`, `elf.h`, `errno.h`, `stdarg.h`. Every `fprintf`, the
+  loader thread, and the whole socket path violate OS-independence as written.
+- **Linking `libubpf.a`** is itself a new library and needs the same approval.
+- **≥80% line coverage on new files**, with the file added to
+  `util/new_feature_coverage_env.sh`, and the pipeline fails if per-file coverage drops 0.5%
+  below baseline. No tests exist.
+- **uBPF is vendored by hand** into `.ubpf/`. Every other dependency here arrives through
+  `input-manifest.yml` — `tc-tmm`, `tc-alien`, the `tmstat`/`libbigpacket`/`tcpdump` RPMs. A
+  hand-copied directory is not how this build takes a dependency, and that alone would be a
+  review objection.
+
+### What must not be in a merge request at all
+
+- **`ls_vm_load.c`** — an unauthenticated load path. Its own banner says it must not exist in a
+  build anyone else runs. It needs signature verification (item 4) first.
+- **`LS_VM_SELFTEST`** — deliberately dereferences NULL. It cannot ship at any level.
+- **`ls_shield_blob.h`** — the shield compiled into the binary. The design loads *signed*
+  programs from the control plane; a baked-in blob is a development shortcut.
+- **`harness.c`**, the `BENCH`/`SAMPLES` development socket ops, and the `.pre-ubpf` whitelist
+  backups.
+
+### The sequencing problem, which is the real one
+
+Strip everything above and what remains is the VM plus a designed-in call site — **rung 1**,
+which this repo has already established is *"a patch with extra steps"*: same rebuild, same
+redeploy, plus a VM. A merge request of that has no value proposition to defend.
+
+Adding back the thing that gives it value — loading a program into a running TMM — requires
+**item 4** (in-TMM signature verification) and **item 0** (the safe point), neither of which
+exists. So the smallest *defensible* merge request is materially larger than what has been
+built, and that is a scheduling fact worth having early rather than discovering at review.
+
+**Also worth flagging for review:** the change adds **ten new entries to the global-state
+manifest**, three of them ours. Those three should move into TMM's per-instance structure
+before anyone is asked to approve them — the manifest exists precisely so that new global
+mutable state in a per-core data plane gets argued for, and "it was the shortest path to a
+link" is not the argument.
