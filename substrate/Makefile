@@ -91,11 +91,12 @@ check-tramp:
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_tramp.c \
 	  && echo "ok    ls_tramp.c  (the per-hook C half; arch-generic)"
 	@if [ "$$(uname -m)" = "x86_64" ]; then \
-	  $(CC) -c trampoline_x86_64.S -o .tramp.o && \
-	  echo "ok    trampoline_x86_64.S  (assembles; endbr64 entry, CFI emitted)" && \
-	  rm -f .tramp.o; \
+	  $(CC) -O1 -I. -o .tramp.out check_tramp.c ls_tramp.c trampoline_x86_64.S victim.S 2>/dev/null && \
+	  ./.tramp.out >/dev/null && \
+	  echo "ok    trampoline_x86_64.S  (patched a stand-in entry; body runs on fall-through, skipped on safe return)" && \
+	  rm -f .tramp.out; \
 	else \
-	  echo "skip  trampoline_x86_64.S  (host is $$(uname -m), not x86_64)"; \
+	  echo "skip  trampoline_x86_64.S  (host is $$(uname -m), not x86_64; assembly cannot run here)"; \
 	fi
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict

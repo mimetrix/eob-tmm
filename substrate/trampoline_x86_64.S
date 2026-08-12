@@ -11,7 +11,7 @@
  *
  * This is for the other claim --- attaching to a function NOBODY EDITED. There
  * the compiler reserved a few bytes at the entry and arming rewrites them into a
- * jump to here. There is no C frame to borrow, so everything the ABI says a
+ * CALL to here. There is no C frame to borrow, so everything the ABI says a
  * caller may rely on has to be preserved by hand. That is the whole content of
  * this file, and it is why development-scope.md calls item 1 badly understated
  * at "a page of asm per arch": the assembly is short, the ABI edge cases are not.
@@ -31,10 +31,19 @@
  *   2. THE PAD SITS AFTER endbr64.  With -fpatchable-function-entry=5,0 the
  *      nops are emitted after the entry label, and with IBT they land after the
  *      endbranch:  f3 0f 1e fa  90 90 90 90 90
- *      That is why FIVE is the right pad: `jmp rel32` is exactly 5 bytes
- *      (e9 xx xx xx xx), so arming replaces the nops in place and DISPLACES NO
+ *      That is why FIVE is the right pad: `call rel32` is exactly 5 bytes
+ *      (e8 xx xx xx xx), so arming replaces the nops in place and DISPLACES NO
  *      REAL INSTRUCTION.  Nothing has to be relocated or re-executed --- which
  *      removes the single largest source of complexity in this kind of hook.
+ *
+ *      IT MUST BE `call`, NOT `jmp`, and an earlier draft of this file said
+ *      jmp.  A jmp pushes nothing, so the `ret` on the fall-through path below
+ *      would return to the hooked function's CALLER --- i.e. it would silently
+ *      behave as a safe return, always, and the body would never run.  `call`
+ *      pushes the address of the instruction after the patch, which IS the
+ *      body, so `ret` continues into it.  Verified on hardware, not reasoned:
+ *      see check-tramp, which patches a stand-in function and asserts that the
+ *      body runs on fall-through and does not on safe return.
  *
  *   3. ARGUMENTS MOVE IMMEDIATELY.  A real target begins
  *          mov %rcx,%r12 ; push %rbp ; mov %rdx,%rbp ; push %rbx ; sub $0x28,%rsp
@@ -74,10 +83,18 @@
     .type   ls_trampoline_entry, @function
 
 /*
- * Reached by the 5-byte `jmp rel32` written over the patch nops.  On entry the
+ * Reached by the 5-byte `call rel32` written over the patch nops.  On entry the
  * stack and registers are exactly as the hooked function's caller left them,
- * except that the return address on top of the stack points at the instruction
- * AFTER the patch --- i.e. the hooked function's real body.
+ * except that the call has pushed the address of the instruction AFTER the
+ * patch --- i.e. the hooked function's real body.
+ *
+ * REACH: `call rel32` spans +/-2GB from the patch site.  TMM's .text is ~30MB,
+ * so a trampoline living in .text is always in range.  A trampoline in
+ * mmap'd memory is NOT guaranteed to be, and five bytes cannot hold an indirect
+ * call --- so either the trampoline is linked into the image, or arming must
+ * allocate its trampolines within +/-2GB of .text and fail closed when it
+ * cannot.  That constraint belongs to item 2 and is easy to miss until a large
+ * ASLR offset makes it intermittent.
  */
 ls_trampoline_entry:
     .cfi_startproc
