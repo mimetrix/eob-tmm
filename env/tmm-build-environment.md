@@ -1001,6 +1001,39 @@ kind: F5VirtualServer          # plural f5-virtualservers.k8s.f5net.com
 TMM commits both — `decl_pool_obj_commit: Add pool name = default-pool-ltm-pool-basic-pool`,
 with audit records for the pool and its member list, and no proxy-initialisation error.
 
+**SOLVED — 2026-08-12 evening. Traffic flows: `http=200`, 500 requests, 0 failures, 136 req/s.**
+
+**The answer is that BNK uses Gateway API, not `F5VirtualServer`.** Everything below this
+paragraph was a chase down the wrong path, kept because the wrong path is instructive and
+because the profile that led there (`profiles/virtualserver`) is a **CNF** profile, not a BNK
+one. The working configuration is `profiles/bnk-external` — a profile that exists specifically
+for traffic testing:
+
+```yaml
+GatewayClass  controllerName: f5.com/default-f5-cne-controller
+Gateway       addresses: [{type: IPAddress, value: "11.11.11.99"}]   # explicit; no IPAM needed
+              listeners:  [{name: http, protocol: HTTP, port: 80}]
+HTTPRoute     parentRefs: [{name: gateway, sectionName: http}]
+              backendRefs:[{name: http-pool, kind: Pool, group: k8s.f5net.com}]
+Pool          members: [{address: 22.22.22.100, port: 80}]
+              monitors: {tcp: [{}]}          # a default TCP monitor
+```
+
+`kubectl get gateway -n spk-app-1` then reports `programmed=True/Programmed`, and a request from
+the client pod returns the backend's own content.
+
+**The `Pool` kind was right from the first attempt.** It is what Gateway routes reference.
+`F5VirtualServer` + `F5BigCnePool` is the CNF model; in BNK it produces a LoadBalancer Service
+that IPAM was never going to fill, which is why every symptom pointed at ports and addresses.
+
+**Two lessons worth more than the fix.** *Check which profile a reference manifest belongs to
+before adapting it* — `profiles/virtualserver` and `profiles/tcpopt-core` both look like
+plausible references and both target a different CRD set. And *`Port denied` in a TMM reset
+payload means the listener never opened*, not that the port is blocked; reading the payload with
+`tcpdump -A` inside the pod is what turned guesswork into a specific message.
+
+### The wrong path, kept for the record
+
 **Root cause found, and mostly cleared — 2026-08-12 evening.** Four distinct problems, in the
 order they had to be solved:
 
