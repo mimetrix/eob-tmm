@@ -80,6 +80,8 @@ check-vm:
 	  && echo "ok    ls_vm.c  (compiles against the real uBPF API, -Wall -Wextra clean)"
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_vm_config.c \
 	  && echo "ok    ls_vm_config.c  (stands alone, no uBPF headers needed)"
+	@$(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I../ubpf/vm ls_vm_load.c \
+	  && echo "ok    ls_vm_load.c  (runtime load path; compiles against the real ABI)"
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
 # asserted. A rejection program that starts passing is the dangerous direction, so both

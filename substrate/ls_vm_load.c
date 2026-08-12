@@ -43,6 +43,7 @@
 #include "shield_abi.h"
 
 #include <errno.h>
+#include <stdarg.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,14 +105,25 @@ handle(int fd)
         return;
     }
 
+    /* O14, on real code: the binding carries ONE identity --- `hook` --- and the
+     * loader needs two, because PREVAIL proved a SECTION and uBPF runs a SYMBOL.
+     * Both are synthesised here by convention (section = "fentry/<hook>",
+     * function = "shield"), and a convention is exactly what O14 says is not good
+     * enough: nothing signed commits to either name, so the identity check in
+     * ls_vm_arm is verifying the program against names this loader made up
+     * rather than against names an authority asserted. The binding needs both
+     * fields. Until it has them, this is the gap, not a detail. */
+    char section[96];
+    snprintf(section, sizeof section, "fentry/%.63s", m->binding.hook);
+
     switch (m->op) {
     case SHIELD_OP_LOAD: {
         fprintf(stderr,
                 "ls_vm: LOAD accepted on %s --- NOT SIGNATURE VERIFIED "
                 "(scope item 4 deferred); hook=%.63s bytes=%u\n",
-                g_sock_path, m->hook, m->prog_len);
+                g_sock_path, m->binding.hook, m->prog_len);
         int slot = ls_vm_reload(0, m->prog, m->prog_len,
-                                m->hook, "shield", (enum ls_mode)m->mode);
+                                section, "shield", (enum ls_mode)m->mode);
         if (slot < 0)
             reply(fd, "ERR load refused (identity mismatch, malformed ELF, or "
                       "uBPF rejected it)\n");

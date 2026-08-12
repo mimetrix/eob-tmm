@@ -452,7 +452,13 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
         return LS_FALLTHROUGH;
 
     struct ls_slot *s = &g_slots[slot];
-    if (!s->armed || s->mode == LS_MODE_DISABLE)
+
+    /* Both of these can be replaced under us by the loader thread, so read each
+     * exactly once. Reading s->vm twice could straddle a swap and use one
+     * program's VM with another's expectations. */
+    enum ls_mode mode = __atomic_load_n(&s->mode, __ATOMIC_ACQUIRE);
+    void *vm = __atomic_load_n(&s->vm, __ATOMIC_ACQUIRE);
+    if (!s->armed || vm == NULL || mode == LS_MODE_DISABLE)
         return LS_FALLTHROUGH;
 
     /* A non-zero return from ubpf_exec is an execution fault --- fuel exhausted,
@@ -460,7 +466,7 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * shield that cannot run must not take the flow with it. Counted, because a
      * silent fail-open is indistinguishable from a shield that never matched. */
     uint64_t t0 = g_cfg.timing ? ls_cycles() : 0;
-    int rc = ubpf_exec(s->vm, ctx, ctx_len, &ret);
+    int rc = ubpf_exec(vm, ctx, ctx_len, &ret);
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;
         s->cycles += d;
@@ -485,7 +491,67 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
 
     /* Monitor mode counts the selection and applies nothing. The counters above
      * are what make a monitor-mode hit distinguishable from a miss. */
-    return (s->mode == LS_MODE_ENFORCE) ? LS_SAFE_RETURN : LS_FALLTHROUGH;
+    return (mode == LS_MODE_ENFORCE) ? LS_SAFE_RETURN : LS_FALLTHROUGH;
+}
+
+/*
+ * Publish a new program over a live slot. The whole point of this function is
+ * the ORDER: everything expensive and everything fallible happens first, into
+ * storage the data path cannot see, and the data path only ever observes a
+ * single pointer store that is either the old program or the new one.
+ *
+ * What this is NOT: the ordered cross-core publish of item 0. A call already in
+ * flight keeps the VM it loaded at entry; the next call gets the new one. That
+ * is atomic-per-call replacement, which is sufficient for one hook and one
+ * program and is not sufficient for a coordinated multi-hook update.
+ *
+ * The old VM is deliberately LEAKED. Freeing it needs proof that no core is
+ * still inside it --- items 0b/0c --- and a wrong free here is a use-after-free
+ * on the data path. Leaking is bounded by the number of loads and cannot
+ * corrupt anything; a load loop would exhaust memory, which is a real limit
+ * stated rather than hidden.
+ */
+int
+ls_vm_reload(int slot, const void *elf, size_t elf_len,
+             const char *section, const char *function, enum ls_mode m)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS || !g_ready)
+        return -1;
+
+    /* Prepare into a spare slot: create, identity-check, load, JIT if asked.
+     * All of it off the data path, all of it able to fail harmlessly. */
+    int staged = ls_vm_arm(elf, elf_len, section, function, m);
+    if (staged < 0)
+        return -1;
+    if (staged == slot)
+        return slot;                      /* nothing was live here */
+
+    struct ls_slot *live = &g_slots[slot];
+    struct ls_slot *new  = &g_slots[staged];
+
+    /* The publish. One store, release-ordered so the VM's contents are visible
+     * to any core that observes the new pointer. */
+    __atomic_store_n(&live->mode, LS_MODE_DISABLE, __ATOMIC_RELAXED);
+    __atomic_store_n(&live->vm, new->vm, __ATOMIC_RELEASE);   /* old VM leaked */
+    __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
+    live->armed = true;
+
+    new->armed = false;                   /* the staging slot goes back */
+    new->vm = NULL;
+
+    fprintf(stderr, "ls_vm: RELOADED slot=%d mode=%d bytes=%zu "
+                    "(previous VM leaked --- reclamation is item 0c)\n",
+            slot, (int)m, elf_len);
+    return slot;
+}
+
+void
+ls_vm_set_mode(int slot, enum ls_mode m)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS)
+        return;
+    __atomic_store_n(&g_slots[slot].mode, m, __ATOMIC_RELEASE);
+    fprintf(stderr, "ls_vm: slot=%d mode -> %d\n", slot, (int)m);
 }
 
 void
