@@ -800,6 +800,27 @@ on that, and no performance claim can be made before it.
 (`ls_shield_blob.h`); the only caller in TMM is `http_psm_init`. No message handler, no file
 read, no socket. Changing the program means rebuilding TMM.
 
+**Do not read that as a safety property — it is the demonstration's central weakness.**
+Rebuilding TMM takes about ten minutes here, so "you would have to rebuild" bounds nothing.
+What it actually means is that **a shield compiled into TMM is a strictly worse version of
+writing the NULL check in C**: same rebuild, same repackage, same redeploy, plus a VM, a
+verifier and an interpreter in the path. Everything established today shows the mechanism
+works; none of it shows why anyone would want it.
+
+The value is entirely in the rung we have not built:
+
+| rung | changing a shield requires | status |
+|---|---|---|
+| 1 · compiled in | rebuild, repackage, redeploy | **where we are** |
+| 2 · loaded at startup from a file or message | no rebuild — but a restart | not built |
+| 3 · loaded into a **running** TMM | nothing: no rebuild, no restart, no maintenance window | **the actual claim** |
+
+Rung 3 is the proposal: a CVE lands, a signed shield goes to fielded systems, no upgrade
+window. Rung 1 is a patch with extra steps. The distance between them is scope items **3**
+(loader message handler), **4** (in-TMM signature verification) and **0** (the safe point, so
+arming does not mean stopping traffic) — and item 0 is the one this repo already flags as
+missing from the original scope list and among the largest.
+
 **But the loader would accept anything handed to it**, and that is the part to be honest about:
 
 | gate | present |
