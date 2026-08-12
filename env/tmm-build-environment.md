@@ -1016,3 +1016,63 @@ against the kind, not the filename.
 
 **Nothing has reached the hook yet**: `FIRST INVOCATION` has not appeared, and the shield's
 `fired` counter is 0. The VM is armed and benchmarked; it has not been driven.
+
+## The JIT, and the shield demonstrated — 2026-08-12, evening
+
+### The JIT is ~4.8× the interpreter, and this is its first real measurement
+
+The previous JIT figure was not the JIT. `ubpf_exec`/`ubpf_exec_ex` **always interpret**; a
+compiled program is reachable only through the pointer `ubpf_compile` returns, which the code
+was discarding. The benchmark now prints which path it measured, precisely so that cannot recur.
+
+| path | min | mean | max | ns @ 2.6 GHz (min) |
+|---|---|---|---|---|
+| interpreter | 126 | 240 | 2,471,618 | **48** |
+| **JIT** (extended mode) | **26** | **74** | 233,286 | **10** |
+
+Same program, same box, one environment variable apart. The tail improves too — max falls by an
+order of magnitude, which matters more for a p99 argument than the floor does.
+
+**Against `big-ip-live-shield-design.md` §11's "order tens of nanoseconds":** the JIT is 10 ns,
+at the low end of tens; the interpreter is 48 ns. Both survive the claim. Against a
+sub-nanosecond C `if`, the JIT is still **roughly an order of magnitude** more expensive, so the
+"emphatically not comparable to a C `if`" half also stands.
+
+**A hypothesis of mine that the measurement killed.** `ubpf_exec` declares its 4 KB program
+stack as a local, so every invocation opens a 4 KB frame; this note previously said that was
+"very likely a real share of the 126-cycle floor". It is not. Moving to a per-instance stack
+left the floor unchanged (126→126, 138→132). Obvious in hindsight: allocating stack is a
+`sub rsp, N`, and untouched pages are never faulted in. **The change is still correct** — it
+removes O7's unprobed-frame hazard from the call path — but it buys nothing measurable, and the
+earlier claim should not be repeated.
+
+### The shield, demonstrated without traffic
+
+`LS_VM_SELFTEST` builds the `ctx` the vulnerable call site would build with a NULL
+protocol-transfer log profile, runs it through the armed shield, and at level 2 performs the
+dereference if the shield declines. Two runs of **one image**, one environment variable apart:
+
+```
+LS_SHIELD_MODE=enforce   SELFTEST cve-condition ptlp=NULL -> verdict=SAFE_RETURN
+                         SELFTEST survived --- shield prevented the dereference
+                         pods Running, restarts=0
+
+LS_SHIELD_MODE=monitor   SELFTEST cve-condition ptlp=NULL -> verdict=FALLTHROUGH
+                         SELFTEST performing the unshielded dereference --- expected fatal
+                         <log ends; rollout times out; that pod is replaced>
+```
+
+**Monitor mode is the right lever here**, and not merely a substitute for disabling: it is the
+real posture an operator uses before enforcing, and it shows the shield *recognising* the
+condition — `verdict` reflects the program's decision — while the host declines to act on it.
+`LS_SHIELD_ENABLE=0` would skip arming altogether, so the self-test would never run.
+
+**What the evidence supports, precisely.** The code prints `SELFTEST did NOT crash` if the
+dereference returns; that line never appeared, the log ends at the attempt, and the pod was
+replaced rather than continuing. That is strong, but it is **not** a captured exit code or
+signal — the pods churned before one could be inspected, so "the process did not continue past
+the dereference" is the defensible statement, not "confirmed SIGSEGV".
+
+**And what it does not show**, unchanged: that the hook is correctly placed in
+`http_psm_profile_name_lookup`, or that live traffic reaches it. This synthesises the condition;
+it does not drive the path.
