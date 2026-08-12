@@ -190,6 +190,7 @@ exfiltration control and attestation are **not** yet specified there).
 | [`development-scope-code.md`](development-scope-code.md) | **Candidate code** for every day-one scope item (1–12 + the shield program) — skeletons scaled to each item's size class, each with a real / stubbed / TODO breakdown, plus a naming-reconciliation table. Backed by the checked artifacts in [`substrate/`](substrate/) — which is also where several of these skeletons were caught being wrong |
 | [`engine-hard-problems.md`](engine-hard-problems.md) | The problems the pitch glosses — **termination ≠ WCET**, the **ctx/helper/program-type ABI is the real 90%**, **maps under CMP + HA mirroring**, and **verifier soundness as a data-plane RCE surface** (with the signing gate as the real perimeter). Honest mitigations, day-one vs. deferred — the "what a security review will ask" register |
 | [`substrate/`](substrate/) | **The artifacts that check themselves** — the loader/binding ABI as a header whose `_Static_assert`s pin the wire layout, the hook-map JSON Schema plus an example map, an admission-time budget pass with a self-test, an offset check, and a guard that fails the build if the safe-return two-gate rule regresses. `make -C substrate check` runs all of it |
+| [`substrate/shields/`](substrate/shields/) | **The eBPF programs we author** — the CVE shield for the real NULL-deref at `http_psm.c:806`, plus three programs that exist to pin the verifier's gates. The `ctx` header is **generated from a real build's DWARF** rather than hand-written, which is what a shield needs to be trustworthy: the layout is a property of one build. `make -C substrate check` compiles each and asserts PREVAIL's verdict |
 | [`explainers/README.md`](explainers/README.md) | **The reading map** — which artifact answers which question, the intended order, and what to hand a skeptic first. Start here when circulating |
 | [`explainers/`](explainers/) | Visual explainers (HTML), one job each. [`programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) — **the engine** (the generic verified-eBPF utility in TMM); [`cve-mitigation.html`](explainers/cve-mitigation.html) — data-plane **CVE mitigation** (the shield); [`cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) — a **worked example**: shielding a real TMM NULL-deref crash class step by step; [`engine-hard-problems.html`](explainers/engine-hard-problems.html) — the **engineering register** (the hard problems, honestly scoped) |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | A proposed catalog of designed-in USDT-style (user statically defined tracing) tracepoints for TMM — observability, debug, and RCA features, by data-path stage |
@@ -198,8 +199,9 @@ exfiltration control and attestation are **not** yet specified there).
 
 There is no prototype in this repo, and no claim in these documents rests on one. What there is, in
 [`substrate/`](substrate/), is the handful of items from the scope that are **real files rather than
-illustrative blocks** — they compile, validate, and run. `make -C substrate check` runs five checks with
-nothing but a C compiler and Python 3:
+illustrative blocks** — they compile, validate, and run. `make -C substrate check` runs eight checks with
+nothing but a C compiler, Python 3, and — for the last one — a BPF-capable clang and a built
+PREVAIL (it skips loudly rather than silently passing if either is missing):
 
 1. **`shield_abi.h` compiles standalone and asserts its own wire layout** — fifteen `_Static_assert`s
    pinning `struct shield_msg` and `struct shield_binding` byte for byte.
@@ -212,14 +214,32 @@ nothing but a C compiler and Python 3:
    over-budget rejection, and refusing a loop rather than guessing its trip count.
 5. **The safe-return two-gate rule is asserted, not just documented** — five cases, and the build fails
    if an unanalysed function body is ever treated as enforce-capable.
+6. **The candidate skeletons are handed to a compiler** — 12 of 13 C blocks in
+   `development-scope-code.md` compile against the ABI header and platform stubs; an opt-out is
+   reported, never silent. Nothing is linked or run.
+7. **The verifier's model of the runtime is compared against the runtime** — PREVAIL's per-subprogram
+   stack frame against uBPF's, parsed from both vendored trees at run time. This one reports two
+   standing findings and `make gate` fails on them, on purpose: item 6a is open.
+8. **The shields in [`substrate/shields/`](substrate/shields/) are compiled and put to PREVAIL, with
+   each verdict asserted** — the CVE shield must pass, two rejection programs must fail, and a
+   surprise in either direction fails the build. The dangerous direction is a rejection program that
+   starts passing.
 
 **Why that is the whole of it.** Writing these for real has already caught four defects
 that the prose versions carried unnoticed: a signature documented as covering a binding the message
 could not carry; a replay that defeated the kill switch; a safe-return model inverted so that `void`
 looked like the easy case; and a hook map declaring offsets that did not match its own header. That is
-the argument for these files existing. It is *not* an argument that the mechanism works — **no shield
-is compiled, verified, loaded, or executed anywhere in this repo**, and every performance and behaviour
-claim in these documents is a design claim awaiting measurement.
+the argument for these files existing. It is *not* an argument that the mechanism works.
+
+**What is and is not demonstrated, precisely.** As of 2026-08-12 a shield **is** compiled here and a
+verifier **does** reach a verdict on it: `clang -O2 -g -target bpf` produces a 9-instruction program,
+PREVAIL passes it with `--termination --no-division-by-zero --strict`, and the budget pass prices it at
+~21 cycles against a budget of 800. Its `ctx` is generated from the DWARF of a TMM built from source on
+2026-08-12 (BNK form factor), so the offsets come from a real binary rather than from someone typing out
+a struct. **Nothing is loaded into TMM and no shield executes anywhere in this repo** — there is still no
+trampoline, no loader, no running data plane, and no measurement of a shield in a poll loop. Every
+performance and behaviour claim about the *mechanism* remains a design claim awaiting measurement; what
+has moved is that the authoring chain is no longer hypothetical.
 
 ## Notes
 

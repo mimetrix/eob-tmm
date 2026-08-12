@@ -90,13 +90,31 @@ the 73,906 out-of-line functions in the shipped TMM binary.
 | `src/compile` — the TMM tree | **82%** |
 | the TMM RPM's own build | **97%** |
 | `src/tm_lib` | **78%** |
-| ~two dozen separately-built F5 components (`dedup`, `mcplib`, `crypto`, `errdefs`, `tmjail`, `aclparser`, `f5util`, `ha_table`, `nxdomain`, `ports`, `afm`, …) | **0%** |
+| ~two dozen separately-built F5 components | **0%** |
 | vendored third party (OpenSSL, the regex engine, json-c) | **0%** |
 
 TMM's binary is **assembled**, not compiled: roughly half its functions arrive from component
 builds that never saw the TMM build's flags, and three of them — `tmstat`, `libbigpacket`,
 `tcpdump` — arrive from Artifactory as **prebuilt RPMs** and are not compiled on the build host
 at all. `input-manifest.yml` versions each component independently.
+
+**Scoped to this catalog's subject, the gap is much narrower than "half the binary."** This
+document covers **the proxy data plane**; the control-plane daemons are a separate engine and out
+of scope here (README, *The mechanism*). Sampling the unpadded components by symbol name against
+that scope:
+
+| component | symbols | on the data path? |
+|---|---|---|
+| `crypto` — OpenSSL (`CRYPTO_128_unwrap`, …) | 788 | **yes** — TLS record and handshake handling |
+| `dedup` (`dedup_abort_flow`, …) | 375 | **yes** — per-flow |
+| `errdefs` (`errdefs_accept_hsl`, `errdefs_accept_ipfix`, …) | 373 | partly — the logging path, which is where §14's CVE lives |
+| `afm` (`AFM_SWEEPER_collector_*`) | 102 | **no** — the unpadded part is the background sweeper, not per-packet enforcement, so §6.1's AFM hooks are unaffected |
+| `nxdomain`, `ports`, `aclparser` | 61 / 17 / 2 | marginal |
+| `mcplib`, `tmjail`, `ha_table`, `f5util` | ~0 by name | control plane / not per-packet |
+
+So within a data-plane scope the unreachable set is **dominated by OpenSSL**, with per-flow dedup
+second. That is not a comfortable answer — TLS record parsing is a prime CVE surface — but it is a
+specific and bounded one, and it points at exactly the case consequence 2 handles.
 
 **Three consequences, in the order they bite.**
 
@@ -106,7 +124,8 @@ case — arming a hook on a function nobody planned for — and it is bounded by
 the optimiser alone. Both mechanisms remain available; they now have different reach, and the
 catalog is the mechanism with the guarantee.
 
-**2 · Unreachable interiors are coarser coverage, not absent coverage — hook the boundary.**
+**2 · Unreachable interiors are coarser coverage, not absent coverage — hook the boundary. And
+the component that matters most is the one this handles best.**
 Design §10.1 already makes this argument for inlining: when a function has no entry of its own,
 the usable boundary moves **outward to the nearest surviving caller**, giving a wider skip radius
 rather than lost reachability. The same logic covers an unpaddable component, and it lands
