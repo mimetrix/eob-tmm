@@ -783,9 +783,20 @@ exists.**
 
 - `make tmm` links `obj_x86_64.no_pgo/tmm.no_pgo`. It does **not** produce an image.
   `make container` / `make tmm-gdb` do that, and neither has been run since the integration.
-- The earlier `tmm:local`, `tmm:local_img` and `tmm_gdb:latest` images are **gone** — the
-  integration script's `sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_*` cleared the
-  artifacts they were built from, and they predated the VM anyway.
+- The earlier `tmm:local`, `tmm:local_img` and `tmm_gdb:latest` images **still exist** — an
+  earlier note here said they had been deleted, which was wrong: `rm -rf RPMS SRPMS
+  docker_build/DEBS BUILD_*` removes build *artifacts*, not Docker images, which live in
+  `/var/lib/docker`. They do, however, **predate the VM**, and that was checked rather than
+  inferred from timestamps: `tmm:local`'s binary is 56,877,952 bytes — the
+  `-fpatchable-function-entry` build exactly — with **zero** `ubpf_*` symbols and no trace of
+  the O14 refusal string.
+
+**What the image list is, since "images on the build box" is ambiguous.** Seven tags, five
+distinct images: `tc-tmm` and `tc-alien` are **pulled** from Artifactory (the toolchain and the
+RPM→DEB converter — tools, not outputs), and three are **built** here. Two of the built ones
+carry a second tag under `publish.artifactory.f5net.com/f5-tmm-docker/…`, which is the build
+naming its own output for the publish registry — the user-build path into
+`input-manifest.yml`. The build is set up to publish; it simply has not.
 - The only image on the build box is the toolchain (`tc-tmm:v2.3.1`); the only running
   container is that toolchain.
 - `eob-bnk-datkube-01` has kind, kubectl and helm installed but **no cluster created**.
