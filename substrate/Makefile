@@ -11,10 +11,10 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry gate clean
+        check-skeletons check-geometry check-shields gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry
+       check-skeletons check-geometry check-shields
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -61,6 +61,12 @@ check-skeletons:
 # `make gate` is the same check with the exit code a build pipeline needs.
 check-geometry:
 	@$(PYTHON) ./check_vm_geometry.py
+
+# The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
+# asserted. A rejection program that starts passing is the dangerous direction, so both
+# directions are failures. Skips loudly if clang has no BPF target or prevail is unbuilt.
+check-shields:
+	@$(PYTHON) ./check_shields.py
 
 # Everything in `check`, plus the standing findings turned fatal. This is what a
 # real admission pipeline would run. It FAILS today, on purpose: item 6a is open.
