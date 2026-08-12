@@ -644,9 +644,20 @@ sort -u debug_whitelist_x86_64 -o debug_whitelist_x86_64
 # repeat for default_whitelist_x86_64
 ```
 
-Two things follow. **Predict the symbols and pre-add them** — it saves a 12-minute cycle. And
-**give every static a unique name**: `print-globals` truncates at the first dot, so a
-`static ... buf[]` enters the permanent allowlist as the entirely generic `buf`.
+**It is an exact match, not a superset allowlist.** `diff-globals` runs `diff -u` between the
+whitelist and the binary's actual globals and fails on a difference in *either* direction — so
+**removing** global state breaks the build exactly as adding it does. Moving a `static` buffer
+to a `malloc` cost a full build cycle for precisely this: the symbol vanished, the whitelist
+still listed it, and the failure reads identically to an unauthorised addition. Read the sign in
+the diff: `+name` is new state, `-name` is state you deleted.
+
+Arguably that is the better design — you cannot quietly drop tracked state either — but it means
+the whitelist is a *manifest*, not a permission list.
+
+Two more things follow. **Predict the symbols and pre-add them** — it saves a 12-minute cycle,
+but only if the prediction is right in both directions; a wrong pre-add costs the cycle it was
+meant to save. And **give every static a unique name**: `print-globals` truncates at the first
+dot, so a `static ... buf[]` enters the permanent manifest as the entirely generic `buf`.
 
 **Then build normally:** `script -qec "make tmm-gdb" /dev/null`.
 
@@ -765,6 +776,7 @@ if you will be back soon.
 | build: "sed: can't read .env" / "username is empty" | TMM needs its own `.env`. Step 8. |
 | `kind load` fails: "failed to detect containerd snapshotter" | use `docker exec <node> ctr --namespace=k8s.io images import -` per node. Step 12c. |
 | a header is missing on exactly ONE file while hundreds compile | a global `CFLAGS +=` does not reach files that `filelist.mk` gives target-specific flags to — which is nearly all of them. Use a `filelist` option. Step 12b. |
+| link fails with a diff of symbol names, and the diff shows `-name` | you *removed* global state; the whitelist is an exact match, not a superset. Delete the entry. Step 12b. |
 | link fails with a diff of symbol names | TMM whitelists mutable global state (`.data`/`.bss`/COMMON, not functions). Add them deliberately. Step 12b. |
 | `strings` inside the f5-tmm container returns 0 for everything | it is not installed there; `kubectl cp` the binary out first. Step 12c. |
 | `nm` shows zero `ubpf_*` symbols in the running binary | it is stripped, not un-integrated. Step 12c. |
