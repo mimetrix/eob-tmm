@@ -1151,3 +1151,85 @@ across a long session never staged either file, and `git log --all` over
 `*clouds*` is empty. But that is the ignore list doing the work, which is
 the fallback and not the rule. Move them out of the tree once merged;
 `merge-clouds-yaml.py` has already copied what it needs.
+
+### 2026-08-12 — one source tree, three form factors
+
+Answering a question asked directly: *can you tell from the TMM clone itself whether the
+appliance, VE and containerized builds all come from the same source?* From the clone,
+yes — and the answer is **one tree, three builds**, not three codebases.
+
+The evidence is in the tree at `gitswarm.f5net.com:tmm/tmm` (`main`, `10.207.3-main`):
+
+- **`p4git/`** is a Perforce→Git bridge with its own README, `make run-auto-import` and
+  `make run` sync targets, and a `.p4config` client view. The GitSwarm repo is a **sync
+  of the Perforce depot**, not an independent fork of it. 25 of the last 400 commits
+  mention P4 or Perforce.
+- **`documents/feature-flags.md` carries appliance and VE flags** — `perf_VE_cores`,
+  `perf_VE_SSL_offload`, `perf_VE_throughput_Mbps`, `security_appliance_mode`. These are
+  **runtime feature flags in the shared TMM**, so this tree knows about form factors it
+  does not itself package for.
+- **CBIP modules are present verbatim** — `src/modules/hudfilter/http/http_psm.c`, the
+  file carrying §14's real vulnerable pattern, is right here in the MBIP tree.
+- **Only `tmm-mbip.spec` exists.** Packaging is MBIP-only in this checkout; the appliance
+  and VE spec files live on the Perforce side.
+
+**What this does and does not license.** It licenses reading TMM *source* here and
+expecting it to be the same source the other form factors compile — so a vulnerable
+pattern found here is a pattern in all three, and the mechanism claim spans them. It does
+**not** license carrying a *measurement* across: the hookable-set count is a property of
+one compilation — flags, inlining decisions, LTO, which modules are configured in — and
+those differ per form factor. Same source, different binaries. The count in §10.1 stays
+labelled BNK, and appliance and VE stay unmeasured until someone builds them on `seadev`.
+
+### 2026-08-12 — condition 1, verified rather than assumed
+
+`big-ip-live-shield-design.md` §10.1 states three conditions the hook mechanism needs. The
+first — *the target function still exists as an out-of-line body after the optimiser has
+run* — had been argued but never checked against a real optimised TMM. It now has been.
+
+From `make tmm-gdb` on this build box, via `tmm-debuginfo_*.deb`: **119,555** out-of-line
+functions, ~113,604 excluding obvious statically-linked third party, with 92 `.constprop`,
+76 `.isra` and 126 `.part` clones and full DWARF. And specifically:
+`http_psm_profile_name_lookup` — a **`static bool`**, exactly the shape most likely to be
+inlined away — **survived `-O2` as symbol type `t`**. That is the condition holding in the
+unfavourable case, not the easy one.
+
+One correction that belongs in the record: **`fw_log_prot_transfer_emit` does not exist.**
+It was invented as a plausible-sounding hook target for §14's worked example, and searching
+119,555 real symbols returns zero. What *is* real is the struct
+(`fw_log_profile_protocol_transfer`), the field (`prot_transfer_log_profile`), and the
+unchecked dereference at `src/modules/hudfilter/http/http_psm.c:806-808` — where every
+other use of that field in the tree is NULL-checked (`listener.c:1161`, `listener.c:1519`,
+`fw_log_profile.c:4551`, `db_fw_log.c:1663`). The example's *mechanism* stands; its symbol
+name was a placeholder and is now labelled as one everywhere it appears.
+
+### 2026-08-12 — rebuilt as two boxes, and the runbook
+
+The first working box, `eob-tmm-dev`, was a hybrid: it built TMM *and* ran a kind cluster.
+That conflates two jobs. Building is not running, and the numbers this proposal needs are
+runtime numbers — measuring TMM's poll loop on a machine simultaneously compiling 2,039
+`.c` files inside an 18 GB toolchain produces nothing worth citing. It is also not how F5
+does it: the fast-cycling page assumes a build machine and a Datkube machine with `scp`
+between them, which is exactly why `datpush` exists.
+
+So the environment is now two boxes, named for what they do:
+
+| | `eob-bnk-build-01` | `eob-bnk-datkube-01` |
+|---|---|---|
+| TMM source + toolchain container | yes | no |
+| clang for eBPF shield programs | yes | no |
+| gcc, gdb, symbol analysis | yes | no |
+| kind, kubectl, helm, datkube CLI | no | yes |
+| runs the `f5-tmm` pod | no | yes |
+
+**eBPF development sits on the build box, deliberately.** The toolchain container has no
+clang (`toolchain-container bpf target: NO`); the host has clang 18.1.3 with `bpf`,
+`bpfel` and `bpfeb` targets. Shield programs therefore compile on the host — and they must
+compile *there*, because a shield includes the `ctx` struct definition for its hook and
+that layout is generated per build. A hand-copied struct drifts silently from the build it
+is loaded into.
+
+The procedure is now written down as commands rather than prose:
+**[`bnk-dev-runbook.md`](bnk-dev-runbook.md)**. It was produced by executing it, not from
+memory — the build box above was provisioned by following it step by step, which is the
+only way the gotchas stay attached to the step that triggers them.

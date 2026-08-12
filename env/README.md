@@ -16,6 +16,7 @@ them claim to execute anything.
 | File | Purpose |
 |---|---|
 | [`tmm-build-environment.md`](tmm-build-environment.md) | **The active document.** Running log for standing up a TMM build host: stack reachability, SSH paths, Perforce, credential runbook, SJC-vs-SEA comparison, open questions. |
+| [`bnk-dev-runbook.md`](bnk-dev-runbook.md) | **The copy-paste procedure.** Exact CLI commands to stand up the BNK build box and the Datkube run box from nothing, in order, with each gotcha stated where it bites. Every command in it was executed. |
 | [`openstack-cli-reference.md`](openstack-cli-reference.md) | How to install and drive `python-openstackclient` against the F5 stacks; image selection, network gotchas, instance launch recipe. |
 | [`sandbox-ebpf-limitations.md`](sandbox-ebpf-limitations.md) | What the Claude dev sandbox can do with eBPF (build/codegen only — capabilities are stripped from the bounding set, so nothing loads). |
 | [`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md) | The 2026-07-17 BIG-IP VE boot attempt and the kernel-3.10/no-BTF blocker it found. |
