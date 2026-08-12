@@ -11,10 +11,10 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields gate clean
+        check-skeletons check-geometry check-shields check-stack gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields
+       check-skeletons check-geometry check-shields check-stack
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -61,6 +61,16 @@ check-skeletons:
 # `make gate` is the same check with the exit code a build pipeline needs.
 check-geometry:
 	@$(PYTHON) ./check_vm_geometry.py
+
+# Item 6a's resolution: the stack-usage calculator that makes uBPF allocate what
+# PREVAIL proved against. Asserts the behaviour that matters — it must never return
+# 0, because uBPF's header says 0 means "assume the maximum" and its code gives a
+# zero-byte frame.
+check-stack:
+	@$(CC) -fsyntax-only -x c vm_stack_policy.h && echo "ok    vm_stack_policy.h  (syntax + _Static_asserts)"
+	@printf '#include "vm_stack_policy.h"\n#include "vm_stack_policy.h"\n#include <assert.h>\nint main(void){\n struct vm_stack_policy g={256,8},bad0={0,8},mis={100,8},deep={512,9};\n assert(vm_stack_policy_valid(&g)); assert(!vm_stack_policy_valid(&bad0));\n assert(!vm_stack_policy_valid(&mis)); assert(!vm_stack_policy_valid(&deep));\n assert(!vm_stack_policy_valid(0));\n assert(vm_stack_usage(0,0,&g)==256);\n assert(vm_stack_usage(0,0,0)==512);\n assert(vm_stack_usage(0,0,&bad0)==512);\n assert(vm_stack_align_up(1)==16&&vm_stack_align_up(16)==16&&vm_stack_align_up(17)==32);\n return 0;}\n' > .vsp.c
+	@$(CC) -I. -o .vsp.out .vsp.c && ./.vsp.out && echo "ok    vm_stack_policy.h  (9 assertions, incl. never-return-0)"
+	@rm -f .vsp.c .vsp.out
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
 # asserted. A rejection program that starts passing is the dangerous direction, so both

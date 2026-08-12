@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Item 6a — does the verifier's model of the runtime match the runtime?
 
+RESOLUTION, 2026-08-12: uBPF does not fix its frame size. It calls a host-supplied
+callback for every local function and uses the result
+(ubpf_register_stack_usage_calculator; vm/ubpf_vm.c:872, ubpf_jit_x86_64.c:1827,
+ubpf_jit_arm64.c:1260). So the 256 reported below is the value used only when NO
+calculator is registered, not a ceiling to be reconciled against. The fix is
+substrate/vm_stack_policy.h: register a calculator returning exactly what PREVAIL
+was told, so the two agree by construction. The comparison below is still worth
+running, because it prices what happens if nobody registers one.
+
 PREVAIL proves memory safety against a *declared* machine: a per-subprogram stack
 frame size, a maximum call depth, and a set of enabled checks. uBPF then executes
 the program on an *actual* machine with its own frame size, depth and checks. The

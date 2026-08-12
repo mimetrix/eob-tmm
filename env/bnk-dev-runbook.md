@@ -368,6 +368,28 @@ openstack --os-cloud sea server list -f value -c Name -c Networks
 
 and take the **IPv4** address — SEA's AdminNetwork is dual-stack and lists IPv6 first.
 
+### 6c · Losing the account passwords is recoverable — don't treat them as precious
+
+`provision-machine.yml` sets `root_password` / `user_password` from `vars.yml`, and if that file
+lived somewhere ephemeral those values can be lost. **That is not a lockout.** Verified on these
+boxes:
+
+- **`sudo` is passwordless** for the dev user (`sudo -n true` succeeds), so the user password is not
+  needed for privilege escalation — only for a console login.
+- **`openstack server rescue` accepts `--password`**, so root access can be re-established without
+  the original: rescue the instance, and the rescue environment gets a password you choose while the
+  original disk is attached for chroot.
+
+```bash
+openstack --os-cloud sea server rescue --password '<new>' eob-bnk-build-01
+# ... chroot the attached disk, `passwd`, then:
+openstack --os-cloud sea server unrescue eob-bnk-build-01
+```
+
+So keep the passwords in a password manager if convenient, and reprovision or rescue if not. What is
+*not* recoverable this way is the SSH key — treat that as the credential that matters. Neither box
+runs `qemu-guest-agent`, so there is no API-side password reset; rescue is the path.
+
 ## 7 · Credentials on the box
 
 ```bash
