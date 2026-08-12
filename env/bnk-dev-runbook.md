@@ -743,6 +743,50 @@ ls_vm: LOADER LISTENING on /tmp/ls_load.sock --- accepts UNVERIFIED programs
 **`LS_LOAD_SOCKET` has no signature verification** (scope item 4, deferred). It is off unless
 set, the socket is 0600, and every load says so. Do not leave it enabled in anything shared.
 
+### Demonstrating the shield without traffic --- `LS_VM_SELFTEST`
+
+The CVE needs a specific misconfiguration to fire naturally (below). `LS_VM_SELFTEST` builds
+the `ctx` the vulnerable call site would build with a NULL protocol-transfer log profile, runs
+it through the armed shield, and at level 2 performs the dereference if the shield declines.
+
+```bash
+# A --- enforce: the shield acts. TMM survives.
+kubectl set env deploy/f5-tmm -c f5-tmm LS_SHIELD_MODE=enforce LS_VM_SELFTEST=2
+#   SELFTEST cve-condition ptlp=NULL -> verdict=SAFE_RETURN
+#   SELFTEST survived --- shield prevented the dereference
+#   pod Running, restarts=0
+
+# B --- monitor: the shield SEES it and declines to act. TMM dies at init.
+kubectl set env deploy/f5-tmm -c f5-tmm LS_SHIELD_MODE=monitor
+#   SELFTEST cve-condition ptlp=NULL -> verdict=FALLTHROUGH
+#   SELFTEST performing the unshielded dereference --- expected fatal
+
+# C --- ALWAYS UNSET IT AFTERWARDS
+kubectl set env deploy/f5-tmm -c f5-tmm LS_VM_SELFTEST- LS_SHIELD_MODE=enforce
+```
+
+**Monitor, not `LS_SHIELD_ENABLE=0`.** Disabling skips arming entirely, so the self-test never
+runs. Monitor is also the honest comparison: it is the posture an operator uses before
+enforcing, and it shows the shield *recognising* the condition while the host declines to act.
+
+> **Step C is not optional.** The self-test runs at **init**, so with `LS_VM_SELFTEST=2` left
+> set in monitor mode **every pod dies at startup and Kubernetes starts another** — a crash loop
+> that looks like a broken deployment rather than a successful demonstration. Leaving it set is
+> how you lose an afternoon to pod churn and cannot capture any evidence, because every pod you
+> try to inspect has already been replaced.
+
+**Two cautions on reading the result.**
+
+The `SELFTEST did NOT crash` line is a **negative control**: it prints only if the dereference
+returns. Its absence is the pass condition. If it ever appears, the dereference was survivable
+(page zero mapped, or the compiler elided it) and the demonstration proves nothing.
+
+And **the self-test pollutes the hook's own counters.** It calls `ls_vm_call()`, the same entry
+point the real hook uses, so it increments `fired` and triggers
+`FIRST INVOCATION --- the hook is reached`. With no traffic flowing, that line is **false** ---
+the harness reached the hook, not a packet. Do not read it as evidence the hook is live while
+`LS_VM_SELFTEST` is set.
+
 ### Reading the numbers honestly
 
 `min` is the cleanest estimate; `mean` is 2–3× it even on an idle box with no traffic, and `max`

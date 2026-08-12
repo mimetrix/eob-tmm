@@ -1076,3 +1076,28 @@ the dereference" is the defensible statement, not "confirmed SIGSEGV".
 **And what it does not show**, unchanged: that the hook is correctly placed in
 `http_psm_profile_name_lookup`, or that live traffic reaches it. This synthesises the condition;
 it does not drive the path.
+
+## The exact TMM source delta
+
+Baseline `e2104734a9` (2026-08-11). What embedding the VM actually costs, in TMM's tree:
+
+| tracked file | change | what |
+|---|---|---|
+| `src/modules/hudfilter/http/http_psm.c` | **+39, −0** | includes, the slot handle, arm at `http_psm_init`, the scratch-`ctx` call at the fault site |
+| `src/compile/filelist` | +4 | the `UBPF` include-path option, and three source registrations |
+| `src/compile/debug_whitelist_x86_64` | +21, −2 | the global-state manifest |
+| `src/compile/default_whitelist_x86_64` | +21, −2 | the same, for the other build type |
+| | **81 insertions, 4 deletions** | across 4 files |
+
+Plus ten new files, all ours, all under `src/base/`: `ls_vm.{c,h}`, `ls_vm_config.{c,h}`,
+`ls_vm_load.c`, `vm_stack_policy.h`, `shield_abi.h`, `ls_ctx_http_psm.h`, `ls_shield_blob.h`,
+and `harness.c`.
+
+**The number worth quoting: one data-path source file, 39 additive lines, and not one existing
+line of F5 code changed anywhere.** The four deletions are all whitelist churn — two entries
+removed after a static buffer became a heap allocation, in each of two files.
+
+That is the honest scale of the *integration*. It is not the scale of the mechanism: the
+trampoline, pad rewriting and the safe point (scope items 0–2) exist to reach functions nobody
+edited, and none of them are in this delta. What 39 lines buys is the **designed-in** form — a
+deliberate call site in source F5 owns.
