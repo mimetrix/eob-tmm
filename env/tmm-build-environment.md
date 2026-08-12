@@ -584,3 +584,99 @@ misses, and whether `.text` is shared or private across TMM instances and whethe
 on huge pages. Also unmeasured: aarch64, where instruction encoding and alignment differ,
 and the armed-at-rate case. **Do not read the size result as the answer to §4** — it is one
 of four columns, on one architecture, at 49% coverage.
+
+## The VM inside TMM — the integration, and where it lives
+
+**2026-08-12.** The proposal's central claim is that a verified eBPF program can live inside
+TMM and be called from it. Nothing had tested that. This records the integration that does.
+
+**Where the code lives, and why the distinction matters.** The candidate artifacts stay in
+this repo — [`../substrate/ls_vm.h`](../substrate/ls_vm.h),
+[`ls_vm.c`](../substrate/ls_vm.c), [`vm_stack_policy.h`](../substrate/vm_stack_policy.h),
+and the shields. The *working integration* lives in the TMM clone on the build box, not
+here. So [`../CLAUDE.md`](../CLAUDE.md)'s statement that nothing in this repo executes a
+shield stays true, and this repo does not become the prototype whose earlier version invited
+the wrong question. Read the artifacts here as candidates; read the box as the experiment.
+
+### uBPF builds inside TMM's toolchain container
+
+The gating question, because linking needs a matching compiler and C library:
+
+```bash
+docker exec -i $C bash -c 'cd /tmm/.ubpf &&
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DUBPF_ENABLE_TESTS=OFF \
+        -DUBPF_SKIP_EXTERNAL=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON &&
+  cmake --build build -j8'
+#  -> build/lib/libubpf.a, built by gcc 11.4.0 — the same compiler that builds TMM
+```
+
+The container has `gcc cmake make ar python3` and **no clang**, which is consistent with the
+earlier finding that shield programs compile on the host.
+
+### The TMM-side change — four places, 30 lines
+
+| # | file | change |
+|---|---|---|
+| 1 | `Makefile.overrides` | `CFLAGS += -I$(TOPDIR)/.ubpf/vm/inc` and `DEVFS_LIBS += $(TOPDIR)/.ubpf/build/lib/libubpf.a` |
+| 2 | `src/compile/filelist` | one line registering `base/ls_vm.c`, **plus a user-defined option carrying the include paths** (below); `filelist.mk` is **generated** by `filelist.py`, so delete it to force a regenerate |
+| 3 | `http_psm_init()` | `ls_vm_init()` then `ls_vm_arm(...)`, once per instance, off the data path |
+| 4 | `http_psm_profile_name_lookup()` | fill a scratch `ctx`, call, act on the verdict |
+
+`DEVFS_LIBS` is the pattern TMM already uses for static libraries, so this adds no new
+mechanism.
+
+**A global `CFLAGS +=` in `Makefile.overrides` does NOT reach most source files, and this is
+the trap worth knowing.** It looks like it works — 344 compile lines picked up the added
+include path — while the one file that needed it did not. The reason is in `filelist`
+line 14:
+
+```make
+INSTRUMENT = CFLAGS +=
+```
+
+Every file inherits that, so `filelist.mk` emits a **target-specific** `CFLAGS +=` line for
+essentially every object, and in that scope the globally-added flag is not visible. The
+symptom is a missing header on exactly one file while hundreds of others compile fine, which
+reads like a problem with that file.
+
+**The mechanism the build provides is a user-defined option**, alongside `ALLOW_UNDEF`,
+`ALLOW_ADR_PKD_MEM` and the rest:
+
+```
+# in src/compile/filelist
+UBPF = CFLAGS += -I$(TOPDIR)/.ubpf/vm/inc -I$(TOPDIR)/.ubpf/build/vm
+
+base/ls_vm.c                        STDINC UBPF
+```
+
+Both paths are needed: `vm/inc` for `ubpf.h`, and `build/vm` for **`ubpf_config.h`, which
+cmake generates** and which therefore does not exist until uBPF has been configured.
+
+**And cross-directory includes use the `local/` convention.** `src/compile/local` is a symlink
+to `..`, so a module file reaches a header in `src/base` as
+`#include <local/base/ls_vm.h>` — not a relative path. Getting this wrong fails only in the
+consuming file, after the new file itself has compiled clean.
+
+**One bug worth recording, because the file's shape causes it.** The call site is at line 827
+and `http_psm_init` is at 5126, so declaring the slot handle beside the init function put the
+declaration 4,300 lines *after* its first use. In a 5,000-line file, "next to the thing it
+belongs with" and "before the thing that uses it" are different places.
+
+### What this establishes, and what it does not
+
+It establishes that the VM links into TMM's build, instantiates per instance, and is callable
+from a real data-path function — the designed-in call form, in source F5 owns.
+
+It does **not** establish anything about cost, and the shortcuts are deliberate and must not
+ship:
+
+- **The shield is embedded as a byte array in a generated header.** The real loader receives a
+  **signed** program from the control plane and verifies it first. Nothing here checks a
+  signature.
+- **No trampoline, no pad rewriting, no safe point.** Those exist to reach functions nobody
+  planned for. The designed-in call needs none of them, which is exactly why it is the first
+  increment.
+- **Interpreter, not native code** — fuel works there and is documented as having no effect
+  once compiled (finding O6), and the native prologue opens a 4 KB frame with no guard-page
+  probe (O7).
+- **Nothing is measured.** A call in a build is not a cost at rate.
