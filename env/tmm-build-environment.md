@@ -974,3 +974,45 @@ buffer *is* touched on the first load, which makes it real rather than theoretic
 Instruction-cache and i-TLB pressure, for both the VM's `.text` and the padding — the part of
 `design-review-findings.md` §4 that needs a running TMM under load. And per-instance heap: each
 `ubpf_create` plus its stack, which is small but has not been counted.
+
+## Traffic through the proxy — where this got to
+
+The topology exists and is more complete than expected: `bnk-core` ships a **two-armed test
+harness** — `client` (11.11.11.100) and `server` (22.22.22.100) pods on Multus networks either
+side of TMM, VLANs `tmm-client` / `tmm-server`, and TMM self-IPs on both. The client image
+carries `curl`, `wget`, `nc` and **`ab`**, so load generation needs nothing installed.
+
+**What is configured and accepted:**
+
+```yaml
+kind: Pool                     # NOT F5BigCnePool --- that CRD is not in bnk-core
+  members: [{address: 22.22.22.100, port: 80}]
+kind: F5VirtualServer          # plural f5-virtualservers.k8s.f5net.com
+  destinationAddress: 11.11.11.99
+  destinationPort: 80
+  fastL4: sys-default-fastl4   # a PROFILE --- without one, TMM logs
+                               # "Proxy initialization failed ... Defaulting to DENY"
+  protocol: tcp
+  pool: ltm-pool-basic
+  snat: {type: automap}        # lower-case; loadBalancingMethod is UPPER (ROUND_ROBIN)
+  vlans: {vlanList: [tmm-client]}
+```
+
+TMM commits both — `decl_pool_obj_commit: Add pool name = default-pool-ltm-pool-basic-pool`,
+with audit records for the pool and its member list, and no proxy-initialisation error.
+
+**What still does not work:** the connection is refused. The remaining suspect is an
+**address conflict** — TMM logged `01190004:4: address conflict detected for 11.11.11.99` and
+that address answered ping *before* anything was created, so something else already owns it.
+The reference profile (`profiles/virtualserver`) assumes `.99` is free; in this cluster it is
+not, and that profile also ships `cnf-values.yaml` and cert-manager resources, suggesting it
+expects a different base than `bnk-core`.
+
+**Reference configs worth knowing about**, since deriving them cost time:
+`profiles/virtualserver/resources/{virtualserver,pool}.yaml` is the canonical pair;
+`profiles/tcpopt-core/resources/virtual.yaml` uses a different CRD (`F5BigContextSecure`) that
+is not installed here. Check which CRDs exist before adapting a manifest — `kubectl get crd`
+against the kind, not the filename.
+
+**Nothing has reached the hook yet**: `FIRST INVOCATION` has not appeared, and the shield's
+`fired` counter is 0. The VM is armed and benchmarked; it has not been driven.

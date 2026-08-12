@@ -787,6 +787,45 @@ in a lab TMM with core dumps still readable.
 > appliance or VE build, from Perforce via `seadev`, needs its own check. That is deferred to the
 > follow-on effort — but it is now a confirmation to repeat, not a question to answer.
 
+**Where this function sits, and how it is reached — settled by reading the source, 2026-08-12.**
+
+It is **data-plane code**, not control plane. It lives in `src/modules/hudfilter/http/` — TMM's
+HUD filter chain — runs in the TMM process, and is invoked while formatting a security log
+record for a **live HTTP flow** (its `source` argument is an `http_psm_log_data` carrying an
+`scb`, a live session control block).
+
+**It has no caller anywhere in the source tree**, which is worth understanding rather than
+finding alarming. `http_psm.c:1238` registers it by token-pasting:
+
+```c
+#define PSM_KEY(E, S) {(E), "\"${" #S "}\",", sizeof(#S) + 5, http_psm_ ## S ## _lookup}
+...
+PSM_KEY(ERRDEFS_KEY_PROFILE_NAME, profile_name),
+```
+
+So it is an entry in a **key → formatter table** for `errdefs`, keyed by
+`ERRDEFS_KEY_PROFILE_NAME`, reached when a log format string contains `${profile_name}`. The
+adjacent code sets `ERRDEFS_CEF_FW_HTTP_SECURITY`, so this is the **CEF security-event record
+builder for HTTP**.
+
+**Two consequences.**
+
+*The shape of the bug is a control-plane misconfiguration that detonates on the data path.*
+`prot_transfer_log_profile` is NULL precisely when no protocol-transfer log profile is attached
+to that listener — configuration state — but the dereference happens per-request, in TMM, on a
+live flow. That combination is a common and unpleasant class, and it is a good advertisement
+for a data-plane shield: the fix has to land where the crash is, not where the mistake was.
+
+*It also makes the trigger concrete.* To reach it: a security log profile whose format string
+includes `${profile_name}`, attached to a virtual server, with the protocol-transfer log
+profile **absent**. Traffic generating an HTTP security event then formats that key and
+dereferences NULL. No control-plane action is needed at fire time — traffic alone does it.
+
+*And it is a second, independent argument for publishing the hookable set as a build artifact*
+(`development-scope.md` item 5). **Nothing in the source says this function is called**, because
+its call site is a macro-generated table entry. An engineer reading the code cannot enumerate
+the reachable functions, and neither can `grep` — only the build can.
+
 **The bug.** TMM's protocol-transfer logging path fetches a listener's log profile and reads its name
 with no NULL check:
 
