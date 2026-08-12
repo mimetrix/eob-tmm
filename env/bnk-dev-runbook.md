@@ -793,6 +793,91 @@ the harness reached the hook, not a packet. Do not read it as evidence the hook 
 is scheduler preemption rather than the program. It measures the program **only** — no `ctx`
 build, no trampoline, no poll loop — so it is a **floor**, for the smallest useful program.
 
+## 12e · Traffic through the proxy
+
+**BNK uses Gateway API.** Not `F5VirtualServer` — that belongs to the **CNF** profiles, and
+adapting one of their manifests leads to `F5BigCnePool`, a CRD `bnk-core` does not install,
+whose absence produces a LoadBalancer Service that IPAM never fills. Every symptom then points
+at ports and addresses and none of the fixes hold. The reference that works is
+**`profiles/bnk-external`**, which exists specifically for traffic testing.
+
+`bnk-core` already ships the harness: `client` (11.11.11.100) and `server` (22.22.22.100) pods
+either side of TMM, VLANs `tmm-client`/`tmm-server`, TMM self-IPs on both. The client image
+carries `curl`, `wget`, `nc` and **`ab`**, so load generation needs nothing installed.
+
+```bash
+kubectl create namespace spk-app-1
+
+cat <<'YAML' | kubectl apply -f -
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata: {name: gateway-class}
+spec:
+  controllerName: f5.com/default-f5-cne-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: {name: gateway, namespace: spk-app-1}
+spec:
+  gatewayClassName: gateway-class
+  addresses:                       # explicit --- no IPAM needed for this
+  - {type: IPAddress, value: "11.11.11.99"}
+  listeners:
+  - {name: http, protocol: HTTP, port: 80, allowedRoutes: {kinds: [{kind: HTTPRoute}]}}
+---
+apiVersion: k8s.f5net.com/v1       # kind Pool --- what Gateway routes reference
+kind: Pool
+metadata: {name: http-pool, namespace: spk-app-1}
+spec:
+  members: [{address: "22.22.22.100", port: 80}]
+  monitors: {tcp: [{}]}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata: {name: http-route, namespace: spk-app-1}
+spec:
+  parentRefs: [{name: gateway, sectionName: http}]
+  rules:
+  - backendRefs: [{name: http-pool, kind: Pool, group: k8s.f5net.com}]
+YAML
+
+# a backend that survives the exec ending
+kubectl exec server -- sh -c 'mkdir -p /tmp/www; echo backend > /tmp/www/index.html;
+  (setsid python3 -m http.server 80 --directory /tmp/www >/tmp/h.log 2>&1 &)'
+
+kubectl get gateway -n spk-app-1     # expect  PROGRAMMED=True
+kubectl exec client -- curl -s http://11.11.11.99/
+kubectl exec client -- ab -n 500 -c 10 -q http://11.11.11.99/
+```
+
+Measured: `http=200`, 500 requests, **0 failures**, 136 req/s.
+
+### When it does not work, read the reset payload
+
+The single most useful diagnostic, and it should be the *first* move rather than the tenth —
+TMM ships with `tcpdump`:
+
+```bash
+kubectl exec <tmm-pod> -c f5-tmm --   sh -c 'timeout 12 tcpdump -i any -n -A -c 6 "host 11.11.11.99 and tcp" > /tmp/c.txt' &
+kubectl exec client -- curl -s -m 6 -o /dev/null http://11.11.11.99/
+kubectl exec <tmm-pod> -c f5-tmm -- grep -a "BIG-IP" /tmp/c.txt
+```
+
+TMM writes its reason into the RST payload:
+
+```
+BIG-IP: [0x34315a9:136] Port denied ... lis=default-ltm-vs-basic port=1.1
+```
+
+`lis=` on the way out names the listener that matched, and `lis=` empty on the way *in* means
+nothing matched at SYN time. **`Port denied` means the listener never opened** — not that a port
+is blocked — which points at the config model rather than at firewalling.
+
+**Two things that cost hours and are worth checking first.** A `python3 -m http.server` started
+inside `kubectl exec` dies when the exec ends; `setsid` it. And controllers here build their
+informers at startup — `spk-f5ingress` kept logging `Failed to find lister` for a CRD created
+after it started, and only a `kubectl rollout restart` fixed it.
+
 ## 13 · Teardown
 
 ```bash
@@ -818,6 +903,9 @@ if you will be back soon.
 | build: "the input device is not a TTY" | every `docker exec` is `-it`; use `script -qec`. Step 8. |
 | build: missing `/usr/include/errdefs/product_codes.h` | `install-libs` never ran because `_start` failed. Step 8. |
 | build: "sed: can't read .env" / "username is empty" | TMM needs its own `.env`. Step 8. |
+| `F5VirtualServer` never programs a listener; TMM resets with `Port denied` | wrong model — BNK uses Gateway API; `F5VirtualServer` is CNF. Step 12e. |
+| a controller ignores a CRD you just created | it built its informers at startup; `kubectl rollout restart` it. Step 12e. |
+| `kubectl apply` of a CRD: `ShortNamesConflict` | two F5 chart sets claim the same short name. Do not file the edges off — use one CRD set. |
 | `kind load` fails: "failed to detect containerd snapshotter" | use `docker exec <node> ctr --namespace=k8s.io images import -` per node. Step 12c. |
 | a header is missing on exactly ONE file while hundreds compile | a global `CFLAGS +=` does not reach files that `filelist.mk` gives target-specific flags to — which is nearly all of them. Use a `filelist` option. Step 12b. |
 | link fails with a diff of symbol names, and the diff shows `-name` | you *removed* global state; the whitelist is an exact match, not a superset. Delete the entry. Step 12b. |
