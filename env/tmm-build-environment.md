@@ -1001,7 +1001,42 @@ kind: F5VirtualServer          # plural f5-virtualservers.k8s.f5net.com
 TMM commits both — `decl_pool_obj_commit: Add pool name = default-pool-ltm-pool-basic-pool`,
 with audit records for the pool and its member list, and no proxy-initialisation error.
 
-**What still does not work:** the connection is refused. The remaining suspect is an
+**Root cause found, and mostly cleared — 2026-08-12 evening.** Four distinct problems, in the
+order they had to be solved:
+
+1. **A self-inflicted address conflict.** Two virtual servers claimed `11.11.11.99`. The
+   `address conflict detected` TMM logged was ours. Deleting the leftover cleared it.
+2. **The wrong pool kind.** `F5VirtualServer`'s `pool:` field is resolved by the controller as an
+   **`F5BigCnePool`** — visible in its own log as
+   `Updated CR relationship map : map[F5BigCnePool:map[N_A/ltm-pool-basic:...]]`. A `Pool` (kind
+   `Pool`, `pools.k8s.f5net.com`) commits to TMM independently but the VS can never bind to it.
+3. **`bnk-core` does not install `F5BigCnePool`.** It ships the `F5VirtualServer` CRD without the
+   pool CRD its controller resolves against. The profiles that use this pair install a *different*
+   chart — `f5-cnf-crds-n6lan`, the **CNF** CRD set, not BNK's.
+4. **The two CRD charts collide on a short name.** Installing the CNF pool CRD fails with
+   `NamesAccepted=False  ShortNamesConflict: "pool" is already in use`, because `bnk-crds`'
+   `pools.k8s.f5net.com` owns `pool`. Applying it with `shortNames` stripped establishes cleanly.
+   **That is a lab expedient, not a recipe** — the real answer is to use one CRD set, not to file
+   the edges off two.
+5. **The controller builds its informers at startup.** After the CRD existed, `spk-f5ingress` still
+   logged `Failed to find lister` and never pushed the listener. `kubectl rollout restart
+   deploy/spk-f5ingress` fixed that, and **the VIP began answering ARP** —
+   `2 packets transmitted, 2 received` where there had been 100% loss, with TMM creating
+   `default-ltm-vs-basic-vsp-fastl4`.
+
+**What still does not work:** TCP is refused — now in ~1 ms rather than timing out, so a listener
+exists and is actively resetting. TMM logs **nothing** during the attempt. The backend is healthy
+(`ss` shows `:80`, its own `curl` returns 200) and the pool member is configured with no monitors
+and `minActiveMembers=0`.
+
+**The remaining lead**, unchased: TMM's first conflict message said
+`address conflict detected for 11.11.11.99 ... on vlan 4094`. The VS is bound to
+`vlans: {vlanList: [tmm-client]}`. If the VIP is associated internally with vlan 4094 rather than
+`tmm-client`, no listener matches the arriving 5-tuple and TMM resets — which is exactly the
+observed behaviour. Next step is the VLAN-to-interface mapping (`interfaces: ["1.1"]` in the vlan
+CR) against what the pod's `net1`/`net2` actually are.
+
+**Old text, superseded:** the connection is refused. The remaining suspect is an
 **address conflict** — TMM logged `01190004:4: address conflict detected for 11.11.11.99` and
 that address answered ping *before* anything was created, so something else already owns it.
 The reference profile (`profiles/virtualserver`) assumes `.99` is free; in this cluster it is
