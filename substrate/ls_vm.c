@@ -58,6 +58,7 @@
  */
 
 #include "ls_vm.h"
+#include "ls_vm_config.h"
 #include "vm_stack_policy.h"
 
 #include <elf.h>
@@ -78,6 +79,63 @@ static bool           g_ready;
  * as the calculator cookie so the two agree by construction rather than by two
  * defaults coincidentally matching (item 6a; see vm_stack_policy.h). */
 static const struct vm_stack_policy g_policy = { .proven_frame = 256, .max_depth = 8 };
+
+static struct ls_vm_config g_cfg;
+
+/* Where the program came from, for the arm-time log. Knowing WHICH shield a pod
+ * is running has already been a question once; it should never be a guess. */
+static char g_origin[160];
+
+/*
+ * Read the timestamp counter. Used only when LS_VM_TIMING or LS_VM_BENCH is on,
+ * so the shipped path is untouched by default.
+ *
+ * This is a CYCLE COUNT, not a duration, and the two are not interchangeable on
+ * a machine that scales frequency. It is the right primitive for comparing two
+ * paths on one box; it is the wrong primitive for quoting nanoseconds. The
+ * aarch64 counter is worse still --- 10-40ns granularity against a budget of
+ * tens of ns (finding O6) --- which is why any arm64 number from this needs its
+ * own caveat rather than the same one.
+ */
+static inline uint64_t
+ls_cycles(void)
+{
+#if defined(__x86_64__)
+    uint32_t lo, hi;
+    __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
+#elif defined(__aarch64__)
+    uint64_t v;
+    __asm__ __volatile__("mrs %0, cntvct_el0" : "=r"(v));
+    return v;
+#else
+    return 0;
+#endif
+}
+
+/* Read a program from a file instead of the compiled-in blob. This is what turns
+ * "change the shield" from a rebuild into a restart. Bounded: a program that
+ * does not fit the cap is refused rather than truncated, because a truncated
+ * ELF that happens to parse is worse than no program. */
+#define LS_MAX_PROG 262144
+static unsigned char g_filebuf[LS_MAX_PROG];
+
+static size_t
+ls_read_program(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (f == NULL)
+        return 0;
+    size_t n = fread(g_filebuf, 1, sizeof g_filebuf, f);
+    int too_big = (n == sizeof g_filebuf) && (fgetc(f) != EOF);
+    fclose(f);
+    if (too_big) {
+        fprintf(stderr, "ls_vm: %s exceeds %d bytes --- refusing rather than truncating\n",
+                path, LS_MAX_PROG);
+        return 0;
+    }
+    return n;
+}
 
 /* Adapter, not a cast. vm_stack_policy.h deliberately does not include uBPF's
  * headers --- it must stay checkable on its own --- so its calculator takes
@@ -179,8 +237,97 @@ bool
 ls_vm_init(void)
 {
     memset(g_slots, 0, sizeof g_slots);
+    ls_vm_config_load(&g_cfg);
+    if (!g_cfg.enable) {
+        /* A shield that misbehaves must be switchable off without reverting the
+         * integration and without a rebuild. */
+        fprintf(stderr, "ls_vm: disabled by LS_SHIELD_ENABLE=0\n");
+        return false;
+    }
     g_ready = true;
+    if (g_cfg.verbose)
+        fprintf(stderr, "ls_vm: init  build=%s %s  jit=%d fuel=%u timing=%d\n",
+                __DATE__, __TIME__, (int)g_cfg.jit, g_cfg.fuel, (int)g_cfg.timing);
     return true;
+}
+
+bool
+ls_vm_stats(int slot, struct ls_stats *out)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS || out == NULL)
+        return false;
+    const struct ls_slot *s = &g_slots[slot];
+    out->armed = s->armed;
+    out->mode = (int)s->mode;
+    out->fired = s->fired;
+    out->safe_returns = s->safe_returns;
+    out->errors = s->errors;
+    out->cycles = s->cycles;
+    out->cycles_max = s->cycles_max;
+    return true;
+}
+
+void
+ls_vm_report(void)
+{
+    for (int i = 0; i < LS_MAX_SLOTS; i++) {
+        const struct ls_slot *s = &g_slots[i];
+        if (!s->armed)
+            continue;
+        fprintf(stderr,
+                "ls_vm: slot=%d mode=%d fired=%llu safe_returns=%llu errors=%llu"
+                " cycles_total=%llu cycles_mean=%llu cycles_max=%llu\n",
+                i, (int)s->mode,
+                (unsigned long long)s->fired, (unsigned long long)s->safe_returns,
+                (unsigned long long)s->errors, (unsigned long long)s->cycles,
+                (unsigned long long)(s->fired ? s->cycles / s->fired : 0),
+                (unsigned long long)s->cycles_max);
+    }
+}
+
+/*
+ * Run the program N times over a fixed ctx and report cycle statistics.
+ *
+ * This exists because the alternative --- waiting for live traffic to reach one
+ * specific vulnerable function --- requires a listener configured with a
+ * protocol-transfer log profile, which is a whole config exercise standing
+ * between us and a number. The benchmark answers "what does one invocation
+ * cost" directly.
+ *
+ * What it measures: ubpf_exec plus this function's own loop overhead, on a warm
+ * cache, with no contention. That is the FLOOR. A real invocation adds the ctx
+ * build, a cold-ish cache, and whatever the poll loop is doing. Report it as a
+ * floor or not at all.
+ */
+static void
+ls_vm_bench(int slot, uint32_t iters)
+{
+    struct ls_slot *s = &g_slots[slot];
+    unsigned char ctx[64];
+    uint64_t ret = 0, best = ~0ull, worst = 0, total = 0;
+
+    if (!s->armed || iters == 0)
+        return;
+    memset(ctx, 0, sizeof ctx);        /* the NULL case: the shield's hot branch */
+
+    for (uint32_t i = 0; i < 100 && i < iters; i++)   /* warm */
+        (void)ubpf_exec(s->vm, ctx, sizeof ctx, &ret);
+
+    for (uint32_t i = 0; i < iters; i++) {
+        uint64_t t0 = ls_cycles();
+        int rc = ubpf_exec(s->vm, ctx, sizeof ctx, &ret);
+        uint64_t d = ls_cycles() - t0;
+        if (rc != 0) { fprintf(stderr, "ls_vm: bench exec fault at %u\n", i); return; }
+        total += d;
+        if (d < best)  best = d;
+        if (d > worst) worst = d;
+    }
+    fprintf(stderr,
+            "ls_vm: bench slot=%d iters=%u min=%llu mean=%llu max=%llu cycles"
+            "  (floor: warm cache, no contention, ubpf_exec only --- NOT a"
+            " per-packet cost)\n",
+            slot, iters, (unsigned long long)best,
+            (unsigned long long)(total / iters), (unsigned long long)worst);
 }
 
 int
@@ -219,7 +366,9 @@ ls_vm_arm(const void *elf, size_t elf_len,
     if (ubpf_register_stack_usage_calculator(vm, ls_stack_usage, (void *)&g_policy) != 0)
         goto fail;
 
-    /* Interpreter path. No ubpf_compile() here on purpose --- O6/O7. */
+    /* Interpreter by default. The JIT is reachable by env var so its cost can be
+     * MEASURED without a rebuild --- not because it is safe to run (O6: fuel has
+     * no effect once JIT'd; O7: the prologue opens a 4KB frame with no probe). */
     /* uBPF selects by FUNCTION SYMBOL here, not section --- see O14 and the
      * check above, which is what makes passing `function` safe. */
     if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
@@ -228,17 +377,70 @@ ls_vm_arm(const void *elf, size_t elf_len,
     /* Fuel. Works in the interpreter; documented as having no effect once
      * compiled to native code, which is the other half of why this is the
      * interpreter path first. */
-    ubpf_set_instruction_limit(vm, 10000, NULL);
+    ubpf_set_instruction_limit(vm, g_cfg.fuel ? g_cfg.fuel : 10000, NULL);
+
+    if (g_cfg.jit) {
+        char *jerr = NULL;
+        if (ubpf_compile(vm, &jerr) == NULL) {
+            fprintf(stderr, "ls_vm: JIT requested but failed: %s\n", jerr ? jerr : "?");
+            free(jerr);
+            goto fail;
+        }
+    }
 
     g_slots[slot].vm    = vm;
     g_slots[slot].mode  = m;
     g_slots[slot].armed = true;
+
+    if (g_cfg.verbose)
+        fprintf(stderr, "ls_vm: ARMED slot=%d section=%s function=%s mode=%d"
+                        " bytes=%zu origin=%s jit=%d\n",
+                slot, section, function, (int)m, elf_len,
+                g_origin[0] ? g_origin : "builtin", (int)g_cfg.jit);
+
+    if (g_cfg.bench)
+        ls_vm_bench(slot, g_cfg.bench);
+
     return slot;
 
 fail:
     if (err) { fprintf(stderr, "ls_vm: arm failed: %s\n", err); free(err); }
     ubpf_destroy(vm);
     return -1;
+}
+
+int
+ls_vm_arm_configured(const void *blob, size_t blob_len,
+                     const char *section, const char *function)
+{
+    const void *prog = blob;
+    size_t      len  = blob_len;
+
+    if (!g_ready)
+        return -1;
+
+    /* A program on disk replaces the compiled-in one. Refusing on a bad path
+     * rather than silently falling back to the built-in matters: an operator who
+     * pointed at a file and got the old shield, with no error, would have no way
+     * to tell which program is running. */
+    if (g_cfg.path) {
+        size_t n = ls_read_program(g_cfg.path);
+        if (n == 0) {
+            fprintf(stderr, "ls_vm: LS_SHIELD_PATH=%s unreadable or empty --- "
+                            "refusing (NOT falling back to the built-in)\n", g_cfg.path);
+            return -1;
+        }
+        prog = g_filebuf;
+        len  = n;
+        snprintf(g_origin, sizeof g_origin, "file:%s(%zu)", g_cfg.path, n);
+    } else {
+        snprintf(g_origin, sizeof g_origin, "builtin(%zu)", len);
+    }
+
+    return ls_vm_arm(prog, len,
+                     g_cfg.section  ? g_cfg.section  : section,
+                     g_cfg.function ? g_cfg.function : function,
+                     (enum ls_mode)g_cfg.mode);
 }
 
 enum ls_verdict
@@ -255,11 +457,26 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
 
     /* A non-zero return from ubpf_exec is an execution fault --- fuel exhausted,
      * or a bounds check the interpreter enforces at run time. Fall through: a
-     * shield that cannot run must not take the flow with it. */
-    if (ubpf_exec(s->vm, ctx, ctx_len, &ret) != 0)
+     * shield that cannot run must not take the flow with it. Counted, because a
+     * silent fail-open is indistinguishable from a shield that never matched. */
+    uint64_t t0 = g_cfg.timing ? ls_cycles() : 0;
+    int rc = ubpf_exec(s->vm, ctx, ctx_len, &ret);
+    if (g_cfg.timing) {
+        uint64_t d = ls_cycles() - t0;
+        s->cycles += d;
+        if (d > s->cycles_max)
+            s->cycles_max = d;
+    }
+    if (rc != 0) {
+        s->errors++;
         return LS_FALLTHROUGH;
+    }
 
+    if (s->fired == 0 && g_cfg.verbose)
+        fprintf(stderr, "ls_vm: FIRST INVOCATION slot=%d --- the hook is reached\n", slot);
     s->fired++;
+    if (g_cfg.report_every && (s->fired % g_cfg.report_every) == 0)
+        ls_vm_report();
 
     if (ret != LS_SAFE_RETURN)
         return LS_FALLTHROUGH;
@@ -274,6 +491,7 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
 void
 ls_vm_fini(void)
 {
+    ls_vm_report();
     for (int i = 0; i < LS_MAX_SLOTS; i++) {
         if (g_slots[i].armed) {
             ubpf_destroy(g_slots[i].vm);

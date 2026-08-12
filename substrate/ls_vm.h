@@ -58,9 +58,44 @@ struct ls_slot {
     void        *vm;        /* struct ubpf_vm *, opaque here          */
     enum ls_mode mode;
     bool         armed;
-    uint64_t     fired;     /* per-instance; a box-wide sum is wrong  */
+    uint64_t     fired;         /* per-instance; a box-wide sum is wrong */
     uint64_t     safe_returns;
+    uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
+    uint64_t     cycles;        /* only when timing is enabled          */
+    uint64_t     cycles_max;    /* the tail is what bounds a hot hook   */
 };
+
+/* A snapshot of one slot, for whatever eventually reports these. Copied rather
+ * than returning a pointer, because the caller must not be able to reach into
+ * live VM state. The permanent home for these numbers is `tmstat`, TMM's own
+ * statistics mechanism, which is already linked into the runtime image ---
+ * see development-scope.md item 14. Until then, logging. */
+struct ls_stats {
+    bool     armed;
+    int      mode;
+    uint64_t fired;
+    uint64_t safe_returns;
+    uint64_t errors;
+    uint64_t cycles;
+    uint64_t cycles_max;
+};
+
+/* The form TMM actually calls. Applies the environment overrides --- program
+ * source, section, function, mode --- over the compiled-in defaults, so the
+ * call site never has to know they exist. Pass the built-in blob and its two
+ * identities; LS_SHIELD_PATH replaces the blob, LS_SHIELD_SECTION and
+ * LS_SHIELD_FUNCTION replace the names, LS_SHIELD_MODE replaces the mode.
+ *
+ * This is what makes a shield change a pod restart rather than a rebuild. */
+int ls_vm_arm_configured(const void *blob, size_t blob_len,
+                         const char *section, const char *function);
+
+/* Off the data path. Returns false for an out-of-range slot. */
+bool ls_vm_stats(int slot, struct ls_stats *out);
+
+/* Log the current counters for every armed slot. Called at fini, every
+ * LS_VM_REPORT_EVERY invocations, and on demand. */
+void ls_vm_report(void);
 
 /* Create this instance's VM state. Called once per TMM instance at startup,
  * off the data path. Returns false and leaves nothing armed on any failure ---
