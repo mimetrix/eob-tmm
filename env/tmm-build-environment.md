@@ -1104,10 +1104,17 @@ deliberate call site in source F5 owns.
 
 ## What a merge request would actually require
 
+**Read this as reconnaissance, not as a defect list.** What was built was only ever intended
+to be a working prototype, and as one it did its job: it turned design claims into numbers and
+surfaced four defects in the tools the design depends on. Submittability was never the goal.
+What follows is what a *later* effort would face, established cheaply now rather than
+discovered at review — which is worth having precisely because none of it is visible until
+someone tries.
+
 `CONTRIBUTING.md` in `tmm/tmm` sets hard conventions, several enforced by CI
-(`clang-style-check` runs on MR pipelines). Measured against them, the integration written
-today is a **working prototype, not a submittable change** — and the gap is architectural in
-places, not cosmetic.
+(`clang-style-check` runs on MR pipelines). Measured against them, the prototype diverges in
+places that are architectural rather than cosmetic — and the architectural ones are the reason
+to know early.
 
 ### Measured violations
 

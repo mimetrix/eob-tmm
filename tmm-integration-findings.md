@@ -7,6 +7,14 @@ proposal documents make design claims; this records what the work returned, incl
 that contradicted the claims — and the parts where an earlier entry in this very file was wrong
 and had to be replaced.
 
+**What was built was a working prototype and nothing more.** It was never meant to be
+submittable, and it is not: it uses system headers TMM forbids, raw C types where TMM requires
+its own, and multiple return points where TMM requires one. That is not a shortfall — an
+instrument is not a product. The prototype's output is this document, and the code was how it
+was obtained. What a submittable change would require is recorded separately in
+[`env/tmm-build-environment.md`](env/tmm-build-environment.md), as reconnaissance for a later
+effort rather than as a list of things left undone.
+
 Scope throughout: **BNK / MBIP**, x86-64, `tmm/tmm` at `e2104734a9`, on an Intel Xeon Gold 6348
 @ 2.60 GHz. Nothing here transfers to the appliance or VE builds without being redone —
 they are separate compilations, and a compilation is what most of these numbers are about.
