@@ -463,3 +463,124 @@ Not needed for BNK. Recorded so the follow-on does not start from zero.
   waiting for, but an image *name* is not proof of kernel version. The cheap probe is to
   boot it and read `openstack console log show` for the kernel line — the console may
   answer without a shell at all, which is why it is the cheapest test available.
+
+## `-fpatchable-function-entry` — the static half, measured
+
+The first experiment `design-review-findings.md` §4 asks for is an A/B build: TMM compiled
+normally, and TMM compiled with entry padding, **nothing armed**, to price the cost every
+customer pays whether or not a shield ever loads. That experiment has four parts — text
+size, throughput, latency tail, instruction-fetch behaviour. **The first is now done. The
+other three still need a running TMM at rate and are untouched.**
+
+### How to inject the flag — no source modification required
+
+`Makefile.inc` includes **`$(TOPDIR)/Makefile.overrides`** at line 116, *after* its own
+`CFLAGS_OPTIMIZE := -O2` (line 99) and *before* `CFLAGS += $(CFLAGS_OPTIMIZE)` (line 134),
+under the comment *"Allow overrides to reset the above variables."* `src/compile/Makefile`
+sets `TOPDIR := ../..`, so the file belongs at the repo root:
+
+```make
+# Makefile.overrides
+CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0
+```
+
+That is the whole change. It matters that a supported hook exists, because the proposal
+claims the mechanism needs no source modification, and here the *experiment* needs none
+either.
+
+**Two ways to get this wrong, both of which produce a clean-looking wrong answer.**
+Patching the root `gcc.mk` does nothing — it *is* included (`Makefile.inc:93`), but line 99
+then reassigns `CFLAGS_OPTIMIZE` with `:=` and clobbers it; the build recompiles 2,893
+objects with plain `-O2` and yields a binary byte-identical to baseline, which reads as
+"padding is free." And `CMDLINE_VARS` (`Makefile:44`) expands `$(v)=$($(v))` **unquoted**,
+so passing a value containing a space splits it into two arguments to the inner make and
+applies half of it.
+
+### Result
+
+Both builds are `make tmm-gdb`, same source revision, same `-O2`, comparing
+`tmm64.no_pgo` extracted from each `tmm_*.deb`. **The flag compiles cleanly across the
+whole tree — 2,039 files under `-Wall -Werror`, zero errors.** That was genuinely open
+beforehand.
+
+| | baseline | `+patchable=5,0` | delta |
+|---|---|---|---|
+| `.text` | 30,099,298 | 30,242,658 | **+143,360 (+0.476%)** |
+| whole binary | 56,449,248 | 56,877,952 | **+428,704 (+0.759%)** |
+| out-of-line functions | 73,906 | 73,906 | unchanged |
+| entries carrying 5 nops (1,200 sampled) | 0 | **48.9%** | — |
+
+**Effective cost is 3.97 bytes per padded entry against a nominal 5 — alignment absorbs
+21%.** §4 asks whether pad placement matters because nops "can occupy alignment slack that
+already existed"; they do, and this quantifies it.
+
+### The coverage number is the finding, not the size
+
+Only **48.9%** of the functions in the shipped binary got padded, and that is not a
+misapplied flag. Mapping sampled entries back to source through DWARF:
+
+| source bucket | padded |
+|---|---|
+| `src/compile` (the TMM tree) | **82%** |
+| `BUILD_x86_64/tmm-10.207` | **97%** |
+| `src/tm_lib` | **78%** |
+| `BUILD_x86_64/{dedup,tmstat,mcplib,crypto,errdefs,tmjail,aclparser,f5util}-*` | **0%** |
+| `builds/{nxdomain,ports,tm_lib,UPSTREAM,afm}` | **0%** |
+| bare filenames (`encode_key2any.c`, `psregexp.c`, `arraylist.c.o`) — vendored third party | **0%** |
+| no DWARF line info (20% of the sample) | **0%** |
+
+**Roughly half of the functions in the TMM binary are not built by the TMM build.** They
+arrive from a couple of dozen separately-built F5 components and vendored third-party
+libraries, each with its own build and its own flags, statically linked at the end. Some —
+`tmstat`, `libbigpacket`, `tcpdump` — are downloaded from Artifactory as **prebuilt RPMs**
+and never compiled here at all.
+
+Three consequences for the design, and they are the reason this measurement was worth
+running:
+
+1. **The hookable set and the *paddable* set are different sets.** The 119,555-function
+   count is what the optimiser leaves addressable; it is not what one flag can reach.
+   Padding the other half means changing each component's build — or, for the prebuilt
+   RPMs, getting whoever builds them to change theirs. That is a coordination problem
+   across component teams, not a compiler flag, and it belongs in the plan as such.
+2. **Where the flag does apply it applies well** — 82–97% inside the TMM tree. The residual
+   there is presumably hand-written assembly and functions the compiler never emitted a
+   normal prologue for.
+3. **The measured +0.476% is roughly half the eventual figure.** Scaling the observed
+   effective rate to full coverage gives **~+0.97% `.text`, ~+1.55% binary, about 4,600
+   64-byte cache lines of pure nop across the image**. That is an extrapolation from one
+   platform and one N, stated as one — but it does bound the static cost at low
+   single-digit percent rather than leaving it open.
+
+### Reproducing it
+
+`substrate/measure_entry_padding.py` is the measurement, so it does not have to be
+reassembled from shell history:
+
+```bash
+python3 substrate/measure_entry_padding.py \
+    --baseline BIN --flagged BIN \
+    --baseline-debug DBG --flagged-debug DBG
+```
+
+It exists because doing this by hand produced **three consecutive wrong answers, every one
+clean-looking and favourable**, plus a fourth caught only by computing coverage instead of
+assuming it. So the script refuses to price anything it cannot verify: it checks build-ids
+before trusting a symbol address, reads bytes from section offsets rather than parsing a
+disassembler, accepts the pad at offset 0 **or** after `endbr64`, falls back to a
+symbol-free 0x90-run count when a debug file does not match, and prints coverage beside
+every size figure. It exits non-zero if the flag did not land, so a size delta can never be
+reported for a build that never got the flag.
+
+On its first run it caught a mismatch in this very experiment's *baseline* control — the
+saved baseline binary and its debug file came from different builds — which is why the
+baseline column above is verified by the symbol-free scan (**28** incidental 5-nop runs
+versus **34,924**) rather than by symbol lookup.
+
+### What is still unmeasured
+
+Everything that needs TMM *running*: throughput, latency at p99/p99.9, i-cache MPKI, i-TLB
+misses, and whether `.text` is shared or private across TMM instances and whether it lands
+on huge pages. Also unmeasured: aarch64, where instruction encoding and alignment differ,
+and the armed-at-rate case. **Do not read the size result as the answer to §4** — it is one
+of four columns, on one architecture, at 49% coverage.

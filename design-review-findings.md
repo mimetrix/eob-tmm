@@ -140,6 +140,16 @@ when dark," "one predictable branch," "tens of nanoseconds is noise" — none of
 flag is image-wide, it interacts with ICF and LTO, and it has no runtime opt-out, so until it is measured
 the design cannot choose its own shape.
 
+**Status — the static column is done; three of four remain.** On BNK/x86-64 the A/B build has been
+run (method, numbers and caveats in [`env/tmm-build-environment.md`](env/tmm-build-environment.md)):
+the flag compiles cleanly across 2,039 files under `-Wall -Werror`; `.text` grows **+0.476%** and the
+binary **+0.759%**; alignment slack absorbs **21%** of the nominal pad width, which answers the
+pad-placement question below; and **48.9%** of the shipped binary's functions were reached, because
+roughly half of them are built by separate component builds rather than the TMM build — so the
+*paddable* set is materially smaller than the hookable set, and closing the gap is a coordination
+problem across component teams rather than a flag. Full coverage extrapolates to **~+0.97% `.text`**.
+Throughput, latency tail, instruction-fetch behaviour and aarch64 are all still unmeasured.
+
 **The experiment.** Build TMM twice from the same source — once normally, once with
 `-fpatchable-function-entry` — and run both under identical traffic on at least one x86-64 and one
 aarch64 platform, with **nothing armed** in either. Hold constant the source revision, optimisation level

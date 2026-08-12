@@ -542,8 +542,14 @@ first shippable form.
 - **uBPF JIT maturity.** §4 is really "the verifier *and this JIT*." uBPF's arm64/x86-64 JIT is
   far less battle-tested than the kernel's, and here a JIT bug is the RCE. Plan to
   **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
-- **The optimiser decides the hookable set, not us.** `-fpatchable-function-entry` pads the entries of
-  functions the build actually emits out-of-line. At `-O2` that is a *subset* of the source: an
+- **The optimiser decides the hookable set, not us — and the build system narrows it again.**
+  `-fpatchable-function-entry` pads the entries of
+  functions the build actually emits out-of-line. **Measured on BNK/x86-64:** it reaches only **48.9%**
+  of the functions in the shipped binary, at 82–97% inside the TMM tree and **0%** across two dozen
+  separately-built F5 components and vendored third-party libraries — some of which (`tmstat`,
+  `libbigpacket`, `tcpdump`) arrive as prebuilt RPMs and are never compiled here at all. So the
+  *paddable* set is about half the hookable set, and the difference is owned by other teams' builds.
+  See [`env/tmm-build-environment.md`](env/tmm-build-environment.md). At `-O2` that is a *subset* of the source: an
   inlined function has no entry of its own — which pushes the usable boundary **outward** to the
   nearest surviving caller, a wider skip radius rather than lost reachability (design §10.1);
   `-fipa-icf` **folds identical function bodies**, so one pad may
