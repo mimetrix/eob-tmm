@@ -45,3 +45,9 @@ SEND-NOTE.md
 *.pdf
 *.docx
 *Confluence*
+
+# Credential files dropped into the working tree (the repo root is a host mount,
+# so files land here from the desktop). Keep them out of git as a matter of course.
+artifactory-token
+*-token
+*.token

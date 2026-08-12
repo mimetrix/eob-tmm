@@ -878,6 +878,98 @@ leaving an agent that reports to nothing. Both toggles are therefore set `false`
 until the package and CID are in hand — and `install-falcon.yml` exists standalone
 precisely so it can be added to an already-provisioned machine without a rebuild.
 
+### SOLVED — docker's default address pool cuts the box off this sandbox
+
+**Set this before running docker or kind on any dev box, or the box will disconnect
+itself and look dead.**
+
+```json
+/etc/docker/daemon.json
+{
+  "bip": "10.0.0.1/24",
+  "dns-search": ["pdsea.f5net.com", "f5net.com"],
+  "default-address-pools": [{"base": "10.0.0.0/9", "size": 24}]
+}
+```
+
+**Why.** SSH from this sandbox arrives at an instance from **`172.18.105.92`** — we are
+NATed, so although the sandbox is `10.88.0.5`, the box sees `172.18.x`. A stock docker
+install puts `docker0` on `172.17.0.0/16` and hands kind `172.18.0.0/16` from the
+default pool. The moment a cluster is created, the box installs a route for
+`172.18.0.0/16` pointing at the docker bridge, **our return traffic is routed into the
+bridge instead of out the default gateway**, and docker's `REJECT` rules answer with ICMP
+port-unreachable.
+
+The symptom is a box that is perfectly healthy on the console — multi-user reached,
+cloud-init finished, login prompt — while **every port refuses**, which reads as "sshd
+died" and is nothing of the sort. It also does not recover, and rescuing the instance
+does not help, because the damage is to routing on a box that is otherwise fine.
+
+Note this collides with more than our SSH path: F5's own estate is inside
+`172.16.0.0/12` — resolver `172.27.1.1`, GitSwarm `172.31.226.252`, Artifactory
+`172.25.9.4`, Confluence `172.25.8.129`.
+
+**`Datkube-Devbox-Berge` already carries this file**, which is why it survives while
+freshly provisioned boxes do not. It is not a coincidence — whoever built that image hit
+this and fixed it.
+
+**Gap in `spk-devmachine`:** its `docker` role installs Docker CE and starts the service
+but never constrains the address pool, so any box it provisions on this network will cut
+itself off as soon as someone runs kind. Worth an MR.
+
+**How it was found**, because the wrong turns are instructive. Two boxes died; five
+theories were tested and disproved by controlled experiment — a NAC/posture cutoff for
+missing Falcon and Qualys (**Berge's image has neither and survives**), the `nfs` role
+(box 2 skipped it and still died), `unattended-upgrades` (enabled *and already run* on
+the survivor), the playbook touching `sshd_config` (nothing in any role writes it), and
+the base image itself (a bare untouched `Ubuntu2404-server-pristine` survived 80/80
+checks over 40 minutes). What isolated it was noticing the survivor had never had docker
+or kind run on it, and then reading its route table.
+
+### OPEN ISSUE (RESOLVED — see above) — sshd stopped coming up on a provisioned box
+
+**Not understood, recorded so the next person does not rediscover it from scratch.**
+The first machine provisioned with `setup-dev-machine-slim.yml` worked for roughly half
+an hour, then began refusing on tcp/22 — an active RST, not a timeout. A reboot brought
+it back for one connection and then it refused again, permanently. Meanwhile the console
+log showed a completely healthy boot: multi-user reached, cloud-init finished, login
+prompt present. So the machine was fine and **sshd specifically was not running**.
+
+What was ruled out: nothing in the playbook writes `sshd_config` (checked every role);
+no `fail2ban` and no `ufw` anywhere in it; the instance stayed `ACTIVE` with power state
+running throughout.
+
+What remains suspected but unproven: the **`security` role**, which installs
+`unattended-upgrades`. It is the only thing provisioning adds that acts on its own
+afterwards, and an `openssh-server` upgrade is the obvious way for sshd to restart into
+a bad state. Notably the earlier box — Berge's snapshot, never touched by this
+playbook — ran for hours without this.
+
+**Mitigation taken**, not a fix: disable the `security` role. If a box provisioned that
+way stays up, that is evidence for the theory but not proof.
+
+**Disable it with the playbook's own toggles — do not edit the roles list.** Every role
+in `setup-dev-machine-slim.yml` is already gated by a flag:
+
+```yaml
+configure_security: false    # the unattended-upgrades role
+install_qualys: false
+install_falcon: false
+```
+
+An earlier attempt here commented out the `- role: security` and `- role: qualys` lines
+instead, which **orphaned their `when:` clauses onto the preceding entry** — so
+`- role: common` inherited `when: configure_security`, that variable was undefined, and
+the entire `common` role was silently skipped. The symptom was a box with no development
+user at all and a later task failing with *"chown failed: failed to look up user"*, which
+points nowhere near the actual cause. A commented-out line in a YAML list leaves its
+continuation lines behind; the toggles exist precisely so nobody has to do that.
+
+**To actually diagnose it**, boot the instance with `openstack server rescue`, mount its
+disk, and read `journalctl -u ssh` and `/var/log/unattended-upgrades/`. That was not done
+here because the box held nothing of value and rebuilding was faster — a reasonable
+trade at the time, but it is why this section says "suspected" rather than "caused by".
+
 ### The instance this produced
 
 `eob-tmm-dev` on SEA — `Ubuntu2404-server-pristine`, flavor `datkube-dev-large`
