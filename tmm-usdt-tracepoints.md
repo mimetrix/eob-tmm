@@ -159,7 +159,7 @@ specific and bounded one, and it points at exactly the case consequence 2 handle
 
 **1 · This catalog is unaffected; the "any function" claim is what narrows.** Designed-in call
 sites live where F5 writes code, so §3–§10 stand as specified. What is bounded is the ad-hoc
-case — arming a hook on a function nobody planned for — and it is bounded by component, not by
+case — arming a hook on a padded function with no designed-in call site — and it is bounded by which build padded it, not by
 the optimiser alone. Both mechanisms remain available; they now have different reach, and the
 catalog is the mechanism with the guarantee.
 

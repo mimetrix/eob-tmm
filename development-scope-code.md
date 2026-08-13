@@ -481,7 +481,7 @@ cannot reason across the batch (`engine-hard-problems.md` §5).
 **The skeleton below is the live-patching form.** At a designed-in call site, arming is an ordered word
 store into the slot and none of this code exists; patching once at startup makes arming a flag store and
 moves this code before the threads go hot, where it needs no coordination at all. Read it as the form
-that buys reach into an entry nobody planned for, and as the only one that needs item 0b.
+that buys reach into a function with no designed-in call site (any padded entry), and as the only one that needs item 0b.
 
 Overwrite the nop pad with a jump to the trampoline; restore the nops to detach. Same discipline
 ftrace has used on live kernel text for years — the difference here is that the pads are in **our own

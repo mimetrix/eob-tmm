@@ -113,7 +113,7 @@ requirement.
    | Form | What arming *is* | Needs 0b? | Cost when nothing is armed | What it gives up |
    |---|---|---|---|---|
    | **A · designed-in call site** | an ordered word store into the slot | **no** | one load + branch per site | reach is fixed at build time — only points someone chose in advance |
-   | **B · patch the entry on demand** | write a jump into the reserved pad, then flush the instruction cache | **yes**, on x86-64 | ~free — the pad is no-ops | nothing; this is the form that reaches an entry nobody planned for |
+   | **B · patch the entry on demand** | write a jump into the reserved pad, then flush the instruction cache | **yes**, on x86-64 | ~free — the pad is no-ops | nothing; this is the form that reaches any padded entry with no designed-in call site |
    | **C · patch once at startup, arm by flag** | a flag store; the pad already calls a dispatcher | **no** — patched while still single-threaded | a permanent call + load + branch on **every** function in the set, armed or not | the hookable set is fixed at process start, so reaching a new function needs a restart |
 
    Form B is the one that carries ftrace's discipline on live text — proven pattern, not research —
@@ -356,7 +356,7 @@ surfaced either, which is the argument for doing that reading before, not after,
 verification, the `ctx`/program-type ABI, the budget pass, the whole control plane, and back-edge fuel
 all sit on the far side of the decision. Item 6 stays hard-problems §2 whichever form is chosen, and
 item 15 stays day one. What the decision moves is **reach and where the delicate code lives**: form B
-buys an entry nobody planned for, at the price of live-text patching, per-architecture assembly, and
+buys any padded entry with no designed-in call site, at the price of live-text patching, per-architecture assembly, and
 0b; forms A and C give that up and spend the difference on the catalog instead. Filed this way so a
 "no" on the poll loop narrows the mechanism rather than ending the list.
 
