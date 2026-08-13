@@ -195,21 +195,27 @@ load with `umalloc`. The ~40 us figure is the one to re-check after B0, on the t
 
 ## 3b. B0 result — done, 17x, and verified correct
 
-`substrate/ubpf-patches/0001-jit-scratch-reuse.patch` — one file, three hunks — allocates the five
-scratch buffers once per process and reuses them, faulting the pages in at first use rather than
-inside a latency-sensitive compile. Same benchmark, same shield, same box:
+`substrate/ubpf-patches/0001-jit-scratch-rightsize.patch` sizes the JIT's scratch to the program
+being compiled (`vm->num_insts`) instead of to `UBPF_MAX_INSTS` (65,536). Same benchmark, same
+shield, same box:
 
 | Stage | before (median) | after (median) |
 |---|---|---|
-| `ubpf_create` | 28.6 us | **4.9 us** |
-| `ubpf_load_elf_ex` | 5.4 us | 5.8 us |
-| `ubpf_compile_ex` | 311.1 us | **10.1 us** |
-| **TOTAL (the stall)** | **348.6 us** | **21.0 us** |
-| p95 | 544.0 us | **37.4 us** |
+| `ubpf_create` | 28.6 us | **4.8 us** |
+| `ubpf_load_elf_ex` | 5.4 us | 5.3 us |
+| `ubpf_compile_ex` | 311.1 us | **9.0 us** |
+| **TOTAL (the stall)** | **348.6 us** | **19.5 us** |
+| p95 | 544.0 us | **28.5 us** |
+| **max** | **3226.8 us** | **58.3 us** |
 
-The one remaining ~1.1 ms outlier is the **first** compile paying the page-faulting once. In TMM that
-lands at startup, because `http_psm_init()` compiles the built-in shield during initialization, so
-every runtime load sees the 21 us figure.
+The **max** is the figure that decides whether this can sit on a poll thread, and it improves 55x.
+There is no first-compile penalty, because nothing large is allocated at any point.
+
+An earlier version of this patch kept a process-global scratch and reused it (21.0 us median, but a
+1.1 ms first compile). It was discarded: process-global mutable state, a non-atomic busy flag, and
+5.25 MB retained for the process lifetime would have made it a **permanent** fork, because upstream
+would rightly reject it. Right-sizing is smaller, faster at every percentile, and is the actual
+upstream bug rather than a workaround for it — so it can be contributed back and then dropped.
 
 **Verified, not assumed.** A speedup that silently miscompiles is worse than no speedup, so
 `verify_scratch_reuse.c` checks compiled *behaviour*: the JIT's output is compared against

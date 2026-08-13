@@ -1,0 +1,62 @@
+--- /tmp/ubpf_jit_support.c.orig	2026-08-13 19:36:24.206490320 +0000
++++ vm/ubpf_jit_support.c	2026-08-13 19:47:46.520448501 +0000
+@@ -68,8 +68,21 @@
+     uint8_t* buffer,
+     uint32_t size,
+     enum JitMode jit_mode,
++    uint32_t num_insts,
+     char** errmsg)
+ {
++    /* eob-tmm: size the scratch to the program, not to UBPF_MAX_INSTS.
++     *
++     * These arrays are indexed by instruction during translation, so num_insts
++     * is the exact bound -- at most one jump/load/lea/local_call per
++     * instruction. Allocating at UBPF_MAX_INSTS (65536) instead costs 5.25 MB
++     * per compile regardless of program size; the calloc itself is free
++     * (lazily mapped zero pages) but faulting those pages in as the JIT walks
++     * them measured at ~272 us, about 90% of compile time for a 4 KB program.
++     *
++     * Guard against a zero count so a degenerate program still gets a valid
++     * (if useless) allocation rather than calloc(0). */
++    uint32_t scratch_insts = num_insts ? num_insts : 1;
+     compile_result->compile_result = UBPF_JIT_COMPILE_FAILURE;
+     compile_result->errmsg = NULL;
+     compile_result->external_dispatcher_offset = 0;
+@@ -78,11 +91,11 @@
+     state->offset = 0;
+     state->size = size;
+     state->buf = buffer;
+-    state->pc_locs = calloc(UBPF_MAX_INSTS + 1, sizeof(state->pc_locs[0]));
+-    state->jumps = calloc(UBPF_MAX_INSTS, sizeof(state->jumps[0]));
+-    state->loads = calloc(UBPF_MAX_INSTS, sizeof(state->loads[0]));
+-    state->leas = calloc(UBPF_MAX_INSTS, sizeof(state->leas[0]));
+-    state->local_calls = calloc(UBPF_MAX_INSTS, sizeof(state->local_calls[0]));
++    state->pc_locs = calloc(scratch_insts + 1, sizeof(state->pc_locs[0]));
++    state->jumps = calloc(scratch_insts, sizeof(state->jumps[0]));
++    state->loads = calloc(scratch_insts, sizeof(state->loads[0]));
++    state->leas = calloc(scratch_insts, sizeof(state->leas[0]));
++    state->local_calls = calloc(scratch_insts, sizeof(state->local_calls[0]));
+     state->num_jumps = 0;
+     state->num_loads = 0;
+     state->num_leas = 0;
+--- /tmp/h.orig	2026-08-13 19:45:55.892753059 +0000
++++ vm/ubpf_jit_support.h	2026-08-13 19:47:46.520448501 +0000
+@@ -165,6 +165,7 @@
+     uint8_t* buffer,
+     uint32_t size,
+     enum JitMode jit_mode,
++    uint32_t num_insts,
+     char** errmsg);
+ 
+ void
+--- /tmp/x86.orig	2026-08-13 19:45:55.894753036 +0000
++++ vm/ubpf_jit_x86_64.c	2026-08-13 19:47:46.520448501 +0000
+@@ -2630,7 +2630,7 @@
+     struct jit_state state;
+     struct ubpf_jit_result compile_result;
+ 
+-    if (initialize_jit_state_result(&state, &compile_result, buffer, *size, jit_mode, &compile_result.errmsg) < 0) {
++    if (initialize_jit_state_result(&state, &compile_result, buffer, *size, jit_mode, vm->num_insts, &compile_result.errmsg) < 0) {
+         goto out;
+     }
+ 
