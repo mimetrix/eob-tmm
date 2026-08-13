@@ -206,9 +206,23 @@ This closes the gap that the whole swap proof had rested on a page *we* made wri
 the surface TMM actually presents. One cost note surfaced here: `membarrier(SYNC_CORE)` per write
 makes each arm/disarm far heavier than a store (72K arm/disarm cycles vs 4M in the same wall-clock),
 which is irrelevant on the packet path — it is paid only at arm time — but means arming is a
-syscall-bound operation, not a memory write. What is still **not** established: behaviour inside
-TMM's real poll loop, whether `tmm64`'s text is hugepage-backed (proven on 4 KB pages), and the
-production node's code-integrity policy.
+syscall-bound operation, not a memory write.
+
+**Soaked, and one honest wrinkle.** Two 20-minute soaks at the same widened window, **~12.5 billion
+calls total, zero corrupt returns** — the protocol never once let a core run a torn or garbage
+instruction, which is the correctness property that matters. Faults: **0 in one run (9.8B calls,
+323M mid-patch traps handled), exactly 1 in the other** (never a second, in 2.8B calls before it
+was stopped). That lone fault was a worker's own *recoverable* fault, absorbed by the retry handler,
+**not a corrupt return** — and it did not reproduce, so it stayed uncharacterized. The scratch-page
+version never produced it. The one thing that differs is the write path: the kernel writing into
+`r-xp` text can, very rarely, disturb a core fetching that same page. Implication for TMM, recorded
+for the TMA: the live-patch path must either **absorb a rare recoverable fault** on a core in the
+patched page at arm time (a handler/retry), or **avoid perturbing the page** at all — the poll-loop
+rendezvous, or a separate writable alias of the text. Correctness is not in question; graceful
+handling of a billion-to-one transient is.
+
+What is still **not** established: behaviour inside TMM's real poll loop, whether `tmm64`'s text is
+hugepage-backed (proven on 4 KB pages), and the production node's code-integrity policy.
 
 **Sources:** kernel `text_poke_bp` (`arch/x86/kernel/alternative.c`); `membarrier(2)` man page,
 `MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE`; Intel SDM Vol 3A §8.1.3, cross-modifying code.

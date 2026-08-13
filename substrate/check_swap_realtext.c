@@ -60,6 +60,14 @@ static _Atomic long g_faults, g_corrupt, g_calls, g_cycles, g_traps;
 static __thread sigjmp_buf g_jb;
 static __thread int g_in_call;
 
+/* First-fault forensics: what signal, where did rip point, what address faulted,
+ * all relative to the pad. Captured once (async-signal-safe: plain stores), printed
+ * from the periodic loop. Tells us whether a fault is a fetch fault ON the pad (the
+ * write perturbing a concurrent fetch) or something else entirely. */
+static _Atomic int  g_fault_seen;
+static volatile int g_fsig;
+static volatile long g_frip_off, g_faddr_off;
+
 /* Write into our own r-xp .text the way a live patcher does: through /proc/self/mem.
  * Single-byte writes are atomic; the 4-byte tail is only ever written while the
  * opcode slot holds a nop (mode 0) or an INT3 (mode 2), never while it is live. */
@@ -87,10 +95,18 @@ trap_handler(int sig, siginfo_t *si, void *uc)
 }
 
 static void
-fault_handler(int sig)
+fault_handler(int sig, siginfo_t *si, void *uc)
 {
-    (void)sig;
-    if (g_in_call) { __atomic_fetch_add(&g_faults, 1, __ATOMIC_RELAXED); siglongjmp(g_jb, 1); }
+    if (g_in_call) {
+        if (!__atomic_exchange_n(&g_fault_seen, 1, __ATOMIC_RELAXED)) {
+            ucontext_t *c = (ucontext_t*)uc;
+            g_fsig = sig;
+            g_frip_off  = (long)((uint8_t*)c->uc_mcontext.gregs[REG_RIP] - g_pad);
+            g_faddr_off = (long)((uint8_t*)(si ? si->si_addr : 0) - g_pad);
+        }
+        __atomic_fetch_add(&g_faults, 1, __ATOMIC_RELAXED);
+        siglongjmp(g_jb, 1);
+    }
     _exit(2);
 }
 
@@ -129,7 +145,8 @@ worker(void *arg)
 {
     (void)arg;
     struct sigaction sa = {0};
-    sa.sa_handler = fault_handler;
+    sa.sa_sigaction = fault_handler;
+    sa.sa_flags = SA_SIGINFO;
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGILL,  &sa, NULL);
     sigaction(SIGBUS,  &sa, NULL);
@@ -219,6 +236,11 @@ main(int argc, char **argv)
                e + chunk, __atomic_load_n(&g_calls,__ATOMIC_RELAXED),
                __atomic_load_n(&g_cycles,__ATOMIC_RELAXED),
                __atomic_load_n(&g_traps,__ATOMIC_RELAXED), f, c);
+        if (__atomic_load_n(&g_fault_seen, __ATOMIC_RELAXED)) {
+            const char *n = g_fsig==SIGSEGV?"SIGSEGV":g_fsig==SIGILL?"SIGILL":g_fsig==SIGBUS?"SIGBUS":"?";
+            printf("        first fault: %s  rip=pad%+ld  fault_addr=pad%+ld\n",
+                   n, g_frip_off, g_faddr_off);
+        }
         fflush(stdout);
     }
     g_stop = 1;
