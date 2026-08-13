@@ -33,7 +33,13 @@ blocks live in [`substrate/`](substrate/) and are verified by `make -C substrate
 
 | Component | Role | License | Status |
 |---|---|---|---|
-| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | the calls item 3 is built on are the library's **real public API**, not invented for this proposal: `ubpf_create` / `ubpf_load_elf` / `ubpf_exec` (`vm/inc/ubpf.h:129, 458, 510` in the gitignored `ubpf/` clone), with `ubpf_compile_ex` (`:575`) as the JIT path — the *extended* mode, because the basic `ubpf_compile` (`:553`) emits a prologue that takes an unprobed 4 KiB stack frame. **No runnable demonstration ships in this repo** — read this cell as an API-surface claim, checkable against uBPF's own header, and *not* as evidence that the load-and-run path has been stood up. Reused as-is **except** item 15's JIT back-edge-fuel patch — F5-owned, upstreamable |
+| **uBPF** | the VM + JIT (~150 KB) | Apache-2.0 | the calls item 3 is built on are the library's **real public API**, not invented for this proposal: `ubpf_create` / `ubpf_load_elf` / `ubpf_exec` (`vm/inc/ubpf.h:129, 458, 510` in the gitignored `ubpf/` clone), with `ubpf_compile_ex` (`:575`) as the JIT path — the *extended* mode, because the basic `ubpf_compile` (`:553`) emits a prologue that takes an unprobed 4 KiB stack frame. **No runnable demonstration ships in this repo** — read this cell as an API-surface claim, checkable against uBPF's own header, and *not* as evidence that the load-and-run path has been stood up. **No longer reused as-is.** The F5 fork now carries a **real patch, not just a planned one**:
+`substrate/ubpf-patches/0001-jit-scratch-reuse.patch` makes the JIT allocate its 5.25 MB of
+fixed scratch once per process instead of on every compile, cutting prepare from 349 us to 21 us
+median (measured; see `load-path-scope.md` §3a/§3b). Item 15's back-edge-fuel patch is still to
+come and is the reason the fork was always going to exist, so this rides along rather than adding
+a burden — but "three unmodified upstream components" is no longer an accurate description, and
+each patch is a merge cost at every pin bump. Both are narrow and upstreamable |
 | **PREVAIL** | the static verifier | MIT **+ Apache-2.0** (the clone ships both `LICENSE` files, plus `external/{CLI11,bpf_conformance,libbtf}`; the SBOM/license scan is a Phase-1 gate per `big-ip-live-shield-design.md` §13) | stock, driven as a CLI invocation — `-q [--section <s>]` (`src/main.cpp:65, 74`). **No verify gate is demonstrated in this repo.** O3 in [`design-review-findings.md`](design-review-findings.md) records the ctx-model limit that any future demonstration has to clear, and it is a property of PREVAIL, not of any one harness |
 | **clang** | C → eBPF bytecode | — | standard toolchain |
 
@@ -43,7 +49,8 @@ through the real uBPF API, plus a verify-gate track that invoked PREVAIL — and
 it as demonstrating the load-and-run half of item 3. That prototype has been removed, and the
 demonstration went with it. The reuse argument above now rests on the two upstream projects' public
 APIs; it no longer rests on anything executable here.
-So: "reused, not written" stands, and **"already works in our hands" is not currently shown** — a
+So: "reused, not written" stands for PREVAIL and clang and stands *with a fork* for uBPF, and
+**"already works in our hands" is not currently shown** — a
 loss of evidence, and the state of the reuse case until something runnable is stood
 up again. The JIT's own properties (item 15's fuel, its unprobed 4 KiB stack frame) were open
 questions before and remain so; they were never measured even while the prototype existed, because
