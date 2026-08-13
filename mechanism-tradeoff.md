@@ -84,6 +84,16 @@ real and valuable window — but it is bounded by axis 1, not unbounded.
 
 ## Reach is per-component adoption, not a wall — and the core is ours
 
+**First, one fact that makes this simpler than it sounds: it is all one binary.** OpenSSL, the
+F5 crypto component, dedup and the rest are **statically linked into the single TMM executable**
+— verified: ~2,000 OpenSSL functions (`X509_`, `EVP_`, `ASN1_`, …) are defined right inside
+`tmm64`, not loaded as separate `.so` files, not separate processes. At runtime it is all one
+TMM, in one address space. "Separate" means separate *build*, not separate *program*. So there
+is no cross-process problem to solve: once a contributing build turns the flag on, its functions
+get the same entry gap and the **same hooking machinery reaches them with nothing new to build**.
+The federated rollout is purely "each build flips the flag," not "shield a different program."
+
+
 The 48.9%-of-the-whole-binary number mixes two scopes that should stay separate. TMM's binary is
 built by several teams: the **TMM core** (ours), OpenSSL, dedup, and the rest, each a separate
 development. The mechanism is adopted **per build**, so:

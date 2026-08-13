@@ -124,10 +124,13 @@ But it reaches only **48.9%** of the shipped binary's functions:
 | ~two dozen separately-built F5 components | **0%** |
 | vendored third party (OpenSSL, regex, json-c) | **0%** |
 
-**TMM is assembled, not compiled.** Roughly half its functions come from builds that never saw
-the TMM build's flags, and three components arrive from Artifactory as **prebuilt RPMs**. So the
-*paddable* set is about half the *hookable* set, and closing the gap means changing other teams'
-builds — coordination, not a compiler flag.
+**TMM is assembled, not compiled — but into ONE binary.** Roughly half its functions come from
+builds that never saw the TMM build's flags, and three components arrive from Artifactory as
+**prebuilt RPMs**. Crucially they are **statically linked into the single `tmm64` executable** —
+~2,000 OpenSSL functions (`X509_`/`EVP_`/`ASN1_`) are verified defined inside it, not separate
+`.so`s or processes. So "separate" means separate *build*, not separate program: the paddable
+set is about half the hookable set, and closing the gap is another *build* turning the flag on,
+after which the same runtime mechanism reaches it — coordination, not new machinery.
 
 Scoped to the data plane the gap narrows and sharpens: it is dominated by **OpenSSL/`crypto`**
 (788 symbols, TLS record and handshake) with per-flow `dedup` second, while `afm`'s unpadded
