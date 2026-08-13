@@ -43,18 +43,23 @@
  *              return append_fn(str, strlen(str), dest);
  *          }
  *
- * That third block is the entire per-hook cost, and it is the DESIGNED-IN form:
- * a deliberate call site in source F5 owns. The trampoline and pad-rewriting
- * work exists to get this same effect at a function nobody edited --- a bigger
- * claim, and not this one.
+ * The block above is the DESIGNED-IN form, and it is shown here only to say that
+ * it was REMOVED (2026-08-13). It is a hand-written call site in source F5 owns,
+ * added per function, forever --- and it cannot reach a function nobody thought
+ * to edit, which is the defining case of a CVE. Patched-entry hooking now works
+ * on a live TMM, so the weaker form has no remaining job and was deleted from
+ * the TMM tree rather than kept as a second, divergent path. There is no call
+ * site in TMM source; a function is reached by patching its entry pad at run
+ * time or not at all.
  *
- * Note what the call site does NOT do: it does not consult the mode. The program
+ * Note what the trampoline does NOT do: it does not consult the mode. The program
  * always selects the outcome its predicate implies and the host decides whether
  * to apply it, because gating mode inside the program would make a monitor-mode
  * hit indistinguishable from a miss.
  *
- * Status: candidate artifact. Compiles against the vendored uBPF headers.
- * Nothing in this repo instantiates it inside TMM.
+ * Status: this file is compiled into TMM and runs there. As of 2026-08-13 it is
+ * loaded in a padded TMM on BNK/datkube, with its program reached through a
+ * patched function entry armed at run time.
  */
 
 #include "ls_vm.h"

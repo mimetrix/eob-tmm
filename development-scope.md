@@ -60,9 +60,8 @@ separate guarantees, and only the first is needed in every variant. Which of the
 depends on a question F5 answers, not this document — so items 0b, 1b and 2's second and third forms
 are **conditional work**, and the list says so rather than pricing them as settled.
 
-0. **The publish protocol** *(step 4)* — **unconditional.** A designed-in call site already exists in
-   the compiled text and the hot path loads a slot per invocation, so publishing a program is one
-   ordered word store and `REVOKE` is a store of `NULL`. What is net-new is the ordering discipline
+0. **The publish protocol** *(step 4)* — **unconditional.** The trampoline loads a slot per
+   invocation, so publishing a program is one ordered word store and `REVOKE` is a store of `NULL`. What is net-new is the ordering discipline
    (release on the publishing side, acquire on the trampoline's reads) and the rule that a slot is
    never half-written. **No text is modified and no rendezvous is involved.** Small, and required
    whatever else is or is not built.
@@ -99,20 +98,20 @@ requirement.
    argument registers per the ABI, build the `ctx`, call the JIT'd program, bump the fire
    counter, apply the verdict (safe-return vs. fall-through), restore. ≈ a page of code per
    architecture, generic across all functions.
-   **This splits by hook kind, and the split matters for what has to be written in assembly.** At a
-   **designed-in call site** the surrounding code is C, the compiler owns the calling convention, and the
-   shim is arch-generic C: read the slot, build `ctx`, call, apply. At a **patched function entry** there
-   is no C frame to borrow — the argument registers must be saved and restored by hand per ABI, which is
-   the per-architecture assembly above. So the delicate per-arch work is **conditional on 0b**, and the
-   rendezvous-free variant needs the small C form only. If 0c is answered with read-side markers rather
-   than a poll-loop epoch, both forms also carry a store and a fence per invocation.
+   **This used to split by hook kind. It no longer does.** The easier half — a designed-in call site,
+   where the surrounding code is C and the compiler owns the calling convention — has been removed from
+   the TMM tree. What remains is the **patched function entry**, where there is no C frame to borrow: the
+   argument registers must be saved and restored by hand per ABI. So the per-architecture assembly is
+   **unconditional**, not conditional on 0b, and the arch-generic C shim (item 1a) survives only as the
+   dispatch half that the assembly calls into. If 0c is answered with read-side markers rather than a
+   poll-loop epoch, this also carries a store and a fence per invocation.
 2. **Arm/disarm routine** *(step 2)* — **one line in an earlier draft; three different
    implementations, and the choice is not this document's to make.** All three arm and disarm a hook;
    they differ in what they must coordinate and what they cost when dark.
 
    | Form | What arming *is* | Needs 0b? | Cost when nothing is armed | What it gives up |
    |---|---|---|---|---|
-   | **A · designed-in call site** | an ordered word store into the slot | **no** | one load + branch per site | reach is fixed at build time — only points someone chose in advance |
+   | **A · designed-in call site** — ~~offered~~ **REMOVED, 2026-08-13** | an ordered word store into the slot | **no** | one load + branch per site | reach is fixed at build time — only points someone chose in advance. **This is disqualifying for CVE work**, whose defining case is a function nobody thought to edit. Deleted from the TMM tree rather than left as a second path |
    | **B · patch the entry on demand** | write a jump into the reserved pad, then flush the instruction cache | **yes**, on x86-64 | ~free — the pad is no-ops | nothing; this is the form that reaches any padded entry with no designed-in call site |
    | **C · patch once at startup, arm by flag** | a flag store; the pad already calls a dispatcher | **no** — patched while still single-threaded | a permanent call + load + branch on **every** function in the set, armed or not | the hookable set is fixed at process start, so reaching a new function needs a restart |
 
@@ -320,7 +319,7 @@ new mitigation. Nothing else on this list is ever written again.
 | 0 | publish protocol (ordered slot store) | TMM, per publish | once | small — **unconditional** | **stub** — today a single atomic store: atomic *per call*, not an ordered cross-core publish |
 | 0b | cross-core rendezvous | TMM poll loop, *or* `SIGTRAP` + `membarrier` | once, x86-64 only | **conditional on form B** | **stub** |
 | 0c | reclamation — epoch · markers · capped leak | TMM | once | small, three forms | **stub** — a swapped-out program is never freed; bounded by load count |
-| 1a | dispatch shim, designed-in call site | TMM hot path (when armed) | once, arch-generic | small, C | **live** — trampoline entered from a patched function in a running TMM (`ls_tramp.c`) |
+| 1a | dispatch shim (arch-generic C half of the trampoline) | TMM hot path (when armed) | once, arch-generic | small, C | **live** — trampoline entered from a patched function in a running TMM (`ls_tramp.c`) |
 | 1b | asm trampoline, patched entry | TMM hot path (when armed) | once per arch | ~1 page of asm — **conditional on form B** | **live** — call target verified as `ls_trampoline_entry` (`ls_tramp_asm.c`) |
 | 2 | arm/disarm | depends on form (A · B · C) | once per arch in form B | store · patch · flag | **live, 2026-08-13** — armed / disarmed / re-armed a running TMM's own `.text` at `0xcd5400`, both pods, **zero restarts** (`ls_arm.c`, `ls_swap.c`) |
 | 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines | **partial** — arm/disarm ops (`0x1003`/`0x1004`) proven live; `SHIELD_OP_LOAD` still blocked, see note below |

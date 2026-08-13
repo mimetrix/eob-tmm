@@ -14,19 +14,28 @@ else is **[estimate]** or a design fact. Scope: BNK / MBIP, whose mainline is **
 
 ---
 
-## The two paths
+## Decided: Path B. Path A has been removed from the tree.
 
-**Path A — designed-in call sites.** F5 plants an explicit call into the VM at chosen functions,
-in TMM source. Arming is one ordered store to a slot; no text is modified. **This is what runs
-in the pod today** (39 lines in `http_psm.c`), validated end to end.
+**This document is now a decision record, not an open question.** It is kept because the reasoning
+below is why the decision went the way it did, and a reviewer is entitled to see the case for the
+road not taken.
+
+**Path A — designed-in call sites.** F5 plants an explicit call into the VM at chosen functions, in
+TMM source. Arming is one ordered store to a slot; no text is modified. **Removed 2026-08-13.** It
+ran in the pod for a while (39 lines in `http_psm.c`) and worked. It was deleted anyway, because its
+reach is fixed at build time: it can only shield functions someone thought to plant a call site at,
+and a CVE's defining property is that nobody thought of it. Keeping it as a fallback would also have
+meant two divergent shield paths, and — sharper — it silently mitigates the bug whether or not
+anything is armed, which makes it impossible to demonstrate that arming did anything.
 
 **Path B — patched function entries.** The compiler reserves a pad at every function entry
 (`-fpatchable-function-entry`); arming rewrites the pad into a `call` to a trampoline. Hooks a
-function *nobody edited*. **Trampoline and arming are validated in isolation on hardware; the
-cross-core coordination (safe point) is not built.**
+function *nobody edited*. **Proven live 2026-08-13:** armed, disarmed and re-armed inside an
+already-running TMM on BNK/datkube, both pods, zero restarts. The cross-core coordination is built
+(`text_poke_bp` protocol in userspace: `INT3`, `membarrier(SYNC_CORE)`, tail, opcode, with a
+`SIGTRAP` handler for cores caught mid-patch).
 
-They are not mutually exclusive — see *The hybrid* below — but the matrix treats them as the
-poles they are.
+The matrix below treats them as the poles they were. Read the Path A column as the case that lost.
 
 ---
 
