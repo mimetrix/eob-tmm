@@ -79,20 +79,34 @@
  * against the JIT prologue, present on the interpreter path as well, and it is
  * paid per call rather than once.
  *
- * ubpf_exec_ex() takes the stack from the caller, so we allocate it once per TMM
- * instance and hand the same one to every invocation. Safe here for the reason
- * the rest of this file is lock-free: one VM per instance, run-to-completion, so
- * two invocations never overlap on a core. It would NOT be safe if a hook could
- * be re-entered --- a shield that somehow triggered the hooked path again would
- * corrupt its own stack, which is why re-entrancy is on the trampoline's
- * requirement list (scope item 1) rather than assumed away.
+ * ubpf_exec_ex() takes the stack from the caller, so we hand it a stack we own
+ * rather than one per call frame. It is PER-THREAD (`__thread`), not one shared
+ * buffer: TMM is core-pinned, so a per-core-thread stack is the honest model ---
+ * each core runs its own invocations on its own stack, and no lock is needed on
+ * the call path because no two threads share a stack. (A single shared buffer was
+ * safe only under "one VM per instance, run-to-completion, two invocations never
+ * overlap"; making it per-thread stops RELYING on that and holds even when several
+ * core-threads drive the same VM object concurrently, as a multi-core harness or a
+ * shared-VM build would.) Re-entrancy on ONE thread --- a shield that re-triggered
+ * its own hooked path --- would still corrupt that thread's stack, which is why
+ * re-entrancy stays on the trampoline's requirement list (scope item 1).
  */
 /* Defined below ls_vm_call, which it uses; declared here because ls_vm_arm
  * invokes it. */
 static void ls_vm_selftest(int slot, unsigned level);
 
-static uint8_t *g_prog_stack;
+static __thread uint8_t *g_prog_stack;   /* per core-thread; see the note above */
 #define LS_PROG_STACK_SIZE 4096
+
+/* This thread's program stack, allocated on first use. Off the hot path only on
+ * the very first call per thread; every call after is a plain thread-local read. */
+static uint8_t *
+ls_prog_stack(void)
+{
+    if (g_prog_stack == NULL)
+        g_prog_stack = calloc(1, LS_PROG_STACK_SIZE);   /* NULL -> ubpf_exec_ex fails closed */
+    return g_prog_stack;
+}
 
 /* Per TMM instance. Not shared, not locked --- see the header. `static` because
  * each TMM instance is its own process. */
@@ -682,11 +696,12 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * reaching this hook, and basic-mode JIT code would do the same in its
      * prologue without a guard-page probe (O7). */
     int rc = 0;
+    uint8_t *stk = ls_prog_stack();          /* this thread's stack; per-core */
     void *jf = __atomic_load_n(&s->jit_fn, __ATOMIC_ACQUIRE);
     if (jf != NULL) {
-        ret = ((ubpf_jit_ex_fn)jf)(ctx, ctx_len, g_prog_stack, LS_PROG_STACK_SIZE);
+        ret = ((ubpf_jit_ex_fn)jf)(ctx, ctx_len, stk, LS_PROG_STACK_SIZE);
     } else {
-        rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
+        rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, stk, LS_PROG_STACK_SIZE);
     }
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;

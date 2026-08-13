@@ -12,7 +12,8 @@
 | arming (install the jump) | yes — incl. on real private `.text` via `/proc/self/mem` | build box |
 | patching TMM's own `r-xp` `.text` so execution sees it | **yes** | build box (`patchtext2`) |
 | the safe swap (`text_poke_bp`) under contention | yes, cross-checked to the kernel — **incl. on real private `.text`** | build box (`check_swap_realtext`) |
-| **the whole Path B slice joined** — VM verdict drives an armed real function | **yes, on the bench** | build box (`check_integrated`) |
+| **the whole Path B slice joined** — VM verdict drives an armed real function | **yes**, single-thread | build box (`check_integrated`) |
+| the same **under multi-core load** — safe swap + VM in the loop, armed/disarmed live | **yes, clean** (118M calls, 5.6M mid-patch traps, 0 faults/corrupt in 20s; 20-min soak) | build box (`check_swap_integrated`) |
 
 **Joined on the bench (2026-08-13):** the real trampoline, the real VM running a PREVAIL-verified
 program, and arming on a real private-`.text` function via `/proc/self/mem` now run as one flow

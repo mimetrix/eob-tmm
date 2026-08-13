@@ -224,5 +224,23 @@ handling of a billion-to-one transient is.
 What is still **not** established: behaviour inside TMM's real poll loop, whether `tmm64`'s text is
 hugepage-backed (proven on 4 KB pages), and the production node's code-integrity policy.
 
+### Folded into the real armed path — swap + trampoline + VM under load
+
+`check_swap_realtext` armed a stub. `check_swap_integrated.c` arms the **real trampoline** onto a
+real function's pad via the same `text_poke_bp` swap, while N workers hammer it and every armed call
+runs the **real VM** (a PREVAIL-verified BLOCK shield → `SAFE_RETURN`). Each call must return one of
+two legal values — `0xBEEF` (body ran: disarmed, or a core caught mid-patch and redirected) or `0`
+(the VM's safe value) — never garbage. 15 workers, widened window: **118M calls, 5.6M mid-patch
+traps handled, 0 faults, 0 corrupt** (20 s; 20-min soak run separately). So the swap stays safe with
+the trampoline and VM actually in the loop, not just a stub.
+
+One change this forced, kept: `ls_vm`'s per-invocation program stack is now **per-thread**
+(`__thread`) rather than one shared buffer. The shared buffer was safe only under "one VM per core,
+run-to-completion"; per-thread models that directly (each core its own stack) and lets several
+core-threads drive one VM object without corrupting each other's stack. The slot stat counters
+(`fired`, `safe_returns`) are still non-atomic, so their totals are meaningless under a shared-VM
+harness (you can see `safe_returns > fired`); real TMM has per-core VMs with private counters, so
+this is a harness artifact, not a defect.
+
 **Sources:** kernel `text_poke_bp` (`arch/x86/kernel/alternative.c`); `membarrier(2)` man page,
 `MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE`; Intel SDM Vol 3A §8.1.3, cross-modifying code.
