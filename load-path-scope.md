@@ -193,12 +193,58 @@ load with `umalloc`. The ~40 us figure is the one to re-check after B0, on the t
 
 ---
 
+## 3b. B0 result — done, 17x, and verified correct
+
+`substrate/ubpf-patches/0001-jit-scratch-reuse.patch` — one file, three hunks — allocates the five
+scratch buffers once per process and reuses them, faulting the pages in at first use rather than
+inside a latency-sensitive compile. Same benchmark, same shield, same box:
+
+| Stage | before (median) | after (median) |
+|---|---|---|
+| `ubpf_create` | 28.6 us | **4.9 us** |
+| `ubpf_load_elf_ex` | 5.4 us | 5.8 us |
+| `ubpf_compile_ex` | 311.1 us | **10.1 us** |
+| **TOTAL (the stall)** | **348.6 us** | **21.0 us** |
+| p95 | 544.0 us | **37.4 us** |
+
+The one remaining ~1.1 ms outlier is the **first** compile paying the page-faulting once. In TMM that
+lands at startup, because `http_psm_init()` compiles the built-in shield during initialization, so
+every runtime load sees the 21 us figure.
+
+**Verified, not assumed.** A speedup that silently miscompiles is worse than no speedup, so
+`verify_scratch_reuse.c` checks compiled *behaviour*: the JIT's output is compared against
+`ubpf_exec` (the interpreter never touches the JIT scratch, so it is an oracle this patch cannot
+influence), across 40 compiles through the shared scratch, on both ctx cases.
+
+```
+round 0 baseline:  null-ctx -> 1   live-ctx -> 0
+interpreter says:  null-ctx -> 1   live-ctx -> 0
+40 rounds through the shared scratch
+RESULT: PASS --- JIT matches interpreter, and every compile agrees
+```
+
+That `1`/`0` split is the shield's own logic confirmed end to end: a null `prot_transfer_log_profile`
+returns the safe value; a live one falls through.
+
+### What this changes about §2 and §3
+
+- **The poll-thread trade is no longer marginal.** 21 us inside a poll iteration is ordinary
+  per-iteration work, so §3's concern is answered rather than merely bounded. The size ceiling (B6)
+  is still worth having, but as a guard rather than the thing holding the design up.
+- **The allocator constraint is much weaker.** Steady-state prepare allocates nothing, so the 1 MB
+  `sthread_malloc` cap stops binding. The §1 spinlock hang still has to be handled for the *first*
+  compile, but that is a one-time startup cost payable on a TMM thread where allocation already works.
+
+Still measured on the build box with glibc, not inside TMM with `umalloc`. Re-check on target.
+
+---
+
 ## 4. Work items
 
 | # | Item | Notes |
 |---|---|---|
 | B1 | ~~Measure JIT cost~~ **DONE — see §3a. The result changes the plan.** | Prepare costs 349 us median / 3.2 ms max, and **90% of it is demand-paging scratch, not compiling** |
-| B0 | **Patch uBPF to allocate JIT scratch once and reuse it** | New, and now the first item. Removes the stall AND the allocator problem together |
+| B0 | ~~Patch uBPF to allocate JIT scratch once and reuse it~~ **DONE — see §3b** | 349 us -> 21 us median (17x). Patch + tests in `substrate/ubpf-patches/` |
 | B2 | Request struct + state machine, release/acquire ordering | File-scope statics; needs whitelist entries |
 | B3 | Timer registration with CAS ownership election | `timer_init_periodic_ex` in `http_psm_init`, one owner |
 | B4 | Move `ls_vm_reload` invocation to the callback | Loader thread must make **zero** allocations; audit the whole path |
