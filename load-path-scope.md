@@ -51,9 +51,11 @@ working `sthread_malloc` path. It still does not work, for a second reason:
 (`.ubpf/vm/ubpf_jit_support.c:81-85`), five arrays of `UBPF_MAX_INSTS` = **65,536** elements:
 
 ```
-pc_locs + jumps + loads + leas + local_calls
-  = 5 x 65,536 x (4 bytes at the floor, realistically 12-16)
-  = 1.3 MB minimum, ~4-5 MB in practice        >  1 MB cap
+pc_locs        65537 x 4  bytes  =  256 KB
+jumps/loads/leas/local_calls
+               65536 x 20 bytes x 4 = 5120 KB
+                                      -------
+                              TOTAL =  5.25 MB per compile   >  1 MB cap
 ```
 
 The inequality holds even at the smallest plausible element size, so registration alone turns a hang
@@ -122,9 +124,9 @@ exactly the thing this project is otherwise careful to avoid.
 
 This is not hidden by the design; it has to be bounded and measured:
 
-- **Measure first.** Time `ubpf_load_elf` + `ubpf_compile_ex` for a representative shield. If it is
-  tens of microseconds, the stall is comparable to other per-iteration work and the trade is fine.
-  If it is milliseconds, it is not, and the work must be chunked or moved again.
+- **Measure first.** Done — see §3a. The answer was 349 us median / 3.2 ms max, which would have
+  been disqualifying, except that the cost turned out to be paging rather than compiling. Read §3a
+  before acting on the rest of this section.
 - **Bound the input.** Refuse programs above a size ceiling, so the stall has a stated maximum
   rather than scaling with whatever arrives on a socket.
 - **Loads are rare.** This runs on shield deployment, not per packet. The idle cost is one atomic
