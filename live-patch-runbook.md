@@ -33,8 +33,10 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
    *Example:* `http_psm_profile_name_lookup` dereferences `prot_transfer_log_profile->name` with no
    null check (`http_psm.c:806`) → null-pointer dereference → TMM crash. **[built: analysis]**
 2. **Confirm it is hookable.** Three gates:
-   - *Padded?* The function must be in a build compiled with `-fpatchable-function-entry` (the TMM
-     core — 56.3% of entries in our `no_pgo` build carry the pad). **[built]**
+   - *Padded?* The function must be in the **TMM core** — the code we own and compile with
+     `-fpatchable-function-entry`, which pads **100% of the TMM build's translation units**. (The
+     statically-linked other-team components — OpenSSL, dedup — are separate builds we do not shield;
+     their functions are unpadded and out of scope.) **[built]**
    - *Trivial return?* The safe-return path delivers a value in `rax`; a struct-by-hidden-pointer or
      FP return needs its own path (restricted in v1). **[built: the gate; policy table dev-stub]**
    - *Affordable?* The function's call rate (`path_class`) must tolerate a per-call VM check. **[built]**
@@ -102,9 +104,10 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
 ## Where this stands on BNK / datkube today
 
 - **Build side is done and verified.** A `no_pgo` **stripped-release-shaped** TMM built with the pad
-  and the VM linked in: **2041 TUs compiled with `-fpatchable`**, **36,522 / 64,897 entries padded
-  (56.3%)**, `ls_vm` present, `rc=0`. The unstripped copy is the DWARF source for the hook map; the
-  stripped copy ships in the pod.
+  and the VM linked in: **all 2041 TMM translation units compiled with `-fpatchable`**, so every
+  TMM-core function carries the pad; `ls_vm` present; `rc=0`. (Whole-binary pad counts are diluted by
+  the statically-linked other-team components we don't shield — not a coverage figure.) The unstripped
+  copy is the DWARF source for the hook map; the stripped copy ships in the pod.
 - **The real target is armable.** `http_psm_profile_name_lookup @ 0xcd4700` carries `endbr64` + 5 nops
   at its entry — byte-for-byte the shape the bench harnesses armed — in a non-PIE binary, so its
   address is fixed.
