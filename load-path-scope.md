@@ -389,3 +389,58 @@ git status on http_psm.c : clean
 
 What the substrate adds to the TMM tree is now **new files plus build configuration** — `filelist`
 entries, whitelist entries, and the `-fpatchable-function-entry` flag. No F5 source file is touched.
+
+---
+
+## 7. Armed-hook cost on a hot function (2026-08-13) — partial
+
+Traffic harness per `env/bnk-dev-runbook.md` §12e: `client` (11.11.11.100) → TMM VIP (11.11.11.99)
+→ `server` (22.22.22.100).
+
+### Established
+
+**Loading under load is free.** Ten shield loads while 9,000 requests were in flight:
+
+```
+10/10 loads OK      round trip: min 7.1  median 11.6  max 30.5 ms
+Complete requests 9000   Failed 0   369 rps   p50 17 ms   p95 41 ms
+```
+
+against an unarmed baseline of 291 rps / 17 ms / 42 ms. Zero failures, percentiles unchanged. The
+~11 ms load round trip is almost entirely the timer's polling interval and the loader's 1 ms wait
+granularity, not the ~20 us compile. Note the throughput *rose* during the load burst, which says
+the run-to-run noise band is wider than any effect being looked for — so **throughput deltas cannot
+settle this question** and the counters have to.
+
+**The hook is genuinely on the request path.** `http_parse_client_headers` (`0xccfd00`, padded)
+armed with `demo_pass` — which always returns FALLTHROUGH, so the function still runs and this is
+pure overhead, not a behaviour change:
+
+```
+fired = 16,000   over bursts of 5,000 + 5,000 + 6,000 requests
+```
+
+Exactly 1:1 with requests. Not an assumption — the trampoline counted them.
+
+### NOT established: the per-call cost
+
+The counter mean is **unusable**, and saying so is more useful than quoting it:
+
+```
+burst 1   fired 11,000   cycles  9,955,880   cycles_max 1,093,190   -> mean 1,134
+burst 2   fired  5,000   cycles  7,807,284   cycles_max 3,144,154   -> mean 1,561
+```
+
+A single call costing 1.09M then 3.14M cycles (~0.4 ms, ~1.2 ms) is a preemption artifact — the
+`rdtsc` pair spanning a context switch — not shield work. Those outliers dominate the total, which
+is why the "warm" delta came out *higher* than the run that included cold start. The mean here
+measures the scheduler, not the hook.
+
+The clean number is the **bench op's min** (`env/bnk-dev-runbook.md`: *"min is the cleanest
+estimate; mean is 2-3x it even on an idle box with no traffic"*). **That op is broken**: `0x1001`
+still calls `ls_vm_bench_program()` on the loader thread, so it hits the identical allocator freeze
+B2-B7 fixed for `SHIELD_OP_LOAD` — the dev ops were simply never converted. Running it wedged the
+loader (`tid RUNNING`, on-CPU); the proxy kept serving throughout, 0 restarts.
+
+Tracked as its own item. **Until it is fixed, no per-call shield cost should be quoted from a live
+TMM.**
