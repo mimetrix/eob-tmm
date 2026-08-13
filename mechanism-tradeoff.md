@@ -35,7 +35,7 @@ poles they are.
 | Dimension | Path A — designed-in call sites | Path B — patched function entries |
 |---|---|---|
 | **What it can hook** | Only functions F5 planted a call site at — today the 41-point catalog | Any function surviving as an out-of-line symbol *with the pad* |
-| **Hookable-set size (BNK)** | Whatever is planted (tens) | **48.9% of the shipped binary [measured]** — not the flag being selective (it pads 100% of what it compiles) but *which builds used it*: 82–97% of the TMM tree, **0% of OpenSSL/dedup/components** (separate builds; three are prebuilt RPMs) |
+| **Hookable-set size (BNK)** | Whatever is planted (tens) | **82–97% of the TMM core [measured]** — the part we own. Whole-binary is 48.9% only because other teams' builds (OpenSSL, dedup, components) have not adopted yet; each is an independent follow-on, not a wall |
 | **The CVE pitch** ("CVE lands, ship a signed shield, no window") | Fails unless a call site was planted there → source change + full release | **Delivers it only if the function was padded.** Padded (TMM tree): signed-shield push, no rebuild. Unpadded (OpenSSL, components): needs a rebuild too — same as A |
 | **Latency to shield an uncovered function** | A full release cycle (source change, rebuild, requalify, ship) | A signed-shield push |
 | **Poll-loop impact** | **None** — the call site is compiled in; hot path already reads a slot | **Cross-core coordination required on x86** — the safe point, or a membarrier-based live-patch. aarch64 is free |
@@ -82,23 +82,33 @@ Where B genuinely beats A, stated precisely: for a novel CVE **in an already-pad
 B ships a signed shield with no rebuild, where A needs a release to add the call site. That is a
 real and valuable window — but it is bounded by axis 1, not unbounded.
 
-## The uncomfortable finding for Path B
+## Reach is per-component adoption, not a wall — and the core is ours
 
-Even at full commitment, Path B's reach on BNK is **bounded at ~49% and the gap is exactly the
-wrong half**: OpenSSL/`crypto` (TLS record and handshake — a prime CVE surface) is **0% padded
-[measured]**, because it is a separately-built component that never saw the TMM build's flags.
-Closing that is not a flag — it is getting other teams (and prebuilt-RPM producers) to rebuild.
-So Path B does **not** by itself deliver "hook any function"; it delivers "hook any function in
-the TMM tree, plus whatever components adopt the flag." That caveat belongs in the decision, not
-after it.
+The 48.9%-of-the-whole-binary number mixes two scopes that should stay separate. TMM's binary is
+built by several teams: the **TMM core** (ours), OpenSSL, dedup, and the rest, each a separate
+development. The mechanism is adopted **per build**, so:
 
-The partial mitigation is real but coarse (`tmm-usdt-tracepoints.md` §2.1): a shield can sit on
-the *TMM function that calls into* OpenSSL rather than inside it — the caller is in the 82–97%
-bucket. That observes the call, not the interior state.
+- **On the TMM core — the part we own — reach is essentially complete: 82–97% [measured].** That
+  is the deliverable, and Path B covers it.
+- **OpenSSL and the other components are independent tracks.** Each adopts the same mechanism on
+  its own schedule. Their 0% today is "they have not adopted yet," not "the approach cannot reach
+  them." We do not control those builds and are not gated on them.
 
----
+So full product coverage is a **federated rollout** — component by component, each team
+independent, the TMM core first. That is a cleaner story than a single monolithic reach number:
+we prove it on the core, and every other component is a well-defined follow-on that copies the
+pattern.
 
-## The hybrid — and why it is not a 50/50
+**The one honest caveat, and it is about the customer, not us:** a CVE in a component that has
+not adopted yet cannot be live-shielded until that component's build comes on board. Until then,
+such a CVE still needs a normal patch. So the "no-window" property grows as components adopt; it
+is not all-or-nothing, and it is not blocked on the TMM core team.
+
+The coarse stopgap while a component is unadopted (`tmm-usdt-tracepoints.md` §2.1): a shield can
+sit on the *TMM-core function that calls into* that component rather than inside it — the caller
+is on our side, in the 82–97%. It sees the call, not the component's internal state.
+
+## The hybrid## The hybrid — and why it is not a 50/50
 
 For the **CVE mission**, Path B is the only path that delivers live shielding of an
 unrestricted-but-padded set; Path A shields only where a call site was pre-planted. So the
