@@ -320,10 +320,10 @@ new mitigation. Nothing else on this list is ever written again.
 | 0 | publish protocol (ordered slot store) | TMM, per publish | once | small — **unconditional** | **stub** — today a single atomic store: atomic *per call*, not an ordered cross-core publish |
 | 0b | cross-core rendezvous | TMM poll loop, *or* `SIGTRAP` + `membarrier` | once, x86-64 only | **conditional on form B** | **stub** |
 | 0c | reclamation — epoch · markers · capped leak | TMM | once | small, three forms | **stub** — a swapped-out program is never freed; bounded by load count |
-| 1a | dispatch shim, designed-in call site | TMM hot path (when armed) | once, arch-generic | small, C | **in the TMM build** (`ls_tramp.c`), bench-proven |
-| 1b | asm trampoline, patched entry | TMM hot path (when armed) | once per arch | ~1 page of asm — **conditional on form B** | **in the TMM build** (`ls_tramp_asm.c`), bench-proven |
-| 2 | arm/disarm | depends on form (A · B · C) | once per arch in form B | store · patch · flag | **in the TMM build** (`ls_arm.c`, `ls_swap.c`); bench-proven incl. safe swap under multi-core load. **Not yet exercised in a live TMM** |
-| 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines | **partial** — arm path (`0x1003`/`0x1004`) works; `SHIELD_OP_LOAD` blocked, see note below |
+| 1a | dispatch shim, designed-in call site | TMM hot path (when armed) | once, arch-generic | small, C | **live** — trampoline entered from a patched function in a running TMM (`ls_tramp.c`) |
+| 1b | asm trampoline, patched entry | TMM hot path (when armed) | once per arch | ~1 page of asm — **conditional on form B** | **live** — call target verified as `ls_trampoline_entry` (`ls_tramp_asm.c`) |
+| 2 | arm/disarm | depends on form (A · B · C) | once per arch in form B | store · patch · flag | **live, 2026-08-13** — armed / disarmed / re-armed a running TMM's own `.text` at `0xcd5400`, both pods, **zero restarts** (`ls_arm.c`, `ls_swap.c`) |
+| 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines | **partial** — arm/disarm ops (`0x1003`/`0x1004`) proven live; `SHIELD_OP_LOAD` still blocked, see note below |
 | 3a | VM hardening config (`ubpf_toggle_*`) | TMM, at load | once + a build-variant decision | small | **stub** |
 | 4 | sig verify in TMM | TMM, at load | once (or reused) | small | **not written** — declared in `shield_abi.h`, no implementation. The trust perimeter; gates the TMA |
 | 5 | hook-map generator | build pipeline | once | tool — DWARF half conditional | **not written** — schema + instance exist (`hook_map.schema.json`, `hook-point-map.json`); the DWARF→map generator does not. Addresses are resolved by hand today |
@@ -341,10 +341,18 @@ new mitigation. Nothing else on this list is ever written again.
 | 14a | **the sink and the view** | control plane / off-box | *unspecified — see §4* | **gap, not an estimate** | **gap** — unchanged |
 | — | **shield program** | TMM, via VM | **per CVE** | **a few lines of C** | **built** — `demo_pass` / `demo_block` verify and run; the CVE shield itself is per-CVE work |
 
-**Status vocabulary.** *In the TMM build* = compiled into the padded TMM binary and bench-proven, but
-**bench-proven is not live-proven** — nothing in this table has yet run armed inside a TMM carrying
-traffic. *Partial* = works on one path, not the whole item. *Stub* = a placeholder committed
-deliberately (`748c4db`), so the shape is visible and the gap is not silently missing.
+**Status vocabulary.** *Live* = has run inside a TMM process that was already running, on BNK/datkube.
+*In the TMM build* = compiled into the padded binary and bench-proven only. *Partial* = works on one
+path, not the whole item. *Stub* = a placeholder committed deliberately (`748c4db`), so the shape is
+visible and the gap is not silently missing.
+
+**What "live" does and does not yet cover.** On 2026-08-13 the arm landed on a running TMM: five nop
+bytes at `http_psm_profile_name_lookup` (`0xcd5400`) replaced with `call rel32` to `ls_trampoline_entry`
+(`0x42c0f9`), reversed to nops, and re-armed — on both pods, with no restart and no container
+restart. What that establishes is that **the patch mechanism works on a live process**. It does *not*
+yet establish that a shield changes the outcome of a request: no traffic has been driven through the
+hooked function while armed. That is the next step, and until it runs, "live" here means
+live-patched, not live-shielded.
 
 **Item 3's blocked half, recorded because it is not obvious.** TMM aliases `malloc`/`calloc`/`free`
 to its own allocator (`src/kern/malloc.c:48`), which routes every allocation through per-thread or

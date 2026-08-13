@@ -83,7 +83,7 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
     barrier, write the real `call` opcode over the `INT3`, barrier; a `SIGTRAP` handler covers any core
     caught mid-patch. This is coordinated across TMM's per-core threads so **no core ever executes a
     torn or stale instruction**. Bench result: clean across billions of calls, real private `.text`,
-    under multi-core load. **[built + bench-proven; wiring into TMM's own threads = the current step]**
+    under multi-core load. **[built + proven live: armed, disarmed and re-armed a running TMM on BNK/datkube 2026-08-13, both pods, zero restarts]**
 15. **Start in `MONITOR`** — evaluate and count, apply nothing. Watch the fire-count and `ctx` samples
     to confirm the shield sees the real condition and is not false-positiving. A `MONITOR` hit is
     distinguishable from a miss (the program always selects; the host decides whether to apply).
@@ -114,10 +114,19 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
 - **The environment permits it.** The pod's TMM text is **4 KB pages (no huge pages)**, the node has
   **no kernel lockdown and no SELinux**, and self-patching needs no ptrace. The two environmental
   risks are retired.
-- **Proven on the bench, not yet in the pod:** the trampoline, arming, the safe swap (incl. on real
-  private `.text` under multi-core load), and the whole slice joined (VM verdict drives an armed real
-  function). The remaining work is deploying the padded image and wiring steps 13–16 into the running
-  pod so an arm lands on `http_psm_profile_name_lookup` under live traffic.
+- **Proven live in the pod (2026-08-13):** the trampoline, arming and the safe swap. Five nop bytes at
+  `http_psm_profile_name_lookup` (`0xcd5400`) became `call rel32` to `ls_trampoline_entry` (`0x42c0f9`)
+  inside an already-running TMM, reversed to nops, and re-armed — on both pods, no restart. Two live-only
+  defects had to be fixed first, neither visible on the bench: the loader thread inherited an unblocked
+  signal mask and spun on `EINTR` instead of parking in `accept()`, and TMM aliases `malloc` to its own
+  per-core allocator (`kern/malloc.c:48`), which spins forever on a thread we create — scratch now comes
+  from `mmap`.
+- **What is still bench-only:** the shield actually changing a request's outcome. No traffic has been
+  driven through the hooked function while armed, so this is live-*patched*, not yet live-*shielded*.
+- **Still bench-only, and not superseded:** the whole slice joined — a VM verdict actually driving an
+  armed real function's behaviour. The bench proved that; the pod has not been asked to yet. The
+  remaining work is steps 13–16 against live traffic: configure the trigger, drive HTTP through the
+  Gateway path, and show the crash stop while armed and return when disarmed.
 
 ## The two honest gaps to a real production live-patch
 
