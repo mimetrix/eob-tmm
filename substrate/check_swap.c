@@ -188,7 +188,20 @@ main(int argc, char **argv)
     cpu_set_t cs; CPU_ZERO(&cs); CPU_SET((nworkers) % ncpu, &cs);
     pthread_setaffinity_np(ar, sizeof cs, &cs);
 
-    sleep(seconds);
+    time_t t0 = 0; /* Date/time unavailable to derive; use elapsed via loop */
+    for (int e = 0; e < seconds; e += 30) {
+        int chunk = (seconds - e) < 30 ? (seconds - e) : 30;
+        sleep(chunk);
+        long f = __atomic_load_n(&g_faults, __ATOMIC_RELAXED);
+        long c = __atomic_load_n(&g_corrupt, __ATOMIC_RELAXED);
+        printf("  [%4ds] calls=%-12ld cycles=%-10ld traps=%-10ld faults=%ld corrupt=%ld\n",
+               e + chunk, __atomic_load_n(&g_calls,__ATOMIC_RELAXED),
+               __atomic_load_n(&g_cycles,__ATOMIC_RELAXED),
+               __atomic_load_n(&g_traps,__ATOMIC_RELAXED), f, c);
+        fflush(stdout);
+        if ((f + c) && g_mode == 2) { printf("  SOAK FAILED at %ds\n", e+chunk); }
+    }
+    (void)t0;
     g_stop = 1;
     for (int w = 0; w < nworkers && w < 256; w++) pthread_join(th[w], NULL);
     pthread_join(ar, NULL);
