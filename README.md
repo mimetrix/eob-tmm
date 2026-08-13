@@ -2,11 +2,16 @@
 
 A **verified, dynamic, in-data-plane programmability surface** for F5 BIG-IP: embed a
 userspace eBPF VM ([uBPF](https://github.com/iovisor/ubpf)) inside TMM and attach small
-programs at **two kinds of hook** — a curated set of designed-in **hook points**, and
-**function-boundary probes** at any padded function that survived the build as its own out-of-line
-body (patchable-entry pad → F5 trampoline). Programs either **observe** internal state (a
-tracepoint) or **act** on a verdict the host applies (a datapath control) — each one
-**statically proven safe before it loads**.
+programs at **function-boundary probes**: any padded function that survived the build as its own
+out-of-line body, reached by rewriting its patchable-entry pad into a call to an F5 trampoline at
+run time. Programs either **observe** internal state (a tracepoint) or **act** on a verdict the host
+applies (a datapath control) — each one **statically proven safe before it loads**.
+
+An earlier design also offered *designed-in call sites* — an explicit call into the VM, hand-added to
+F5's source at each function worth hooking. **That was removed** (2026-08-13): its reach is fixed at
+build time, so it can never cover a function nobody thought to edit, which is the defining property
+of a CVE. The consequence is worth stating plainly — **the substrate now modifies no F5 source file
+at all.** It adds new files, `filelist` and whitelist entries, and one compiler flag.
 
 **Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
 deployed** wins. TMM — BIG-IP's data-plane microkernel — already changes behaviour at runtime through
@@ -31,9 +36,13 @@ known** — nobody has checked published F5 advisories one by one, so *enough of
 the proposal rests on (design §1.1, assumption 8). The retrospective study that would settle it needs no
 engineering and has not been done.
 
-This repo holds design proposals, visual explainers, and a small set of **candidate ABI (application
-binary interface) artifacts that compile and check themselves**. It does **not** contain a running
-implementation: nothing here executes a shield. **Live Shield** — vendor-authored runtime CVE
+This repo holds design proposals, visual explainers, and the **substrate sources that are built into
+TMM**, plus candidate ABI (application binary interface) artifacts that compile and check themselves.
+**As of 2026-08-13 the mechanism runs in a live TMM** on BNK/datkube: a shield is loaded over a
+socket into an already-running process, armed at a function entry while traffic flows, and disarmed
+again — no rebuild, no restart. What the repo itself still does not contain is a self-contained
+runnable demo; the sources here are compiled into TMM elsewhere, and `make -C substrate check`
+exercises the bench harnesses, not a data plane. **Live Shield** — vendor-authored runtime CVE
 mitigations that apply before the patched build does — is the *first instance* of the substrate, not the
 whole of it.
 
@@ -85,10 +94,9 @@ failover, regression risk, a rollback plan. Full argument in
 
 ## What the substrate enables
 
-A verified VM at designed-in hook points — and, via function-boundary probes, at any padded function the
-build emitted as its own out-of-line body and listed in its hook map — opens several use-case
-families (substrate §3–§4),
-of which CVE shielding is only one:
+A verified VM at any padded function the build emitted as its own out-of-line body and listed in
+its hook map opens several use-case families (substrate §3–§4), of which CVE shielding is only
+one:
 
 - **Observability, on-demand** — *bpftrace-for-TMM*: deep telemetry for a specific
   condition / flow / tenant, on then off; per-flow latency across internal stages; a
@@ -167,8 +175,8 @@ mistake to unpick later.
   where the change actually lands.
 - **Data plane (TMM)** — attachable by kernel eBPF, but neither affordable nor enforceable there (the
   per-hit trap and the return-override rule above), so shields are **userspace
-  eBPF** run by an embedded uBPF VM: the host **calls the VM like a library** at a designed-in
-  hook and acts on the return — no kernel, no injection, no added privileges. Each program is
+  eBPF** run by an embedded uBPF VM: the trampoline **calls the VM like a library** from a patched
+  function entry and acts on the return — no kernel, no injection, no added privileges. Each program is
   **statically verified by [PREVAIL](https://github.com/vbpf/ebpf-verifier)** (the verifier from
   eBPF-for-Windows) **in F5's admission pipeline, before it is signed** — failing closed on any
   nonzero verdict. Note the order, because it is the whole security argument: verification precedes
@@ -213,9 +221,12 @@ exfiltration control and attestation are **not** yet specified there).
 
 ## What is actually checkable here
 
-There is no prototype in this repo, and no claim in these documents rests on one. What there is, in
-[`substrate/`](substrate/), is the handful of items from the scope that are **real files rather than
-illustrative blocks** — they compile, validate, and run. `make -C substrate check` runs eight checks with
+Two different things are checkable, and they should not be conflated. **In this repo**,
+[`substrate/`](substrate/) holds items from the scope that are **real files rather than illustrative
+blocks** — they compile, validate, and run under `make -C substrate check`. **In a live TMM**, the
+same sources are compiled in and have been exercised on BNK/datkube: load, arm, disarm, and a hook
+firing 1:1 with requests through the proxy. The second set is not reproducible from this repo alone —
+it needs the TMM build tree and the cluster. `make -C substrate check` runs eight checks with
 nothing but a C compiler, Python 3, and — for the last one — a BPF-capable clang and a built
 PREVAIL (it skips loudly rather than silently passing if either is missing):
 
@@ -252,10 +263,15 @@ verifier **does** reach a verdict on it: `clang -O2 -g -target bpf` produces a 9
 PREVAIL passes it with `--termination --no-division-by-zero --strict`, and the budget pass prices it at
 ~21 cycles against a budget of 800. Its `ctx` is generated from the DWARF of a TMM built from source on
 2026-08-12 (BNK form factor), so the offsets come from a real binary rather than from someone typing out
-a struct. **Nothing is loaded into TMM and no shield executes anywhere in this repo** — there is still no
-trampoline, no loader, no running data plane, and no measurement of a shield in a poll loop. Every
-performance and behaviour claim about the *mechanism* remains a design claim awaiting measurement; what
-has moved is that the authoring chain is no longer hypothetical.
+a struct. **That paragraph described the state before 2026-08-13 and is superseded.** The trampoline, the
+loader, arming and the safe swap now exist and run in a live TMM; a shield armed on
+`http_parse_client_headers` fired exactly once per request across 16,000 requests through the proxy.
+
+What is still *not* measured is the **per-call cost** of an armed hook. The counter mean is dominated
+by preemption artifacts (single calls of 1.09M and 3.14M cycles — an `rdtsc` pair spanning a context
+switch, not shield work), and the bench op that would give a clean minimum currently wedges the
+loader thread. So per-call performance claims remain design claims awaiting measurement; see
+[`load-path-scope.md`](load-path-scope.md) §7 for exactly what was and was not established.
 
 ## Notes
 
