@@ -189,5 +189,26 @@ Does **not** establish: behaviour inside TMM's real poll loop (rung 6, integrati
 choice for the final form, or that a stress pass alone proves cross-modifying-code correctness —
 it does not, which is why this leans on the protocol match.
 
+### Now confirmed on the real surface — private `.text`, patched via `/proc/self/mem`
+
+The table above used a scratch `MAP_SHARED` page and plain stores. TMM's functions are not that:
+they live in the binary's own `.text`, mapped `r-xp` (private), writable only the way a debugger
+writes a breakpoint — through `/proc/self/mem`. `check_swap_realtext.c` reruns the ladder on that
+real surface: a real compiled function's `-fpatchable-function-entry` pad, every patch byte written
+by `pwrite` to `/proc/self/mem`, 15 workers pinned per core, same widened window.
+
+| rung | mechanism | outcome on real private `.text` |
+|---|---|---|
+| 1 | unsafe (opcode-first), widened | **7.49M faults** — the harness has teeth on the real write path too |
+| 4 | `text_poke_bp`, widened | **0 faults, 0 corrupt, 8.9M INT3 traps handled in 163M calls** — clean |
+
+This closes the gap that the whole swap proof had rested on a page *we* made writable. It holds on
+the surface TMM actually presents. One cost note surfaced here: `membarrier(SYNC_CORE)` per write
+makes each arm/disarm far heavier than a store (72K arm/disarm cycles vs 4M in the same wall-clock),
+which is irrelevant on the packet path — it is paid only at arm time — but means arming is a
+syscall-bound operation, not a memory write. What is still **not** established: behaviour inside
+TMM's real poll loop, whether `tmm64`'s text is hugepage-backed (proven on 4 KB pages), and the
+production node's code-integrity policy.
+
 **Sources:** kernel `text_poke_bp` (`arch/x86/kernel/alternative.c`); `membarrier(2)` man page,
 `MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE`; Intel SDM Vol 3A §8.1.3, cross-modifying code.

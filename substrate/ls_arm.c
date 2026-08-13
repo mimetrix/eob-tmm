@@ -10,9 +10,9 @@
  *  WHAT THIS DOES, AND WHAT IT DELIBERATELY DOES NOT
  * ===================================================================
  *
- * DOES: locate the pad, compute the rel32, relax the page to writable, write the
- * five bytes atomically enough for the single-writer case, flush the i-cache,
- * restore W^X. Reversibly. Verified by arming a live function and calling it.
+ * DOES: locate the pad, compute the rel32, write the five bytes through
+ * /proc/self/mem (opcode byte last) atomically enough for the single-writer case,
+ * flush the i-cache. Reversibly. Verified by arming a live function and calling it.
  *
  * DOES NOT: coordinate with other cores. On x86 a `call` opcode is written by a
  * single aligned store of its first byte last, so a core fetching mid-write sees
@@ -24,10 +24,12 @@
  * it is not here. This is correct for a single thread and for the demonstration;
  * it is NOT correct to run against a live multi-core TMM without item 0.
  *
- * The W^X relaxation here is a raw mprotect on the mapped page. In TMM it must go
- * through the memory manager, respect hugepage COW, and interact with whatever
- * code-integrity enforcement is present --- all of which is item 2's real weight
- * and none of which a standalone mprotect represents.
+ * Writes go through /proc/self/mem, the debugger's path into r-xp text --- no
+ * mprotect, no W^X relaxation, no writable alias. Proven to reach the *executed*
+ * bytes on real private .text (it was long assumed impossible here; that was a
+ * flawed readback test --- see ls_write_text). What remains TMM-specific: whether
+ * tmm64's text is hugepage-backed (this is proven on 4 KB pages) and whatever
+ * code-integrity policy the production node enforces.
  *
  * Status: candidate artifact. It runs (see check_arm.c). Nothing in TMM calls it.
  */
@@ -36,6 +38,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 /* The pad, as -fpatchable-function-entry=5,0 emits it under IBT: endbr64 then
  * five single-byte nops. Arming replaces the nops; the endbr64 stays, so the
@@ -79,24 +82,42 @@ ls_find_pad(void *fn)
  * Write `len` bytes to executed code at `dst`, opcode byte LAST so the 5-byte
  * window is never a call-with-garbage-target.
  *
- * This does a plain store, and that is a DEMAND ON THE CALLER, not a shortcut:
- * `dst` must be in a mapping where writes are seen by instruction fetch --- i.e.
- * writable AND executed, and not MAP_PRIVATE. Proven the hard way (finding
- * below): mprotect-then-store on a process's own MAP_PRIVATE text triggers COW,
- * and /proc/self/mem writes through to a page neither reads nor fetches use, so
- * BOTH silently leave the executed bytes stale. In TMM this mapping is the
- * memory manager's job --- W^X relaxation over the real text, respecting hugepage
- * COW and code-integrity. Here the test supplies a MAP_SHARED page. Either way,
- * arming does not get to invent a writable alias; it must be handed one.
+ * The write goes through /proc/self/mem --- the path a debugger uses to set a
+ * breakpoint in its target's r-xp text. A process's own .text is mapped private
+ * (r-xp), so a plain store faults (not writable) and mprotect-then-store depends
+ * on a W^X policy that may deny PROT_EXEC|PROT_WRITE on the production node.
+ * /proc/self/mem needs neither: the kernel writes through to the page the CPU
+ * actually fetches.
+ *
+ * This CORRECTS an earlier finding here that claimed the opposite. That test read
+ * the bytes back with a normal load and saw them "stale" --- but a load and an
+ * instruction fetch can see different pages mid copy-on-write, so the readback
+ * lied. Testing EXECUTION instead (write INT3 to a real function's pad, then CALL
+ * it) shows the write IS fetched: it traps. Proven on real private .text by
+ * patchtext2 (control clean, pad INT3 traps SIGTRAP, restore reversible) and by
+ * the full multi-core swap in check_swap_realtext.c (clean under contention).
+ *
+ * Single-writer primitive. The cross-core coordination --- INT3 dance plus
+ * membarrier so no other core runs a torn or stale instruction --- is the safe
+ * point (item 0, built in check_swap.c), not here.
  */
 static int
 ls_write_text(void *dst, const uint8_t *bytes, size_t len)
 {
-    volatile uint8_t *p = (volatile uint8_t *)dst;
-    for (size_t i = len; i-- > 1; )         /* displacement first */
-        p[i] = bytes[i];
-    __atomic_store_n(p, bytes[0], __ATOMIC_RELEASE);   /* opcode last */
-    return 0;
+    int fd = open("/proc/self/mem", O_RDWR);
+    if (fd < 0)
+        return -1;
+    off_t at = (off_t)(uintptr_t)dst;
+    int rc = -1;
+    /* displacement first (bytes 1..len-1), then the opcode byte (0) last */
+    if (len > 1 && pwrite(fd, bytes + 1, len - 1, at + 1) != (ssize_t)(len - 1))
+        goto out;
+    if (pwrite(fd, bytes, 1, at) != 1)
+        goto out;
+    rc = 0;
+out:
+    close(fd);
+    return rc;
 }
 
 int
@@ -123,11 +144,9 @@ ls_arm(void *fn, void *trampoline)
      * concurrent fetch never sees a call with a garbage target. Single-writer
      * ordering only; the cross-core serialisation is item 0.
      *
-     * ls_write_text abstracts HOW the bytes reach executed memory. mprotect on a
-     * MAP_PRIVATE text page triggers copy-on-write --- the writer gets a private
-     * page while the CPU keeps fetching the original, so the write is real and
-     * invisible. Proven, not assumed (finding below). /proc/self/mem writes
-     * through to the underlying page and is what live patchers use.
+     * ls_write_text reaches executed memory through /proc/self/mem --- the path
+     * live patchers and debuggers use --- so no writable alias and no mprotect are
+     * needed on the process's own r-xp text. (Proven; see ls_write_text.)
      */
     uint8_t bytes[LS_PAD_LEN];
     bytes[0] = patch[0];

@@ -9,8 +9,9 @@
 | the VM, in a real TMM | yes | BNK pod — armed a shield, ran verified bytecode |
 | the shield's *decision* on the CVE condition | yes, but on a **synthetic** input | BNK pod, `LS_VM_SELFTEST` |
 | trampoline (the jump target) | yes | standalone, build box |
-| arming (install the jump) | yes | standalone, build box |
-| the safe swap (`text_poke_bp`) under contention | yes, cross-checked to the kernel | standalone, build box |
+| arming (install the jump) | yes — incl. on real private `.text` via `/proc/self/mem` | build box |
+| patching TMM's own `r-xp` `.text` so execution sees it | **yes** | build box (`patchtext2`) |
+| the safe swap (`text_poke_bp`) under contention | yes, cross-checked to the kernel — **incl. on real private `.text`** | build box (`check_swap_realtext`) |
 
 **Not yet joined:** a single BNK TMM that patches an *unmodified* function's entry, safely arms a
 verified shield onto it while traffic flows, and blocks a **real CVE hit arriving over the wire**.
@@ -40,29 +41,35 @@ fallback, not the target.
 - **Generate the trampoline's per-hook C** (`ls_tramp_dispatch`) against the real `ctx` for each
   target, from the build's DWARF — the same pipeline already used for the shield `ctx`.
 
-## 2 · The integration blocker — making TMM's own text patchable
+## 2 · The integration blocker — SETTLED: TMM can patch its own text
 
-**This is the piece the bench sidestepped, and it must be solved first.** `check_swap` patched a
-scratch `MAP_SHARED` page we allocated. A real TMM function lives in the binary's `.text`, mapped
-`r-xp` (**private**). Our earlier probes showed both `mprotect`-then-store and `/proc/self/mem`
-failing to reach the *executed* bytes on a private page — the store hit a copy the CPU never
-fetches.
+**This gate is closed, on the simplest branch.** `check_swap` patched a scratch `MAP_SHARED` page
+we allocated; a real TMM function lives in the binary's `.text`, mapped `r-xp` (**private**), and an
+earlier probe had claimed neither `mprotect`-then-store nor `/proc/self/mem` reached the *executed*
+bytes on a private page. That claim was wrong — it read the byte back with a normal load, and a
+load and an instruction *fetch* can see different pages during copy-on-write, so the readback lied.
 
-**But that result is suspect and must be re-verified, because gdb patches private `r-xp` text via
-`/proc/self/mem` every time it sets a breakpoint, and it works.** The likely flaw in our earlier
-test: we read the byte back with a normal load, and a normal *load* and an instruction *fetch* can
-see different pages during COW. So the real experiment is: write `0xcc` to a real function's entry
-via `/proc/self/mem`, then **call the function** and see whether it traps — test *execution*, not
-readback.
+Testing *execution* instead settles it. Write `0xcc` (a breakpoint) to a real function's pad via
+`/proc/self/mem`, then **call** the function — it **traps**, so the write was fetched. Measured
+(`patchtext2`, build box):
+- **control** — no write → the function runs, no trap;
+- **patched at the pad** (offset 4, right after `endbr64` — the real `-fpatchable-function-entry`
+  slot) → **SIGTRAP**, so the write is executed;
+- **restored** → the function runs again, unchanged.
 
-Three outcomes, each with a known path:
-- **`/proc/self/mem` write is executed** → TMM patches its own text with no memory-manager change.
-  Simplest, and most likely given gdb.
-- **It is not** → TMM maps a second `MAP_SHARED` alias of its text pages and writes through that,
-  or routes through the memory manager's W^X relaxation (hugepage-COW-aware). Heavier.
+`mprotect`-then-store also reached the executed bytes here, but `/proc/self/mem` is the path to use:
+it is what gdb uses for breakpoints, and needs no `PROT_EXEC|PROT_WRITE` relaxation that a
+production node's W^X policy might deny.
 
-**Settle this experiment before anything else in Path B integration** — it decides how much of
-item 2 (arm/disarm) is real work versus a syscall.
+And the whole safe swap now runs on this real surface. `check_swap_realtext.c` arms and disarms a
+real private-`.text` function's pad through `/proc/self/mem`, 15 workers hammering it, using the
+`text_poke_bp` protocol: **clean** — 163M calls, 8.9M mid-patch breakpoint traps handled, zero
+faults, zero corrupt returns — while the unsafe baseline on the same surface faults in the millions
+(teeth proven).
+
+**So arming real TMM text is a syscall, not a memory-manager project.** Two narrow checks remain,
+and neither is the old blocker: whether `tmm64`'s text is hugepage-backed (this is proven on 4 KB
+pages), and whatever code-integrity policy the production node enforces.
 
 ## 3 · The safe swap in TMM's real threads
 
@@ -120,8 +127,10 @@ this is the plan for building it.
 
 ## Order of work, and the first gate
 
-1. **§2, the patchable-text experiment** — a half-day test that decides whether arming real TMM
-   text is a syscall or a memory-manager project. Everything else in Path B waits on it.
+1. **§2, the patchable-text experiment — DONE (green).** Arming real TMM text is a syscall
+   (`/proc/self/mem`), not a memory-manager project, and the full safe swap runs clean on real
+   private `.text` (`check_swap_realtext.c`). This also de-risks §3 down to wiring the swap into
+   TMM's own threads, plus the hugepage / code-integrity checks.
 2. Build side (§1) + arming wired to the loader (§5).
 3. The safe swap in TMM's threads (§3) + SIGTRAP coexistence (§4).
 4. The CVE trigger config (§6), then the four-step demo.

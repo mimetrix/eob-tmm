@@ -40,7 +40,7 @@ poles they are.
 | **Latency to shield an uncovered function** | A full release cycle (source change, rebuild, requalify, ship) | A signed-shield push |
 | **Poll-loop impact** | **None** — the call site is compiled in; hot path already reads a slot | **Cross-core coordination required on x86** — the safe point, or a membarrier-based live-patch. aarch64 is free |
 | **Entry-padding cost** | **None — no flag needed** | **`-fpatchable-function-entry` image-wide: +0.476% `.text` [measured]** at 49% reach, ~+0.97% at full; i-cache/i-TLB cost **[unmeasured]** — paid by every customer whether or not a shield ever loads |
-| **Live text modification** | No | Yes — W^X relaxation over real text, hugepage COW, code-integrity interaction; **cannot self-patch MAP_PRIVATE text [measured]**, so the memory manager must supply the mapping |
+| **Live text modification** | No | Yes — but **self-patch of private `r-xp` text via `/proc/self/mem` is proven [measured]** (the earlier "cannot" was a flawed readback test); the safe swap runs clean on real private `.text`. Remaining TMM-specifics: hugepage-backed text and the node's code-integrity policy |
 | **Security-review / TMA surface** | Lighter — no self-modifying code in a security appliance | Heavier — live self-modifying code is a red flag that must be justified hard |
 | **Per-architecture** | Both, no safe point either | x86-64 owes coordination (BNK mainline); aarch64 free (`NOP`↔`B` in the concurrent-mod set) |
 | **Built / validated today** | **Running in TMM, measured**: 10 ns JIT / 48 ns interpreter, +0.27% `.text` [measured] | Trampoline + arming validated in isolation on hardware; safe point **not built** |
