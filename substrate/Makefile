@@ -11,10 +11,10 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm check-tramp gate clean
+        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm check-tramp
+       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -97,6 +97,21 @@ check-tramp:
 	  rm -f .tramp.out; \
 	else \
 	  echo "skip  trampoline_x86_64.S  (host is $$(uname -m), not x86_64; assembly cannot run here)"; \
+	fi
+
+# Arming: write the patch into live code and take it back out. Runs the real
+# thing --- maps an executable page near the trampoline, arms a hand-built target,
+# calls it, disarms it --- on x86_64; skips loudly elsewhere.
+check-arm:
+	@if [ "$$(uname -m)" = "x86_64" ]; then \
+	  $(CC) -O2 -fcf-protection=branch -c ls_arm.c -o .ls_arm.o && \
+	  $(CC) -O2 -fcf-protection=branch -c test_tramp.S -o .tt.o && \
+	  $(CC) -O2 -fcf-protection=branch -o .arm.out check_arm.c .ls_arm.o .tt.o && \
+	  ./.arm.out >/dev/null && \
+	  echo "ok    ls_arm.c  (armed a live function: patch installed, both verdicts, reversed)" && \
+	  rm -f .ls_arm.o .tt.o .arm.out; \
+	else \
+	  echo "skip  ls_arm.c  (host is $$(uname -m), not x86_64; cannot execute the patch)"; \
 	fi
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
