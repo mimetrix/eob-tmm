@@ -137,11 +137,66 @@ fork of for item 15's back-edge fuel.
 
 ---
 
+## 3a. B1 result — measured, and it moves the fix
+
+Fifty iterations of the exact `ls_vm.c:484-522` sequence against the real 4320-byte shield, linked
+against the vendored uBPF, in the toolchain container:
+
+| Stage | median | p95 | max |
+|---|---|---|---|
+| `ubpf_create` | 28.6 us | 35.6 us | 44.9 us |
+| `ubpf_load_elf_ex` | 5.4 us | 9.3 us | 13.1 us |
+| `ubpf_compile_ex` | **311.1 us** | 505.5 us | **3187.4 us** |
+| **TOTAL (the stall)** | **348.6 us** | 544.0 us | **3226.8 us** |
+
+3.2 ms inside a poll iteration is not acceptable, so on the naive design the answer would be no.
+**But the cost is not compilation.** `ubpf_jit_support.c:81-85` allocates, per compile, a fixed
+scratch set sized by `UBPF_MAX_INSTS` = 65,536 regardless of program size:
+
+```
+pc_locs      65537 x 4  bytes  =  256 KB
+jumps/loads/leas/local_calls
+             65536 x 20 bytes x 4 = 5120 KB      (patchable_relative is 20 bytes, measured)
+                                     -------
+                            TOTAL = 5.25 MB per compile
+```
+
+`calloc` of that size is lazy — measured at **0.0 us**, because it is `mmap` of zero pages. The cost
+is the **demand faults when the JIT touches them**:
+
+```
+calloc 5.25 MB + fault every page:   mean 271.8 us   max 2115.1 us
+ubpf_compile_ex:                   median 311.1 us   max 3187.4 us
+```
+
+Paging accounts for essentially the whole thing. **The real compilation of a 4 KB program is the
+remainder, roughly 40 us.**
+
+### What follows
+
+Allocate the scratch **once** and reuse it. After the first compile those pages are resident and
+every subsequent compile costs ~40 us. This is a small patch to uBPF — which has no allocator hook
+(confirmed) but which **F5 already forks for item 15's back-edge fuel**, so the fork is not a new
+cost. It fixes two problems at once:
+
+- **The poll-thread stall** drops from 349 us / 3.2 ms to ~40 us, which is comfortably inside a poll
+  iteration and makes §2 viable rather than marginal.
+- **The allocator problem partly dissolves.** Steady-state prepare allocates nothing, so the 1 MB
+  `sthread_malloc` cap stops being the binding constraint. The spinlock hang (§1) still has to be
+  handled, because the *first* compile still allocates — but it becomes a one-time startup cost that
+  can be paid on a TMM thread at init, where allocation already works.
+
+**Honest caveat:** measured on the build box (idle 16-vCPU VM, glibc malloc), not inside TMM under
+load with `umalloc`. The ~40 us figure is the one to re-check after B0, on the target.
+
+---
+
 ## 4. Work items
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **Measure JIT cost** on the box before writing anything | Decides whether §2 is viable at all. Cheapest possible first step |
+| B1 | ~~Measure JIT cost~~ **DONE — see §3a. The result changes the plan.** | Prepare costs 349 us median / 3.2 ms max, and **90% of it is demand-paging scratch, not compiling** |
+| B0 | **Patch uBPF to allocate JIT scratch once and reuse it** | New, and now the first item. Removes the stall AND the allocator problem together |
 | B2 | Request struct + state machine, release/acquire ordering | File-scope statics; needs whitelist entries |
 | B3 | Timer registration with CAS ownership election | `timer_init_periodic_ex` in `http_psm_init`, one owner |
 | B4 | Move `ls_vm_reload` invocation to the callback | Loader thread must make **zero** allocations; audit the whole path |
