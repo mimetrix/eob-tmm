@@ -371,7 +371,17 @@ in the tree (`dev/ndal/xnet/if_xnet.c:1642`), and BNK does not load xnet. Since 
 permanently owned, so **any allocation on a foreign thread spins on-CPU forever.** Measured, not
 inferred, and a latent defect in F5's code worth reporting upstream.
 
-**Resolved 2026-08-13.** Preparation no longer happens on the loader thread: it is handed to a TMM
+**Zero F5 source modifications, as of 2026-08-13.** The VM bootstrap used to be 26 lines inside
+`http_psm_init()` — startup-only and hooking nothing, but still an edit to F5's code, and in the
+wrong module: bringing up a general-purpose VM has nothing to do with HTTP protocol security. It now
+registers itself through TMM's own init linker set (`INIT_FUNC(INIT_LATE, ...)` from
+`local/sys/init.h`, the mechanism `urlcat`, `pem_lib` and `license_pgo_gen` already use), so
+`http_psm.c` is byte-for-byte pristine. **What the substrate adds to the TMM tree is new files plus
+build configuration — the `filelist` entries, the whitelist entries, and the
+`-fpatchable-function-entry` flag — and nothing else.** Verified live: startup logs the VM, the
+handoff and the loader with F5's source unmodified.
+
+**Preparation is off the loader thread.** it is handed to a TMM
 thread through a periodic timer (`ls_prep.c`), where `umalloc` works. That made this substrate
 **rung 3** of `ls_vm_load.c`'s own ladder — no rebuild, no restart, no window, for the *program*
 rather than only for where it is armed. The rule that produced the bug still stands for any future

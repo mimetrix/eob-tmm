@@ -43,6 +43,7 @@
 #include <local/kern/sys.h>
 #include <local/sys/time.h>
 #include <local/sys/timer_external.h>
+#include <local/sys/init.h>
 
 /* In ls_vm_load.c. void(void) on purpose: no TMM type may cross into that file,
  * and no STDINC type may cross into this one. */
@@ -77,3 +78,26 @@ ls_prep_timer_start(void)
     printf("ls_vm: prepare handoff armed on tmm %d (every %d ticks)\n",
            (int)tid, (int)LS_PREP_TICKS);
 }
+
+/*
+ * Startup registration --- this is why no F5 source file calls into the VM.
+ *
+ * INIT_FUNC registers into TMM's init linker set (local/sys/init.h), the same
+ * mechanism urlcat, pem_lib and license_pgo_gen use. INIT_LATE (-10) is in the
+ * "events in threads" group, so this runs once per TMM thread with `tid` valid
+ * --- exactly where the bootstrap used to sit inside http_psm_init(), which is
+ * what the tid-0 timer election and the per-thread VM state expect.
+ *
+ * The work itself is ls_vm_bootstrap() in ls_vm_load.c. Only a void(void)
+ * crosses the include-world boundary; see the note on that function for why.
+ */
+extern void ls_vm_bootstrap(void);
+
+static err_t
+ls_startup(void)
+{
+    ls_vm_bootstrap();
+    return ERR_OK;
+}
+
+INIT_FUNC(INIT_LATE, ls_startup);

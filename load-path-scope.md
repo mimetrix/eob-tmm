@@ -353,3 +353,39 @@ Note what this is *not*: an identity check is not a signature check. Nothing her
 Reclamation (item 0c) — a reload leaks the old VM. Signature verification (item 4) — the socket
 still accepts unsigned programs, which is why it is off unless `LS_LOAD_SOCKET` is set, is created
 0600, and logs every accepted load as unverified.
+
+
+---
+
+## 6. Zero F5 source modifications (2026-08-13)
+
+The designed-in call site went first. What remained was 26 lines of VM bootstrap in
+`http_psm_init()` — startup-only, hooking nothing, but still an edit to F5's source and in the wrong
+module.
+
+TMM already had the right mechanism: `INIT_FUNC(when, func)` (`local/sys/init.h`) registers into an
+init linker set, and `INIT_LATE` (-10) sits in the "events in threads" group, so it runs once per TMM
+thread with `tid` valid — exactly where the bootstrap used to sit, which is what the tid-0 timer
+election and the per-thread VM state expect. `urlcat`, `pem_lib` and `license_pgo_gen` all use it.
+
+The include-world split applies again: `INIT_FUNC` is in TMM's `-nostdinc` universe, but
+`ls_vm_init()` returns `bool` and `ls_vm_arm_configured()` takes `size_t`. Redeclaring those by hand
+across the boundary risks a genuine ABI mismatch — `bool` returns in `al`, and reading `eax` as `int`
+does not guarantee the upper bits. So the work stays in `ls_vm_load.c` behind `ls_vm_bootstrap()`,
+and only that `void(void)` crosses.
+
+**Result, verified on `tmm:live8`:**
+
+```
+ls_vm: init  build=... jit=1 fuel=0 timing=1
+ls_vm: prepare handoff armed on tmm 0 (every 10 ticks)
+ls_vm: ARMED slot=0 section=fentry/http_psm_profile_name_lookup ...
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock.23
+
+load + arm + disarm : PASS
+distinct bytecode   : ALL PASS
+git status on http_psm.c : clean
+```
+
+What the substrate adds to the TMM tree is now **new files plus build configuration** — `filelist`
+entries, whitelist entries, and the `-fpatchable-function-entry` flag. No F5 source file is touched.

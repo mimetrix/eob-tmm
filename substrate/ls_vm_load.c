@@ -40,6 +40,7 @@
 
 #include "ls_vm.h"
 #include "ls_arm.h"
+#include "ls_shield_blob.h"
 #include <stdlib.h>
 
 extern void ls_trampoline_entry(void);
@@ -401,6 +402,33 @@ handle(int fd)
 }
 
 void ls_vm_loader_start(void);
+void ls_vm_bootstrap(void);
+
+/* Startup, once per TMM thread. Registered by ls_prep.c through TMM's INIT_FUNC
+ * linker set, so no F5 source calls it --- see the note there.
+ *
+ * Lives on this side of the include-world split because ls_vm_init() returns
+ * bool and ls_vm_arm_configured() takes size_t. Redeclaring those in TMM's
+ * -nostdinc world would risk a genuine ABI mismatch (bool returns in al; reading
+ * eax as int does not guarantee the upper bits), so only a void(void) crosses. */
+void
+ls_vm_bootstrap(void)
+{
+    if (!ls_vm_init())
+        return;   /* VM down; TMM behaves exactly as shipped */
+
+    /* Both identities: PREVAIL proved the SECTION, uBPF runs the SYMBOL, and
+     * ls_vm_arm refuses unless they are the same program (O14). The _configured
+     * form applies the environment overrides --- program source, names, mode ---
+     * so changing any of them is a restart rather than a rebuild. */
+    (void)ls_vm_arm_configured(ls_shield_blob, sizeof ls_shield_blob,
+                               LS_SHIELD_SECTION, LS_SHIELD_FUNCTION);
+
+    /* Runtime load path. Does nothing unless LS_LOAD_SOCKET is set, and it
+     * accepts UNVERIFIED programs when it is --- signature verification is
+     * scope item 4 and is deferred. */
+    ls_vm_loader_start();
+}
 
 static void *
 loader_thread(void *arg)
