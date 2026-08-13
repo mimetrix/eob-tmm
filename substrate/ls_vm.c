@@ -43,23 +43,18 @@
  *              return append_fn(str, strlen(str), dest);
  *          }
  *
- * The block above is the DESIGNED-IN form, and it is shown here only to say that
- * it was REMOVED (2026-08-13). It is a hand-written call site in source F5 owns,
- * added per function, forever --- and it cannot reach a function nobody thought
- * to edit, which is the defining case of a CVE. Patched-entry hooking now works
- * on a live TMM, so the weaker form has no remaining job and was deleted from
- * the TMM tree rather than kept as a second, divergent path. There is no call
- * site in TMM source; a function is reached by patching its entry pad at run
- * time or not at all.
+ * That third block is the entire per-hook cost, and it is the DESIGNED-IN form:
+ * a deliberate call site in source F5 owns. The trampoline and pad-rewriting
+ * work exists to get this same effect at a function nobody edited --- a bigger
+ * claim, and not this one.
  *
- * Note what the trampoline does NOT do: it does not consult the mode. The program
+ * Note what the call site does NOT do: it does not consult the mode. The program
  * always selects the outcome its predicate implies and the host decides whether
  * to apply it, because gating mode inside the program would make a monitor-mode
  * hit indistinguishable from a miss.
  *
- * Status: this file is compiled into TMM and runs there. As of 2026-08-13 it is
- * loaded in a padded TMM on BNK/datkube, with its program reached through a
- * patched function entry armed at run time.
+ * Status: candidate artifact. Compiles against the vendored uBPF headers.
+ * Nothing in this repo instantiates it inside TMM.
  */
 
 #include "ls_vm.h"
@@ -84,34 +79,20 @@
  * against the JIT prologue, present on the interpreter path as well, and it is
  * paid per call rather than once.
  *
- * ubpf_exec_ex() takes the stack from the caller, so we hand it a stack we own
- * rather than one per call frame. It is PER-THREAD (`__thread`), not one shared
- * buffer: TMM is core-pinned, so a per-core-thread stack is the honest model ---
- * each core runs its own invocations on its own stack, and no lock is needed on
- * the call path because no two threads share a stack. (A single shared buffer was
- * safe only under "one VM per instance, run-to-completion, two invocations never
- * overlap"; making it per-thread stops RELYING on that and holds even when several
- * core-threads drive the same VM object concurrently, as a multi-core harness or a
- * shared-VM build would.) Re-entrancy on ONE thread --- a shield that re-triggered
- * its own hooked path --- would still corrupt that thread's stack, which is why
- * re-entrancy stays on the trampoline's requirement list (scope item 1).
+ * ubpf_exec_ex() takes the stack from the caller, so we allocate it once per TMM
+ * instance and hand the same one to every invocation. Safe here for the reason
+ * the rest of this file is lock-free: one VM per instance, run-to-completion, so
+ * two invocations never overlap on a core. It would NOT be safe if a hook could
+ * be re-entered --- a shield that somehow triggered the hooked path again would
+ * corrupt its own stack, which is why re-entrancy is on the trampoline's
+ * requirement list (scope item 1) rather than assumed away.
  */
 /* Defined below ls_vm_call, which it uses; declared here because ls_vm_arm
  * invokes it. */
 static void ls_vm_selftest(int slot, unsigned level);
 
-static __thread uint8_t *g_prog_stack;   /* per core-thread; see the note above */
+static uint8_t *g_prog_stack;
 #define LS_PROG_STACK_SIZE 4096
-
-/* This thread's program stack, allocated on first use. Off the hot path only on
- * the very first call per thread; every call after is a plain thread-local read. */
-static uint8_t *
-ls_prog_stack(void)
-{
-    if (g_prog_stack == NULL)
-        g_prog_stack = calloc(1, LS_PROG_STACK_SIZE);   /* NULL -> ubpf_exec_ex fails closed */
-    return g_prog_stack;
-}
 
 /* Per TMM instance. Not shared, not locked --- see the header. `static` because
  * each TMM instance is its own process. */
@@ -701,12 +682,11 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * reaching this hook, and basic-mode JIT code would do the same in its
      * prologue without a guard-page probe (O7). */
     int rc = 0;
-    uint8_t *stk = ls_prog_stack();          /* this thread's stack; per-core */
     void *jf = __atomic_load_n(&s->jit_fn, __ATOMIC_ACQUIRE);
     if (jf != NULL) {
-        ret = ((ubpf_jit_ex_fn)jf)(ctx, ctx_len, stk, LS_PROG_STACK_SIZE);
+        ret = ((ubpf_jit_ex_fn)jf)(ctx, ctx_len, g_prog_stack, LS_PROG_STACK_SIZE);
     } else {
-        rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, stk, LS_PROG_STACK_SIZE);
+        rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
     }
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;

@@ -13,6 +13,7 @@
  */
 
 #include "ls_vm.h"
+#include "ls_arm.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -40,10 +41,7 @@
  * happened to be at that address. Returning the pair removes the mismatch by
  * construction rather than by both sides remembering the same convention.
  */
-struct ls_tramp_result {
-    int      verdict;
-    uint64_t safe_value;
-};
+/* struct ls_tramp_result lives in ls_arm.h */
 
 struct ls_tramp_result
 ls_tramp_dispatch(int slot, uint64_t a0, uint64_t a1, uint64_t a2,

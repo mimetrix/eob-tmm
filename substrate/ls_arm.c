@@ -35,6 +35,8 @@
  */
 
 #include <stdint.h>
+#include <fcntl.h>
+#include "ls_arm.h"
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -186,5 +188,67 @@ ls_disarm(void *fn)
     __builtin___clear_cache((char *)pad, (char *)pad + LS_PAD_LEN);
     if (pad[0] != 0x90)
         return -1;
+    return 0;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * LIVE arming --- the whole point of the mechanism.
+ *
+ * Called on a RUNNING TMM (from the load path) while the per-core poll threads
+ * are executing. The five pad bytes are rewritten by ls_swap_write5(), so no
+ * core can observe a torn or stale instruction. No rebuild, no restart.
+ * ------------------------------------------------------------------------ */
+extern void ls_trampoline_entry(void);
+extern unsigned char ls_tramp_slot_insn[];
+
+int
+ls_arm_live(void *fn, void *trampoline, int slot)
+{
+    uint8_t *pad = ls_find_pad(fn);
+    if (pad == NULL) {
+        fprintf(stderr, "ls_arm: 0x%llx has no patchable pad --- refusing\n",
+                (unsigned long long)(uintptr_t)fn);
+        return -1;
+    }
+    int64_t disp = (int64_t)((uint8_t *)trampoline - (pad + LS_PAD_LEN));
+    if (disp < INT32_MIN || disp > INT32_MAX) {
+        fprintf(stderr, "ls_arm: trampoline out of rel32 range --- refusing\n");
+        return -1;
+    }
+    /* bake the slot into the trampoline immediate, then swap in the call */
+    /* The slot immediate is 4 bytes, and nothing is calling the trampoline yet
+     * (the target is still unarmed), so a plain write is correct. The INT3 swap
+     * is only for the 5 bytes that ARE being executed. */
+    int32_t imm = slot;
+    if (ls_write_text(ls_tramp_slot_insn + 1, (const uint8_t *)&imm, 4) != 0) {
+        fprintf(stderr, "ls_arm: could not set slot immediate --- refusing\n");
+        return -1;
+    }
+    __builtin___clear_cache((char *)ls_tramp_slot_insn,
+                            (char *)ls_tramp_slot_insn + 8);
+    uint8_t patch[LS_PAD_LEN];
+    patch[0] = 0xe8;
+    int32_t d32 = (int32_t)disp;
+    memcpy(patch + 1, &d32, 4);
+    if (ls_swap_write5(pad, patch) != 0)
+        return -1;
+    fprintf(stderr, "ls_arm: ARMED LIVE entry=%p slot=%d tramp=%p\n", fn, slot, trampoline);
+    return 0;
+}
+
+int
+ls_disarm_live(void *fn)
+{
+    uint8_t *p = (uint8_t *)fn;
+    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) != 0)
+        return -1;
+    uint8_t *pad = p + LS_ENDBR_LEN;
+    if (pad[0] != 0xe8)
+        return -1;
+    static const uint8_t nops[LS_PAD_LEN] = { 0x90,0x90,0x90,0x90,0x90 };
+    if (ls_swap_write5(pad, nops) != 0)
+        return -1;
+    fprintf(stderr, "ls_arm: DISARMED LIVE entry=%p\n", fn);
     return 0;
 }

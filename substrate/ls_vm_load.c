@@ -39,15 +39,21 @@
  */
 
 #include "ls_vm.h"
+#include "ls_arm.h"
+#include <stdlib.h>
+
+extern void ls_trampoline_entry(void);
 #include "ls_vm_config.h"
 #include "shield_abi.h"
 
 #include <errno.h>
 #include <stdarg.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -58,6 +64,132 @@
  * which is the exact shape finding O8 was filed about --- so it is checked
  * against the bytes actually received, not trusted. */
 #define LS_LOAD_MAX (1u << 20)
+
+/* ------------------------------------------------------------------------
+ * Preparation handoff: loader thread -> TMM thread.
+ *
+ * ubpf_create/ubpf_load_elf/ubpf_compile all allocate, and allocation on a
+ * thread we created hangs forever inside TMM's allocator (kern/malloc.c:48 ->
+ * init_thread_cache -> spin_lock on a lock nothing ever spin_init'd, because
+ * sthread_handler_register is only called by if_xnet.c and BNK has no xnet).
+ * Measured, not inferred: the loader goes on-CPU and never returns.
+ *
+ * So the loader does no preparation. It parks a request here and a TMM thread
+ * --- where umalloc works --- performs it.
+ * --------------------------------------------------------------------- */
+#define LS_PREP_IDLE     0
+#define LS_PREP_PENDING  1
+#define LS_PREP_DONE     2
+
+/* B6: bound what one request may ask a poll iteration to do. Prepare cost is
+ * dominated by program size once the scratch is right-sized, so an unbounded
+ * length is an unbounded stall. 256 KB is far above any real shield (the
+ * built-in one is 4320 bytes) and far below anything that would matter. */
+#define LS_PREP_MAX_PROG (256u * 1024u)
+
+
+/* How long the loader waits before giving up. A prepare that never completes
+ * means the owning TMM thread is not running its timers; say so rather than
+ * hanging the way this code used to. */
+#define LS_PREP_WAIT_MS  5000
+
+struct ls_prep {
+    volatile int state;          /* LS_PREP_* --- the only cross-thread word    */
+    int          slot;
+    const void  *prog;           /* into the loader's mmap scratch; alive until DONE */
+    unsigned int prog_len;
+    unsigned char mode;
+    char         section[80];
+    char         function[64];
+    int          rc;             /* slot on success, negative on refusal        */
+};
+
+static struct ls_prep g_prep;
+
+/* Set by ls_prep.c once a TMM thread owns the timer. Read here only to refuse a
+ * load that could never be serviced. */
+int ls_prep_timer_on;
+
+/* Provided by ls_prep.c, which is compiled in TMM's include world because the
+ * timer and `tid` live there. Kept to a void(void) so no TMM type crosses into
+ * this file --- it is built STDINC and syntax-checked standalone. */
+extern void ls_prep_timer_start(void);
+
+/* Called from ls_prep.c on a TMM thread. Declared because it is not static. */
+void ls_prep_run_pending(void);
+
+/* THE WORK. Called from ls_prep.c's timer callback, so it runs on a TMM thread
+ * where umalloc works. Short by construction: it is inside a poll iteration.
+ * Lives here rather than there so everything touching the request state stays
+ * in one file. */
+void
+ls_prep_run_pending(void)
+{
+    if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) != LS_PREP_PENDING)
+        return;
+
+    /* Everything below allocates. That is the entire point of being here. */
+    g_prep.rc = ls_vm_reload(g_prep.slot, g_prep.prog, g_prep.prog_len,
+                             g_prep.section, g_prep.function,
+                             (enum ls_mode)g_prep.mode);
+
+    __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+}
+
+/* Loader side. Parks the request, waits for a TMM thread to do it, returns the
+ * slot or negative. Allocates nothing --- nanosleep is a syscall, which is the
+ * one thing this thread can safely do. */
+static int
+ls_prep_submit(int slot, const void *prog, unsigned int prog_len,
+               const char *section, const char *function, unsigned char mode,
+               const char **why)
+{
+    if (!ls_prep_timer_on) {
+        *why = "prepare handoff not armed (no TMM thread owns the timer)";
+        return -1;
+    }
+    if (prog_len > LS_PREP_MAX_PROG) {
+        *why = "program exceeds the accepted size ceiling";
+        return -1;
+    }
+    /* One request at a time. The socket is serial, so this only trips if a
+     * previous prepare never completed. */
+    if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) != LS_PREP_IDLE) {
+        *why = "a previous prepare is still outstanding";
+        return -1;
+    }
+
+    g_prep.slot     = slot;
+    g_prep.prog     = prog;
+    g_prep.prog_len = prog_len;
+    g_prep.mode     = mode;
+    /* snprintf, not strlcpy: this file is STDINC and strlcpy is not in the
+     * standard C library it gets. Both truncate safely and NUL-terminate. */
+    snprintf(g_prep.section,  sizeof g_prep.section,  "%s", section);
+    snprintf(g_prep.function, sizeof g_prep.function, "%s", function);
+    g_prep.rc = -1;
+
+    __atomic_store_n(&g_prep.state, LS_PREP_PENDING, __ATOMIC_RELEASE);
+
+    for (int waited = 0; waited < LS_PREP_WAIT_MS; waited++) {
+        if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) == LS_PREP_DONE) {
+            int rc = g_prep.rc;
+            __atomic_store_n(&g_prep.state, LS_PREP_IDLE, __ATOMIC_RELEASE);
+            if (rc < 0)
+                *why = "identity mismatch, malformed ELF, or uBPF rejected it";
+            return rc;
+        }
+        {
+            struct timespec ms = { 0, 1000000 };   /* 1 ms */
+            nanosleep(&ms, NULL);
+        }
+    }
+
+    /* Left PENDING deliberately: if the TMM thread is merely late it will still
+     * complete, and the next submit is refused rather than racing this one. */
+    *why = "timed out waiting for a TMM thread to prepare it";
+    return -1;
+}
 
 static pthread_t g_loader;
 static int       g_loader_running;
@@ -81,24 +213,54 @@ reply(int fd, const char *fmt, ...)
         (void)!write(fd, buf, (size_t)n);
 }
 
+/* Scratch for one control message, from the kernel rather than from malloc.
+ *
+ * malloc() is NOT usable on this thread. TMM aliases it to __wrap_malloc
+ * (kern/malloc.c:48), which routes every allocation through per-thread or
+ * per-core state --- sthread_malloc's stats row, umalloc's per-core arena, or a
+ * raw spin_lock on the bootstrap heap. The loader is a plain pthread we
+ * created: it is neither a TMM poll thread nor a registered DPDK service
+ * thread, so it has none of that state, and the allocator spins. Measured as
+ * 20/20 samples of /proc/<tid>/syscall reading "running" --- on-CPU, never in a
+ * syscall --- with the arm op wedged before its first line of output.
+ *
+ * sthread_handler_register() is the supported way to register a foreign thread
+ * and is deliberately not used: init_thread_row() (kern/sthread_memory.c:66)
+ * leaks thread_stats_lock on both error paths and leaves thread_stats NULL for
+ * _sthread_malloc() to dereference. Not a trade worth making for scratch space.
+ *
+ * mmap keeps the property the previous comment was protecting --- a 1 MB static
+ * buffer is 1 MB of resident .bss in EVERY instance, one per core, for a
+ * message that arrives approximately never (measured: +15.6% .bss). This
+ * mapping is per-connection and released on every exit path. */
+static unsigned char *
+ls_load_buf_alloc(void)
+{
+    void *p = mmap(NULL, LS_LOAD_MAX, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    return (p == MAP_FAILED) ? NULL : (unsigned char *)p;
+}
+
+static void
+ls_load_buf_free(unsigned char *p)
+{
+    if (p != NULL)
+        (void)munmap(p, LS_LOAD_MAX);
+}
+
 static void
 handle(int fd)
 {
-    /* Allocated per connection, not statically. A 1 MB static buffer is 1 MB of
-     * permanently-resident .bss in EVERY TMM instance --- one per core --- to
-     * receive a control message that arrives approximately never. Measured: the
-     * static version grew .bss by 15.6%. The load path is off the data path, so
-     * a malloc here costs nothing that matters. */
-    unsigned char *g_load_buf = malloc(LS_LOAD_MAX);
+    unsigned char *g_load_buf = ls_load_buf_alloc();
     if (g_load_buf == NULL) {
-        reply(fd, "ERR out of memory\n");
+        reply(fd, "ERR scratch mmap failed\n");
         return;
     }
     ssize_t n = read(fd, g_load_buf, LS_LOAD_MAX);
 
     if (n < (ssize_t)sizeof(struct shield_msg)) {
         reply(fd, "ERR short message (%ld bytes)\n", (long)n);
-        free(g_load_buf);
+        ls_load_buf_free(g_load_buf);
         return;
     }
 
@@ -112,7 +274,7 @@ handle(int fd)
     if (m->prog_len > (size_t)n - hdr) {
         reply(fd, "ERR prog_len %u exceeds received payload %lu\n",
               m->prog_len, (unsigned long)((size_t)n - hdr));
-        free(g_load_buf);
+        ls_load_buf_free(g_load_buf);
         return;
     }
 
@@ -133,11 +295,13 @@ handle(int fd)
                 "ls_vm: LOAD accepted on %s --- NOT SIGNATURE VERIFIED "
                 "(scope item 4 deferred); hook=%.63s bytes=%u\n",
                 g_sock_path, m->binding.hook, m->prog_len);
-        int slot = ls_vm_reload(0, m->prog, m->prog_len,
-                                section, "shield", (enum ls_mode)m->mode);
+        /* Handed to a TMM thread: preparing here would hang this thread in
+         * TMM's allocator. See ls_prep above. */
+        const char *why = "unknown";
+        int slot = ls_prep_submit(0, m->prog, m->prog_len, section, "shield",
+                                  m->mode, &why);
         if (slot < 0)
-            reply(fd, "ERR load refused (identity mismatch, malformed ELF, or "
-                      "uBPF rejected it)\n");
+            reply(fd, "ERR load refused (%s)\n", why);
         else
             reply(fd, "OK loaded slot=%d mode=%d unverified=yes\n", slot, m->mode);
         break;
@@ -193,6 +357,35 @@ handle(int fd)
         break;
     }
 
+    case 0x1003: {   /* ARM LIVE --- hook a real function while TMM is RUNNING */
+        char a[65];
+        memcpy(a, m->binding.hook, 64); a[64] = 0;
+        unsigned long long addr = strtoull(a, NULL, 0);
+        int slot = (int)m->epoch;
+        if (addr == 0) {
+            reply(fd, "ERR arm: put the entry address in binding.hook (e.g. 0xcd4700)\n");
+            break;
+        }
+        /* ls_arm_live rewrites the five pad bytes with the kernel's text_poke_bp
+         * protocol, so the poll threads may be executing this function right now. */
+        if (ls_arm_live((void *)(uintptr_t)addr, (void *)ls_trampoline_entry, slot) != 0)
+            reply(fd, "ERR arm 0x%llx failed (no pad, out of rel32 range, or swap refused)\n", addr);
+        else
+            reply(fd, "OK ARMED LIVE entry=0x%llx slot=%d (no restart)\n", addr, slot);
+        break;
+    }
+    case 0x1004: {   /* DISARM LIVE --- restore the nops, equally live */
+        char a[65];
+        memcpy(a, m->binding.hook, 64); a[64] = 0;
+        unsigned long long addr = strtoull(a, NULL, 0);
+        if (addr == 0) { reply(fd, "ERR disarm: bad address\n"); break; }
+        if (ls_disarm_live((void *)(uintptr_t)addr) != 0)
+            reply(fd, "ERR disarm 0x%llx failed (not armed?)\n", addr);
+        else
+            reply(fd, "OK DISARMED LIVE entry=0x%llx\n", addr);
+        break;
+    }
+
     case SHIELD_OP_REVOKE:
         /* Disarm is the honest half of revocation. The other half --- reclaiming
          * the program's memory --- needs item 0c. Mode DISABLE stops it running;
@@ -204,13 +397,33 @@ handle(int fd)
     default:
         reply(fd, "ERR unknown op %d\n", m->op);
     }
-    free(g_load_buf);
+    ls_load_buf_free(g_load_buf);
 }
+
+void ls_vm_loader_start(void);
 
 static void *
 loader_thread(void *arg)
 {
     (void)arg;
+
+    /* Block signals on this thread. TMM is timer-driven, and an unblocked helper
+     * thread has accept() interrupted (EINTR) continuously -- measured as a
+     * spinning thread that never accepts a queued connection. Signal handling
+     * belongs to the poll threads and crashagent, not here.
+     *
+     * SIGTRAP is deliberately left UNBLOCKED: the safe swap's breakpoint is a
+     * synchronous, thread-directed signal, and blocking it would convert a
+     * mid-patch trap into the kernel's fatal default action. */
+    sigset_t block;
+    sigfillset(&block);
+    sigdelset(&block, SIGTRAP);
+    sigdelset(&block, SIGSEGV);
+    sigdelset(&block, SIGBUS);
+    sigdelset(&block, SIGILL);
+    sigdelset(&block, SIGFPE);
+    pthread_sigmask(SIG_SETMASK, &block, NULL);
+
     int srv = socket(AF_UNIX, SOCK_STREAM, 0);
     if (srv < 0) {
         fprintf(stderr, "ls_vm: loader socket(): %s\n", strerror(errno));
@@ -253,6 +466,17 @@ loader_thread(void *arg)
     return NULL;
 }
 
+
+/* pthreads do not survive fork(): a child keeps the listening socket but loses
+ * the thread that was accepting on it, which looks exactly like a hang. Restart
+ * it in the child. */
+static void
+ls_loader_after_fork(void)
+{
+    g_loader_running = 0;
+    ls_vm_loader_start();
+}
+
 /* Called from init, off the data path. No socket unless asked for. */
 void
 ls_vm_loader_start(void)
@@ -260,13 +484,29 @@ ls_vm_loader_start(void)
     const char *p = getenv("LS_LOAD_SOCKET");
     if (p == NULL || *p == '\0')
         return;                      /* default: no load path at all */
+
+    /* Every TMM thread reaches here (http_psm_init is per-thread); tid 0 takes
+     * the timer. Done before the g_loader_running check so the owner registers
+     * even when it is not the thread that created the loader. */
+    ls_prep_timer_start();
+
     if (g_loader_running)
         return;
-    snprintf(g_sock_path, sizeof g_sock_path, "%s", p);
+    /* PER-INSTANCE path. BNK runs one TMM instance per core, each its own
+     * process with its own address space, so a single shared path lets only the
+     * first instance bind --- the rest fail bind() and their loader thread
+     * exits, leaving a socket nobody accepts on. Arming is per-address-space
+     * too, so one socket could only ever arm one core. */
+    snprintf(g_sock_path, sizeof g_sock_path, "%s.%d", p, (int)getpid());
     if (pthread_create(&g_loader, NULL, loader_thread, NULL) != 0) {
         fprintf(stderr, "ls_vm: could not start loader thread\n");
         return;
     }
     pthread_detach(g_loader);
     g_loader_running = 1;
+    static int atfork_done;
+    if (!atfork_done) {
+        pthread_atfork(NULL, NULL, ls_loader_after_fork);
+        atfork_done = 1;
+    }
 }

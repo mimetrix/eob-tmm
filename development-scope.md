@@ -331,7 +331,7 @@ new mitigation. Nothing else on this list is ever written again.
 | 1a | dispatch shim (arch-generic C half of the trampoline) | TMM hot path (when armed) | once, arch-generic | small, C | **live** — trampoline entered from a patched function in a running TMM (`ls_tramp.c`) |
 | 1b | asm trampoline, patched entry | TMM hot path (when armed) | once per arch | ~1 page of asm — **conditional on form B** | **live** — call target verified as `ls_trampoline_entry` (`ls_tramp_asm.c`) |
 | 2 | arm/disarm | depends on form (A · B · C) | once per arch in form B | store · patch · flag | **live, 2026-08-13** — armed / disarmed / re-armed a running TMM's own `.text` at `0xcd5400`, both pods, **zero restarts** (`ls_arm.c`, `ls_swap.c`) |
-| 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines | **partial** — arm/disarm ops (`0x1003`/`0x1004`) proven live; `SHIELD_OP_LOAD` still blocked, see note below |
+| 3 | loader handler | **control thread**; publish at hot path | once | hundreds of lines | **live, 2026-08-13** — arm/disarm *and* `SHIELD_OP_LOAD` all proven against a running TMM. Preparation runs on a TMM thread via `ls_prep.c`; see `load-path-scope.md` §5 |
 | 3a | VM hardening config (`ubpf_toggle_*`) | TMM, at load | once + a build-variant decision | small | **stub** |
 | 4 | sig verify in TMM | TMM, at load | once (or reused) | small | **not written** — declared in `shield_abi.h`, no implementation. The trust perimeter; gates the TMA |
 | 5 | hook-map generator | build pipeline | once | tool — DWARF half conditional | **not written** — schema + instance exist (`hook_map.schema.json`, `hook-point-map.json`); the DWARF→map generator does not. Addresses are resolved by hand today |
@@ -362,14 +362,21 @@ yet establish that a shield changes the outcome of a request: no traffic has bee
 hooked function while armed. That is the next step, and until it runs, "live" here means
 live-patched, not live-shielded.
 
-**Item 3's blocked half, recorded because it is not obvious.** TMM aliases `malloc`/`calloc`/`free`
-to its own allocator (`src/kern/malloc.c:48`), which routes every allocation through per-thread or
-per-core state. The loader runs on a thread we create, which has none of that state, so **any
-allocation on it spins on-CPU forever** — measured, not inferred. The arm path was fixed by taking
-its scratch buffer from `mmap` instead. `SHIELD_OP_LOAD` still reaches `ls_vm.c` and uBPF's internal
-allocations from that same thread and has the identical freeze latent in it. Until that is resolved,
-this substrate does **rung 2** of the file's own ladder — no restart to *arm* a compiled-in program —
-not rung 3, no restart to *load a new one*.
+**Item 3's allocator problem, recorded because it is not obvious and it will recur.** TMM aliases
+`malloc`/`calloc`/`free` to its own allocator (`src/kern/malloc.c:48`), which routes every allocation
+through per-thread or per-core state. A thread we create has none of it, and worse, the spinlocks
+that path takes are only initialised by `sthread_handler_register()` — called from exactly one site
+in the tree (`dev/ndal/xnet/if_xnet.c:1642`), and BNK does not load xnet. Since `SPIN_UNOWNED` is
+`0xffffffff` and a `static struct spinlock` is zeroed `.bss`, an uninitialised lock reads as
+permanently owned, so **any allocation on a foreign thread spins on-CPU forever.** Measured, not
+inferred, and a latent defect in F5's code worth reporting upstream.
+
+**Resolved 2026-08-13.** Preparation no longer happens on the loader thread: it is handed to a TMM
+thread through a periodic timer (`ls_prep.c`), where `umalloc` works. That made this substrate
+**rung 3** of `ls_vm_load.c`'s own ladder — no rebuild, no restart, no window, for the *program*
+rather than only for where it is armed. The rule that produced the bug still stands for any future
+helper thread: **grep the whole reachable path for `malloc|calloc|realloc|strdup|free` before
+putting code on a thread TMM did not create.**
 
 The **Size class** column is *shape*, not effort: it says how much code an item is, not how long it
 takes to get right. Items 1–4: delicate, small, must be exactly right. Items 5–7: tooling with one
