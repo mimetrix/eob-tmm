@@ -143,3 +143,51 @@ Reclamation (item 0c — freeing a swapped-out program once no core is inside it
 problem from installing the swap; it is not in this plan. And this is x86-64 only — aarch64's
 aligned `NOP`↔`B` swap is inside the architecture's concurrent-modification set and needs none of
 this.
+
+---
+
+## Results — rungs 1–4 run, and cross-checked against the sources
+
+Run on the 16-core x86-64 build box (`substrate/check_swap.c`), 2026-08-13.
+
+| rung | mechanism | window | outcome |
+|---|---|---|---|
+| 1 | unsafe (opcode-first) | **natural (widen=0)** | **0 faults in 43M calls** — the race is real but its window is nanoseconds, so the test cannot see it. This is the evidence that a passing stress run is weak proof here |
+| 1 | unsafe (opcode-first) | widened | **2.4M faults** — teeth proven; the harness *can* catch a torn read |
+| 2 | opcode-last | widened | **2.1M faults — the hypothesis was wrong.** Any 5-byte ordering passes through a dangerous state: opcode-first is a call to garbage; displacement-first is a nop that falls through into the displacement executed as instructions. There is no safe 5-byte ordering |
+| 4 | `text_poke_bp` | widened | **0 faults, 0 corrupt returns, 1.19M INT3 traps handled** — clean under the same window that broke both naive versions. The traps prove cores *were* caught mid-patch and safely redirected |
+
+Rung 3 (opcode-last + membarrier) was skipped once rung 2 showed ordering alone cannot fix the
+torn read for a 5-byte call — the `INT3` step is not gold-plating, it is required.
+
+### Cross-checked, not just self-tested
+
+The result above is a test I wrote passing; that is weak evidence on its own for a race. Checked
+against the authoritative sources:
+
+- **Sequence** — matches the kernel's `text_poke_bp_batch` exactly: *INT3, sync, write tail,
+  sync, write first byte, sync.*
+- **`membarrier(SYNC_CORE)`** — the man page guarantees "all running thread siblings have executed
+  a core serializing instruction… exactly the JIT/self-modifying code use case." Registered with
+  `MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE` as required. It is the userspace equivalent
+  of the kernel's per-CPU IPI, and its per-process scope is *better* here — it serialises only this
+  process's threads, which are the only ones executing the patched text.
+- **Barrier placement** — after every write, matching the kernel.
+
+**One deliberate difference, surfaced by the cross-check.** The kernel's `poke_int3_handler`
+*emulates the intended instruction* (RET/CALL/JMP) for a core caught on the breakpoint. This
+harness instead redirects that core to the function body — it behaves as *unarmed* for that one
+in-flight call. Safe (never executes garbage), but it means the few calls that trap during the
+~microsecond arming window are not shielded. Production choice: emulate the call to shield even
+those, or accept the transient. Recorded rather than shipped silently.
+
+### What this establishes and what it does not
+
+Establishes: the swap can be made safe under heavy multi-core contention by the proven protocol,
+and a naive swap cannot — both demonstrated on real hardware and matched to the kernel's design.
+Does **not** establish: behaviour inside TMM's real poll loop (rung 6, integration), the A-vs-B
+choice for the final form, or that a stress pass alone proves cross-modifying-code correctness —
+it does not, which is why this leans on the protocol match.
+
+**Sources:** kernel `text_poke_bp` (`arch/x86/kernel/alternative.c`); `membarrier(2)` man page,
+`MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE`; Intel SDM Vol 3A §8.1.3, cross-modifying code.

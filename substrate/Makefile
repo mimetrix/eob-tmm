@@ -11,10 +11,10 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm gate clean
+        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm
+       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -112,6 +112,19 @@ check-arm:
 	  rm -f .ls_arm.o .tt.o .arm.out; \
 	else \
 	  echo "skip  ls_arm.c  (host is $$(uname -m), not x86_64; cannot execute the patch)"; \
+	fi
+
+# The safe swap: prove the naive patch races and the text_poke_bp protocol does
+# not, under multi-core stress. x86_64 only; needs membarrier(SYNC_CORE).
+check-swap:
+	@if [ "$$(uname -m)" = "x86_64" ]; then \
+	  $(CC) -O2 -fcf-protection=branch -c test_tramp.S -o .tt.o && \
+	  $(CC) -O2 -fcf-protection=branch -pthread -o .swap.out check_swap.c .tt.o && \
+	  ./.swap.out 8 3 5000 0 >/dev/null && ./.swap.out 8 3 5000 2 >/dev/null && \
+	  echo "ok    check_swap.c  (naive swap races under stress; text_poke_bp clean)" && \
+	  rm -f .tt.o .swap.out; \
+	else \
+	  echo "skip  check_swap.c  (host is $$(uname -m); needs x86_64 + multi-core)"; \
 	fi
 
 # The candidate shields in shields/, compiled and put to PREVAIL, with each verdict
