@@ -12,10 +12,19 @@
 | arming (install the jump) | yes — incl. on real private `.text` via `/proc/self/mem` | build box |
 | patching TMM's own `r-xp` `.text` so execution sees it | **yes** | build box (`patchtext2`) |
 | the safe swap (`text_poke_bp`) under contention | yes, cross-checked to the kernel — **incl. on real private `.text`** | build box (`check_swap_realtext`) |
+| **the whole Path B slice joined** — VM verdict drives an armed real function | **yes, on the bench** | build box (`check_integrated`) |
 
-**Not yet joined:** a single BNK TMM that patches an *unmodified* function's entry, safely arms a
-verified shield onto it while traffic flows, and blocks a **real CVE hit arriving over the wire**.
-That is the deliverable. Everything below is how to build it.
+**Joined on the bench (2026-08-13):** the real trampoline, the real VM running a PREVAIL-verified
+program, and arming on a real private-`.text` function via `/proc/self/mem` now run as one flow
+(`substrate/check_integrated.c`) — the VM's verdict decides whether the hooked body runs
+(FALLTHROUGH → body runs; SAFE_RETURN → body skipped, caller gets the safe value; reversible). This
+is the mechanism, proven end to end, single-threaded, on the bumped ubpf (`508d5e4b`) + PREVAIL
+(`v0.2.6`).
+
+**Still not joined:** that same flow *inside a running BNK TMM*, arming an unmodified function while
+traffic flows (the safe swap from `check_swap_realtext` folded into the armed path under live
+multi-core load), blocking a **real CVE hit arriving over the wire**. That is the deliverable.
+Everything below is how to get from the bench slice to that.
 
 ---
 
