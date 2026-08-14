@@ -314,7 +314,11 @@ handle(int fd)
 
     case SHIELD_OP_STATUS: {
         struct ls_stats st;
-        if (!ls_vm_stats(0, &st)) { reply(fd, "ERR no such slot\n"); break; }
+        /* slot comes from epoch, as it does for LOAD and ARM. Hardcoding 0
+         * made every slot but one invisible, which is a poor property for a
+         * mechanism whose whole point is arming several things at once. */
+        int qslot = (int)m->epoch;
+        if (!ls_vm_stats(qslot, &st)) { reply(fd, "ERR no such slot %d\n", qslot); break; }
         reply(fd, "OK armed=%d mode=%d fired=%llu safe_returns=%llu errors=%llu "
                   "cycles=%llu cycles_max=%llu\n",
               (int)st.armed, st.mode,
@@ -344,7 +348,7 @@ handle(int fd)
     }
     case 0x1002: {   /* SAMPLES: the last few ctx values the hook actually saw */
         struct ls_ctx_sample sm[LS_CTX_SAMPLES];
-        unsigned n2 = ls_vm_samples(0, sm, LS_CTX_SAMPLES);
+        unsigned n2 = ls_vm_samples((int)m->epoch, sm, LS_CTX_SAMPLES);
         if (n2 == 0) { reply(fd, "OK no samples (hook not fired, or LS_VM_SAMPLES unset)\n"); break; }
         for (unsigned i = 0; i < n2; i++) {
             char hex[2 * LS_CTX_SAMPLE_BYTES + 1];
