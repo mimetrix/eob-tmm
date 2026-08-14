@@ -1,9 +1,40 @@
-# `substrate/` — the parts of the scope that are real files
+# `substrate/` — the sources that are compiled into TMM, and the checks that gate them
 
-These are the parts of [`../development-scope.md`](../development-scope.md) kept as
-**real files rather than illustrative blocks**, so that they compile, validate, and run — and
-because writing them for real caught four defects the prose versions carried unnoticed. Each is
-listed below.
+This directory holds two different kinds of thing, and the distinction matters more than any
+other line in this file:
+
+1. **Sources that are built into TMM.** `ls_vm.c`, `ls_vm_load.c`, `ls_prep.c`, `ls_arm.c`,
+   `ls_swap.c`, `ls_tramp.c`, `ls_vm_config.c` and `trampoline_x86_64.S` are compiled into the
+   TMM binary in a different tree. They are the running mechanism, not illustrations of it.
+   [`TMM-TREE-DELTA.md`](TMM-TREE-DELTA.md) is what that other tree needs.
+2. **Candidate artifacts and checks**, kept as real files rather than illustrative blocks so they
+   compile, validate and run — which caught four defects the prose versions carried unnoticed.
+
+**This repo is still not self-contained.** `make check` exercises bench harnesses, not a data
+plane; reproducing the live results needs the TMM build tree and the cluster. And two limits stand
+throughout: **no CVE has been mitigated on live traffic**, and the **per-call cost of an armed hook
+is unmeasured**.
+
+## Compiled into TMM
+
+| File | What it is |
+|---|---|
+| [`ls_vm.c`](ls_vm.c), [`ls_vm.h`](ls_vm.h) | The VM wrapper: create, load ELF, JIT-compile, publish into a slot, and the O14 section/symbol identity check. Item **3**. |
+| [`ls_vm_load.c`](ls_vm_load.c) | The runtime load path — the socket loader thread, the `shield_msg` dispatch, and the prepare handoff onto a TMM poll thread (preparation cannot run on a thread we create; TMM aliases `malloc` to a per-core allocator whose spinlock is never initialized there). Item **3**. |
+| [`ls_prep.c`](ls_prep.c) | The TMM-side glue: the periodic timer that drains the handoff, and the `INIT_FUNC(INIT_LATE, …)` registration that is **why no F5 source file is modified**. The one file without `STDINC` — see `TMM-TREE-DELTA.md` §5. |
+| [`ls_arm.c`](ls_arm.c), [`ls_arm.h`](ls_arm.h) | Writing the patch into live code and taking it back out. Item **2**. |
+| [`ls_swap.c`](ls_swap.c) | The `text_poke_bp` protocol in userspace: INT3, `membarrier(SYNC_CORE)`, tail, sync, real opcode. Item **0b**. |
+| [`ls_tramp.c`](ls_tramp.c), [`trampoline_x86_64.S`](trampoline_x86_64.S) | The trampoline — one of them, shared by every armed hook. Item **1**. |
+| [`ls_vm_config.c`](ls_vm_config.c) | Environment overrides, so program source and names are a restart rather than a rebuild. |
+| [`mk_shield_blob.py`](mk_shield_blob.py) | Generates `ls_shield_blob.h`, the built-in shield TMM arms at startup. Generated, so gitignored; `make check-vm` depends on it. |
+
+## Driving a live TMM
+
+[`loader-client/`](loader-client/) — the client half of the load path: the wire protocol, the
+measurement drivers, and `check_load_distinct.py`, which proves distinct bytecode is loaded and
+discriminated. Not the operator front-end; that is item **11** and is unwritten.
+
+## Candidate artifacts and checks
 
 | File | What it is | Verified by |
 |---|---|---|
@@ -50,11 +81,22 @@ all:
 4. **A hook map declaring the wrong `ctx` offsets.** `check_offsets.py` was written after finding a
    live one in this repo, and it still catches that bug when reintroduced.
 
-**Not real:** every function declared in `shield_abi.h` is a **stub** — there are no bodies in this
-repo, and there is no TMM here to attach to. `sig_verify`, `hook_map_lookup`, `trampoline_arm`,
-`trampoline_disarm` and `shield_msg_handle` name F5-internal work that does not exist yet. The
-skeletons that *use* this ABI live in [`../development-scope-code.md`](../development-scope-code.md)
-and are candidates for review, not production code.
+**Not real — and this paragraph used to overstate it.** It said "there are no bodies in this repo,
+and there is no TMM here to attach to." Both were true when written and neither is now: `ls_arm.c`,
+`ls_tramp.c` and `ls_vm_load.c` are bodies, and they are compiled into a TMM that runs.
+
+What genuinely remains a stub is narrower, and it is the part that matters for a security review:
+
+- **`sig_verify` — nothing verifies a signature.** Item 4 is unbuilt, so the loader accepts
+  **unverified programs** whenever `LS_LOAD_SOCKET` is set. That is the perimeter, and it is open.
+- **`hook_map_lookup` — there is no hook map.** Item 5 is unbuilt; entry addresses are supplied by
+  hand and move with every rebuild.
+- The `shield_abi.h` entry points remain the *proposed product* ABI. The in-TMM sources above are a
+  working implementation of the mechanism, not of that ABI, and the two have not been reconciled.
+
+The skeletons that *use* the proposed ABI live in
+[`../development-scope-code.md`](../development-scope-code.md) and are candidates for review, not
+production code.
 
 **Deliberately a subset:** the schema's `required` list is scoped to what the hand-written
 [`hook-point-map.json`](hook-point-map.json) beside it already carries, so that instance stays valid. The
@@ -71,7 +113,8 @@ something concrete to compile against. [`shield_abi.h`](shield_abi.h) is the
 **product-side** ABI: it adds what that example has no analog for (the
 signed binding, patchable-entry slots, per-core evidence, the loader message family). The two use
 different prefixes on purpose — `ls_*` names the worked example's types, `shield_*` names the proposed
-product ABI. Neither header is attached to anything: **nothing in this repo executes a shield.** The
+product ABI. Neither *header* is attached to anything, but the `ls_*` **sources** in this directory
+are: they are compiled into TMM and they do execute a shield. The
 naming-reconciliation table in
 [`../development-scope-code.md`](../development-scope-code.md) maps between them, and between
 both and the spellings already committed in the explainers.

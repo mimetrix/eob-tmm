@@ -126,13 +126,15 @@ path.
 
 > **step 4** · runs in **TMM, per publish** · written **once** · **small** · **unconditional**
 
-The one piece of "the safe point" that every variant needs. A designed-in call site already exists in the
-compiled text and the hot path already loads the slot per invocation, so publishing is a store and `REVOKE`
-is a store of zero. No text changes; no rendezvous is involved. What is net-new is the **ordering**.
+The one piece of "the safe point" that every variant needs, and it survived the removal of designed-in call
+sites unchanged. Once a hook is armed, the trampoline **already loads the slot per invocation**, so swapping
+the program in that slot is a store and `REVOKE` is a store of zero. No text changes and no rendezvous are
+involved — those belong to arming the entry (item 2), which is a separate act. What is net-new is the
+**ordering**.
 
 ```c
 /*
- * substrate/publish.c — item 0. Arming at a designed-in call site.
+ * substrate/publish.c — item 0. Publishing a program into an armed slot.
  *
  * The whole content of this item is that a core must never observe `armed`
  * before the payload arming refers to. Two plain stores and a flag, in the
@@ -478,10 +480,12 @@ cannot reason across the batch (`engine-hard-problems.md` §5).
 > **step 2** · runs in **TMM** · written **once per architecture** · **small** · **conditional —
 > this is form B of three** ([`development-scope.md`](development-scope.md) §1 item 2)
 
-**The skeleton below is the live-patching form.** At a designed-in call site, arming is an ordered word
-store into the slot and none of this code exists; patching once at startup makes arming a flag store and
-moves this code before the threads go hot, where it needs no coordination at all. Read it as the form
-that buys reach into a function with no designed-in call site (any padded entry), and as the only one that needs item 0b.
+**The skeleton below is the live-patching form, and it is now the only form.** Two alternatives once sat
+here: a designed-in call site, where arming is an ordered word store and none of this code exists — **removed
+2026-08-13**, because its reach is fixed at build time; and patching once at startup, which makes arming a
+flag store and moves this code before the threads go hot, where it needs no coordination at all. That second
+one is still open, but it forfeits arming a function nobody anticipated, which is the point. So this is the
+form that buys reach into **any padded entry**, and the only one that needs item 0b.
 
 Overwrite the nop pad with a jump to the trampoline; restore the nops to detach. Same discipline
 ftrace has used on live kernel text for years — the difference here is that the pads are in **our own

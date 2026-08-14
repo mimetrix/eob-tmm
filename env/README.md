@@ -5,11 +5,15 @@ internal OpenStack stacks, how to stand up a **TMM build host**, and what
 the Claude sandbox can and cannot do. **Infrastructure plumbing, not
 proposal content.**
 
-Deliberately separate from the repo-root design docs. Per
-[`../CLAUDE.md`](../CLAUDE.md) this repo holds design proposals, candidate
-ABI artifacts, and explainers, and **contains no prototype** — nothing here
-changes that. These are notes on *provisioning the machines*, and none of
-them claim to execute anything.
+Deliberately separate from the repo-root design docs: these are notes on *provisioning the
+machines*, not proposal content.
+
+> **Correction, 2026-08-14.** This section used to say the repo "contains no prototype — nothing
+> here changes that." That convention was superseded on 2026-08-13. The substrate now runs in a
+> live TMM, and these notes are load-bearing for reproducing it: `bnk-dev-runbook.md` carries the
+> image ship, per-node `ctr` import, rollout and verify steps, and
+> [`../substrate/TMM-TREE-DELTA.md`](../substrate/TMM-TREE-DELTA.md) carries what changes in the
+> TMM build tree.
 
 ## Contents
 

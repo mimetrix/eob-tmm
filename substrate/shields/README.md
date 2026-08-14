@@ -1,10 +1,25 @@
 # `substrate/shields/` — candidate shield programs, compiled and verified
 
-Four small eBPF programs and one generated header. They are **candidate artifacts**: they
-compile, and PREVAIL reaches a verdict on each. **Nothing here is loaded into TMM, and
-nothing executes a shield** — per [`../../CLAUDE.md`](../../CLAUDE.md) this repo has no
-prototype, and these do not change that. What they demonstrate is that the *authoring
-chain* is real end to end, and that the verifier's gates fire when they should.
+Four small eBPF programs and one generated header. They compile, and PREVAIL reaches a verdict on
+each — which is what makes them useful as gate tests.
+
+> **This description used to end "nothing here is loaded into TMM, and nothing executes a shield —
+> this repo has no prototype." That is no longer true, and the change is worth stating precisely.**
+>
+> - `ls_2026_http_psm.bpf.c` is the shield that is **baked into TMM and armed at startup**
+>   (`../mk_shield_blob.py` turns it into `ls_shield_blob.h`), and it is what the live
+>   arm/disarm runs were performed against.
+> - `demo_block.bpf.c` and `demo_pass.bpf.c` are **loaded into a running TMM over a socket** by
+>   `../loader-client/check_load_distinct.py`.
+> - `reject_memory.bpf.c` and `reject_termination.bpf.c` are still exactly what they were: programs
+>   that must **fail** verification, and never run anywhere.
+>
+> Still true, and the limit that matters: **no CVE has been mitigated on live traffic.** The shield's
+> decision has only ever been exercised on a synthetic input.
+
+What the set demonstrates is that the *authoring chain* is real end to end, and that the verifier's
+gates fire in both directions — a rejection program that starts passing is the dangerous direction,
+so `make check-shields` treats both as failures.
 
 ## What made this possible
 
