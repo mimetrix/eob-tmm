@@ -806,7 +806,11 @@ either side of TMM, VLANs `tmm-client`/`tmm-server`, TMM self-IPs on both. The c
 carries `curl`, `wget`, `nc` and **`ab`**, so load generation needs nothing installed.
 
 ```bash
-kubectl create namespace spk-app-1
+# NOT needed --- bnk-core pre-provisions SIX app namespaces, spk-app-1 .. spk-app-6.
+# Only spk-app-1 is populated below; 2-6 are empty and available. Use them to drive
+# several VIPs at once when a single backend and URL is too thin a traffic profile
+# (e.g. measuring per-call shield cost, where one flat workload understates the path).
+kubectl get ns | grep spk-app          # expect six, already Active
 
 cat <<'YAML' | kubectl apply -f -
 apiVersion: gateway.networking.k8s.io/v1
