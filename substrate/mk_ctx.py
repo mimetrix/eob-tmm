@@ -65,16 +65,31 @@ def is_scalar(debuginfo, t):
 
 
 def struct_fields(debuginfo, struct_name):
-    """Scalar members of a struct, with their declared types. One level only."""
+    """Scalar members of a struct, with their declared types. One level only.
+
+    BITFIELDS ARE THE POINT, NOT AN EDGE CASE. An earlier version of this regex
+    put the `: <width>` suffix outside the capture, so `unsigned int version : 2;`
+    yielded a field named "2" and emitted `c->a2_2 = a2->2;` --- which does not
+    compile. Worse, it silently dropped every flag field, and flags are usually
+    the most valuable thing at a hook: for http_parse_info the five f_invalid_*
+    bits ARE the parse-error signal the tracepoint exists to capture.
+
+    Reading a bitfield in C needs no special handling once the NAME is right ---
+    the compiler does the extraction --- so the fix is entirely in the parse."""
     out = gdb(debuginfo, f"ptype struct {struct_name}")
     fields = []
     for line in out.splitlines():
-        m = re.match(r"^\s{4}(.+?)\s*\**(\w+)\s*(\[\d+\])?;\s*$", line)
+        # type, optional stars, name, optional [n], optional : width, semicolon
+        m = re.match(r"^\s{4}(.+?)\s*(\**)\s*(\w+)\s*(\[\d+\])?\s*(:\s*\d+)?\s*;\s*$", line)
         if not m:
             continue
-        ty, nm, arr = m.group(1).strip(), m.group(2), m.group(3)
-        if arr or "*" in line.split(nm)[0]:
+        ty, stars, nm, arr, bits = (m.group(1).strip(), m.group(2), m.group(3),
+                                    m.group(4), m.group(5))
+        if arr or stars:
             continue                                   # arrays and pointers: not followed
+        if bits:
+            fields.append(("unsigned int", nm))        # a bitfield reads as an unsigned
+            continue
         if is_scalar(debuginfo, ty):
             fields.append((ty, nm))
     return fields
@@ -98,7 +113,12 @@ def main():
     ap.add_argument("--debuginfo", required=True)
     ap.add_argument("--function", required=True)
     ap.add_argument("--max-fields", type=int, default=6,
-                    help="scalar fields to lift per dereferenced struct")
+                    help="fallback: lift the first N scalar fields per pointer")
+    ap.add_argument("--fields", default=None,
+                    help="CURATED selection, e.g. 'a2:method,a2:f_invalid_path,a0:state'. "
+                         "This is the tracepoint's actual content and should normally be "
+                         "given: --max-fields takes whatever comes first in the struct, "
+                         "which is not the same as what is worth capturing.")
     a = ap.parse_args()
 
     sig = gdb(a.debuginfo, f"ptype {a.function}")
@@ -107,6 +127,20 @@ def main():
         raise SystemExit(f"*** no signature for {a.function}")
     inner = m.group(1).strip()
     args = [] if inner in ("void", "") else [x.strip() for x in re.split(r",(?![^(]*\))", inner)]
+
+    # A tracepoint is a PLACE plus a CHOICE of what to record there. --max-fields
+    # picks by struct order, which has nothing to do with value: for
+    # http_parse_info it stops before the five f_invalid_* bits, which are the
+    # entire parse-error signal. --fields is the curation, and the generator's job
+    # is only to turn that choice into correct, null-guarded C.
+    want = None
+    if a.fields:
+        want = {}
+        for spec in a.fields.split(","):
+            arg, _, fld = spec.strip().partition(":")
+            if not fld:
+                raise SystemExit(f"*** --fields entry needs argN:field, got '{spec}'")
+            want.setdefault(arg, []).append(fld)
 
     members, fills, notes = [], [], []
     for i, t in enumerate(args):
@@ -117,7 +151,18 @@ def main():
             fills.append(f"    c->{an} = ({w}){an};")
         elif re.match(r"^(const\s+)?struct\s+(\w+)\s*\*$", t):
             sname = re.match(r"^(const\s+)?struct\s+(\w+)\s*\*$", t).group(2)
-            flds = struct_fields(a.debuginfo, sname)[:a.max_fields]
+            avail = struct_fields(a.debuginfo, sname)
+            if want is not None:
+                names = want.get(an, [])
+                have = {n: t for t, n in avail}
+                missing = [n for n in names if n not in have]
+                if missing:
+                    raise SystemExit(f"*** {an} (struct {sname}) has no scalar field(s): "
+                                     f"{', '.join(missing)}\n    available: "
+                                     f"{', '.join(n for _, n in avail)}")
+                flds = [(have[n], n) for n in names]
+            else:
+                flds = avail[:a.max_fields]
             members.append(f"    __u64  {an}_ptr;".ljust(34) + f"/* arg{i}: {t} -- MAY BE NULL */")
             fills.append(f"    c->{an}_ptr = (__u64)(unsigned long){an};")
             if not flds:
