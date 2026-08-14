@@ -261,7 +261,7 @@
   <!-- 00 HERO -->
   <section class="hero" id="hero" data-sec="hero">
     <p class="eyebrow">F5 TMM · <b>engineering register</b> · the honest half</p>
-    <h1>Before we build it: <em>where this gets hard</em>.</h1>
+    <h1>Building it: <em>where this gets hard</em>.</h1>
     <p class="sub"><b>The proposal says a verified eBPF engine is safe to run inside TMM</b> — F5's data-plane
       microkernel, with its own scheduler and stacks, bypassing the Linux kernel for all traffic. <b>True, as far
       as it goes.</b> This page is the other half: the problems it raises —
@@ -275,7 +275,14 @@
       <span class="chip">the trust surface</span>
     </div>
     <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
-  </section>
+      <div class="callout sig"><p><b>Accuracy note — 2026-08-13.</b> This page was written as a proposal.
+      The data-plane mechanism described here now <b>runs on a live TMM</b>: a shield is loaded over a
+      socket into an already-running process, armed at a function entry while traffic flows, and
+      disarmed — no rebuild, no restart. Two claims remain genuinely unproven and stay conditional
+      throughout: <b>no CVE has been mitigated on live traffic</b>, and the <b>per-call cost of an
+      armed hook is unmeasured</b>. Where this page still reads &ldquo;would&rdquo;, treat the
+      mechanism as built and the outcome as not yet shown.</p></div>
+</section>
 
   <!-- 01 TIME -->
   <section class="beat reveal" id="time" data-sec="time">
