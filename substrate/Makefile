@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch shield-blob gate clean
+        check-selfpatch check-ring shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch
+       check-selfpatch check-ring
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -134,6 +134,15 @@ check-swap:
 # directions are failures. Skips loudly if clang has no BPF target or prevail is unbuilt.
 check-shields:
 	@$(PYTHON) ./check_shields.py
+
+# The egress ring: the four properties that cannot be tested inside TMM, because
+# reaching them there means engineering a stalled consumer and a full ring, and a
+# wrong answer looks like "records are occasionally odd" inside a poll loop.
+# STREAM drop-and-count, RECORD overwrite-oldest, SPSC exactness, wraparound.
+check-ring:
+	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .ring.out check_ring.c && ./.ring.out >/dev/null \
+	  && echo "ok    ls_ring.h  (15 assertions: SPSC exact, both full-policies, wraparound)" \
+	  && rm -f .ring.out
 
 # The built-in shield, as bytes. ls_vm_load.c includes this and arms it at
 # startup; it is generated, so it is not committed. check-vm depends on it --
