@@ -52,38 +52,54 @@ echo "  waiting for the IPAM controller (takes ~30s)"
 sleep 30
 kubectl get svc f5-tmm-tcp-service --no-headers 2>/dev/null | sed 's/^/  /'
 
-echo "=== 3. virtual server $VIP:80 -> $BACKEND"
-# Adapted from profiles/tcpopt-core/resources/virtual.yaml, with tcpSettings
-# DROPPED: that resource does not exist in bnk-core, and referencing it makes the
-# VS apply cleanly and then never program anything --- a silent failure.
-kubectl apply -f - <<YAML 2>&1 | tail -1 | sed 's/^/  /'
+echo "=== 3. pool + virtual server $VIP:80 -> $BACKEND"
+# The kind is F5VirtualServer (CRD f5-virtualservers.k8s.f5net.com), and the pool
+# is a SEPARATE resource referenced by name -- not an inline block. Check with
+# `kubectl get crd | grep f5` before assuming any other shape: F5BigContextSecure
+# is a different CRD that is NOT installed on this cluster, and applying it fails
+# with "no matches for kind", which reads like a cluster fault rather than a typo.
+#
+# `http: {}` is not optional for our purposes: it puts the flow through TMM's HTTP
+# processing, which is where the hooks of interest live. Without it the flow is
+# L4-only and an HTTP hook never fires -- traffic flows, the hook reads zero, and
+# nothing looks broken.
+#
+# THE ENUM CASING IS INCONSISTENT BETWEEN FIELDS AND THE CRD IS THE ONLY AUTHORITY:
+#   loadBalancingMethod  UPPER_SNAKE  -- ROUND_ROBIN (round-robin is rejected)
+#   snat.type            lowercase    -- automap (SRC_TRANS_AUTOMAP is rejected)
+# Every combination of those was tried by hand at some point. Do not guess; run
+#   kubectl apply --dry-run=server -f -
+# which reports the supported values for whichever field is wrong.
+kubectl apply -f - <<YAML 2>&1 | tail -2 | sed 's/^/  /'
 apiVersion: k8s.f5net.com/v1
-kind: F5BigContextSecure
+kind: Pool
+metadata:
+  name: eob-pool
+  namespace: default
+spec:
+  members:
+  - address: $BACKEND
+    port: 80
+  minActiveMembers: 0
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5VirtualServer
 metadata:
   name: eob-vs
   namespace: default
 spec:
-  destinationAddress: $VIP/32
+  destinationAddress: $VIP
   destinationPort: 80
-  ipProtocol: tcp
-  profile: tcp
-  loadBalancingMethod: round-robin
-  sourceAddress: 11.11.11.0/24
-  pool:
-    members:
-    - address: $BACKEND
-      port: 0
-    minActiveMembers: 0
+  protocol: tcp
+  pool: eob-pool
+  loadBalancingMethod: ROUND_ROBIN
+  http: {}
   snat:
     type: automap
-    pool: ''
-  monitors: {}
-  iRules: []
-  vlans:
-    disableListedVlans: true
-    vlanList: []
 YAML
-sleep 8
+sleep 10
+kubectl get f5virtualserver eob-vs \
+    -o jsonpath='  vs: {.spec.destinationAddress}:{.spec.destinationPort} pool={.spec.pool}{"\n"}' 2>/dev/null
 
 echo "=== 4. does traffic actually flow?"
 kubectl exec client -- curl -s -m 10 -w "\n  http=%{http_code} time=%{time_total}s\n" \

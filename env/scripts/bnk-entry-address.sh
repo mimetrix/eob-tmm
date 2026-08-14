@@ -26,9 +26,25 @@ trap 'rm -rf "$W"' EXIT
 
 [ -d "$DEBS" ] || { echo "no DEBS dir at $DEBS (set DEBS=)"; exit 1; }
 
+# The runtime deb sits in DEBS/; the debuginfo deb is one level down in tmm_debs/.
+# They are NOT alongside each other, which is easy to get wrong -- and getting it
+# wrong is how you end up with no address at all, or worse, one from a stale pair.
+BIN_DEB=$(ls "$DEBS"/tmm_*.deb 2>/dev/null | head -1)
+DBG_DEB=$(find "$DEBS" -name 'tmm-debuginfo_*.deb' 2>/dev/null | head -1)
+
+[ -n "$BIN_DEB" ] || { echo "*** no tmm_*.deb under $DEBS --- has packaging run?"; exit 1; }
+if [ -z "$DBG_DEB" ]; then
+    echo "*** no tmm-debuginfo_*.deb found under $DEBS (searched recursively)."
+    echo "    Without it there are no symbols: the shipped binary is stripped, so"
+    echo "    nm on it returns nothing and there is no address to arm."
+    exit 1
+fi
+echo "  runtime deb  : $(basename "$BIN_DEB")"
+echo "  debuginfo deb: $(basename "$DBG_DEB")"
+
 mkdir -p "$W/bin" "$W/dbg"
-(cd "$W/bin" && dpkg-deb -x "$(ls "$DEBS"/tmm_*.deb | head -1)" .)
-(cd "$W/dbg" && dpkg-deb -x "$(ls "$DEBS"/tmm-debuginfo_*.deb | head -1)" .)
+dpkg-deb -x "$BIN_DEB" "$W/bin"
+dpkg-deb -x "$DBG_DEB" "$W/dbg"
 
 B="$W/bin/usr/bin/tmm64.no_pgo"
 D="$W/dbg/usr/lib/debug/usr/bin/tmm64.no_pgo.debug"
@@ -48,8 +64,11 @@ A=$(nm --defined-only "$D" | awk -v s="$SYM" '$3==s {print $1}' | head -1)
 [ -n "$A" ] || { echo "*** symbol not found in debuginfo: $SYM"; exit 1; }
 echo "  $SYM  entry = 0x$A"
 echo
-echo "  first 24 bytes as they will be in the pod:"
-objdump -d --start-address="0x$A" --stop-address="$((0x$A + 24))" "$B" | tail -6 | sed 's/^/    /'
+echo "  first instructions as they will be in the pod:"
+# Take the FIRST instruction lines, not the last: the pad is at the entry, and a
+# `tail` here shows the far end of the range and hides the very bytes being checked.
+objdump -d --start-address="0x$A" --stop-address="$((0x$A + 24))" "$B" \
+    | awk '/^ *[0-9a-f]+:/ {print; if (++n == 4) exit}' | sed 's/^/    /'
 echo
 echo "  Expect 'f3 0f 1e fa' (endbr64) then five 0x90 nops --- that pad is what arming"
 echo "  overwrites with 'e8 <rel32>', a call to ls_trampoline_entry. If you see"

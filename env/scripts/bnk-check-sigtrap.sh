@@ -32,9 +32,18 @@ done
 
 echo "tmm pid=$pid comm=$(cat /proc/$pid/comm 2>/dev/null) threads=$(ls /proc/$pid/task 2>/dev/null | wc -l)"
 echo
-printf "%-8s %-16s %-18s %-14s %-18s %s\n" tid comm SigBlk TRAP_blocked SigCgt TRAP_caught
+printf "%-8s %-16s %-6s %-18s %-14s %-18s %s\n" tid comm role SigBlk TRAP_blocked SigCgt TRAP_caught
 
-blocked=0
+# WHICH THREAD blocks SIGTRAP is the whole question, not how many. Only threads
+# that EXECUTE patched data-path text can take a mid-patch trap. On BNK the poll
+# threads are named tmm.<N> (tmm.0, tmm.1, ...); a bare "tmm" is a housekeeping
+# thread that does not run the hooked code, and it legitimately masks nearly every
+# signal. Counting all threads together reports a false alarm --- an early version
+# of this script did exactly that, and its verdict contradicted the fact that
+# arming demonstrably works on this build.
+poll_blocked=0
+poll_total=0
+other_blocked=0
 caught=0
 for t in /proc/$pid/task/*; do
     tid=$(basename "$t")
@@ -43,24 +52,41 @@ for t in /proc/$pid/task/*; do
     cgt=$(grep '^SigCgt' "$t/status" 2>/dev/null | sed 's/.*:[ \t]*//')
     [ -n "$blk" ] || continue
     bb=$(( 0x$blk & 0x10 )); cc=$(( 0x$cgt & 0x10 ))
-    [ "$bb" -ne 0 ] && blocked=$((blocked+1))
     [ "$cc" -ne 0 ] && caught=$((caught+1))
-    printf "%-8s %-16s %-18s %-14s %-18s %s\n" "$tid" "$nm" "$blk" \
+
+    role=other
+    case "$nm" in tmm.[0-9]*) role=poll;; esac
+    if [ "$role" = poll ]; then
+        poll_total=$((poll_total+1))
+        [ "$bb" -ne 0 ] && poll_blocked=$((poll_blocked+1))
+    else
+        [ "$bb" -ne 0 ] && other_blocked=$((other_blocked+1))
+    fi
+
+    printf "%-8s %-16s %-6s %-18s %-14s %-18s %s\n" "$tid" "$nm" "$role" "$blk" \
         "$( [ "$bb" -ne 0 ] && echo YES-BLOCKED || echo no )" "$cgt" \
         "$( [ "$cc" -ne 0 ] && echo yes || echo no )"
 done
 
 echo
-if [ "$blocked" -ne 0 ]; then
-    echo "*** $blocked thread(s) BLOCK SIGTRAP. text_poke_bp cannot be used on those threads:"
-    echo "    a synchronous trap there kills the process. Stop and rethink the arming form."
+if [ "$poll_blocked" -ne 0 ]; then
+    echo "*** $poll_blocked of $poll_total POLL thread(s) block SIGTRAP. That is the blocking"
+    echo "    case: a mid-patch trap on a poll thread cannot be delivered, so the kernel's"
+    echo "    default action kills the process. Stop and rethink the arming form."
 else
-    echo "ok  no thread blocks SIGTRAP --- a mid-patch trap can be delivered."
+    echo "ok  none of the $poll_total poll thread(s) block SIGTRAP --- a mid-patch trap on the"
+    echo "    threads that execute hooked code can be delivered. This is the condition that"
+    echo "    matters for text_poke_bp."
+fi
+if [ "$other_blocked" -ne 0 ]; then
+    echo "--  $other_blocked non-poll thread(s) block SIGTRAP. Expected and harmless: they do not"
+    echo "    execute hooked data-path text, so they never hit a patched pad."
 fi
 if [ "$caught" -ne 0 ]; then
-    echo "!!  $caught thread(s) already CATCH SIGTRAP. Our handler must chain to the existing"
-    echo "    one for any address that is not one of our pads, and must not race crashagent."
+    echo "!!  $caught thread(s) already CATCH SIGTRAP --- TMM or crashagent has a handler."
+    echo "    Ours MUST chain to it for any address that is not one of our pads, or we break"
+    echo "    crash reporting for faults that have nothing to do with us."
 else
-    echo "ok  nothing else handles SIGTRAP today --- but do not assume that stays true across"
+    echo "ok  nothing else handles SIGTRAP today --- but do not assume that holds across"
     echo "    builds; crashagent and apport are both in this pod."
 fi

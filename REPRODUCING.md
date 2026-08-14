@@ -59,6 +59,12 @@ env-gated and off by default, and why none of this is near a production box.
 | 7 | Load a program, arm it, disarm it | `substrate/loader-client/ls_client.py` |
 | 8 | Prove *distinct* bytecode is loaded and discriminated | `substrate/loader-client/check_load_distinct.py` |
 
+**Tested 2026-08-14** against the build box and the live cluster — steps 4 and 5 run for real,
+step 3's `verify` runs for real, and step 6's resources are validated server-side with
+`--dry-run=server`. What was *not* re-run: step 3's `deploy` rollout and step 6's apply, because
+both mutate a working cluster. Testing found six defects in scripts that had passed a syntax check,
+including two wrong CRD enum spellings and a verdict that contradicted observed reality.
+
 Steps 4, 5 and 6 each encode a fact that cost a day when it was missing:
 
 - **Step 4** — packaging **re-links** the binary, so the build tree's address is not the pod's
