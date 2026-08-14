@@ -1,8 +1,23 @@
 # Joining the pieces into BNK — the integration map
 
-### The pieces are proven on the bench; none is joined into a running TMM that shields a live CVE end to end. BNK is the first target application. This maps the unbuilt work to get there, grounded in what we already have running.
+### The mechanism is joined into a running BNK TMM. What is *not* joined is the outcome: no CVE has been shielded on live traffic. This maps what remains, grounded in what runs.
 
-**State, stated plainly.** What exists is validated *components*, not an integrated whole:
+> **Status update — 2026-08-13.** When this map was written, its premise was "the pieces are proven
+> on the bench; none is joined into a running TMM." That premise is now **false for the mechanism
+> and still true for the outcome**, and the difference is the whole point of the map:
+>
+> - **§1–§5 are built and running.** A shield is loaded over a socket into an already-running BNK
+>   TMM, armed at a function entry while traffic flows, and disarmed again — no rebuild, no restart.
+>   A hook armed on `http_parse_client_headers` fired **exactly once per request across 16,000
+>   requests**; 10 loads during 9,000 requests produced 0 failures with latency percentiles
+>   unchanged; both pods, 0 restarts. The substrate modifies **no F5 source file**.
+> - **§6 is not, and its premise was wrong** — see that section.
+> - **Path A (designed-in call sites) was removed**, so the "floor" §0 described no longer exists.
+> - **Per-call hook cost is still unmeasured.** Quote no per-call number
+>   ([`load-path-scope.md`](load-path-scope.md) §7).
+
+**State when this map was written.** Validated *components*, not an integrated whole — kept because
+the bench evidence is what each in-TMM step was built on:
 
 | piece | proven | where |
 |---|---|---|
@@ -22,20 +37,24 @@ program, and arming on a real private-`.text` function via `/proc/self/mem` now 
 is the mechanism, proven end to end, single-threaded, on the bumped ubpf (`508d5e4b`) + PREVAIL
 (`v0.2.6`).
 
-**Still not joined:** that same flow *inside a running BNK TMM*, arming an unmodified function while
-traffic flows (the safe swap from `check_swap_realtext` folded into the armed path under live
-multi-core load), blocking a **real CVE hit arriving over the wire**. That is the deliverable.
-Everything below is how to get from the bench slice to that.
+**Still not joined:** blocking a **real CVE hit arriving over the wire**. Arming an unmodified
+function inside a running BNK TMM while traffic flows is done (§1–§5); what remains is the outcome,
+and §6 explains why it is not reachable on this target.
 
 ---
 
-## 0 · The floor already in BNK
+## 0 · The floor already in BNK — REMOVED, 2026-08-13
 
-Path A runs in the pod today: VM compiled in, shield armed at a designed-in call site, and the
-self-test shows the shield returning "safe" on the null-pointer condition while the same binary
-crashes with the shield off. That is real and integrated — but it uses a **planted** hook and a
-**synthesized** condition, not the patched-entry mechanism and not live traffic. It is the
-fallback, not the target.
+**This section described Path A, which no longer exists.** A VM compiled in with the shield armed at
+a *designed-in call site* did run in the pod, and its self-test showed the shield returning "safe"
+on the null-pointer condition while the same binary crashed with the shield off. It was deleted
+anyway. Two reasons, and the second is the sharper one: its reach was fixed at build time, so it
+could only ever shield functions someone thought to plant a call site at — which is precisely what a
+CVE is not; and it mitigated the bug **whether or not anything was armed**, which makes it
+impossible to demonstrate that arming did anything. See
+[`mechanism-tradeoff.md`](mechanism-tradeoff.md) for the full decision record.
+
+There is no fallback now. The patched entry is the sole mechanism.
 
 ---
 
@@ -77,9 +96,11 @@ real private-`.text` function's pad through `/proc/self/mem`, 15 workers hammeri
 faults, zero corrupt returns — while the unsafe baseline on the same surface faults in the millions
 (teeth proven).
 
-**So arming real TMM text is a syscall, not a memory-manager project.** Two narrow checks remain,
-and neither is the old blocker: whether `tmm64`'s text is hugepage-backed (this is proven on 4 KB
-pages), and whatever code-integrity policy the production node enforces.
+**So arming real TMM text is a syscall, not a memory-manager project.** The two narrow checks this
+section left open — whether `tmm64`'s text is hugepage-backed, and whatever code-integrity policy
+the node enforces — are **both settled in the affirmative by the live arm**: the patch lands and
+executes on the datkube node, verified byte-for-byte (`f3 0f 1e fa e8 f0 6c 75 ff`, call target
+resolving to `ls_trampoline_entry`).
 
 ## 3 · The safe swap in TMM's real threads
 
@@ -93,8 +114,8 @@ on the BNK node's kernel. Two forms, decide with the loop in hand:
   is in a hooked prologue, making the swap trivially safe without the INT3 dance. Cheaper per-arm,
   but touches the loop.
 
-The bench proved `text_poke_bp` works; the rendezvous is the "maybe simpler in situ" option to
-evaluate once integrated, not to assume now.
+**Settled: `text_poke_bp`.** It is what runs in the pod, and it needed no poll-loop change. The
+rendezvous was never built — it stays on the list as a possible simplification, not a gap.
 
 ## 4 · The SIGTRAP handler must coexist with TMM
 
@@ -105,18 +126,38 @@ agent. This is real integration care, not a component we can bench in isolation.
 
 ## 5 · Arming wired to the load path
 
-Today `ls_vm_arm` loads bytecode into a slot. Path B adds: given a target function name in a
-`shield_msg`, resolve its address (from the signed hook map — item 5), and `ls_arm` the trampoline
-onto its padded entry, then `ls_swap` it in safely. Extend the loader (`ls_vm_load.c`) so a `LOAD`
-can carry "hook this function" and drive that path.
+**Built.** `ls_vm_load.c` takes a `LOAD` carrying a target function, and `ls_arm`/`ls_swap` install
+the trampoline on its padded entry. One correction to the plan as written: preparation
+(`ubpf_create`/`ubpf_load_elf`/`ubpf_compile_ex`) **cannot run on the loader thread** — TMM aliases
+`malloc` to its own per-core allocator, whose spinlock is never initialized on a thread we create,
+so the loader spins forever. Work is handed to a TMM poll thread through a prepare/complete
+structure driven by a periodic timer ([`load-path-scope.md`](load-path-scope.md) §5).
 
-## 6 · Trigger the real CVE with live traffic
+**One piece is still stubbed:** the address comes from configuration, not from a signed hook map —
+item 5 is unbuilt, and the entry address has moved with every rebuild.
 
-The shield's decision is proven on a synthetic input; the end-to-end demo needs the real path hit.
-`http_psm_profile_name_lookup` runs when a security log record with `${profile_name}` in its format
-is built for a flow whose listener has **no** protocol-transfer log profile. So: configure a
-security log profile with that format, attach it, leave the protocol-transfer profile unset, and
-drive HTTP through the Gateway path (already working). That reaches the null deref.
+## 6 · Trigger the real CVE with live traffic — BLOCKED, and the earlier premise here was wrong
+
+**The premise this section originally stated was never verified.** It said the fault is reached by
+configuring a security log profile with `${profile_name}` in its format, attaching it, and *leaving
+the protocol-transfer profile unset*. That was carried forward from an earlier discussion and
+asserted without checking. Two corrections:
+
+**What the defect actually is.** The caller reads
+`flow_get_listener(cf)->prot_transfer_log_profile` into a local and guards *that local*; the callee
+re-reads the live listener state. So an unset profile is **not** the trigger — the guard covers it.
+The window is a **check-then-reread race**: the profile is released between the caller's check and
+the callee's read. And `fw_log_release_protocol_transfer_from_listener()` **frees before it nulls**,
+so the window carries a use-after-free as well as a null dereference.
+
+**Why it is not reachable on BNK.** `prot_transfer_log_profile` has **no Kubernetes CRD field** on
+this form factor, so there is no supported way to attach one — and therefore no way to release one
+mid-flow. The race cannot be driven from the outside here at all.
+
+**Consequence for the demo below:** on BNK the crash→arm→no-crash→disarm sequence cannot be run
+against this CVE. Closing it needs either a different target CVE that is reachable on BNK, or a form
+factor (appliance/VE) where the profile is configurable. **Until one of those happens, "it stops the
+crash" remains unproven end to end** — the standing negative repeated throughout this repo.
 
 ---
 
@@ -130,8 +171,11 @@ One BNK TMM pod, functions padded, shield **not** compiled in (loaded at runtime
 3. Drive the CVE traffic again → **no crash**, shield fire-count > 0.
 4. Disarm → the crash returns.
 
-That is the whole proposal, on the first target application, end to end. Nothing above is built;
-this is the plan for building it.
+That is the whole proposal, on the first target application, end to end. **Steps 2 and 4 are built
+and demonstrated** — arming and disarming a real function over the load path, no rebuild, no
+restart, under live traffic. **Steps 1 and 3 are not**, because the CVE they name cannot be
+triggered on BNK (§6). What the mechanism does when the fault arrives is therefore still a claim,
+not a result.
 
 ---
 
@@ -141,9 +185,13 @@ this is the plan for building it.
    (`/proc/self/mem`), not a memory-manager project, and the full safe swap runs clean on real
    private `.text` (`check_swap_realtext.c`). This also de-risks §3 down to wiring the swap into
    TMM's own threads, plus the hugepage / code-integrity checks.
-2. Build side (§1) + arming wired to the loader (§5).
-3. The safe swap in TMM's threads (§3) + SIGTRAP coexistence (§4).
-4. The CVE trigger config (§6), then the four-step demo.
+2. **Build side (§1) + arming wired to the loader (§5) — DONE.** Loaded and armed over a socket
+   into a running TMM, under traffic.
+3. **The safe swap in TMM's threads (§3) + SIGTRAP coexistence (§4) — DONE.** Arm/disarm/re-arm on
+   both pods, 0 restarts.
+4. **The CVE trigger (§6) — BLOCKED, not merely pending.** Not reachable on BNK; needs a different
+   target CVE or a different form factor. This is the gate on the four-step demo, and the reason
+   "it stops the crash" is still unproven.
 
 Deferred and out of this map: reclamation (freeing a swapped-out program — item 0c), aarch64 (the
 DPU case — needs none of the x86 swap machinery), and every component beyond the TMM core (SSL et

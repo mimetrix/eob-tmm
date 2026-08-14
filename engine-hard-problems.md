@@ -544,8 +544,9 @@ first shippable form.
   **audit/harden/fork it**, or default to the **interpreter** on high-assurance builds.
 - **The optimiser decides the hookable set, not us — and the build system narrows it again.**
   `-fpatchable-function-entry` pads the entries of
-  functions the build actually emits out-of-line. **Measured on BNK/x86-64:** it reaches only **48.9%**
-  of the functions in the shipped binary, at 82–97% inside the TMM tree and **0%** across two dozen
+  functions the build actually emits out-of-line. **Measured on BNK/x86-64:** it reaches **82–97%
+  inside the TMM tree** — the scope the shield targets, where the flag is applied to every
+  compilation and the shortfall is the optimiser, not the flag — and **0%** across two dozen
   separately-built F5 components and vendored third-party libraries — some of which (`tmstat`,
   `libbigpacket`, `tcpdump`) arrive as prebuilt RPMs and are never compiled here at all. So the
   *paddable* set is about half the hookable set, and the difference is owned by other teams' builds.
