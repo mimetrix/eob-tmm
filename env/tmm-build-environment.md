@@ -594,9 +594,15 @@ TMM and be called from it. Nothing had tested that. This records the integration
 this repo — [`../substrate/ls_vm.h`](../substrate/ls_vm.h),
 [`ls_vm.c`](../substrate/ls_vm.c), [`vm_stack_policy.h`](../substrate/vm_stack_policy.h),
 and the shields. The *working integration* lives in the TMM clone on the build box, not
-here. So [`../CLAUDE.md`](../CLAUDE.md)'s statement that nothing in this repo executes a
-shield stays true, and this repo does not become the prototype whose earlier version invited
-the wrong question. Read the artifacts here as candidates; read the box as the experiment.
+here. Read the artifacts here as candidates; read the box as the experiment.
+
+> **Updated 2026-08-14.** This paragraph used to close by citing
+> [`../CLAUDE.md`](../CLAUDE.md)'s statement that nothing in this repo executes a shield. That
+> convention was superseded on 2026-08-13 and the citation is removed. The distinction it was
+> drawing still holds and is the useful half: **this repo is not self-contained.** Its sources are
+> compiled into TMM elsewhere, so `make -C substrate check` exercises bench harnesses, not a data
+> plane. What changed is that `substrate/` now also holds the sources that really are built into a
+> running TMM — see [`../substrate/README.md`](../substrate/README.md) for which is which.
 
 ### uBPF builds inside TMM's toolchain container
 
@@ -716,6 +722,13 @@ objdump   http_psm_profile_name_lookup at 0xcbd940:
             call 4297c0 <ls_vm_call>        <- the data-path function calls the VM
             call *%rbp                      <- append_fn, the original path
 ```
+
+> **Snapshot, 2026-08-12 — superseded twice over. This section is kept as the build log it is.**
+> The mechanism has since run in a live TMM, so the "no" rows below are answered. And the
+> `call ls_vm_call` that this section treats as the achievement is the **designed-in call site**,
+> which was **removed on 2026-08-13** — it could only reach functions someone planted a call in,
+> and it mitigated the bug whether or not anything was armed, making it impossible to show that
+> arming did anything. The current mechanism patches the function's entry pad instead.
 
 **State the claim exactly, because it is easy to inflate.** What is true: the VM's code and a
 PREVAIL-verified program are **inside the TMM binary**, and a data-path function contains a

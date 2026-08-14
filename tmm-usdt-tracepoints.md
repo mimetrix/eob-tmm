@@ -243,8 +243,8 @@ them. What a TMM hook *can* see is the **IPC boundary** — direction, message t
 latency, and the verdict that came back. A genuine `bd`-internal hook is a *second engine instance in `bd`*,
 with its own program type, its own address space, and its own safe-point problem in multi-threaded C++ with
 no poll loop (`engine-hard-problems.md` §5) — out of scope for this catalog, and explicitly **not** the Live
-Shield Phase 1 target (`big-ip-live-shield-design.md` §12: Phase 1 is a designed-in call site on a `warm`/`cold` TMM
-path, precisely because `bd` is the hardest first target, not the easiest).
+Shield Phase 1 target (`big-ip-live-shield-design.md` §12: Phase 1 is a **patched function entry** on a
+`warm`/`cold` TMM path, precisely because `bd` is the hardest first target, not the easiest).
 
 ### 6.1 In-TMM enforcement filters (AFM, DoS, the TMM side of APM)
 

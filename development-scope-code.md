@@ -64,12 +64,15 @@ make -C substrate check
 **What this repo does and does not execute.** Everything under `substrate/` really runs, and
 `make -C substrate check` is the whole of it: header and wire-layout asserts, the safe-return gate
 cases, the schema, the offset check, and the budget pass over its own self-test. All of it is
-**build- and admission-time** material. An earlier revision of this repo also carried a prototype — a
-relay that loaded and ran a shield through uBPF and drove PREVAIL as a verify gate — and several
-sections below cited it as evidence that the load-and-run path worked. **That prototype has been
-removed and nothing replaces it**, so no claim of the form "this runs today" survives anywhere in this
-file. Each place one used to stand now says so explicitly. The skeletons are unchanged in substance;
-what changed is that they are now candidates only, with no executable counterpart.
+**build- and admission-time** material.
+
+> **Corrected 2026-08-14.** This paragraph used to end: an earlier prototype relay "has been removed and
+> nothing replaces it, so no claim of the form 'this runs today' survives anywhere in this file." The first
+> half is still true — that relay is gone. The second half is not. `substrate/` now holds sources that are
+> **compiled into a TMM which runs**, and `check_integrated.c` drives the whole slice on the bench. What is
+> still true, and is the distinction worth keeping, is that **the skeletons in this file remain candidates**:
+> they compile against the ABI header, and nothing links or executes them. The running mechanism and the
+> proposed product ABI have not been reconciled — see [`substrate/README.md`](substrate/README.md).
 
 ## Naming reconciliation
 

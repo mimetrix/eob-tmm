@@ -488,9 +488,11 @@ per-packet hooks. Certification has the best existing answer, since BIG-IP alrea
 WASM inline on evaluated appliances, so code outside the validated image is not a new question and only
 the JIT is novel. And **four exist only because function-boundary probes are on the table** — the
 build-specific probe context, the optimiser deciding the hookable set, the unwind information a
-trampoline needs, and the JIT's maturity. Take the narrowest form, designed-in call sites only (outcome 3
-of the measurement in [`design-review-findings.md`](design-review-findings.md) §4), and those four go away
-along with live-text patching — and so does the rendezvous. What remains is ordered publish, a
+trampoline needs, and the JIT's maturity. An earlier revision offered an escape from those four: take the
+narrowest form, designed-in call sites only (outcome 3 of the measurement in
+[`design-review-findings.md`](design-review-findings.md) §4), and they go away along with live-text patching
+and the rendezvous. **That escape was closed on 2026-08-13, when designed-in call sites were removed** — their
+reach is fixed at build time, which is precisely what a CVE defeats. So these four are unconditional. What remains is ordered publish, a
 reclamation policy, certification, and the ordinary work.
 
 - **uBPF's own hardening switches, which are per-program and mostly default-off.** `ubpf_create`
@@ -656,8 +658,9 @@ the rest of the design**, and none of them requires building the thing: measure 
 the idle cost with nothing armed, then the armed cost at rate (§1.1) — settle a `ctx` model that
 verifies against real TMM debug info, and arm one hook end-to-end in a lab TMM with core dumps still
 readable. The first of those is specified in `design-review-findings.md` §4, and what its result decides
-is **which of three forms the mechanism takes** — pad the image, pad an allowlisted subset of
-translation units, or designed-in call sites only — rather than whether to proceed. The threshold
+is **which of two forms the mechanism takes** — pad the image, or pad an allowlisted subset of translation
+units — rather than whether to proceed. (A third outcome, designed-in call sites only, was on this list until
+2026-08-13 and is no longer available.) The threshold
 separating those outcomes belongs to whoever owns the platform's published performance numbers, not to
 this document, and should be agreed before the experiment runs.
 
