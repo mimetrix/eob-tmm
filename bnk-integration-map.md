@@ -25,7 +25,7 @@ the bench evidence is what each in-TMM step was built on:
 | the shield's *decision* on the CVE condition | yes, but on a **synthetic** input | BNK pod, `LS_VM_SELFTEST` |
 | trampoline (the jump target) | yes | standalone, build box |
 | arming (install the jump) | yes — incl. on real private `.text` via `/proc/self/mem` | build box |
-| patching TMM's own `r-xp` `.text` so execution sees it | **yes** | build box (`patchtext2`) |
+| patching TMM's own `r-xp` `.text` so execution sees it | **yes** | build box ([`substrate/check_selfpatch.c`](substrate/check_selfpatch.c), `make check-selfpatch`) |
 | the safe swap (`text_poke_bp`) under contention | yes, cross-checked to the kernel — **incl. on real private `.text`** | build box (`check_swap_realtext`) |
 | **the whole Path B slice joined** — VM verdict drives an armed real function | **yes**, single-thread | build box (`check_integrated`) |
 | the same **under multi-core load** — safe swap + VM in the loop, armed/disarmed live | **yes, clean** (118M calls, 5.6M mid-patch traps, 0 faults/corrupt in 20s; 20-min soak) | build box (`check_swap_integrated`) |
@@ -60,9 +60,21 @@ There is no fallback now. The patched entry is the sole mechanism.
 
 ## 1 · Build side — link the Path B pieces into the BNK TMM
 
-- **Turn on `-fpatchable-function-entry=5,0`** for the BNK TMM build. Proven to compile clean
-  across 2,039 files. This is the per-build "leave a gap" step; it pads the TMM core (82–97%),
-  not the separately-built components.
+- **Turn on `-fpatchable-function-entry=5,0`** for the BNK TMM build, via
+  `CFLAGS_OPTIMIZE` in `Makefile.overrides`. Being an optimize flag, it applies to **every
+  translation unit the TMM build compiles — 100% of the code we own**, with the separately-built
+  components (OpenSSL, dedup, the prebuilt RPMs) untouched because they are other builds entirely.
+  **Do not restate that as "it pads the TMM core (82–97%)."** Those are two different measurements
+  and conflating them understates our own reach: the flag reaches 100% of our translation units,
+  and **82–97% of *emitted* functions carry a pad** because at `-O2` the optimiser inlines or folds
+  the rest away. The shortfall is the optimiser's, not the flag's.
+
+  > **Unresolved, and flagged rather than smoothed over:** the file count differs across documents —
+  > four say **2,039**, [`live-patch-runbook.md`](live-patch-runbook.md) says **2,041**, and the
+  > current `filelist` carries **1,710** `.c`/`.S` entries with 1,705 objects built. The provenance
+  > of 2,039 is not recoverable from the present tree, so all three should be treated as
+  > unverified until someone re-counts against a named build. The *100%* claim does not depend on
+  > the count and is checkable directly from `Makefile.overrides`.
 - **Add `trampoline_x86_64.S`, `ls_arm.c`, and a new `ls_swap.c`** (the `text_poke_bp` protocol
   extracted from `check_swap.c`) to `src/base`, register in `src/compile/filelist` with the uBPF
   include option, and add the new global-state symbols (arming slots, the patch state) to the
@@ -80,7 +92,7 @@ load and an instruction *fetch* can see different pages during copy-on-write, so
 
 Testing *execution* instead settles it. Write `0xcc` (a breakpoint) to a real function's pad via
 `/proc/self/mem`, then **call** the function — it **traps**, so the write was fetched. Measured
-(`patchtext2`, build box):
+([`substrate/check_selfpatch.c`](substrate/check_selfpatch.c), build box):
 - **control** — no write → the function runs, no trap;
 - **patched at the pad** (offset 4, right after `endbr64` — the real `-fpatchable-function-entry`
   slot) → **SIGTRAP**, so the write is executed;
