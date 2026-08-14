@@ -1,7 +1,25 @@
 # BIG-IP Runtime Compensating Controls ("Live Shield")
 ### Design proposal — embedded userspace eBPF for runtime CVE mitigation ahead of the patched build
 
-**Status:** Draft for architecture review
+**Status:** Draft for architecture review — **with the data-plane mechanism now proven on a running TMM (2026-08-13)**
+
+> **What changed since this was drafted.** Two things in here are settled by measurement rather than
+> argument now, and the text below has been corrected where it said otherwise.
+>
+> 1. **The mechanism works on a live TMM.** A shield is loaded over a socket into an already-running
+>    process, armed at a function entry while traffic flows, and disarmed — no rebuild, no restart.
+>    A hook fired 1:1 with requests through the proxy (16,000 of them). See
+>    [`load-path-scope.md`](load-path-scope.md).
+> 2. **Designed-in call sites are gone.** This document weighed them against patched function entries
+>    and treated both as live options. They were **removed from the TMM tree**, because their reach is
+>    fixed at build time and therefore cannot cover the unforeseen function a CVE lands on. The
+>    substrate now modifies **no F5 source file**. Passages arguing the trade-off are kept as the
+>    record of why the decision went this way; forward-looking claims that assumed both mechanisms
+>    have been corrected. Where "designed-in" refers to **USDT tracepoints**, it is still accurate and
+>    is left alone.
+>
+> Still not shown: **no CVE has been mitigated on live traffic**, and **per-call hook cost is
+> unmeasured** — see [`load-path-scope.md`](load-path-scope.md) §7 for what was and was not established.
 **Audience:** TMOS (BIG-IP's operating system) architecture, F5 SIRT (Security Incident Response Team), BIG-IP security engineering
 **Scope:** On-box, vendor-authored runtime shields for TMOS's *own* control-plane and data-plane code paths
 **Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — Live Shield is its first instance) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `substrate/` (**candidate ABI (application binary interface) artifacts + their checkers** — shield ABI header, hook-map schema and example map, budget/offset/gate checks; **not a running prototype** — no shield executes anywhere in this repo)
@@ -217,7 +235,7 @@ A userspace eBPF VM runs eBPF bytecode entirely in userspace — an interpreter 
 There are two ways to get userspace eBPF into a process, and the distinction is the crux of this design (§3.1):
 
 - **Inject** into an unmodified, running process (the bpftime model — `LD_PRELOAD`/ptrace, binary rewriting, a syscall-emulation shim). Powerful for instrumenting software you don't own, but brittle and invasive. **Evaluated and rejected** — see §3.1, on documented grounds: the kernel forbids `bpf_override_return` on uprobes, and injection needs ptrace/`LD_PRELOAD` against stripped binaries at guessed offsets. (No empirical comparison is claimed — this repo ships no running prototype of either path.)
-- **Embed** the VM as a library and call it at designed-in hook points — and, via compiler-reserved entry pads, at function boundaries the build already emitted (§5.3). This is what Live Shield uses. Both halves matter: the designed-in catalog covers what was anticipated, and the function boundaries are what make an *unforeseen* CVE shieldable without a pre-placed hook.
+- **Embed** the VM as a library and reach functions through compiler-reserved entry pads, rewritten at run time into a call to an F5 trampoline (§5.3). This is what Live Shield uses. An earlier design also offered *designed-in call sites* — a hand-added call in F5's source at each function worth hooking — and both halves were said to matter. **Only one does, and the other was removed 2026-08-13:** a designed-in catalog covers what was anticipated, which is precisely what a CVE is not. The patched entry is what makes an *unforeseen* CVE shieldable without a pre-placed hook, and it is now the sole mechanism.
 
 For a customer, userspace eBPF's headline benefit would be routing around a locked-down kernel. **For F5 as the vendor that benefit is irrelevant** — we can enable kernel eBPF in our own build, and we already ship kernel eBPF in BIG-IP eBPF Observability ("eob") for Kubernetes traffic on Cloud-Native Edition.
 
@@ -364,7 +382,7 @@ The schema says a shield *targets* a hook point; it does not by itself say how a
 **Two attach modes**, declared per hook point in the hook-point map:
 
 - `observe` — the program runs at function entry/exit, may read arguments and **return a value the host aggregates**, but **cannot alter control flow**. All telemetry, monitor-only points, and evidence collection use this mode. No skippability question arises for it (below); it still executes in TMM's address space and still carries a per-invocation budget (§9, §11).
-- `filter` — the program runs at a **designed-in decision point** and its return value selects among a *fixed, enumerated set of outcomes the host code already knows how to take*. That set is canonical and defined once in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §2 — **PASS · DROP · RESET · SAFE-RETURN · STEER · SAMPLE** — and it is six, not three. `observe` is **not** a seventh member: it is the host declining to *apply* whichever outcome the program selected while still counting it, with the same program unchanged. A `filter` point is not an arbitrary function entry; it is a location TMOS source explicitly compiles in, immediately before the vulnerable operation, at a place where each enumerated outcome leaves TMM in a consistent state — either a designed-in call site, or a **patchable function entry** drawn from the build's signed hook map, where the enumerated outcome is that function's safe-return policy.
+- `filter` — the program runs at a **designed-in decision point** and its return value selects among a *fixed, enumerated set of outcomes the host code already knows how to take*. That set is canonical and defined once in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §2 — **PASS · DROP · RESET · SAFE-RETURN · STEER · SAMPLE** — and it is six, not three. `observe` is **not** a seventh member: it is the host declining to *apply* whichever outcome the program selected while still counting it, with the same program unchanged. A `filter` point is not an arbitrary function entry; it is a location TMOS source explicitly compiles in, immediately before the vulnerable operation, at a place where each enumerated outcome leaves TMM in a consistent state — a **patchable function entry** drawn from the build's signed hook map, where the enumerated outcome is that function's safe-return policy. (Designed-in call sites were the other option here and were removed — see §5.3.)
 
 **Why not arbitrary override.** Out of scope is an *unpoliced* synthesized return at a guessed offset
 in a foreign binary (the `bpf_override_return`-on-uprobes shape the kernel itself forbids): it fakes a
@@ -701,9 +719,9 @@ Userspace eBPF is not free, but the embedded model is the cheap end of it. With 
 ## 12. Phased delivery
 
 **Phase 1 — MVP (in TMM, on a non-hot path, against a real bug).**
-Embed the userspace eBPF VM and ship one shield against **a designed-in call site on a `warm`/`cold` TMM path** — the worked example in §14. Note that non-hot is a claim about *structure*, and §14's hook is still attacker-reachable, so it carries a measured budget like any other (§9). Implement all three modes, signing, hit evidence to SIEM, and version-based auto-retirement.
+Embed the userspace eBPF VM and ship one shield against **a patched function entry on a `warm`/`cold` TMM path** — the worked example in §14. *(This phase originally named a designed-in call site; that mechanism was removed 2026-08-13, and the patched entry has since been proven on a running TMM.)* Note that non-hot is a claim about *structure*, and §14's hook is still attacker-reachable, so it carries a measured budget like any other (§9). Implement all three modes, signing, hit evidence to SIEM, and version-based auto-retirement.
 
-**Not `bd`.** `bd` sits off the hot path, which makes it look like the safe first target; it is the hardest one in the set, for reasons that are properties of its code. It is multi-threaded C++ with no poll loop and therefore **no defined safe point** for delivery — which §5 requires — plus mangled names, references and by-value structs in its signatures, and RAII (resource-acquisition-is-initialization) destructors that a skipped body silently fails to run. A designed-in TMM call site exercises the in-TMM spine (the VM, the safe point, the trampoline, per-core fan-out) that Phases 2–3 depend on. `bd` follows once that spine exists.
+**Not `bd`.** `bd` sits off the hot path, which makes it look like the safe first target; it is the hardest one in the set, for reasons that are properties of its code. It is multi-threaded C++ with no poll loop and therefore **no defined safe point** for delivery — which §5 requires — plus mangled names, references and by-value structs in its signatures, and RAII (resource-acquisition-is-initialization) destructors that a skipped body silently fails to run. A patched TMM function entry exercises the in-TMM spine (the VM, the safe point, the trampoline, per-core fan-out) that Phases 2–3 depend on. `bd` follows once that spine exists.
 
 **Phase 2 — control-plane daemons.**
 Generalize hook points across the resident native daemons (httpd, MCPD, and the other C config daemons — not `tmsh`, which is a per-invocation shell) using the **kernel-eBPF/uprobe adapter** (kernel-space, the Cisco analog — §5.1), and stand up the **separate JVM adapter** for the iControl REST stack (`restjavad`/`icrd`) plus a **Node adapter** for iControl LX (`restnoded`), since native uprobes reach neither (§5.1). Three runtimes, three implementations — that is the honest scope of "the control-plane adapter." This is the clean Cisco analog, and the CVE classes it reaches (auth bypass, config-utility RCE, command injection) are the ones historically disclosed most often — again, uncounted here (§10.1). Many of them live in the iControl REST surface, so the JVM adapter is not optional.

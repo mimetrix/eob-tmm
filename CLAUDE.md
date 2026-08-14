@@ -1,9 +1,32 @@
 # Working conventions — eob-tmm
 
 Guidance for Claude Code sessions and contributors working in this repo. This repo holds design
-proposals, candidate ABI artifacts, and visual explainers for the embedded-eBPF-in-TMM proposal.
-There is deliberately **no prototype**: an earlier relay named for TMM invited the wrong question and
-was removed. Nothing in this repo executes a shield, and no claim should imply otherwise.
+proposals, candidate ABI artifacts, visual explainers, and the **substrate sources that are compiled
+into TMM**.
+
+**Status, and the distinction that governs every claim (updated 2026-08-13).** The mechanism runs in
+a live TMM on BNK/datkube: a shield is loaded over a socket into an already-running process, armed at
+a function entry while traffic flows, and disarmed again — no rebuild, no restart. A hook armed on
+`http_parse_client_headers` fired exactly once per request across 16,000 requests through the proxy.
+The substrate modifies **no F5 source file**; it adds new files, `filelist`/whitelist entries, and one
+compiler flag.
+
+That is not licence to claim more than was shown. Three lines still hold:
+
+- **This repo is not self-contained.** Its sources are built into TMM elsewhere. `make -C substrate
+  check` exercises bench harnesses, not a data plane. Reproducing the live results needs the TMM
+  build tree and the cluster.
+- **Mechanism proven ≠ outcome proven.** No CVE has been mitigated on live traffic. The BNK target
+  is not even reachable there (`prot_transfer_log_profile` has no Kubernetes CRD, and the caller
+  guards the null), so "it stops the crash" has never been demonstrated end to end.
+- **Per-call hook cost is unmeasured.** The counter mean is dominated by preemption artifacts and the
+  bench op that would give a clean minimum currently wedges the loader thread. Quote no per-call
+  number until that is fixed — see `load-path-scope.md` §7.
+
+The earlier convention read "there is deliberately no prototype; nothing in this repo executes a
+shield." That was true when written and is now superseded. **Replace such claims when they are
+falsified rather than letting them stand — and add the new limit in the same edit**, which is why the
+three bullets above exist.
 
 ## 1. The git repo is the system of record — publishing to claude.ai needs explicit approval
 
