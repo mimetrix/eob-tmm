@@ -36,13 +36,11 @@ optimize flag it reaches **every translation unit the TMM build compiles — 100
 own.** The separately-built components (OpenSSL, dedup, the prebuilt RPMs) are untouched because
 they are different builds.
 
-> **Two numbers that are easy to conflate, and the confusion always runs the same way.** The *flag*
-> reaches 100% of our translation units. Separately, **82–97% of *emitted* functions carry a pad** —
-> the gap being functions the optimiser inlined or folded at `-O2`. A hookable set of 82–97% is the
-> honest figure; "the flag pads 82–97% of the core" is not, and understates our own coverage.
->
-> A third number, **48.9%**, is whole-binary. It counts other teams' components as misses, so it is
-> not a coverage figure for anything we control.
+> **Three numbers, measuring three different things.** The **flag** reaches **100%** of our
+> translation units. **82–97%** of *emitted* functions carry a pad — the gap is functions the
+> optimiser inlined or folded at `-O2`, so that is the **hookable set**. **48.9%** is whole-binary,
+> which counts other teams' separately-built components as misses and therefore measures the build
+> layout rather than our coverage.
 
 Sources, `filelist` entries and the whitelist symbols are in
 [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md).
@@ -60,8 +58,8 @@ The full safe swap runs on that surface: **163M calls, 8.9M mid-patch traps hand
 zero corrupt returns**, while the unsafe baseline faults in the millions.
 [`substrate/check_selfpatch.c`](substrate/check_selfpatch.c) · `make -C substrate check-selfpatch`.
 
-Hugepage backing and the node's code-integrity policy were open here; the live arm settles both,
-since the patch lands and executes on the datkube node.
+The live arm settles hugepage backing and the node's code-integrity policy too: the patch lands
+and executes on the datkube node.
 
 ## 3 · The safe swap in TMM's threads
 
@@ -69,9 +67,9 @@ since the patch lands and executes on the datkube node.
 `membarrier` serialises — and the BNK node's kernel supports it. It needs **no poll-loop change**,
 which is why it won.
 
-A *poll-loop rendezvous* would be cheaper per arm, since TMM's run-to-completion loop has a natural
-point where no thread is inside a hooked prologue. It touches the loop, and was not needed. It
-remains available as a simplification rather than a gap.
+A *poll-loop rendezvous* is the cheaper alternative per arm, since TMM's run-to-completion loop has
+a natural point where no thread is inside a hooked prologue. It costs a change to the loop, and is
+available if arming ever becomes frequent enough to justify one.
 
 ## 4 · SIGTRAP coexistence
 
@@ -103,27 +101,23 @@ must avoid the allocator.** Use `mmap`.
 
 ## 6 · Triggering a real CVE — blocked on BNK
 
-The worked example cannot be driven here, and the reason matters before picking a replacement.
+**The defect is a race.** The caller reads `flow_get_listener(cf)->prot_transfer_log_profile` into a
+local and guards that local; the callee then re-reads live listener state. The window opens if the
+profile is released between those two reads. `fw_log_release_protocol_transfer_from_listener()`
+frees before it nulls, so the window carries a use-after-free as well as a null dereference.
 
-**The defect is a race, not a missing configuration.** The caller reads
-`flow_get_listener(cf)->prot_transfer_log_profile` into a local and guards *that local*; the callee
-re-reads live listener state. An unset profile is therefore **not** the trigger — the guard covers
-it. The window is a **check-then-reread race**, and
-`fw_log_release_protocol_transfer_from_listener()` frees before it nulls, so the window carries a
-use-after-free as well as a null dereference.
-
-**Why BNK cannot reach it:** `prot_transfer_log_profile` has **no Kubernetes CRD field**, so the
-profile cannot be attached and therefore cannot be released mid-flow. There is no external trigger.
+**Triggering it therefore requires attaching a protocol-transfer profile and releasing it mid-flow.**
+On BNK, `prot_transfer_log_profile` has no Kubernetes CRD field: it cannot be attached, and what
+cannot be attached cannot be released. There is no external trigger on this form factor.
 
 **To unblock, one of:**
 
-1. **A different CVE that is reachable on BNK** — the preferred route; an SPK advisory list would
-   settle it.
+1. **A different CVE reachable on BNK** — the preferred route; an SPK advisory list would settle it.
 2. **Appliance or VE**, where the profile is configurable — which first needs the source-tree
-   question answered.
-3. **Driving the race from inside** via a test-only hook, stated plainly as synthetic.
+   question answered ([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10).
+3. **Driving the race from inside** via a test-only hook, reported as synthetic.
 
-Until then, **"it stops the crash" is unproven end to end.**
+Until one of those lands, **"it stops the crash" is unproven end to end.**
 
 ## 7 · Cost and the runtime guard
 
