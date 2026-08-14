@@ -7,11 +7,12 @@ out-of-line body, reached by rewriting its patchable-entry pad into a call to an
 run time. Programs either **observe** internal state (a tracepoint) or **act** on a verdict the host
 applies (a datapath control) — each one **statically proven safe before it loads**.
 
-An earlier design also offered *designed-in call sites* — an explicit call into the VM, hand-added to
-F5's source at each function worth hooking. **That was removed** (2026-08-13): its reach is fixed at
-build time, so it can never cover a function nobody thought to edit, which is the defining property
-of a CVE. The consequence is worth stating plainly — **the substrate now modifies no F5 source file
-at all.** It adds new files, `filelist` and whitelist entries, and one compiler flag.
+**The substrate modifies no F5 source file.** It adds new files, `filelist` and whitelist entries, and
+one compiler flag — nothing else. Startup registers itself through TMM's own `INIT_FUNC` linker set,
+the same mechanism `urlcat` and `pem_lib` use, so no existing file calls into the VM.
+([`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md) is the complete delta; it is checkable
+in one `git status`.) The single mechanism is the patched entry — the alternative that was also on
+the table, and why it lost, is in [`mechanism-tradeoff.md`](mechanism-tradeoff.md).
 
 **Why this matters, in one sentence:** whoever shortens the distance from **code commit to code
 deployed** wins. TMM — BIG-IP's data-plane microkernel — already changes behaviour at runtime through
@@ -290,5 +291,7 @@ loader thread. So per-call performance claims remain design claims awaiting meas
   a designed-in hook, a uBPF track and a PREVAIL verify gate. **It was removed deliberately.** Its
   name read as an F5 component and invited the wrong question — whether it was cut-down TMM source —
   and a toy relay standing in for TMM invites an argument about the analogy rather than the design.
-  The cost of removing it: the verify gate is no longer demonstrable here.
+  The stated cost at the time — "the verify gate is no longer demonstrable here" — **no longer
+  applies:** `make -C substrate check-shields` compiles each candidate program and asserts PREVAIL's
+  verdict on it in **both** directions, so a rejection test that starts passing fails the build.
 - Nothing here is production TMM source.
