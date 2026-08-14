@@ -900,6 +900,22 @@ if you will be back soon.
 
 ## Gotchas, in one place
 
+### The six empty `spk-app-*` namespaces are ours, and are supposed to be there
+
+`kubectl get ns` on datkube shows `spk-app-1` … `spk-app-6`, all empty, and they look like someone
+else's leftovers on a shared cluster. They are not. **The `bnk-core` profile creates them in its
+own `install:` step** — six `kubectl create ns spk-app-N || true` lines, with matching deletes in
+`uninstall:` (`~/code/datkube/profiles/bnk-core/profile.yaml`; `ai-tokenomics-core` has the same
+block).
+
+They are a fixed set of tenant namespaces for SPK multi-tenancy demos. Nothing in this work deploys
+into them, so each holds only what Kubernetes and the profile add automatically: `default`
+serviceaccount, `kube-root-ca.crt`, and an `artifactory-credentials` image-pull secret.
+
+Check the creation timestamps if you doubt it — they appear within seconds of the
+`f5-ipam-controller` helm install, in the middle of the profile run, not at cluster creation.
+**Everything this work uses lives in `default`.**
+
 | symptom | cause |
 |---|---|
 | box healthy on console, **every port refuses**, never recovers | docker/kind allocated `172.18.0.0/16`, which is the NATed path back to this sandbox. Step 5. |
