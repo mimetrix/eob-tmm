@@ -477,8 +477,9 @@ Exactly one is both unavoidable and hard — **the safe point**, and an earlier 
 overstated it as "needed for any dynamic load into a running TMM whatever the hook kind." It is not.
 "Safe point" was one label over three guarantees, and only the first is unconditional: an **ordered
 publish** into a slot the hot path already reads, which modifies no text and needs no rendezvous. A
-**cross-core rendezvous** is needed only to change live text, which makes it x86-64 work in the
-function-boundary form and nothing at all in the designed-in form. **Quiescence** for reclamation is
+**cross-core rendezvous** is needed only to change live text, which makes it x86-64 work. (It was
+nothing at all in the designed-in-call-site form — but that form was removed on 2026-08-13, so the
+rendezvous is now unavoidable rather than optional.) **Quiescence** for reclamation is
 needed in every form, but has three answers — a poll-loop epoch, per-invocation read-side markers, or a
 capped leak. The decomposition and what each form costs is in
 [`development-scope.md`](development-scope.md) §1, items 0 · 0b · 0c. Two are not open questions: keeping the verifier out of TMM is a decision
