@@ -2063,7 +2063,7 @@ is not a follow-on** and is called out below.
   file it. **(a) Fuel is the mechanism, not the optional extra.** uBPF's own API states that
   `ubpf_set_instruction_limit` *"has no effect on JIT'd programs"* (`ubpf/vm/inc/ubpf.h`), so
   enforcing a bound means **patching uBPF's JIT** — F5-owned, upstreamable, and the one place the
-  "reused as-is" claim does not hold. **(b) Wall-clock is *reporting*, not enforcement**, so naming
+  "reused (uBPF with an F5 patch; see substrate/ubpf-patches/)" claim does not hold. **(b) Wall-clock is *reporting*, not enforcement**, so naming
   the deliverable "wall-clock deadline" named the unmeasurable half: on aarch64 the counter ticks at
   tens of MHz (10–40 ns granularity) against a hot hook's budget of tens of nanoseconds.
   **(c) "The worked example's cold log-site hook does not need it" was the `path_class` error** — a
@@ -2123,7 +2123,7 @@ items 1–12 is a subsystem on the scale of writing a VM or a verifier. That rem
 reusing uBPF and PREVAIL." The first sentence is retired. Nobody writes a VM, a verifier or a
 compiler — that reuse is real, and narrow. What is being built instead is a **code-patching,
 live-text, dynamic-code-loading facility inside the crown-jewel process**, carrying a build-pipeline
-toolchain and a permanent per-build ABI, and needing a fork of one of the three reused components to
+toolchain and a permanent per-build ABI, and needing a fork of one of the three reused components (uBPF now with an F5 patch) to
 get time safety at all (item 15). Sized honestly that is **subsystem-scale work** for a
 defensible v1 on two architectures, plus the TMA and certification engagement
 ([`engine-hard-problems.md`](engine-hard-problems.md) §6.1). No month figure is offered anywhere in

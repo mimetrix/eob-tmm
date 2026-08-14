@@ -78,7 +78,7 @@ ahead of time, but *how long* they take is not.
   counter at loop back-edges) is cheap and deterministic — but uBPF's own API documents that the
   instruction limit *"has no effect on JIT'd programs"* (`ubpf.h`, on
   `ubpf_set_instruction_limit`), so fuel means **patching uBPF's JIT**, which costs the
-  "reused as-is" claim on one of the three reused components. **Wall-clock** reads a clock at
+  "reused (uBPF with an F5 patch; see substrate/ubpf-patches/)" claim on one of the three reused components (uBPF now with an F5 patch). **Wall-clock** reads a clock at
   back-edges — but on aarch64 the architectural generic timer (`CNTFRQ_EL0`) ticks at tens of MHz,
   a granularity of tens of nanoseconds, against a hot hook's budget of tens of nanoseconds, so it is
   **not measurable at the granularity that matters** on that architecture. **Signals/timers** cost a

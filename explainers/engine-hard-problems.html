@@ -344,7 +344,7 @@
       <p style="margin-top:.7rem"><b>Fuel</b> (a counter at loop back-edges) is cheap and deterministic — but
         <b>uBPF</b>, the small userspace eBPF interpreter and <b>JIT</b> (just-in-time native compiler) this design
         embeds, states that its limit <em>&ldquo;has no effect on JIT'd programs&rdquo;</em>: fuel means
-        <b>patching uBPF's JIT</b>, costing the &ldquo;reused as-is&rdquo; claim on one reused component. (The limit
+        <b>patching uBPF's JIT</b>, costing the &ldquo;reused (uBPF with an F5 patch; see substrate/ubpf-patches/)&rdquo; claim on one reused component. (The limit
         <em>does</em> work in uBPF's <b>interpreter</b>, so an interpreter-only high-assurance build has enforceable
         fuel with no fork.) <b>Wall-clock</b> reads a clock at back-edges — but on aarch64 that counter ticks at
         tens of MHz, 10–40&nbsp;ns granularity against a hot-hook budget of tens of nanoseconds:
