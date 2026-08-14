@@ -114,6 +114,22 @@ to F5's source. `http_psm.c` is now pristine.
 
 ## 7. Packaging traps
 
+**`make clean_rpms` between `make tmm` and `make container`, or the image ships a stale binary.**
+This one is silent and cost two builds. `make container` runs `alien` over `RPMS/`, so if the RPM
+was not regenerated the deb is built from the *previous* binary — the build tree is correct, the
+image is not, and nothing warns. `make tmm-gdb` gets this right (`make tmm && make clean_rpms &&
+make … container`); a hand-rolled `make tmm && make container` does not.
+
+The symptom is the worst kind: everything reports success, the deployed code silently predates your
+edit, and you debug the wrong layer. Check a string you added is actually in the image before
+shipping:
+
+```sh
+cid=$(docker create <tag>); docker cp "$cid:/usr/bin/tmm64.no_pgo" /tmp/b; docker rm "$cid"
+strings /tmp/b | grep -c '<a string from your change>'
+```
+
+
 These are not substrate issues but they will cost hours:
 
 - `Dockerfile.runtime:53-54` overrides `tmm` → `tmm.debug` when a debug binary is present.
