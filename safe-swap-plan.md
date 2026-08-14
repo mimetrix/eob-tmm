@@ -1,4 +1,11 @@
-# The safe swap — plan before building
+# The safe swap — plan, and what building it returned
+
+> **Status, 2026-08-14 — this was written as a plan and the thing it plans is now built and
+> running.** `ls_swap.c` implements the `text_poke_bp` protocol below, it is compiled into TMM, and
+> it is what arms and disarms a function entry inside a live pod under traffic — no poll-loop change
+> was needed, which settles the A-vs-B choice §3 leaves open in favour of the self-contained form.
+> The Results sections from §6 onward are outcomes; everything before them is the reasoning that got
+> there, kept because the protocol argument is why the stress pass is believable.
 
 ### The last piece of Path B: rewrite a function's entry into a hook (and back) while other CPU cores are executing that exact code, without ever letting one of them run a half-written or stale instruction. This maps the hazards, the candidate mechanisms, the test that can actually catch a mistake, and the iterate-till-right loop.
 
@@ -188,6 +195,11 @@ and a naive swap cannot — both demonstrated on real hardware and matched to th
 Does **not** establish: behaviour inside TMM's real poll loop (rung 6, integration), the A-vs-B
 choice for the final form, or that a stress pass alone proves cross-modifying-code correctness —
 it does not, which is why this leans on the protocol match.
+
+> **The first two have since been established.** The swap runs inside a live TMM's real threads, and
+> the A-vs-B question resolved to **A, `text_poke_bp` with no poll-loop change**. The third stands
+> and always will: a stress pass is not a proof, which is why the protocol match to the kernel's own
+> design remains the load-bearing argument.
 
 ### Now confirmed on the real surface — private `.text`, patched via `/proc/self/mem`
 

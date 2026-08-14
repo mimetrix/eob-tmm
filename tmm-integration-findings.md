@@ -15,6 +15,13 @@ was obtained. What a submittable change would require is recorded separately in
 [`env/tmm-build-environment.md`](env/tmm-build-environment.md), as reconnaissance for a later
 effort rather than as a list of things left undone.
 
+> **Updated 2026-08-14.** That paragraph describes the 2026-08-12 prototype and stays as written,
+> but the substrate has since moved past every objection in it. It now respects TMM's include-world
+> split (`ls_prep.c` carries the `-nostdinc` half, `ls_vm_load.c` the `STDINC` half, and only a
+> `void(void)` crosses), registers itself through TMM's own `INIT_FUNC` linker set, and **modifies
+> no F5 source file** — `http_psm.c` is pristine. What a submittable change requires is no longer
+> only reconnaissance: see [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md).
+
 Scope throughout: **BNK / MBIP**, x86-64, `tmm/tmm` at `e2104734a9`, on an Intel Xeon Gold 6348
 @ 2.60 GHz. Nothing here transfers to the appliance or VE builds without being redone —
 they are separate compilations, and a compilation is what most of these numbers are about.
@@ -327,9 +334,14 @@ before trusting a symbol address.
 
 ## 6 · What is still not established
 
-- **Traffic has never reached the hook.** The `Pool` and `F5VirtualServer` are configured and
-  TMM commits both, but connections are refused; the prime suspect is an address conflict on the
-  VIP. `fired` is 0 from real traffic.
+> **Read this section as of 2026-08-12; two entries have since been answered.** Marked inline
+> rather than deleted, because what was blocking and how it cleared is part of the record.
+
+- ~~**Traffic has never reached the hook.**~~ **Answered 2026-08-13.** The connection refusals were
+  a routing problem, not a hook problem. A hook armed on `http_parse_client_headers` then fired
+  **exactly once per request across 16,000 requests** — 1:1, so the hook demonstrably sits on the
+  request path. What that does *not* show is a shield changing an outcome: every program armed live
+  so far returns `FALLTHROUGH` by construction.
 - **The crash is not demonstrated with a captured exit code.** The shield's *decision* is
   demonstrated in both directions; the consequence of not shielding is inferred from a container
   that dies at init under one environment variable and is replaced.
@@ -338,5 +350,7 @@ before trusting a symbol address.
 - **aarch64.** Every number here is x86-64.
 - **The appliance and VE builds.** Same source tree, different compilations; the pattern
   transfers, the measurements do not.
-- **Everything above rung 1.** Changing a shield still means a rebuild in any configuration
-  that could ship: the runtime load path exists but is unauthenticated, so it cannot.
+- ~~**Everything above rung 1.**~~ **Partly answered 2026-08-13.** Changing a shield no longer
+  means a rebuild: a program is loaded over a socket into a running TMM and armed while traffic
+  flows. The second half of the sentence is untouched and is now the whole of the objection — **the
+  load path is unauthenticated**, so no configuration that could ship may use it. Item 4.

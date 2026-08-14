@@ -54,6 +54,23 @@ image" page draws the line:
 So *"you will need Perforce"* is true for CBIP and false for MBIP. Source is git; the
 build machine is a container you pull.
 
+> **Open question, and it is load-bearing: is it one source tree or two?** This table says the two
+> worlds use different *source-control systems*. It does not say whether they hold the **same
+> source**. Large products commonly mirror one depot into both, but **nobody here has verified
+> that**, and everything measured or built in this repo is **MBIP/BNK only**.
+>
+> Reading `#ifdef`s would not settle it either, because at least one form-factor difference we hit
+> is not a conditional at all: `sthread_handler_register()` — which initializes the per-thread
+> allocator's spinlocks — is called from exactly one site, `dev/ndal/xnet/if_xnet.c:1642`, and
+> **BNK does not load xnet**. Same source, different linked set, different runtime behaviour. That
+> is why `malloc` on a thread we create spins forever here and would very likely not on an
+> appliance.
+>
+> **What to do about it:** ask the TMM team whether GitSwarm `tmm/tmm` is the single source of
+> truth with Perforce mirrored. If it is not, diff the two for the files in
+> [`../substrate/TMM-TREE-DELTA.md`](../substrate/TMM-TREE-DELTA.md) before any claim is made that
+> the mechanism carries to appliance or VE.
+
 **Datkube is not the build system.** It is a `kind` (Kubernetes-in-Docker) cluster for
 *running* TMM. The build uses one plain docker container with no orchestration at all.
 Both involve containers and that is the whole of the resemblance.

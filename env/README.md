@@ -20,7 +20,7 @@ machines*, not proposal content.
 | File | Purpose |
 |---|---|
 | [`bnk-dev-runbook.md`](bnk-dev-runbook.md) | **The copy-paste procedure.** Exact CLI commands to stand up the BNK build box and the Datkube run box from nothing, in order, with each gotcha stated where it bites. Every command in it was executed. |
-| [`tmm-build-environment.md`](tmm-build-environment.md) | **The reference.** Why each runbook step exists: CBIP-vs-MBIP, the BNK pipeline, one-source-tree-three-form-factors, what is gated, the stacks, the docker address-pool trap, and what has been measured. |
+| [`tmm-build-environment.md`](tmm-build-environment.md) | **The reference.** Why each runbook step exists: CBIP-vs-MBIP (**two** build worlds, and whether they share one source tree is *unverified* — see that doc), the BNK pipeline, what is gated, the stacks, the docker address-pool trap, and what has been measured. |
 | [`openstack-cli-reference.md`](openstack-cli-reference.md) | How to install and drive `python-openstackclient` against the F5 stacks; image selection, network gotchas, instance launch recipe. |
 | [`sandbox-ebpf-limitations.md`](sandbox-ebpf-limitations.md) | What the Claude dev sandbox can do with eBPF (build/codegen only — capabilities are stripped from the bounding set, so nothing loads). |
 | [`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md) | The 2026-07-17 BIG-IP VE boot attempt and the kernel-3.10/no-BTF blocker it found. |

@@ -121,25 +121,42 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
   signal mask and spun on `EINTR` instead of parking in `accept()`, and TMM aliases `malloc` to its own
   per-core allocator (`kern/malloc.c:48`), which spins forever on a thread we create — scratch now comes
   from `mmap`.
-- **What is still bench-only:** the shield actually changing a request's outcome. No traffic has been
-  driven through the hooked function while armed, so this is live-*patched*, not yet live-*shielded*.
-- **Still bench-only, and not superseded:** the whole slice joined — a VM verdict actually driving an
-  armed real function's behaviour. The bench proved that; the pod has not been asked to yet. The
-  remaining work is steps 13–16 against live traffic: configure the trigger, drive HTTP through the
-  Gateway path, and show the crash stop while armed and return when disarmed.
+- **Traffic has since run through an armed hook.** A hook armed on `http_parse_client_headers` fired
+  **exactly once per request across 16,000 requests**, and 10 loads during 9,000 requests produced no
+  failures with latency percentiles unchanged. So the hook demonstrably sits on the request path and
+  costs nothing visible at that resolution.
+- **What is still bench-only:** the shield actually **changing** a request's outcome. Every live
+  program armed so far returns `FALLTHROUGH` by construction, so what has been shown is the
+  *mechanism* on live traffic, not the *mitigation*. This is live-patched and live-exercised, not yet
+  live-shielded.
+- **And the remaining step is blocked, not merely pending.** Steps 13–16 need the CVE triggered on
+  live traffic, and on BNK it cannot be: `prot_transfer_log_profile` has **no Kubernetes CRD field**,
+  so the profile cannot be attached and the check-then-reread window cannot be driven from outside.
+  (The earlier premise here — "leave the protocol-transfer profile unset" — was wrong as well: the
+  caller guards its local, so an unset profile is not the trigger.) Closing this needs a different
+  target CVE that is reachable on BNK, or an appliance/VE where the profile is configurable. See
+  [`bnk-integration-map.md`](bnk-integration-map.md) §6.
+- **Per-call hook cost remains unmeasured** — the counter mean is dominated by preemption artifacts,
+  and the bench op that would give a clean minimum still runs on the loader thread and wedges it.
 
-## The two honest gaps to a real production live-patch
+## The three honest gaps to a real production live-patch
 
-Everything above is built, bench-proven, reused, or the wiring now in progress — **except two things**,
-and they are the difference between this dev demo and a shippable capability:
+Everything above is built, bench-proven, reused, or the wiring now in progress — **except three
+things**, and they are the difference between this dev demo and a shippable capability:
 
 1. **Signing (step 10) + in-TMM signature verification (step 12).** Today the loader accepts unsigned
    programs; production must reject anything not signed by F5's key. This is the trust perimeter and
    feeds the formal **TMA** (Threat Model Analysis), a gating prerequisite.
-2. **Fleet distribution (step 11).** Getting the signed object to appliances is out of this repo's
+2. **The signed hook map (step 5).** This was listed as in-progress rather than as a gap until the
+   live runs made its absence concrete: with no map, a `LOAD` cannot name a function. The **entry
+   address is supplied by hand**, it moved with every rebuild during this work, and it has to be read
+   from the matching `tmm-debuginfo` package rather than the build tree, because packaging re-links
+   the binary. Nothing about that is shippable, and the generator — a parameter classifier over DWARF
+   against an optimised build — is the *least-proven engineering assumption* in the package.
+3. **Fleet distribution (step 11).** Getting the signed object to appliances is out of this repo's
    scope but on the critical path to "ship a shield, no window."
 
-Neither is invention; both are named, scoped work.
+None is invention; all three are named, scoped work.
 
 ---
 
