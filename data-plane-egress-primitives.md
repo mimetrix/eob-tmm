@@ -207,6 +207,26 @@ Wakeup is a **`STREAM`** concern only. A `RECORD` ring has no standing drainer t
 
 ### 5.7 shm lifecycle & crash semantics
 
+> **Measured on BNK/datkube, 2026-08-14** (`env/scripts/bnk-check-shm.sh`, re-runnable):
+>
+> - **`/dev/shm` is present and writable** in the `f5-tmm` container, tmpfs, and two processes map
+>   the same segment and see each other's writes in both directions. The basic requirement holds.
+> - **The cap is 64 MB** (`size=65536k`). That is the ceiling on *total* ring bytes across every
+>   core and sink, not per ring — it turns §8's "ring sizing per core / per sink" from an open
+>   question into a division problem with a fixed numerator.
+> - **A sidecar can read what `f5-tmm` writes.** Containers in a pod share the IPC namespace by
+>   default, so containerd bind-mounts one `/dev/shm` into each. **The drain agent can be a sidecar
+>   with no deployment change** — no `emptyDir{medium: Memory}`, no volume, no manifest edit. That
+>   was the deployment question this section left open and it is now answered.
+>
+> **What this does not establish, and it is the half that can still invalidate the design:** that a
+> **TMM poll thread** can create and write the mapping. TMM has its own memory manager, and a thread
+> we create already cannot call `malloc` — it spins on an uninitialised spinlock
+> ([`load-path-scope.md`](load-path-scope.md) §1). Only a build doing the mapping from `INIT_LATE`
+> settles it. Until then this section's lifecycle is proven for ordinary processes in the container
+> and assumed for the producer.
+
+
 **Mapping — and which single word the consumer must be allowed to write.** Own `mmap`'d, named shm segment(s) (not Boost). A small **header** carries a build-id, `layout_version`, the ring's declared policy (§5.1), and a **generation** counter, so a consumer verifies ABI and provenance before draining. Consumers map the **data area and the producer page read-only**; on a `STREAM` ring the **consumer page is writable**, because it has to be — draining means publishing `consumer_pos` (§5.4 step 6), and a wholly read-only mapping makes drain impossible. That one word is the entire writable surface exposed to the drainer. If even that is unacceptable for a given consumer, the alternative is to keep the drain position in a private state file outside the shm and declare the ring **`RECORD`**, so the producer never consults a reader position at all.
 
 **Generation / epoch, so a restart cannot destroy the evidence.** The generation is bumped at producer start, and the producer sets a `dirty` flag while live. Without this, a restarted TMM re-maps the same named segment and immediately begins clobbering pre-crash records **before anyone has drained them** — losing the exact data the recorder exists to hold, in the exact scenario it was deployed for. So on start, a producer that finds `dirty` already set must **either allocate a fresh segment or refuse to reuse the old one until a drainer has claimed it**. Which of the two is a config choice; refusing is the safer default for a `RECORD` ring. The generation is also what lets the consumer's abandon rule (§5.4 step 4) distinguish a live producer's in-flight record from a dead one's.
