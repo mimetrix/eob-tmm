@@ -232,6 +232,36 @@ a matching section — and false under the other, where registering a named TMM 
 a per-release rebase cost. Day one takes the first. Say which one is meant, because the two have very
 different maintenance stories and the phrase "stock PREVAIL" hides the difference.
 
+**Measured 2026-08-14, and it redirects this item.** The framing "a function-boundary probe's `ctx`
+is the function's typed arguments" is true and, taken literally, nearly useless. Sampling 388
+functions from the build's own hookable set:
+
+| parameter kind | share | what DWARF gives us |
+|---|---|---|
+| scalar, including resolved typedefs (`UINT32`, `BOOL`, `hud_msg_t`) | ~25% | the value; pass it straight through |
+| **typed pointer** | **~61%** | **the pointee's full layout** — enough to generate a dereference |
+| `void *`, and typedefs to it (`bwc_policy_t`) | ~14% | nothing; the type information is genuinely absent |
+
+**Functions whose parameters are *all* scalars: 2 of 388.** So a generator that emits a struct of the
+formal parameters produces something a program cannot use, for essentially every hook — eBPF cannot
+chase an unbounded pointer and PREVAIL will not admit a program that tries.
+
+The worked example shows what is actually required. `http_psm_profile_name_lookup` has the signature
+`_Bool(enum errdefs_key, void *, errdefs_append, void *)`, and its hand-written `ctx` carries four
+fields of which **one** is a formal parameter; the rest are a walked pointer chain, a dereference,
+and a measured length.
+
+**So the deliverable is codegen, not a struct.** From DWARF, emit the trampoline's **ctx-builder in
+host C**: dereference typed pointers, flatten the fields the hook needs, hand the program scalars.
+The program stays a bounded predicate over flat memory, which is the canonical case PREVAIL already
+proves — so this reaches **stock verifier, no fork**, by moving the pointer-chasing to the host
+rather than by extending the verifier to permit it.
+
+That puts roughly **86%** of parameters within mechanical reach and leaves the `void *` residue as
+the honest hard part: those need per-hook human knowledge of what the pointer points to, exactly as
+the worked example did. **Which hooks are worth that effort is a curation question, not a tooling
+one** — and it is the same question the USDT catalog answers for the anticipated surface.
+
 **Put concretely, the designed-in half of that interface *is* a catalog of well-defined USDTs** — one per hook,
 each a curated `ctx` — and the other half is the per-build typed-argument map that **function-boundary probes**
 read. Together they are the ceiling on what the engine can observe or enforce: the USDT catalog bounds the
