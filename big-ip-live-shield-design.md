@@ -700,7 +700,7 @@ check is done, any statement about how many data-plane CVEs this would have caug
 right-sizes the programme. If the answer is "a minority, and mostly in one subsystem," that is a smaller
 project than this document describes.
 
-**Form-factor consequence.** The *mechanism* (an embedded VM at designed-in hooks) is identical across appliance, VE, and BIG-IP Next for Kubernetes, because all three run the same TMM data plane. **Coverage** is not: **BIG-IP VE** (Virtual Edition — pure software, no offload) is the best case — the VM sees the entire data path; an **appliance** carries the offload dead zone above; **BNK** on a DPU (data-processing unit) depends on how much traffic the DPU steers versus lands in the containerized TMM. Coverage scales inversely with how much the platform offloads to hardware.
+**Form-factor consequence.** The *mechanism* (one embedded VM, reached from patched function entries through a shared trampoline) is identical across appliance, VE, and BIG-IP Next for Kubernetes, because all three run the same TMM data plane. **Coverage** is not: **BIG-IP VE** (Virtual Edition — pure software, no offload) is the best case — the VM sees the entire data path; an **appliance** carries the offload dead zone above; **BNK** on a DPU (data-processing unit) depends on how much traffic the DPU steers versus lands in the containerized TMM. Coverage scales inversely with how much the platform offloads to hardware.
 
 Live Shield narrows the window for most data-plane CVEs; it does not claim to close all of them. Those in the residual zone require an engineering hotfix.
 

@@ -349,8 +349,9 @@
       that has to reach the code's own internals — a parser's error branch, a plugin handoff, a counter or
       steering decision at a stage the model does not expose, the condition behind a crash — has exactly one
       path, and it is a build.</p>
-    <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — a
-      verified VM at designed-in hook points <em>and at existing function boundaries</em> — so its code and behavior can change at runtime, provably safely.
+    <p class="pivot">The fix: give TMM its <b>own eBPF engine</b> — <em>one</em> verified engine, resident at a
+      single address in the process, reached from <em>any function entry the build already emitted</em>
+      — so its code and behavior can change at runtime, provably safely.
       One general-purpose surface: <b>load a program, prove it safe, run it in-process</b> — no rebuild, no
       reboot, no release train. <em>(The engine ships in one enabling build. After that, every program — every probe at a boundary
       that build exposes — is a load.)</em></p>
@@ -432,7 +433,10 @@
       safety — a per-hook time budget handles the rest (§5.4);</em> the verifier is the floor, not the ceiling.</p>
     <p class="lede" style="margin-top:1.2rem">So bring them inside. Embed a small userspace eBPF VM —
       <span class="inlinecode">uBPF</span>, ~150&nbsp;KB, compiled just-in-time (JIT) to native code — <em class="sig">inside TMM's own address
-      space</em>, at designed-in hook points and at existing function boundaries, gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
+      space</em> — <b>once, in one place</b> — gated by a stock verifier (<span class="inlinecode">PREVAIL</span>).
+      The engine does not move to the code it inspects: <b>a single trampoline</b> sits between them, and
+      arming a function rewrites that function's entry to call it. What differs per hook is a
+      <em>slot</em> — a program, a mode, a counter — not another engine.
       Now behavior arrives as <b>bytecode, proven safe before it loads</b>. No rebuild. No reboot. The data
       plane gets a fast lane:</p>
     <div class="schematic">
@@ -451,7 +455,7 @@
     <div class="callout sig"><p><b>And the mechanism isn't hypothetical.</b> Microsoft's <b>eBPF-for-Windows</b> ships this pair
       — <b>uBPF</b> as the execution engine, <b>PREVAIL</b> as the verifier — in a maintained, production-used
       component. The verifier half is the well-trodden part; the JIT is where we do our own hardening (§5.4). A userspace VM
-      running verified bytecode at a designed-in hook is an established pattern; what's new is bringing it to a
+      running verified bytecode at a host-owned hook is an established pattern; what's new is bringing it to a
       proxy data plane that hasn't had it. The parts we'd build are
       the parts that are ours anyway: the hooks, the host-owned outcomes, and the signing gate.</p></div>
     <p class="aside-note">And the hooks map onto structures TMM <b>already has — and new ones it will define</b>,
@@ -611,8 +615,11 @@
   <div class="spec reveal">
     <h3><span class="sn">5.1</span> The engine &amp; its hook points</h3>
     <p>What's embedded in TMM is a <b>full in-process eBPF engine</b> — a JIT-compiled VM that runs arbitrary
-      <em>verified</em> bytecode — not a single-purpose gate. A <b>hook point</b> is a named spot in TMM's own source, placed by
-      F5's engineers, where that engine runs a program over a curated view of the code's local state. The same
+      <em>verified</em> bytecode — not a single-purpose gate. It is linked in <b>once</b> and stays at one
+      address. A <b>hook point</b> is a named place the engine can be <em>reached from</em>; nothing about the
+      engine is replicated there. Arming a hook rewrites that spot to call <b>one shared trampoline</b>, which
+      builds a curated view of the code's local state, runs the program registered for that hook, and applies the
+      return. What exists per hook is a <b>slot</b> — a program, a mode, a counter — not another engine. The same
       machinery feeds counters, histograms and flight-recorder rings, streams captured state out to userspace for
       RCA, and drives steering and self-tuning where the host wants to act on the return.</p>
     <p><b>Two kinds of hook — the anticipated and the unanticipated.</b> The first is a <b>designed-in
@@ -630,7 +637,7 @@
       unreachable</b> — and, as one case among
       those, <b>recognising the precondition of a bug nobody foresaw</b>. (The mechanism is the kernel's own
       <span class="inlinecode">fentry</span>/ftrace trampoline model, applied to TMM's own functions.)</p>
-    <p><b>Both stay designed-in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
+    <p><b>Both are built in, not injected.</b> F5 owns the source and the symbol table, compiles the hook
       capability in (patchable function entries), and attaches at a <em>named symbol</em>, not offsets
       an external tool guesses at in a foreign process. A hook with nothing attached is <em>dark until lit</em>.
       And the honest bound on reach: <b>which functions are hookable is decided by the optimiser, not by us.</b>
@@ -645,9 +652,17 @@
       versioned contract; a function-boundary probe's is <em>build-specific</em> (function X's signature at build
       Y) — more reach, a looser contract, <b>re-validated per build</b>. Either way it is verified, signed, and
       budgeted before it runs.</p>
-    <div class="codeblock"><span class="c">// at a hook point in TMM: pack a curated snapshot, run the VM</span>
-<span class="kw">struct</span> l7_ctx ctx = { .opcode = f-&gt;opcode, .len = f-&gt;len };
-<span class="fn">ubpf_exec</span>(vm, &amp;ctx, <span class="kw">sizeof</span> ctx, &amp;ret);
+    <div class="codeblock"><span class="c">// the hook is not code. It is the function's own entry, rewritten in place:</span>
+<span class="c">//   f3 0f 1e fa                endbr64</span>
+<span class="c">//   e8 f0 6c 75 ff             call ls_trampoline_entry   &lt;- was 5 NOPs</span>
+
+<span class="c">// the trampoline — ONE of these, shared by every armed hook</span>
+<span class="kw">uint64_t</span> <span class="fn">ls_trampoline</span>(<span class="kw">struct</span> hook_slot *slot, ...)
+{
+    <span class="kw">struct</span> l7_ctx ctx = { .opcode = f-&gt;opcode, .len = f-&gt;len };   <span class="c">// curated snapshot</span>
+    <span class="kw">uint64_t</span> ret = slot-&gt;<span class="fn">fn</span>(&amp;ctx, <span class="kw">sizeof</span> ctx, stack, stack_len);
+}                                    <span class="c">// ^ native code, JIT'd once at load.</span>
+                                     <span class="c">//   No bytecode is walked per call.</span>
 
 <span class="c">// ret is the program's result; the host decides what it means:</span>
 <span class="c">//   summarize  →  recorded as a counter, histogram, or ring</span>
@@ -790,7 +805,8 @@
         kernel — reachable from outside only at a cost the poll loop can't pay, and never with the power to
         act.</span></div>
       <div class="rrow"><span class="rn">02</span><span class="rt">So give it <b>its own eBPF</b>: verifier + VM,
-        in-process, at designed-in hooks — complementing iRules and WASM.</span></div>
+        in-process — <em>one</em> engine, reached from function entries the build already emitted —
+        complementing iRules and WASM.</span></div>
       <div class="rrow"><span class="rn">03</span><span class="rt">One program shape — read a context, return a
         value: <b>observe it or act on it</b>, the host decides.</span></div>
       <div class="rrow"><span class="rn">04</span><span class="rt">A <b>general-purpose platform</b> —

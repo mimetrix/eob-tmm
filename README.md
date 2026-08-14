@@ -94,9 +94,11 @@ failover, regression risk, a rollback plan. Full argument in
 
 ## What the substrate enables
 
-A verified VM at any padded function the build emitted as its own out-of-line body and listed in
-its hook map opens several use-case families (substrate §3–§4), of which CVE shielding is only
-one:
+One verified engine, resident in the process and reachable from any padded function the build emitted
+as its own out-of-line body and listed in its hook map, opens several use-case families
+(substrate §3–§4), of which CVE shielding is only one. (The engine does not move to the code:
+arming rewrites a function's entry pad into a call to a single shared trampoline, and what exists
+per hook is a slot — a program, a mode, a counter.)
 
 - **Observability, on-demand** — *bpftrace-for-TMM*: deep telemetry for a specific
   condition / flow / tenant, on then off; per-flow latency across internal stages; a
