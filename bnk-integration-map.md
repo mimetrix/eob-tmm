@@ -101,23 +101,22 @@ must avoid the allocator.** Use `mmap`.
 
 ## 6 · Triggering a real CVE — blocked on BNK
 
-**The defect is a race.** The caller reads `flow_get_listener(cf)->prot_transfer_log_profile` into a
-local and guards that local; the callee then re-reads live listener state. The window opens if the
-profile is released between those two reads. `fw_log_release_protocol_transfer_from_listener()`
-frees before it nulls, so the window carries a use-after-free as well as a null dereference.
+The demonstration needs a CVE whose trigger can be driven from outside a BNK pod. The original
+worked example cannot: reaching it requires attaching a protocol-transfer profile and releasing it
+mid-flow, and `prot_transfer_log_profile` has no Kubernetes CRD field on this form factor. (The
+defect itself is written up where it is used — [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md)
+§14 and [`substrate/shields/ls_2026_http_psm.bpf.c`](substrate/shields/ls_2026_http_psm.bpf.c).)
 
-**Triggering it therefore requires attaching a protocol-transfer profile and releasing it mid-flow.**
-On BNK, `prot_transfer_log_profile` has no Kubernetes CRD field: it cannot be attached, and what
-cannot be attached cannot be released. There is no external trigger on this form factor.
+**That gives the selection criterion for a replacement.** The target must sit on a code path
+reachable through BNK's supported configuration surface — CRDs and traffic — with no dependency on a
+knob the form factor does not expose. An SPK advisory list is what would settle which candidates
+qualify.
 
-**To unblock, one of:**
+Failing that: appliance or VE, which first needs the source-tree question answered
+([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10); or driving a trigger from
+inside via a test-only hook, reported as synthetic.
 
-1. **A different CVE reachable on BNK** — the preferred route; an SPK advisory list would settle it.
-2. **Appliance or VE**, where the profile is configurable — which first needs the source-tree
-   question answered ([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10).
-3. **Driving the race from inside** via a test-only hook, reported as synthetic.
-
-Until one of those lands, **"it stops the crash" is unproven end to end.**
+Until one lands, **"it stops the crash" is unproven end to end.**
 
 ## 7 · Cost and the runtime guard
 
