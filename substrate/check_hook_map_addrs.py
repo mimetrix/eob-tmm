@@ -10,7 +10,7 @@ failure can take here.
 Four checks, and the third is the one with teeth:
 
   1 build id      the map's build_id matches the binary's
-  2 entries       every listed address really carries endbr64 + 5 nops
+  2 entries       every listed address really carries a 5-byte pad where it says
   3 stale refusal a map from a DIFFERENT build is rejected, not silently accepted
   4 absences      a function the map omits genuinely has no pad
 
@@ -67,10 +67,15 @@ def main():
             bad.append((h["name"], "outside .text"))
             continue
         head = blob[off:off + 9]
-        if head[:4] != ENDBR64 or head[4:9] != PAD5:
-            bad.append((h["name"], head.hex(" ")))
+        po = h.get("pad_offset", 4)
+        ok_shape = ((po == 4 and head[:4] == ENDBR64 and head[4:9] == PAD5)
+                    or (po == 0 and head[:5] == PAD5))
+        if not ok_shape:
+            bad.append((h["name"], f'pad_offset={po} bytes={head.hex(" ")}'))
+        elif int(h.get("arm_at", h["entry"]), 16) != addr + po:
+            bad.append((h["name"], "arm_at does not equal entry + pad_offset"))
     n = len(doc["hook_points"])
-    print(f"  {'ok  ' if not bad else 'FAIL'} all {n:,} listed entries carry endbr64 + 5 nops"
+    print(f"  {'ok  ' if not bad else 'FAIL'} all {n:,} listed entries carry a 5-byte pad at their stated offset"
           + (f"   --- {len(bad)} bad, e.g. {bad[:2]}" if bad else ""))
     fails += bool(bad)
 
@@ -93,7 +98,7 @@ def main():
                 off = int(f[0], 16) - taddr
                 if 0 <= off < len(blob) - 9:
                     head = blob[off:off + 9]
-                    if head[:4] == ENDBR64 and head[4:9] == PAD5:
+                    if (head[:4] == ENDBR64 and head[4:9] == PAD5) or head[:5] == PAD5:
                         missing_but_padded.append(f[2])
         good = not missing_but_padded
         print(f"  {'ok  ' if good else 'FAIL'} nothing padded was omitted"

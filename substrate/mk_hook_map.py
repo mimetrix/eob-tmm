@@ -19,8 +19,16 @@ applied to every translation unit we compile, but at -O2 the optimiser inlines
 and folds functions away, so the flag being on does not mean a given symbol has
 an emitted body with a pad. The only reliable answer is the bytes at the entry:
 
-    f3 0f 1e fa   endbr64
-    90 90 90 90 90   <- the pad; arming rewrites these into `call rel32`
+    f3 0f 1e fa   endbr64          <- only on indirect-call targets
+    90 90 90 90 90                   <- the pad; arming rewrites it into `call rel32`
+
+TWO SHAPES, AND MISSING THE SECOND UNDERCOUNTS THE HOOKABLE SET. `-fcf-protection`
+emits `endbr64` only on functions that can be reached by an INDIRECT call. A
+function only ever called directly does not get one, so its pad sits at offset 0
+rather than offset 4. An earlier version of this tool required endbr64 and
+discarded 4,227 armable functions in our own tree -- mostly `.isra`/`.constprop`
+clones, which are never indirect-call targets. Both shapes are accepted, and the
+map records `pad_offset` because the arming code has to know where to write.
 
 Anything else means not padded --- and note what that does NOT mean. In a file on
 disk there is no "armed" state: arming happens at runtime, in memory. A function
@@ -132,21 +140,30 @@ def main():
                 outside += 1
                 continue
             head = text[addr - taddr: addr - taddr + 9]
-            if head[:4] != ENDBR64:
-                unpadded += 1
-                continue
-            if head[4:9] == PAD5:
-                padded.append({"name": name, "symbol": name,
-                               "entry": f"0x{addr:x}", "patchable_pad_bytes": 5,
-                               "attach_mode": "observe", "path_class": "unclassified",
-                               "enumerated_outcomes": ["LS_FALLTHROUGH", "LS_SAFE_RETURN"]})
+            if head[:4] == ENDBR64 and head[4:9] == PAD5:
+                pad_off = 4                      # indirect-call target: pad follows endbr64
+            elif head[:5] == PAD5:
+                pad_off = 0                      # direct-call only: pad at the entry
             else:
                 unpadded += 1
-                if head[4] == 0xE8:
-                    callfirst += 1          # first instruction is a call; not a pad
+                if head[:4] == ENDBR64 and head[4] == 0xE8:
+                    callfirst += 1               # first instruction is a call; not a pad
+                continue
+            padded.append({"name": name, "symbol": name,
+                           "entry": f"0x{addr:x}",
+                           "pad_offset": pad_off,
+                           "arm_at": f"0x{addr + pad_off:x}",
+                           "patchable_pad_bytes": 5,
+                           "attach_mode": "observe", "path_class": "unclassified",
+                           "enumerated_outcomes": ["LS_FALLTHROUGH", "LS_SAFE_RETURN"]})
 
         doc = {
             "_comment": ("PHASE A: addresses and pad status only, read from the binary. "
+                         "NOTE pad_offset: ls_arm.c currently REQUIRES endbr64 and arms at "
+                         "entry+4, so it can arm only the pad_offset==4 entries. The "
+                         "pad_offset==0 entries are real and armable in principle, but need "
+                         "ls_arm to honour pad_offset first; today it refuses them, which is "
+                         "the safe direction. Filter on pad_offset==4 for what works now. "
                          "arg_btf (the typed argument layout a program is verified against) "
                          "is NOT emitted --- that needs DWARF parameter classification. "
                          "Enough to arm a function by name; not enough to write a program "
@@ -164,7 +181,16 @@ def main():
             open(a.out, "w").write(out + "\n")
 
         print(f"  build id      : {bid_b}", file=sys.stderr)
+        e4 = sum(1 for h in padded if h["pad_offset"] == 4)
+        e0 = len(padded) - e4
         print(f"  padded        : {len(padded):,}   <- armable by name", file=sys.stderr)
+        print(f"    pad after endbr64 : {e4:,}", file=sys.stderr)
+        print(f"    pad at entry      : {e0:,}   (no endbr64: direct-call-only, clones)",
+              file=sys.stderr)
+        print(f"  armable by ls_arm TODAY: {e4:,}  --- it requires endbr64 and arms at entry+4;",
+              file=sys.stderr)
+        print(f"    the other {e0:,} need ls_arm to honour pad_offset (it refuses them now).",
+              file=sys.stderr)
         print(f"  no pad        : {unpadded:,}   <- inlined, folded, or another build's",
               file=sys.stderr)
         print(f"    of which start with a call: {callfirst}  (not armed --- a file has no armed state)",
