@@ -116,32 +116,34 @@ must avoid the allocator.** Use `mmap`.
 
 **Still stubbed:** the entry address comes from configuration, not a signed hook map. Item 5.
 
-## 6 · Triggering a real CVE — open, and previously mis-analysed
+## 6 · Triggering a real CVE — unreachable on BNK, and the reason is the useful part
 
-**Status: untested, not blocked.** An earlier reading of this held that the worked-example fault
-needed a check-then-reread race and could not be driven on BNK. Reading the code settles it
-differently, and the correction matters because it changes what to try next.
+**The fault needs an alarm, and BNK cannot raise one.** `http_psm_profile_name_lookup` is reached
+only when a PSM log record is built, which is gated on `if (psmd->alarm_mask != 0)`. Every write to
+`alarm_mask` — bad version, bad method, null-in-headers, high-ASCII, bad host, max-headers, both
+length checks — sits inside an `enforce->*` guarded block. **No BNK CRD exposes any `enforce`
+field.** BNK offers protocol-inspection *logging* (`protocolInspection.enabled`, `.publisher`) and
+no enforcement tuning, so the alarm never fires.
 
-`http_psm_profile_name_lookup` is installed into a dictionary indexed by log key
-(`http_psm_log_keys`, wired up by `http_psm_publisher_template_create`) and is called for every
-occurrence of `${profile_name}` in a PSM log template. **That path has no guard**, and the template
-is built from *every* key in the table rather than from a user-supplied format. So a single NULL
-`prot_transfer_log_profile` is enough: `ptlp->name` dereferences address zero and takes the process
-down. No race, no timing window.
+Verified rather than reasoned: a security log profile **does** reach TMM
+(`decl_security_log_profile_handler: received 'spk-app-1-eob-logprof-securitylogprofile'`), the
+SecPolicy → Gateway attachment resolves, and malformed HTTP — `HTTP/9.9`, a bogus method, control
+characters, an oversized header — produced no crash and no restarts. The chain breaks at the alarm,
+not at the profile.
 
-The consequence for BNK inverts the earlier conclusion. Having no CRD field for
-`prot_transfer_log_profile` means the pointer is **always** NULL, which makes the fault *more*
-reachable. The CRD does expose `protocolInspection.enabled` and `protocolInspection.publisher`.
+Note what is *not* the reason. There is no caller guard and no check-then-reread race; the dispatch
+is a dictionary lookup with nothing gating it, and a plain NULL suffices. `prot_transfer_log_profile`
+having no CRD field makes the pointer *always* NULL, which helps rather than hinders.
 
-**The open question is narrow and testable:** does enabling protocol-inspection logging produce a
-PSM log record on ordinary HTTP traffic? If it does, the four-step demonstration runs here. That
-experiment deliberately crashes a TMM pod, so it is a decision rather than a task.
+**The criterion this yields for a replacement CVE:** the fault must sit on a path BNK actually turns
+on. This one is gated behind a feature whose *logging* half BNK exposes and whose *enforcement* half
+it does not — a shape that is invisible from an advisory and worth checking for explicitly.
 
-Failing that: appliance or VE, which first needs the source-tree question answered
-([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10); or a different CVE whose
-trigger is drivable through the supported configuration surface.
+**To demonstrate this one anyway**, dev op `0x1005 SET_ENFORCE` sets the bits directly, so ordinary
+traffic walks the real path into the real fault. Only the configuration is reached by an unsupported
+route. Driver: [`substrate/loader-client/cve_demo.py`](substrate/loader-client/cve_demo.py).
 
-Until one is run, **"it stops the crash" is unproven end to end.**
+Until that is run, **"it stops the crash" is unproven end to end.**
 
 ## 7 · Cost and the runtime guard
 

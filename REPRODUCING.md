@@ -104,10 +104,10 @@ where you think it is.
 
 - **A CVE actually mitigated on live traffic.** Every program armed live so far returns
   `FALLTHROUGH` by construction, so the *mechanism* is demonstrated and the *mitigation* is not.
-  Whether the worked-example target is reachable on BNK is **open**: the lookup is dispatched from a
-  log-key dictionary with no guard, so a NULL `prot_transfer_log_profile` is sufficient — no race —
-  and BNK never populating that field may make it *more* reachable, not less. The experiment that
-  would settle it deliberately crashes a TMM pod and has not been run. See
+  The worked-example target is **not reachable through BNK configuration**: the fault needs a PSM
+  log record, that needs `alarm_mask != 0`, and every write to `alarm_mask` sits behind an
+  `enforce->*` flag that no BNK CRD exposes. Demonstrating it therefore needs dev op `0x1005`, which
+  sets those bits directly so ordinary traffic walks the real path. See
   [`bnk-integration-map.md`](bnk-integration-map.md) §6.
 - **A per-call cost number.** The counter mean is dominated by preemption artifacts, and the bench
   op that would give a clean minimum still runs on the loader thread and wedges it.

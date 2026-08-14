@@ -129,17 +129,14 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
   program armed so far returns `FALLTHROUGH` by construction, so what has been shown is the
   *mechanism* on live traffic, not the *mitigation*. This is live-patched and live-exercised, not yet
   live-shielded.
-- **The remaining step may not be blocked after all — the earlier analysis here was wrong.**
-  `http_psm_profile_name_lookup` is dispatched from a dictionary indexed by log key
-  (`http_psm_log_keys`, installed by `http_psm_publisher_template_create`), and **nothing guards
-  that path**. The template is built from *every* key in the table, so any PSM log record formats
-  `${profile_name}` and calls the lookup. With no protocol-transfer log profile on the listener,
-  `ptlp` is NULL and `ptlp->name` dereferences address zero. **No race is required.**
-  BNK exposing no CRD field for `prot_transfer_log_profile` therefore makes `ptlp` *always* NULL,
-  which makes the fault more reachable rather than less. The CRD does expose
-  `protocolInspection.enabled` and `protocolInspection.publisher`. **Whether enabling those produces
-  a PSM log record on HTTP traffic is untested** — that experiment deliberately crashes a TMM pod
-  and has not been run.
+- **The remaining step is blocked by enforcement gating, not by the profile.** The fault needs a
+  PSM log record, which is gated on `alarm_mask != 0`, and every write to `alarm_mask` sits inside an
+  `enforce->*` guarded block that no BNK CRD exposes — BNK offers protocol-inspection logging and no
+  enforcement tuning. Verified on the cluster: the security log profile reaches TMM and the
+  SecPolicy attaches, but malformed HTTP raises no alarm and causes no crash. There is no caller
+  guard and no race; a plain NULL suffices, and BNK never populating `prot_transfer_log_profile`
+  makes the pointer always NULL, which helps. Dev op `0x1005 SET_ENFORCE` sets the bits directly for
+  the demonstration.
 - **Per-call hook cost remains unmeasured** — the counter mean is dominated by preemption artifacts,
   and the bench op that would give a clean minimum still runs on the loader thread and wedges it.
 
