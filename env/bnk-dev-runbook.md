@@ -806,11 +806,16 @@ either side of TMM, VLANs `tmm-client`/`tmm-server`, TMM self-IPs on both. The c
 carries `curl`, `wget`, `nc` and **`ab`**, so load generation needs nothing installed.
 
 ```bash
-# NOT needed --- bnk-core pre-provisions SIX app namespaces, spk-app-1 .. spk-app-6.
-# Only spk-app-1 is populated below; 2-6 are empty and available. Use them to drive
-# several VIPs at once when a single backend and URL is too thin a traffic profile
-# (e.g. measuring per-call shield cost, where one flat workload understates the path).
+# NOT needed --- bnk-core/profile.yaml lines 30-35 already create spk-app-1 .. spk-app-6
+# at `datkube install`. They are empty scaffolding: NOTHING runs in them. Every pod that
+# matters --- both f5-tmm replicas, and TWO client/server pairs (client, client-lb,
+# server, server-lb) --- lives in `default`. A namespace here is only where a Gateway CR
+# is placed; it is not a traffic path and adding more does not add load.
+# To drive a richer profile than one VIP with one backend and one URL (which is what the
+# 2026-08-13 hook measurement used, and too thin to price a per-call cost from), use the
+# second client/server pair and more Gateways --- not more namespaces.
 kubectl get ns | grep spk-app          # expect six, already Active
+kubectl get pods -n default            # this is where the work actually is
 
 cat <<'YAML' | kubectl apply -f -
 apiVersion: gateway.networking.k8s.io/v1
