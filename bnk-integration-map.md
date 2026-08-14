@@ -101,15 +101,9 @@ must avoid the allocator.** Use `mmap`.
 
 ## 6 · Triggering a real CVE — blocked on BNK
 
-The demonstration needs a CVE whose trigger can be driven from outside a BNK pod. The original
-worked example cannot: reaching it requires attaching a protocol-transfer profile and releasing it
-mid-flow, and `prot_transfer_log_profile` has no Kubernetes CRD field on this form factor. (The
-defect itself is written up where it is used — [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md)
-§14 and [`substrate/shields/ls_2026_http_psm.bpf.c`](substrate/shields/ls_2026_http_psm.bpf.c).)
-
-**That gives the selection criterion for a replacement.** The target must sit on a code path
-reachable through BNK's supported configuration surface — CRDs and traffic — with no dependency on a
-knob the form factor does not expose. An SPK advisory list is what would settle which candidates
+The demonstration needs a CVE whose trigger is drivable from outside a BNK pod: on a code path
+reachable through the supported configuration surface — CRDs and traffic — with no dependency on a
+knob this form factor does not expose. An SPK advisory list is what would settle which candidates
 qualify.
 
 Failing that: appliance or VE, which first needs the source-tree question answered

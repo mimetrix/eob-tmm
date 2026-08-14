@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring shield-blob gate clean
+        check-selfpatch check-ring check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring
+       check-selfpatch check-ring check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -134,6 +134,26 @@ check-swap:
 # directions are failures. Skips loudly if clang has no BPF target or prevail is unbuilt.
 check-shields:
 	@$(PYTHON) ./check_shields.py
+
+# The hook map (scope item 5, phase A): every function's entry address and whether
+# it really carries an arming pad, read from the binary. Needs the DEB PAIR, which
+# lives on the build box -- packaging re-links the binary, so the build tree's
+# addresses are not the pod's. Skips loudly rather than silently passing.
+DEBS ?= $(HOME)/code/tmm/docker_build/DEBS/amd64
+check-hook-map:
+	@if [ -d "$(DEBS)" ] && ls $(DEBS)/tmm_*.deb >/dev/null 2>&1; then \
+	  $(PYTHON) ./mk_hook_map.py --debs "$(DEBS)" -o .hookmap.json 2>/dev/null && \
+	  rm -rf .hmx && mkdir -p .hmx/b .hmx/d && \
+	  dpkg-deb -x $$(ls $(DEBS)/tmm_*.deb | head -1) .hmx/b && \
+	  dpkg-deb -x $$(find $(DEBS) -name 'tmm-debuginfo_*.deb' | head -1) .hmx/d && \
+	  $(PYTHON) ./check_hook_map_addrs.py --map .hookmap.json \
+	     --binary .hmx/b/usr/bin/tmm64.no_pgo \
+	     --debuginfo .hmx/d/usr/lib/debug/usr/bin/tmm64.no_pgo.debug >/dev/null && \
+	  echo "ok    hook map  ($$($(PYTHON) -c 'import json;print(f"{len(json.load(open(".hookmap.json"))["hook_points"]):,}")') entries, pads verified against the binary)" && \
+	  rm -rf .hmx .hookmap.json; \
+	else \
+	  echo "skip  hook map  (no deb pair under $(DEBS); run on the build box)"; \
+	fi
 
 # The egress ring: the four properties that cannot be tested inside TMM, because
 # reaching them there means engineering a stalled consumer and a full ring, and a
