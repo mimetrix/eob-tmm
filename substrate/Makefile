@@ -11,10 +11,12 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap gate clean
+        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
+        check-selfpatch shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap
+       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
+       check-selfpatch
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -75,7 +77,7 @@ check-stack:
 # The embedded VM itself: the ~120 lines that make "TMM has its own BPF VM" true.
 # Compiled against the REAL vendored uBPF headers, so a signature drift upstream
 # fails here rather than at integration time. Compiled, not linked or run.
-check-vm:
+check-vm: shield-blob
 	@$(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I../ubpf/vm ls_vm.c \
 	  && echo "ok    ls_vm.c  (compiles against the real uBPF API, -Wall -Wextra clean)"
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_vm_config.c \
@@ -132,6 +134,28 @@ check-swap:
 # directions are failures. Skips loudly if clang has no BPF target or prevail is unbuilt.
 check-shields:
 	@$(PYTHON) ./check_shields.py
+
+# The built-in shield, as bytes. ls_vm_load.c includes this and arms it at
+# startup; it is generated, so it is not committed. check-vm depends on it --
+# without it the loader does not compile at all.
+shield-blob:
+	@$(PYTHON) ./mk_shield_blob.py
+
+# Can a process patch its OWN private r-xp .text so EXECUTION sees the change?
+# This is the gate the whole patched-entry mechanism rests on (bnk-integration-map.md
+# section 2), and it was not wired into `check` until 2026-08-14. Tests the only way
+# that counts: write 0xcc into a real function's pad via /proc/self/mem, then CALL it
+# and see whether it traps. A control run with no write must NOT trap, so a passing
+# result cannot be an ambient signal.
+check-selfpatch:
+	@if [ "$$(uname -m)" = "x86_64" ]; then \
+	  $(CC) -O2 -fcf-protection=branch -o .sp.out check_selfpatch.c && \
+	  ./.sp.out >/dev/null && \
+	  echo "ok    check_selfpatch.c  (own r-xp .text patched; execution sees it; control clean)" && \
+	  rm -f .sp.out; \
+	else \
+	  echo "skip  check_selfpatch.c  (host is $$(uname -m), not x86_64)"; \
+	fi
 
 # Everything in `check`, plus the standing findings turned fatal. This is what a
 # real admission pipeline would run. It FAILS today, on purpose: item 6a is open.

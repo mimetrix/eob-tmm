@@ -326,7 +326,7 @@ slot 0 at startup. That proves the load *path* works, not that a *different* pro
 because the bytes going in matched the bytes already resident. Named here rather than left for a
 reviewer to find.
 
-`substrate/check_load_distinct.py` closes it, using the loader's own identity check as the
+`substrate/loader-client/check_load_distinct.py` closes it, using the loader's own identity check as the
 discriminator. `ls_vm_load.c` builds the section from the declared hook, and `ls_vm_reload` refuses
 unless the program's **own** section agrees (finding O14 --- PREVAIL proves a SECTION, uBPF runs a
 SYMBOL, and a mismatch must not be accepted):

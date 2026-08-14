@@ -355,19 +355,15 @@
         three we give up: <b>the run-to-completion loop, the unmodified uBPF, or enforce mode on hot hooks.</b> The
         good answer is to fork uBPF's JIT for back-edge fuel, own it, upstream it.</p></div>
     <div class="callout accent"><span class="lbl">what is plausible per packet — ranked, all conditional on measurement nobody has taken</span>
-      <p><b>Per-packet observability with a sampling divisor:</b> high confidence — the cost is adjustable
-        downward by construction. <b>Per-packet enforcement on an exceptional branch, time-boxed:</b> good, and
-        where the flagship CVE classes sit — conditional on the fuel guard existing, since an unbudgeted program
-        on an attacker-driven branch is the worst case here. <b>Per-packet enforcement on the common
-        path at line rate:</b> doubtful without a burst-capable invocation form (§05). <b>The contents of an
-        offloaded flow:</b> no — they never enter TMM software (the offload <em>boundary</em> is hookable software;
-        the accelerated middle is not).</p>
-      <p style="margin-top:.7rem">Two levers are narrower than they look. A <b>sampling divisor</b> is fine for
-        observability and useless for enforcement: you cannot block one in N instances of an exploit. And
-        <b>time-boxing applies only to mitigation</b> — a few percent for an exposure window is a categorically
-        different trade from a few percent permanently, and does not transfer to always-on telemetry. That window is
-        itself an <em>assumption</em> about operator behaviour: that a patched build cannot always be installed at
-        once.</p></div>
+      <p><b>Observability with a sampling divisor:</b> high confidence — cost is adjustable downward by
+        construction. <b>Enforcement on an exceptional branch, time-boxed:</b> good, and where the flagship CVE
+        classes sit — conditional on the fuel guard, since an unbudgeted program on an attacker-driven branch is
+        the worst case. <b>Enforcement on the common path at line rate:</b> doubtful without a burst-capable
+        invocation form (§05). <b>The contents of an offloaded flow:</b> no — they never enter TMM software.</p>
+      <p style="margin-top:.7rem">Both levers are narrower than they look: a sampling divisor is useless for
+        enforcement (you cannot block one in N instances of an exploit), and time-boxing applies only to
+        mitigation — a few percent for an exposure window is a different trade from a few percent permanently,
+        and does not transfer to always-on telemetry.</p></div>
     <figure class="bp">
       <svg viewBox="0 0 640 238" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A verified control-flow graph with a proven loop bound of 64: worst case 652 instructions, about 800 cycles, compared to the hook's budget — load if under, reject if over.">
         <defs>
@@ -398,118 +394,14 @@
         basic blocks and branches — is <em>verified</em>, every loop carries a proven bound, so the <b>worst-case
         path</b> is computable: cost it, gate on the budget, load or reject.</figcaption>
     </figure>
-    <figure class="bdd">
-      <svg viewBox="0 0 720 682" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The full pipeline as eight stages grouped into five zones, each stage with the flags or configuration that drive it and the artifact it emits. Two lanes converge. The per-release lane: TMM itself is compiled with -fpatchable-function-entry plus noinline on a curated list, emitting nop pads in TMM&apos;s own text but only where the optimiser kept an out-of-line body; the same build emits its config from DWARF and BTF, giving a signed per-build hook-point map of names, offsets and typed arguments. The per-program lane: compile the shield with clang at -O2 for the bpf target; verify with PREVAIL, which assumes a 512-byte per-subprogram stack and at most 8 call frames and takes its program type from the --section name, with termination, strict mode and division-by-zero rejection all off by default; a budget pass prices against a per-architecture cost model and a budget of 800 cycles, fail-closed; signing binds program hash, hook, build range, mode ceiling, expiry and epoch, and that signature is the perimeter; load checks the signature on the box; and run executes on uBPF defaults, where bounds checking is on but constant blinding and the undefined-behaviour check are off, with a total stack of 8 frames of 512 bytes but a local function frame of 256. Three cross-stage contracts are called out below: the SEC name is the only thing that picks PREVAIL&apos;s program type; PREVAIL&apos;s assumed 512-byte subprogram stack does not match uBPF&apos;s 256-byte local frame; and pads and offsets move every build, so the binding&apos;s build range is what refuses a stale program.">
-        <defs>
-          <marker id="bdah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" class="bd-head"/></marker>
-        </defs>
-        <text class="bd-h" x="34" y="30">stage</text>
-        <text class="bd-h" x="200" y="30">flags / configuration &#8212; what drives it</text>
-        <text class="bd-h" x="508" y="30">emits</text>
-        <path class="bd-rail" d="M14,40 L14,602" marker-end="url(#bdah)"/>
-        <text class="bd-zone" x="24" y="49">TMOS build &#183; per release</text>
-        <rect class="bd-row" x="24" y="56" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="77">TMM build</text>
-        <text class="bd-ns" x="34" y="93">clang, per release</text>
-        <text class="bd-fl" x="200" y="75">-fpatchable-function-entry=N,M</text>
-        <text class="bd-fl" x="200" y="91">noinline on a curated list</text>
-        <rect class="bd-chip" x="508" y="64" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="77" text-anchor="middle">nop pads in TMM text</text>
-        <text class="bd-ns" x="607" y="98" text-anchor="middle">only where a body survived -O2</text>
-        <rect class="bd-row" x="24" y="110" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="131">emit config</text>
-        <text class="bd-ns" x="34" y="147">DWARF / BTF</text>
-        <text class="bd-fl" x="200" y="129">from the build&#8217;s DWARF / BTF</text>
-        <text class="bd-fl" x="200" y="145">signed alongside the build</text>
-        <rect class="bd-chip" x="508" y="118" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="131" text-anchor="middle">signed per-build config</text>
-        <text class="bd-ns" x="607" y="152" text-anchor="middle">names, offsets, typed args</text>
-        <line class="bd-div" x1="190" y1="56" x2="190" y2="160"/>
-        <line class="bd-div" x1="500" y1="56" x2="500" y2="160"/>
-        <text class="bd-zone" x="24" y="185">dev / CI</text>
-        <rect class="bd-row" x="24" y="192" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="213">compile</text>
-        <text class="bd-ns" x="34" y="229">clang &#183; the shield</text>
-        <text class="bd-fl" x="200" y="213">-O2  -target bpf  -c  -g</text>
-        <rect class="bd-chip" x="508" y="200" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="213" text-anchor="middle">ELF object</text>
-        <text class="bd-ns" x="607" y="234" text-anchor="middle">SEC() name &#183; BTF types</text>
-        <line class="bd-div" x1="190" y1="192" x2="190" y2="242"/>
-        <line class="bd-div" x1="500" y1="192" x2="500" y2="242"/>
-        <text class="bd-zone" x="24" y="267">F5 build + sign &#183; per program</text>
-        <rect class="bd-row" x="24" y="274" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="295">verify</text>
-        <text class="bd-ns" x="34" y="311">PREVAIL</text>
-        <text class="bd-fl" x="200" y="293">--section &lt;SEC&gt;  --stack-size 512  frames 8</text>
-        <text class="bd-fl" x="200" y="309"><tspan class="off">off:</tspan> --termination  --strict  --no-div-0</text>
-        <rect class="bd-chip" x="508" y="282" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="295" text-anchor="middle">proof: memory-safe</text>
-        <text class="bd-ns" x="607" y="316" text-anchor="middle">terminating only if asked</text>
-        <rect class="bd-row" x="24" y="328" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="349">budget pass</text>
-        <text class="bd-ns" x="34" y="365">static, off-box</text>
-        <text class="bd-fl" x="200" y="349">--budget 800 &#183; cost model, per arch</text>
-        <rect class="bd-chip" x="508" y="336" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="349" text-anchor="middle">worst-case cycle estimate</text>
-        <text class="bd-ns" x="607" y="370" text-anchor="middle">pass / fail, closed</text>
-        <rect class="bd-row" x="24" y="382" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="403">sign</text>
-        <text class="bd-ns" x="34" y="419">HSM key</text>
-        <text class="bd-fl" x="200" y="401">binding: prog hash &#183; hook &#183; build range</text>
-        <text class="bd-fl" x="200" y="417">mode ceiling &#183; expiry &#183; epoch</text>
-        <rect class="bd-chip key" x="508" y="390" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="403" text-anchor="middle">signed program</text>
-        <text class="bd-ns" x="607" y="424" text-anchor="middle">the perimeter</text>
-        <line class="bd-div" x1="190" y1="274" x2="190" y2="432"/>
-        <line class="bd-div" x1="500" y1="274" x2="500" y2="432"/>
-        <text class="bd-zone" x="24" y="457">control plane &#183; on-box</text>
-        <rect class="bd-row" x="24" y="464" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="485">load</text>
-        <text class="bd-ns" x="34" y="501">control plane</text>
-        <text class="bd-fl" x="200" y="483">op + epoch &#183; signature checked on box</text>
-        <text class="bd-fl" x="200" y="499">mode: monitor | enforce</text>
-        <rect class="bd-chip" x="508" y="472" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="485" text-anchor="middle">armed hook</text>
-        <text class="bd-ns" x="607" y="506" text-anchor="middle">one program per hook</text>
-        <line class="bd-div" x1="190" y1="464" x2="190" y2="514"/>
-        <line class="bd-div" x1="500" y1="464" x2="500" y2="514"/>
-        <text class="bd-zone hot" x="24" y="539">data plane &#183; per packet</text>
-        <rect class="bd-row hot" x="24" y="546" width="690" height="50" rx="7"/>
-        <text class="bd-nt" x="34" y="567">run</text>
-        <text class="bd-ns" x="34" y="583">uBPF defaults</text>
-        <text class="bd-fl" x="200" y="565">bounds <tspan class="on">on</tspan> &#183; blinding <tspan class="off">off</tspan> &#183; UB check <tspan class="off">off</tspan></text>
-        <text class="bd-fl" x="200" y="581">stack 8&#215;512 &#183; local frame 256 &#183; extended JIT</text>
-        <rect class="bd-chip" x="508" y="554" width="198" height="19" rx="5"/>
-        <text class="bd-ct" x="607" y="567" text-anchor="middle">one outcome from the host&#8217;s set</text>
-        <text class="bd-ns" x="607" y="588" text-anchor="middle">fuel enforces the sealed bound</text>
-        <line class="bd-div" x1="190" y1="546" x2="190" y2="596"/>
-        <line class="bd-div" x1="500" y1="546" x2="500" y2="596"/>
-        <text class="bd-ann" x="24" y="632"><tspan class="k">contract</tspan>  the <tspan class="k">SEC()</tspan> name is the only thing that picks PREVAIL&#8217;s program type &#8212; there is no --program-type flag.</text>
-        <text class="bd-ann" x="24" y="650"><tspan class="bad">contract</tspan>  --stack-size <tspan class="bad">512</tspan> is what the proof assumes; uBPF gives a local function frame of <tspan class="bad">256</tspan>. The two have to agree.</text>
-        <text class="bd-ann" x="24" y="668"><tspan class="k">contract</tspan>  pads and offsets move every build &#8212; <tspan class="k">build_min..build_max</tspan> in the binding is what refuses a stale program.</text>
-      </svg>
-      <figcaption class="bd-cap"><b>From source to hot path &#8212; every stage with the switches that drive it and
-        the artifact it hands on.</b> <b>Two lanes converge here</b>, which a single row of boxes hid. The
-        <b>per-release lane</b> builds TMM itself: <span class="inlinecode">-fpatchable-function-entry</span> is a flag
-        on <em>TMM&#8217;s</em> compile, not the shield&#8217;s, and what it emits is <b>nop pads in TMM&#8217;s own
-        text</b> &#8212; only at entries the optimiser kept as out-of-line bodies, which is why
-        <span class="inlinecode">noinline</span> on a curated list is the only hard guarantee. The <b>per-program
-        lane</b> is everything from the shield&#8217;s own compile down. Only <b>run</b> executes per packet; the rest
-        is amortized, once per build or once per program, off the data path.
-        <p style="margin-top:.6rem">Reading the middle column is the point: <b>these are not neutral defaults.</b>
-        PREVAIL ignores termination unless asked, runs without strict mode, and <em>permits</em> division by zero;
-        uBPF ships with constant blinding and the undefined-behaviour check off. So &#8220;verified, JIT&#8221; names a
-        <em>configuration</em>, not a property &#8212; and a configuration has to be stated to be a claim. Every value
-        in that column was read out of <span class="inlinecode">config.hpp</span> and
-        <span class="inlinecode">ubpf.h</span>, not assumed.</p>
-        <p style="margin-top:.6rem">The three <b>contracts</b> are where a flag at one stage is an assumption at
-        another &#8212; the seams this diagram exists to expose. The first and third are benign but easy to get wrong.
-        <b>The second is not.</b> PREVAIL proves against a <b>512-byte</b> per-subprogram stack by default while uBPF
-        sizes a local function frame at <b>256</b>; where those notions line up, a program admitted under the default
-        may use twice the stack the runtime provides &#8212; a proof about a different machine. That the numbers differ
-        is checkable in a minute; whether the two notions correspond exactly is worth settling before anything is
-        built.</p></figcaption>
-    </figure>
+    <div class="callout"><span class="lbl">&ldquo;verified, JIT&rdquo; names a configuration, not a property</span>
+      <p>Both defaults have to be stated to be a claim, and neither is the safe one. <b>PREVAIL</b> ignores
+        termination unless asked, runs without strict mode, and <em>permits</em> division by zero; <b>uBPF</b>
+        ships with constant blinding and the undefined-behaviour check off. Every one of those was read out of
+        <span class="inlinecode">config.hpp</span> and <span class="inlinecode">ubpf.h</span>, not assumed. The
+        full stage-by-stage pipeline &mdash; what drives each stage and the artifact it emits &mdash; is in
+        <span class="inlinecode">engine-hard-problems.md</span>; only <b>run</b> executes per packet, and
+        everything before it is amortized once per build or once per program.</p></div>
     <div class="callout accent"><span class="lbl">the problem is also the pitch</span>
       <p>Setting those budgets is itself an <b>observability</b> problem — exactly what a few <b>designed-in
         USDTs</b> (<em>userland statically-defined tracing</em> — probe points built into the source) expose:
@@ -620,26 +512,28 @@
   <section class="beat reveal" id="further" data-sec="further">
     <p class="kicker"><span class="num">05</span> further concerns</p>
     <h2>Thirteen more to get ahead of — and one of them is the biggest item here.</h2>
-    <p class="lede">The four above are the ones the design turns on; these are the next tier. <b>Read the list with its severity in mind, because thirteen equal-looking boxes overstate the risk.</b> Exactly one is both unavoidable and hard — <b>the safe point</b>, and it is not one thing: it is an <b>ordered publish</b> that needs no rendezvous, a <b>rendezvous</b> needed only to change live text, and <b>quiescence</b> that has three answers. Two are not open questions at all: keeping the verifier out of TMM is a decision already taken, and the concurrency item records a property that makes three other things simple. Four are ordinary lifecycle and governance work. And <b>four exist only because function-boundary probes are on the table</b> — the build-specific probe context, the optimiser deciding the hookable set, the unwind information a trampoline needs, and the JIT&rsquo;s maturity. Take the narrowest form of the mechanism, designed-in call sites only (outcome 3 of the measurement), and those four go away along with live-text patching &mdash; and so does the rendezvous. What remains is ordered publish, a reclamation policy, certification, and the ordinary work.</p>
+    <p class="lede">The four above are the ones the design turns on; these are the next tier. <b>Read the list
+      with its severity in mind — thirteen equal-looking boxes overstate the risk.</b> Exactly one is both
+      unavoidable and hard: <b>the safe point</b>, and it is three separable things — an <b>ordered publish</b>
+      needing no rendezvous, a <b>rendezvous</b> needed only to change live text, and <b>quiescence</b>, which has
+      three answers. Two are not open questions at all. Four are ordinary lifecycle and governance work. And
+      <b>four exist only because function-boundary probes are the mechanism</b> — the build-specific probe
+      context, the optimiser-decided hookable set, the unwind information a trampoline needs, and the JIT&rsquo;s
+      maturity. An earlier draft offered an escape from those four: fall back to designed-in call sites, and
+      live-text patching goes away along with the rendezvous. <b>That fallback was removed on 2026-08-13</b> — its
+      reach is fixed at build time, which is precisely what a CVE defeats — so these four are now unconditional.</p>
     <div class="concerns">
-      <div class="concern"><span class="cl">item zero · the safe point — which is three items</span><p>Every in-TMM
-        piece once assumed &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo; Two
-        things were wrong with that. <b>Nothing needs picking up in the poll loop:</b> parse, verify and
-        <b>JIT compile</b> run on a control thread — as first sketched they ran <em>at</em> the safe point,
-        milliseconds in which the loop is not polling, a latency spike and possibly a dropped heartbeat. What
-        reaches the hot path is <b>one ordered store</b> into a slot it already reads. And the rest is
-        <b>separable</b>: a <b>rendezvous</b>, needed only to modify live text — x86-64 only, since aarch64&rsquo;s
-        aligned <span class="inlinecode">NOP</span>&harr;<span class="inlinecode">B</span> swap is safe against
-        concurrent execution — and available either from the poll loop or from a userspace
-        <span class="inlinecode">text_poke_bp</span> equivalent; and <b>quiescence</b>, to free a program&rsquo;s
-        code, from a poll-loop epoch, from per-invocation read-side markers, or by declining to free and capping
-        the leak. <b>The poll loop is the cheapest source of the last two, not the only one</b> — every
+      <div class="concern"><span class="cl">item zero &middot; the safe point &mdash; which is three items</span><p>Every
+        in-TMM piece once assumed &ldquo;a safe point between poll-loop iterations that picks up a load request.&rdquo;
+        Two things were wrong. <b>Nothing needs picking up:</b> parse, verify and <b>JIT compile</b> run on a control
+        thread &mdash; as first sketched they ran <em>at</em> the safe point, milliseconds in which the loop is not
+        polling. What reaches the hot path is <b>one ordered store</b> into a slot it already reads. And the poll loop
+        is the <em>cheapest</em> source of the rendezvous and of quiescence, <b>not the only one</b> &mdash; every
         alternative pays in hot-path cycles, a restart, or leaked memory. <b>Exactly one capability has no
-        substitute:</b> an <b>atomic multi-slot change</b>. TMM is run-to-completion per packet, so a checkpoint
-        between iterations is the only point where several slots flip with no core seeing a half-applied set —
-        without one, a packet already past hook A sees old-A/new-B and no hot-path counter can rewind it. That is
-        <em>forfeited rather than blocking</em>, since day one is one program per hook with chaining refused. It was not on the list at all, and when
-        added it was added as one item.</p></div>
+        substitute:</b> an <b>atomic multi-slot change</b>. Run-to-completion makes the inter-iteration checkpoint the
+        only point where several slots flip with no core seeing a half-applied set &mdash; without it, a packet
+        already past hook A sees old-A/new-B and no hot-path counter can rewind it. <em>Forfeited rather than
+        blocking</em>, since day one is one program per hook with chaining refused.</p></div>
       <div class="concern"><span class="cl">certification · FIPS / Common Criteria</span><p>An appliance validated under <b>FIPS</b> 140-2/3 (crypto-module validation) or <b>Common Criteria</b> (independent evaluation against a stated target) that also loads data-plane code at runtime is a certification problem — evaluators may not accept &ldquo;it's signed,&rdquo; which can force a <b>dynamic-load-disabled certified mode</b>. Likely the biggest productization gate.</p></div>
       <div class="concern"><span class="cl">keep the verifier out of TMM</span><p>PREVAIL (heavy C++/Boost) verifies at <b>build / control-plane time</b>; only the small runtime and a signature check live in TMM. This <em>shrinks</em> the §04 surface.</p></div>
       <div class="concern"><span class="cl">boundary-probe ctx is build-specific</span><p>A <b>function-boundary probe's</b> contract — function X's typed args at build Y — is regenerated every build: more reach than a versioned USDT <span class="inlinecode">ctx</span>, looser contract. The <b>signed hook map</b> and the binding's build range keep it honest.</p></div>
@@ -654,11 +548,34 @@
         specific one into it means <span class="inlinecode">noinline</span> — a source change. Publish the set as a
         build artifact and treat it as the contract.</p></div>
       <div class="concern"><span class="cl">invocation granularity · per-packet vs. batched</span><p>eBPF's calling convention takes <b>one <span class="inlinecode">ctx</span>, once</b> — it cannot express &ldquo;here is a vector of 256 packets,&rdquo; so a data plane whose speed comes from a stage seeing a whole batch is a poor host for bytecode. <b>TMM is the favorable case</b>: a proxy, run-to-completion and core-pinned, per-flow rather than per-vector. What remains is per-invocation overhead where TMM <em>does</em> batch (burst receive): a <b>burst-capable invocation form</b>, with §01's budget pass reasoning <b>per burst</b> — which §01 ranks as the enabling mechanism for common-path enforcement, not merely a concern.</p></div>
-      <div class="concern"><span class="cl">handlers running at the same time</span><p>A different question from arming, and three simplifications rest on it. <b>Within one instance there is no concurrency at all</b> — single-threaded, un-preemptible, run-to-completion — which is <em>why</em> per-core counters need no atomics, one <span class="inlinecode">ctx</span> scratch buffer per core suffices, and a per-core depth guard answers re-entrancy completely. <b>Across instances there is full N-way parallelism</b>: arming a hook arms it everywhere, so N copies run at once on disjoint flows — hence shared state is a real concurrency problem, <span class="inlinecode">STATUS</span> must report per-instance (skew is diagnostic — disaggregation picks the instance), and partial arming is not &ldquo;mostly protected&rdquo;. <b>The one real seam</b> is the loader mutating a slot while that slot&rsquo;s program runs on another core: defined memory ordering on those fields, and epoch-based quiescence before freeing a VM.</p></div>
-      <div class="concern"><span class="cl">many programs armed at once</span><p>The support answer first: <b>different hooks armed at once, yes</b>; <b>two chained on one hook, refused</b>; <b>two handlers at the same instant on one core, impossible</b>. Beyond that, every argument here is written for <b>one program at one hook</b> — arm two and four things appear. <b>(1)</b> One slot per hook, so a second load on an armed hook gets a <b>distinct rejection</b>, not a silent overwrite — which would disarm a live shield and reset its counter, looking exactly like &ldquo;no matches.&rdquo; <b>(2)</b> Chaining is deferred because the blocker is declaring a <b>total order over the outcome set</b>, not plumbing: without one, behaviour follows load order, which is config-sync arrival order and differs across HA peers. <b>(3)</b> Nothing bounds the <b>cumulative armed cost</b>: the budget is <em>per hook</em>, and hooks on a flow&rsquo;s path are not independent, so <b>a flow pays the sum of the hooks it traverses</b>, not the maximum. <b>(4)</b> Worst of them: a shield that <b>safe-returns</b> — the host returning a benign value in place of the whole body — past a body containing another hook silences it, and that hook reads <b>zero fires</b>, indistinguishable from &ldquo;nothing matched.&rdquo; Our own mitigation manufacturing a false success, so a masked hook reports <span class="inlinecode">masked</span>, never zero.</p></div>
+      <div class="concern"><span class="cl">handlers running at the same time</span><p>A different question from
+        arming, and three simplifications rest on it. <b>Within one instance there is no concurrency at all</b> &mdash;
+        single-threaded, un-preemptible, run-to-completion &mdash; which is <em>why</em> per-core counters need no
+        atomics, one <span class="inlinecode">ctx</span> scratch buffer per core suffices, and a per-core depth guard
+        answers re-entrancy completely. <b>Across instances there is full N-way parallelism</b>, so shared state is a
+        real concurrency problem and <span class="inlinecode">STATUS</span> must report per-instance. <b>The one real
+        seam</b> is the loader mutating a slot while that slot&rsquo;s program runs on another core.</p></div>
+      <div class="concern"><span class="cl">many programs armed at once</span><p>Different hooks at once, <b>yes</b>;
+        two chained on one hook, <b>refused</b>; two handlers at the same instant on one core, <b>impossible</b>.
+        Beyond that, every argument here is written for <b>one program at one hook</b>, and arming two raises four
+        things. <b>(1)</b> A second load on an armed hook gets a <b>distinct rejection</b>, never a silent overwrite
+        &mdash; which would disarm a live shield and reset its counter, looking exactly like &ldquo;no matches.&rdquo;
+        <b>(2)</b> Chaining is deferred because the blocker is a <b>total order over the outcome set</b>, not
+        plumbing. <b>(3)</b> Nothing bounds <b>cumulative armed cost</b>: the budget is per hook, so a flow pays the
+        <em>sum</em> of the hooks it traverses. <b>(4)</b> Worst: a shield that <b>safe-returns</b> past a body
+        containing another hook silences it, and that hook reads <b>zero fires</b> &mdash; our own mitigation
+        manufacturing a false success. A masked hook must report <span class="inlinecode">masked</span>, never
+        zero.</p></div>
       <div class="concern"><span class="cl">multi-tenancy · partitions · vCMP</span><p>BIG-IP is deeply multi-tenant, and <b>vCMP</b> guests (virtual CMP — hardware-partitioned guests) each run their own TMM. A program's <b>scope, authorization, and blast radius</b> must be tenant-aware from day one.</p></div>
       <div class="concern"><span class="cl">ISSU + failover</span><p><b>ISSU</b> (in-service software upgrade) and HA failover need defined behavior: loaded programs <b>re-verify and reload on the new TMM</b>, with explicit map-state handling. (Extends §03.)</p></div>
-      <div class="concern"><span class="cl">post-mortem debuggability — it cuts both ways</span><p>The first concern support engineers raise. A <b>backtrace through a hooked function</b> is garbage without correct <b>CFI</b> on the trampoline — the call-frame information an unwinder walks. A <b>PC inside JIT&rsquo;d code</b> lands in anonymous memory with no symbol unless the loader registers the region. And the one rarely listed: <b>a core dump has to record which shields were armed</b>, with hashes, hooks and modes — without that, <b>every future crash on a box that has ever loaded one is ambiguous</b>, a support cost paid even on crashes no shield touched. Patched text also means the dump no longer matches the shipped binary. The flip side: a flight recorder captures the run-up <em>into</em> a fault, which a dump structurally cannot — but it <b>does not replace</b> core dumps, because a probe only answers a question someone already thought to ask.</p></div>
+      <div class="concern"><span class="cl">post-mortem debuggability &mdash; it cuts both ways</span><p>The first
+        concern support engineers raise. A <b>backtrace through a hooked function</b> is garbage without correct
+        <b>CFI</b> on the trampoline &mdash; the call-frame information an unwinder walks &mdash; and a <b>PC inside
+        JIT&rsquo;d code</b> lands in anonymous memory with no symbol unless the loader registers the region. The one
+        rarely listed: <b>a core dump has to record which shields were armed</b>, with hashes, hooks and modes.
+        Without that, <b>every future crash on a box that has ever loaded one is ambiguous</b> &mdash; a support cost
+        paid even on crashes no shield touched. The flip side is that a flight recorder captures the run-up
+        <em>into</em> a fault, which a dump structurally cannot.</p></div>
       <div class="concern"><span class="cl">jitter-sensitive deployments</span><p>Trading, 5G UPF and similar won't tolerate <em>any</em> added per-packet jitter — expect a <b>per-hook / per-deployment opt-out</b>.</p></div>
     </div>
   </section>
@@ -696,10 +613,12 @@
         build-pipeline toolchain and a permanent per-build ABI. That is a subsystem — but describing it as
         smaller than it is doesn't make it easier to say yes to; it makes the yes collapse in month nine. <b>So this
         register argues for a sequencing, not a commitment: three questions decide whether the rest is worth
-        designing, and none requires building the engine.</b> Measure the compiler flag <b>twice</b> — the idle cost
-        with nothing armed, then the armed cost at rate — settle a <span class="inlinecode">ctx</span> model that
-        verifies against real TMM debug info, and arm one hook end-to-end in a lab TMM with core dumps still
-        readable.</p></div>
+        designing.</b> Of the three, one is now half-answered: <b>arming one hook end-to-end in a live TMM is done</b> —
+        loaded over a socket, armed under traffic, disarmed, no restart — but the other half of that question,
+        <em>whether core dumps stay readable through a patched entry</em>, was never tested. The other two are the
+        two that gate everything else: measure the compiler flag <b>twice</b> — the idle cost with nothing
+        armed, then <b>the armed cost at rate, which remains unmeasured</b> — and settle a
+        <span class="inlinecode">ctx</span> model that verifies against real TMM debug info.</p></div>
     <p class="big">The verifier is the <span class="hl">floor, not the building</span>.</p>
     <p>It gives you memory-safety and termination — <b>not</b> WCET, <b>not</b> correctness, <b>not</b>
       immunity from its own bugs. The engine is defensible because the <b>signing gate</b> keeps attacker input
