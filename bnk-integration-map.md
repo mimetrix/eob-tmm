@@ -42,6 +42,23 @@ they are different builds.
 > which counts other teams' separately-built components as misses and therefore measures the build
 > layout rather than our coverage.
 
+**The hookable set on this build is 41,137 functions**, generated and verified by
+`make -C substrate check-hook-map`. Two pad shapes, and the split matters for planning:
+
+| | count | why |
+|---|---|---|
+| pad after `endbr64`, at entry+4 | 36,526 | the function is an indirect-call target |
+| pad at entry+0 | 4,611 | direct-call-only, mostly `.isra`/`.constprop` clones — `-fcf-protection` emits no `endbr64` for these |
+
+`ls_arm.c` requires `endbr64` and arms at entry+4, so today it handles the first row and **refuses
+the second**. Refusing is the safe direction, but it is 4,611 functions we can see and cannot use.
+
+**That gap grows when the other components come on board.** Of the 32,896 functions still unpadded
+and carrying a real body, 77% already begin with `endbr64` and 22% do not. Rebuilding them with the
+flag would take the hookable set to roughly **74,000** and add about **7,556** more offset-0 entries
+— so around **1 in 6** of the eventual set needs `ls_arm` to honour `pad_offset`. That makes it a
+planning item rather than a clone-handling nicety.
+
 Sources, `filelist` entries and the whitelist symbols are in
 [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md).
 
