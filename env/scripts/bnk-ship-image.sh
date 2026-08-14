@@ -42,15 +42,25 @@ verify)
     docker run --rm --entrypoint sh "$TAG" -c '
       echo "  tmm -> $(readlink -f /usr/bin/tmm)"
       if [ -e /usr/bin/tmm.debug ]; then
-        echo "  *** tmm.debug PRESENT --- Dockerfile.runtime points tmm at it."
-        echo "      Not the production shape, and probably not what you measured."
+        echo "  *** FATAL FOR ARMING: tmm.debug PRESENT and tmm points at it."
+        echo "      The debug build overrides CFLAGS_OPTIMIZE, which is where"
+        echo "      -fpatchable-function-entry lives --- so tmm64.debug has NO pads on"
+        echo "      TMM-core functions and NOTHING CAN EVER BE ARMED in it. Arming"
+        echo "      fails with \"no pad\", which reads like a wrong address and is not."
+        echo "      This is not a fidelity caveat. Rebuild with 'make tmm && make container'"
+        echo "      (no INSTALL_DEBUG_TMM) before trying to arm anything."
       else
         echo "  ok  no debug binary (production shape)"
       fi'
 
     echo "=== 2. is the binary it resolves to actually padded?"
+    # Check the binary tmm RESOLVES to, not a padded one that happens to be in
+    # the image. An image can carry a perfectly padded tmm64.no_pgo and run
+    # tmm64.debug instead --- which is exactly what tmm:0b and tmm:cve1 did.
+    RESOLVED=$(docker run --rm --entrypoint sh "$TAG" -c 'readlink -f /usr/bin/tmm' 2>/dev/null)
+    echo "  checking $RESOLVED (what tmm resolves to)"
     cid=$(docker create "$TAG")
-    docker cp "$cid:/usr/bin/tmm64.no_pgo" /tmp/.shipcheck
+    docker cp "$cid:$RESOLVED" /tmp/.shipcheck
     docker rm "$cid" >/dev/null
     python3 - <<'PY'
 d = open('/tmp/.shipcheck', 'rb').read()

@@ -14,6 +14,16 @@ needs DWARF parameter classification and is Phase B/C. A map from this tool is
 enough to arm a function by name and not enough to write a program against one.
 The schema marks the fields a product map must add.
 
+WHICH BINARY, AND WHY IT MATTERS MORE THAN IT LOOKS. A TMM image can carry BOTH
+tmm64.no_pgo (padded) and tmm64.debug (not), with /usr/bin/tmm pointing at the
+debug one --- `make tmm-gdb` does exactly that. The debug build overrides
+CFLAGS_OPTIMIZE, which is where -fpatchable-function-entry lives, so it has no
+pads on TMM-core functions and NOTHING IN IT CAN BE ARMED. A map generated from
+tmm64.no_pgo and used against a pod running tmm64.debug produces addresses that
+are wrong twice over: wrong binary, and no pad at the destination anyway. Arming
+then fails with "no pad", which reads like a stale address and is not. Confirm
+what the pod actually runs (readlink -f /usr/bin/tmm) before trusting a map.
+
 WHY THE PAD IS READ RATHER THAN INFERRED. `-fpatchable-function-entry=5,0` is
 applied to every translation unit we compile, but at -O2 the optimiser inlines
 and folds functions away, so the flag being on does not mean a given symbol has
