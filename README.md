@@ -92,6 +92,12 @@ overhead), and **the alternative to a shield is a build**, which has to be insta
 failover, regression risk, a rollback plan. Full argument in
 [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §1.1.
 
+## Reproducing the live result
+
+[`REPRODUCING.md`](REPRODUCING.md) is the path from a clean checkout to a shield loaded and armed in
+a running TMM — and, just as importantly, the three places this repo is **not** sufficient: it is
+not the TMM source tree, not the cluster, and not a signed pipeline.
+
 ## What the substrate enables
 
 One verified engine, resident in the process and reachable from any padded function the build emitted
