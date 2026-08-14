@@ -65,7 +65,7 @@ theme-aware HTML. **One job per page**; keep each single-purpose and cross-linke
 helps. Current set: the programmable-data-plane **engine**, **CVE mitigation** (the shield), and the
 **engine hard-problems** register. Companion design docs live at the repo root
 (`engine-hard-problems.md`, `data-plane-egress-primitives.md`, `embedded-ebpf-substrate.md`,
-`big-ip-live-shield-design.md`, `tmm-usdt-tracepoints.md`).
+`big-ip-live-surface-design.md`, `tmm-usdt-tracepoints.md`).
 
 
 

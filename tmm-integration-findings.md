@@ -81,7 +81,7 @@ falls by an order of magnitude — which matters more for a p99 argument than th
 contention, `ubpf_exec`/the JIT entry **only** — no `ctx` build, no trampoline, no poll loop.
 It is a **floor, for the smallest useful program**.
 
-Against `big-ip-live-shield-design.md` §11's *"order tens of nanoseconds… emphatically not
+Against `big-ip-live-surface-design.md` §11's *"order tens of nanoseconds… emphatically not
 comparable to a C `if`"*: both halves survive. 10 ns is tens of ns; against a sub-nanosecond C
 `if` it remains roughly an order of magnitude more expensive.
 

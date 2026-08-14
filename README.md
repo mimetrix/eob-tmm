@@ -43,7 +43,7 @@ TMM**, plus candidate ABI (application binary interface) artifacts that compile 
 socket into an already-running process, armed at a function entry while traffic flows, and disarmed
 again — no rebuild, no restart. What the repo itself still does not contain is a self-contained
 runnable demo; the sources here are compiled into TMM elsewhere, and `make -C substrate check`
-exercises the bench harnesses, not a data plane. **Live Shield** — vendor-authored runtime CVE
+exercises the bench harnesses, not a data plane. A **CVE shield** — a vendor-authored runtime
 mitigations that apply before the patched build does — is the *first instance* of the substrate, not the
 whole of it.
 
@@ -123,7 +123,7 @@ per hook is a slot — a program, a mode, a counter.)
 - **Lightweight policy / steering** — mirror-selection, A/B, member-steering driven by
   internal signals (decision in eBPF; heavy logic stays in iRules/WASM).
 - **Self-tuning / performance** — read internal load and nudge a knob; live hot-path profiling.
-- **Live Shield (CVE mitigation)** — the flagship first instance; see below.
+- **CVE shielding** — the flagship first consumer of the surface; see below.
 
 The differentiated asset is the compiled-in **attach capability** (patchable entries +
 trampoline) plus **where** in TMM a hook earns its keep — the hook-point
@@ -133,7 +133,7 @@ enforcement path is only partly out-of-process), LB / persistence, and cross-cut
 loop's own iteration accounting). Most are read-only
 tracepoints that can graduate to active controls once the signal is trusted.
 
-## Live Shield — the first instance
+## The CVE shield — the surface's first consumer
 
 The motivating application: **surgical, reversible, vendor-signed mitigations that block a
 specific exploit path** until the patched build is installed. A shield
@@ -211,7 +211,7 @@ exfiltration control and attestation are **not** yet specified there).
 | Path | What it is |
 |---|---|
 | [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) | The substrate: programmability spectrum, use-case families, hook-point catalog, and the security model |
-| [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) | The Live Shield design — threat model, hook-point map, modes, and trust/validation lifecycle (signing, verify-before-load, auto-retirement) |
+| [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) | The Live Surface design — threat model, hook-point map, modes, and trust/validation lifecycle (signing, verify-before-load, auto-retirement) |
 | [`data-plane-intelligence.md`](data-plane-intelligence.md) | The proxy as AI's sensory organ — the unique post-decrypt data vantage as a product moat, the sense→learn→act flywheel, tiered use-cases, and a reference architecture for the API-discovery MVP (value captured *in the product*, not sold as a feed) |
 | [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) | How data leaves the embedded VM — a per-core, single-producer, shared-memory ring; the **host emits, the program only signals** (no helpers, stock verifier). Prior-art review (DPDK `rte_ring`, kernel BPF ringbuf, bpftime), and the record-layout / backpressure / wakeup / crash design |
 | [`development-scope.md`](development-scope.md) | **What F5 actually builds** beyond the reused OSS (uBPF/PREVAIL/clang) — in-TMM code, build-pipeline tooling, control-plane pieces, optional tiers, and the one recurring per-CVE cost (a few lines of C). Keyed to the walkthrough's step numbers |

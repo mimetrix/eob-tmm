@@ -2,7 +2,7 @@
 
 ### A proposed set of designed-in hook points for TMM — USDT-style (userland statically defined tracing) tracepoints plus filter-capable decision points — consumed by the embedded userspace-eBPF VM. Observability, debug & RCA (root-cause analysis) are the primary lens here; CVE shields, steering, and self-tuning are **peer consumers of the same hooks**. The engine is generic; the shield is one application.
 
-**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (Live Shield), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`substrate/`](substrate/) (candidate ABI artifacts + checkers — **not** a running prototype)
+**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (the Live Surface), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`substrate/`](substrate/) (candidate ABI artifacts + checkers — **not** a running prototype)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
 
 ---
@@ -14,7 +14,7 @@ This is a candidate catalog of **designed-in hook points** to build into TMM's s
 Most hooks are consumed in **observe mode**: the program reads `ctx`, returns a value, and the host aggregates it (a counter, a histogram, a ring) — traffic is untouched. A subset sit at a clean decision point and also support **act mode**: the same `ctx`-in / value-out program picks among the host-owned outcomes declared for that hook — the canonical set is `PASS · DROP · RESET · SAFE-RETURN · STEER · SAMPLE`, defined once in [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §2 and referenced everywhere else. Observability, debug & RCA are the primary lens of this catalog — but the **same hooks** are the surface for a spectrum of applications, of which the CVE shield is only one:
 
 - **Observability, debug & RCA** — the focus of this catalog: bpftrace-for-TMM summaries, flight recorders, per-flow latency, in-situ field-support probes.
-- **CVE shields (Live Shield)** — a `filter`/drop program at a parser or plugin hook blocks a specific exploit path, applying with no restart and no failover. That it is *needed* rests on an assumption about operator behaviour — that a patched build cannot always be installed immediately (`big-ip-live-shield-design.md` §1.1, assumption 9) — which is not something F5 observes or controls. One consumer, *not* the purpose.
+- **CVE shields** — a `filter`/drop program at a parser or plugin hook blocks a specific exploit path, applying with no restart and no failover. That it is *needed* rests on an assumption about operator behaviour — that a patched build cannot always be installed immediately (`big-ip-live-surface-design.md` §1.1, assumption 9) — which is not something F5 observes or controls. One consumer, *not* the purpose.
 - **Steering & policy** — member-selection / mirror / A-B decisions driven by internal signal.
 - **Self-tuning** — read internal load and emit a scalar recommendation the host's tuning controller applies within sanctioned bounds; live hot-path profiling.
 
@@ -34,7 +34,7 @@ The engine is generic; the shield is one application on top of it. The reason a 
 > a one-liner convenience: `tmmtrace list 'tmm:l7:*'` to discover, then e.g.
 > `tmmtrace run 'tmm:l7:http2_frame { @streams = hist(args.n_streams); }'`. The **same grammar** would author an
 > acting program — a `filter`/drop shield, a steer, a sampler — by swapping the action verb; observe and act
-> share the machinery (design §6.1, `big-ip-live-shield-design.md`).
+> share the machinery (design §6.1, `big-ip-live-surface-design.md`).
 
 **Two companion utilities — both proposed, neither built.** `tmmtrace` would be the *summary* consumer — bpftrace-for-the-data-plane: counters, histograms, predicates, shields. `tmmdump` would be the *capture* consumer — tcpdump-for-the-data-plane: it streams a bounded window of the **actual bytes** at a hook off the box, *together with the internal state at that hook* — the one thing an interface-boundary packet capture cannot correlate for you (§10.6). One summarizes, one captures; both would be thin front-ends over the same in-process VM: **`tmmtrace : bpftrace :: tmmdump : tcpdump`**.
 
@@ -243,7 +243,7 @@ them. What a TMM hook *can* see is the **IPC boundary** — direction, message t
 latency, and the verdict that came back. A genuine `bd`-internal hook is a *second engine instance in `bd`*,
 with its own program type, its own address space, and its own safe-point problem in multi-threaded C++ with
 no poll loop (`engine-hard-problems.md` §5) — out of scope for this catalog, and explicitly **not** the Live
-Shield Phase 1 target (`big-ip-live-shield-design.md` §12: Phase 1 is a **patched function entry** on a
+Shield Phase 1 target (`big-ip-live-surface-design.md` §12: Phase 1 is a **patched function entry** on a
 `warm`/`cold` TMM path, precisely because `bd` is the hardest first target, not the easiest).
 
 ### 6.1 In-TMM enforcement filters (AFM, DoS, the TMM side of APM)

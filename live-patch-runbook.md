@@ -163,7 +163,7 @@ None is invention; all three are named, scoped work.
 ## Canonical sources
 
 - Outcome set, the host owns it — [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §2
-- What must be true for a hook to reach a CVE — [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) §10.1
+- What must be true for a hook to reach a CVE — [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10.1
 - Loader ABI + wire layout — [`substrate/shield_abi.h`](substrate/shield_abi.h)
 - Hook-map schema — [`substrate/hook_map.schema.json`](substrate/hook_map.schema.json)
 - The safe swap, and why testing alone is weak evidence — [`safe-swap-plan.md`](safe-swap-plan.md)

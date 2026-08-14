@@ -112,4 +112,4 @@ where you think it is.
 - **Anything on appliance or VE.** All of this is MBIP/BNK. Whether CBIP and MBIP share one source
   tree is **unverified** — and reading `#ifdef`s would not settle it, because at least one
   divergence we hit is about what gets *linked*, not compiled. See
-  [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) §10.
+  [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10.

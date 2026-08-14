@@ -28,7 +28,7 @@ files that never existed under these names.
    and [`../bigip-mcp-server.md`](../bigip-mcp-server.md).
 2. **Possible conflict with the root design docs.** `01`'s treatment of form
    factors and the eBPF attach surface was written independently and has
-   **not** been reconciled against `big-ip-live-shield-design.md`,
+   **not** been reconciled against `big-ip-live-surface-design.md`,
    `data-plane-intelligence.md`, or `design-review-findings.md`. Where they
    disagree, **the root design docs win.** Do not cite `01` as authority.
 3. **They describe a repo that no longer exists.** References to the Go

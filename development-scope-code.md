@@ -2106,7 +2106,7 @@ the canon is not edited as a side effect of other work:
 3. **`explainers/cve-shield-walkthrough.html`** writes `jit_fn(&ctx)`; the JIT entry point this design
    uses is uBPF's extended form, `(mem, mem_len, stack, stack_len)`. A parenthetical would close the
    gap without lengthening the block.
-4. **`big-ip-live-shield-design.md`** shield-object JSON uses `perf_class` where the hook map and the
+4. **`big-ip-live-surface-design.md`** shield-object JSON uses `perf_class` where the hook map and the
    USDT catalog use `path_class`.
 5. **`embedded-ebpf-substrate.md`** prose writes `SAFE-RETURN`; the code constant is `SAFE_RETURN`.
 

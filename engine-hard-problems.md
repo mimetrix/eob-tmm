@@ -2,7 +2,7 @@
 
 ### The problems the explainers gloss — real-time, interface & scope, distributed state, security, certification, operations. What building this entails, surfaced up front: what's day-one vs. deferred, and the honest mitigations
 
-**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), [`development-scope.md`](development-scope.md) (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
+**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), [`development-scope.md`](development-scope.md) (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
 **Audience:** TMM core engineering, architecture, F5 SIRT / security review, product & certification
 
 ---
@@ -575,7 +575,7 @@ first shippable form.
   cloning warned about just above is real and countable rather than hypothetical. This is the first
   hookable-set measurement in this proposal. Appliance and VE are **CBIP** builds, from Perforce via
   `seadev`, and remain unmeasured — the three form factors are separate builds and a count from one
-  does not transfer. See [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) §10.1.
+  does not transfer. See [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10.1.
 - **Invocation granularity — per-packet bytecode on a partly batched data plane.** eBPF's calling
   convention takes **one `ctx`, once**: it cannot express "here is a vector of 256 packets." A data
   plane whose performance comes from a stage seeing an entire batch at once — so it can loop and

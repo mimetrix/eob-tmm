@@ -4,7 +4,7 @@
 
 **Status:** **Strategy annex** / opportunity framing — deliberately **out of scope for the feasibility phase**
 **Audience:** F5 product & strategy, TMOS architecture, F5 SIRT (Security Incident Response Team), data/ML leadership, OSPO (Open Source Program Office)
-**Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-shield-design.md`](big-ip-live-shield-design.md) (the security instance), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a signal actually leaves the poll loop), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (the hook + `ctx` catalog whose fields are the feature inputs assumed here)
+**Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (the security instance), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a signal actually leaves the poll loop), [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) (the hook + `ctx` catalog whose fields are the feature inputs assumed here)
 **Scope:** What a bounded in-process substrate could unlock if it is later pointed not at *behavior* but at *data* — and the flywheel that would connect the two.
 
 > ### Read this as an annex, not as a request
@@ -37,7 +37,7 @@ Every observer of enterprise traffic is structurally blind somewhere. **So is th
 
 The supportable claim is narrower than "sees everything": **for traffic a virtual actually terminates, this is the least-blind of the four vantages in the table** — the only one of them that is simultaneously post-decrypt, in protocol context, and at line rate. Bounded, and stated as bounded.
 
-Those bounds are not new here. They are the same coverage limits `big-ip-live-shield-design.md` §10 and `tmm-usdt-tracepoints.md` state for enforcement, they are properties of the platform rather than of this proposal, and every counter derived from these hooks has to be read against them — a zero can mean "no attack," "handled in silicon," or "a different TMM instance saw it."
+Those bounds are not new here. They are the same coverage limits `big-ip-live-surface-design.md` §10 and `tmm-usdt-tracepoints.md` state for enforcement, they are properties of the platform rather than of this proposal, and every counter derived from these hooks has to be read against them — a zero can mean "no attack," "handled in silicon," or "a different TMM instance saw it."
 
 And today even that narrower view **evaporates**: observed once for forwarding, then discarded — *digital exhaust.*
 
@@ -60,7 +60,7 @@ So the honest form of the claim:
 
 That combination is still a **privacy** story — a data-minimization architecture designed for jurisdictions where centralizing decrypted traffic is not permissible — as well as an **economics** story (kilobytes of signal instead of gigabits of payload) and a **data-quality** story (post-decrypt, in-context, line-rate fidelity, within §1's coverage bounds).
 
-**What it requires:** *both halves* — the vantage (be the proxy) **and** the bounded in-process surface (this substrate). Whether anyone else holds both is a claim about other products' internals that this annex does not make. On the legal side, state only what is established: the verifier and VM carry permissive licenses, so there is **no copyleft in the primary path — subject to the pinned-version SBOM and license scan that `big-ip-live-shield-design.md` §13 (licensing & OSS posture) lists as still to be run**. That is a posture, not a clearance.
+**What it requires:** *both halves* — the vantage (be the proxy) **and** the bounded in-process surface (this substrate). Whether anyone else holds both is a claim about other products' internals that this annex does not make. On the legal side, state only what is established: the verifier and VM carry permissive licenses, so there is **no copyleft in the primary path — subject to the pinned-version SBOM and license scan that `big-ip-live-surface-design.md` §13 (licensing & OSS posture) lists as still to be run**. That is a posture, not a clearance.
 
 ## 3. The flywheel — where an F5 model lives
 
@@ -196,11 +196,11 @@ Most of the pipeline (§3.1) assembles from mature, permissively-licensed open s
 | **Learn** | PyTorch / JAX (training), PyOD · River · XGBoost (anomaly, SLM), HuggingFace Transformers (sequence SSL), Flower or NVIDIA FLARE (federated) + Opacus (DP), ONNX Runtime · llama.cpp (on-box inference) | the **protocol-event feature schema & self-supervised objective**, federation bound to the host-confined sensor of §2, and the model-registry → signed-program bridge |
 | **Act** | PREVAIL (reuse the gate), clang/LLVM, Sigstore/cosign + in-toto + TUF (sign, attest, distribute), Outlines · llguidance (grammar-constrained LLM output) | the **model-output → DSL candidate** synthesis, the **verifier-as-oracle refine loop**, and the **lifecycle engine** (observe-first, catalog, auto-retire, kill-switch) |
 
-The reuse column is a permissive open-source floor — the same posture as the core VM + verifier (`big-ip-live-shield-design.md` §13 (licensing & OSS posture)). The build column is where F5's value lives.
+The reuse column is a permissive open-source floor — the same posture as the core VM + verifier (`big-ip-live-surface-design.md` §13 (licensing & OSS posture)). The build column is where F5's value lives.
 
 ### 7.1 Reference implementations (for OSPO / engineering scoping)
 
-License + repo per candidate. **Run the SBOM/license scan described in `big-ip-live-shield-design.md` §13 (licensing & OSS posture) on pinned versions before shipping** — transitive trees drift.
+License + repo per candidate. **Run the SBOM/license scan described in `big-ip-live-surface-design.md` §13 (licensing & OSS posture) on pinned versions before shipping** — transitive trees drift.
 
 **Sense**
 - **uBPF** — Apache-2.0 — `github.com/iovisor/ubpf`
@@ -227,7 +227,7 @@ License + repo per candidate. **Run the SBOM/license scan described in `big-ip-l
 - **TUF** (`python-tuf`) — MIT/Apache-2.0 — `github.com/theupdateframework/python-tuf`
 - grammar-constrained generation: **Outlines** — Apache-2.0 — `github.com/dottxt-ai/outlines` · **llguidance** — MIT/Apache — `github.com/guidance-ai/llguidance`
 
-> **Licensing posture.** Every candidate above is permissive (Apache / BSD / MIT), with two footnotes for counsel: **MPL-2.0** (Vector) is *file-level* copyleft — fine when consumed as a separate binary, not statically linked; **Redpanda is BSL** (source-available, **not** OSI-approved) — excluded here. This mirrors the core substrate's posture; the same SBOM scan (`big-ip-live-shield-design.md` §13 (licensing & OSS posture)) applies, and — as that section says — it has not been run yet.
+> **Licensing posture.** Every candidate above is permissive (Apache / BSD / MIT), with two footnotes for counsel: **MPL-2.0** (Vector) is *file-level* copyleft — fine when consumed as a separate binary, not statically linked; **Redpanda is BSL** (source-available, **not** OSI-approved) — excluded here. This mirrors the core substrate's posture; the same SBOM scan (`big-ip-live-surface-design.md` §13 (licensing & OSS posture)) applies, and — as that section says — it has not been run yet.
 
 ## 8. Governance as a property of the mechanism
 

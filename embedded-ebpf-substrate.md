@@ -1,10 +1,10 @@
 # The Embedded eBPF Substrate in TMM
 
-### The third programmability surface — verified, dynamic, in the data plane. Live Shield is its first instance.
+### The third programmability surface — verified, dynamic, in the data plane. The CVE shield is its first instance.
 
 **Status:** Strategy / use-case exploration
 **Audience:** TMOS (Traffic Management Operating System) architecture, F5 SIRT (Security Incident Response Team), BIG-IP security & observability engineering, product
-**Companion:** `big-ip-live-shield-design.md` (the detailed Live Shield mechanism — the first instance of this substrate) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `substrate/` (**candidate ABI (application binary interface) artifacts and their checkers** — the shield ABI header, the hook-map schema + an example map, the budget/offset/gate checks. These are proposed interfaces under mechanical check, **not a running prototype**: nothing in this repo executes a shield.)
+**Companion:** `big-ip-live-surface-design.md` (the detailed Live Surface mechanism — whose CVE shield is the first instance of this substrate) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `substrate/` (**candidate ABI (application binary interface) artifacts and their checkers** — the shield ABI header, the hook-map schema + an example map, the budget/offset/gate checks. These are proposed interfaces under mechanical check, **not a running prototype**: nothing in this repo executes a shield.)
 **Scope:** What becomes possible once a verified userspace eBPF (extended Berkeley Packet Filter) virtual machine (uBPF) is embedded in TMM and instrumented with designed-in hook points **and function-boundary probes at entries the build already emitted**
 
 ---
@@ -51,7 +51,7 @@ The remaining four are about being a shipped product rather than a component:
 
 - **F5 owns the source and the build.** Hook points can therefore be **designed in** — named, versioned, placed deliberately — and a per-build signed hook map can be emitted from the build's own debug info. Where the data plane is assembled from third-party code, none of that is available: there is no single vendor-owned build to instrument or to sign.
 - **It is a shipped, closed appliance, so the proof is a requirement.** Where the operator writes and runs their own extension, they own the crash risk. F5 cannot ship a mitigation that *might* fault: `sod` restarts TMM in seconds and HA (high availability) fails over, so the harm is a repeatable crash-loop on a traffic pattern the attacker controls rather than a sustained outage — and a crash-loop is still not shippable. That asymmetry is what the static verifier answers: safety is the precondition for the artifact being shippable at all.
-- **The two delivery forms have different artifact properties.** A build has to be installed: that means a restart or a failover, regression risk across everything else the build changes, and a rollback plan. A signed shield has none of those properties — it applies with no restart and no failover, and `REVOKE` disarms it by restoring the original bytes at a safe point. Whether and when any given operator installs a build is an **assumption**, not a fact: `big-ip-live-shield-design.md` §1.1 records it as assumption 9 and marks it as ending the case if false.
+- **The two delivery forms have different artifact properties.** A build has to be installed: that means a restart or a failover, regression risk across everything else the build changes, and a rollback plan. A signed shield has none of those properties — it applies with no restart and no failover, and `REVOKE` disarms it by restoring the original bytes at a safe point. Whether and when any given operator installs a build is an **assumption**, not a fact: `big-ip-live-surface-design.md` §1.1 records it as assumption 9 and marks it as ending the case if false.
 
 - **The problem is vendor-delivered change, not third-party extension.** "How does someone else add functionality to this?" and "how does the vendor change the behaviour of an already-shipped closed data plane, between releases, provably safely?" are different questions. Native extension answers the first well and the second not at all.
 
@@ -101,7 +101,7 @@ Observability (the engine) and runtime compensating controls (the shield) are tw
 - **No helper functions.** eBPF helpers are the program's syscalls — the surface you must design, register, audit, and confine. With none, there is nothing to confine: a program that can only read `ctx` and return a value is **maximally sandboxed by construction** (§6.3).
 - **No verifier extension.** A bounded predicate over a typed `ctx` is the canonical case PREVAIL already proves. You *configure* the `ctx` layout; you do not *extend* the verifier — so **stock PREVAIL**, no fork in the trust path.
 
-Anything stateful (rates, time, cross-flow counters) is handled by the host computing it into `ctx`. Helpers — letting the program touch host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite. **Live Shield and the tracepoint/`tmmtrace` surface need no helpers and no verifier *extension* — stock PREVAIL; the real (bounded) work is the `ctx`/program-type descriptor.** And because a new tracepoint is just "define a `ctx`, place a hook, emit it in the map," the dev team can **grow the instrumentation surface incrementally** — USDT-style — in normal releases, each hook dark-until-lit and each new `ctx` field widening what can be observed *and* shielded, all without touching the VM, the verifier, or a helper ABI.
+Anything stateful (rates, time, cross-flow counters) is handled by the host computing it into `ctx`. Helpers — letting the program touch host maps directly — are an **optional later tier** for richer stateful programs, not a prerequisite. **CVE shields and the tracepoint/`tmmtrace` surface need no helpers and no verifier *extension* — stock PREVAIL; the real (bounded) work is the `ctx`/program-type descriptor.** And because a new tracepoint is just "define a `ctx`, place a hook, emit it in the map," the dev team can **grow the instrumentation surface incrementally** — USDT-style — in normal releases, each hook dark-until-lit and each new `ctx` field widening what can be observed *and* shielded, all without touching the VM, the verifier, or a helper ABI.
 
 ## 3. Use-case families
 
@@ -124,7 +124,7 @@ Both patterns below are **observe-mode, read-only, and verified**, so they carry
 
 **Flight recorder.** A small **per-CPU ring** of recent internal state is maintained at the relevant hook(s); on a **trigger**, the ring is frozen and dumped — yielding the run-up *into* a failure rather than the wreckage after it (the core-dump's blind spot). Two flavors: a *per-context ring* (recent state for the active flow, dumped on the error branch) and a *global tripwire* (cross-cutting state — poll-loop jitter, memory-pool pressure — dumped on an emergency-mode / watchdog event). Design points:
 
-- **Steady-state cost** — this is the one observe pattern that is *not* free when nothing is wrong: writing the ring on every event is a standing tax, hence a measured-budget decision (design §11, `big-ip-live-shield-design.md`). Mitigate with a small per-CPU ring (the single-threaded poll loop makes the freeze lock-free), cheap recorded fields, or **conditional arming** (record only once a leading indicator appears).
+- **Steady-state cost** — this is the one observe pattern that is *not* free when nothing is wrong: writing the ring on every event is a standing tax, hence a measured-budget decision (design §11, `big-ip-live-surface-design.md`). Mitigate with a small per-CPU ring (the single-threaded poll loop makes the freeze lock-free), cheap recorded fields, or **conditional arming** (record only once a leading indicator appears).
 - **Trigger taxonomy** — entry to a known-vulnerable function, a parser reaching an error state, an assertion, a watchdog event. The trigger is itself a hook, so a flight recorder is really *two* coordinated hooks (record + trip).
 - **Dump path off the hot path** — freeze the ring cheaply; hand serialization/export to the lifecycle engine.
 
@@ -136,7 +136,7 @@ Both patterns reuse the same machinery — signing + RBAC, context minimization,
 
 ## 4. Candidate hook points — observability & active datapath
 
-Below are candidate points by data-path stage, in both modes. How many real advisories clear the four shieldability conditions in `big-ip-live-shield-design.md` §10.1 — a surviving out-of-line boundary before the fault, a condition derivable from that boundary's arguments, a safe outcome, and a budget — is an **assumption**, recorded there as assumption 8 and marked as ending the case if false. Nobody has checked published advisories one by one; the fraction is unknown rather than merely unproven. A concrete, named candidate set — with per-hook `ctx` fields and their observability/debug/RCA use — is proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md). (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per design §11 (`big-ip-live-shield-design.md`).)
+Below are candidate points by data-path stage, in both modes. How many real advisories clear the four shieldability conditions in `big-ip-live-surface-design.md` §10.1 — a surviving out-of-line boundary before the fault, a condition derivable from that boundary's arguments, a safe outcome, and a budget — is an **assumption**, recorded there as assumption 8 and marked as ending the case if false. Nobody has checked published advisories one by one; the fraction is unknown rather than merely unproven. A concrete, named candidate set — with per-hook `ctx` fields and their observability/debug/RCA use — is proposed in [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md). (These are architectural stages; exact named hook points are placed against TMM source and emitted in the per-build hook-point map — design §5.3. `path_class` per design §11 (`big-ip-live-surface-design.md`).)
 
 | Data-path stage | **Observe** (tracepoint) | **Active** (datapath control) | Why eBPF (what iRules / kernel eBPF miss) |
 |---|---|---|---|
@@ -189,7 +189,7 @@ PREVAIL proves a program is **memory-safe**, and **terminating only when the ter
 
 ### 6.4 Coverage vs. the design doc
 
-Already specified in `big-ip-live-shield-design.md`: signing and SIRT-author/red-team (§8), the mandatory verifier and watchdog (design §9), monitor-first and auto-retirement (design §7), mode-promotion governance and config-sync-in-trust-path (design §13). This section adds the substrate-level pieces those don't yet name: **verified≠secure**, **capability confinement + context minimization** (free in the zero-helper core; §2), the **observe-mode exfiltration** control, **authorization tiers + load-path hardening**, and **attestation/inventory + revocation/kill-switch**.
+Already specified in `big-ip-live-surface-design.md`: signing and SIRT-author/red-team (§8), the mandatory verifier and watchdog (design §9), monitor-first and auto-retirement (design §7), mode-promotion governance and config-sync-in-trust-path (design §13). This section adds the substrate-level pieces those don't yet name: **verified≠secure**, **capability confinement + context minimization** (free in the zero-helper core; §2), the **observe-mode exfiltration** control, **authorization tiers + load-path hardening**, and **attestation/inventory + revocation/kill-switch**.
 
 ## 7. The honest boundary (where this is *not* the tool)
 
@@ -199,7 +199,7 @@ eBPF's compute model is deliberately constrained — bounded loops, small stack,
 
 Build the substrate once; land use cases in order (each reuses the same VM + verifier + hook-point map):
 
-1. **Live Shield on `bd`** — proves the embedded-VM + verify + lifecycle spine against a real bug, off the hot path. *(Companion doc, Phase 1.)*
+1. **A CVE shield on `bd`** — proves the embedded-VM + verify + lifecycle spine against a real bug, off the hot path. *(Companion doc, Phase 1.)*
 2. **Control-plane daemon shields** — the bulk of disclosed TMOS CVEs.
 3. **Observe-mode tracepoints for diagnostics & support** — high value, low risk (read-only), same machinery.
 4. **TMM-internal shields** on exceptional paths — the data-plane CVE classes nothing else reaches.
@@ -213,4 +213,4 @@ CVE disclosure moves at machine speed, and the verified-shield model admits mach
 
 ## 9. One-line thesis
 
-**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes carry a static proof — memory-safety, and termination where that check is enabled — with time-safety bounded at admission by the budget pass and at runtime by a fuel-metered guard. Live Shield is the first instance; the substrate, and the hook-point map, are the asset.**
+**TMM's power is dynamic programmability. Embedded eBPF is the third surface — alongside iRules and WASM — extending that power to the data plane's own code and internal state, and the only one whose runtime changes carry a static proof — memory-safety, and termination where that check is enabled — with time-safety bounded at admission by the budget pass and at runtime by a fuel-metered guard. The CVE shield is the first consumer; the substrate, and the hook-point map, are the asset.**

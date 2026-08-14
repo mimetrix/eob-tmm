@@ -24,7 +24,7 @@ programmability surface it is.
 - [`../development-scope.md`](../development-scope.md) — what F5 builds, item by item, with a per-item status column. uBPF is **no longer reused as-is**: F5 carries a patch (`../substrate/ubpf-patches/`).
 - [`../development-scope-code.md`](../development-scope-code.md) — a candidate code skeleton per item, with real/stubbed/TODO marked.
 - [`../design-review-findings.md`](../design-review-findings.md) — the author's own adversarial review and its dispositions, including the findings that changed the design.
-- [`../engine-hard-problems.md`](../engine-hard-problems.md) · [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) · [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) — the long-form docs these pages are distilled from.
+- [`../engine-hard-problems.md`](../engine-hard-problems.md) · [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) · [`../big-ip-live-surface-design.md`](../big-ip-live-surface-design.md) — the long-form docs these pages are distilled from.
 - [`../substrate/`](../substrate/) — the candidate ABI artifacts and their checkers: a header whose `_Static_assert`s pin the loader message's wire layout, a hook-map schema, an admission-time budget pass with a self-test, and a check that fails the build if the safe-return two-gate rule regresses. **These check themselves** (`make -C substrate check`). The same sources are compiled into TMM, where the mechanism has run: loaded over a socket into an already-running process, armed while traffic flowed, disarmed. That part is not reproducible from this repo alone — it needs the TMM build tree and the cluster.
 
 ## Canonical sources
@@ -34,9 +34,9 @@ these is the thing that's wrong.
 
 | Fact | Defined in |
 |---|---|
-| **What the proposal assumes** — split into known, controlled, and assumed, with the two that end the case if false | [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §1.1 |
+| **What the proposal assumes** — split into known, controlled, and assumed, with the two that end the case if false | [`../big-ip-live-surface-design.md`](../big-ip-live-surface-design.md) §1.1 |
 | The host-owned outcome set | [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) §2 |
-| What must be true for a hook to reach a given CVE, and that the fraction of real advisories clearing those bars is unknown | [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §10.1 |
+| What must be true for a hook to reach a given CVE, and that the fraction of real advisories clearing those bars is unknown | [`../big-ip-live-surface-design.md`](../big-ip-live-surface-design.md) §10.1 |
 | `path_class` as the rate class, read as structure ∧ adversarial reachability | [`../engine-hard-problems.md`](../engine-hard-problems.md) §1 |
 | What is and is not supported when several programs are armed or running | [`../engine-hard-problems.md`](../engine-hard-problems.md) §3.1 · §3.2 |
 | ~~The first experiment, and the three forms the mechanism can take~~ — **run, and decided: form B, patched function entries. Designed-in call sites were removed from the TMM tree 2026-08-13.** Kept as the record of why | [`../design-review-findings.md`](../design-review-findings.md) §4 · [`../mechanism-tradeoff.md`](../mechanism-tradeoff.md) |

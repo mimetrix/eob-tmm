@@ -219,12 +219,24 @@ Wakeup is a **`STREAM`** concern only. A `RECORD` ring has no standing drainer t
 >   with no deployment change** — no `emptyDir{medium: Memory}`, no volume, no manifest edit. That
 >   was the deployment question this section left open and it is now answered.
 >
-> **What this does not establish, and it is the half that can still invalidate the design:** that a
-> **TMM poll thread** can create and write the mapping. TMM has its own memory manager, and a thread
-> we create already cannot call `malloc` — it spins on an uninitialised spinlock
-> ([`load-path-scope.md`](load-path-scope.md) §1). Only a build doing the mapping from `INIT_LATE`
-> settles it. Until then this section's lifecycle is proven for ordinary processes in the container
-> and assumed for the producer.
+> **Step 0b — settled 2026-08-14. A TMM poll thread CAN map and write shared memory.** Built into
+> `ls_prep.c`/`ls_vm_load.c`, shipped as `tmm:0b`, rolled on datkube. TMM logged
+> `ls_vm: egress probe MAPPED at 0x779dfd690000 (magic set)` at startup; the magic word read back
+> correct and the tick counter advanced **6829 → 7128 over 3 s** (~100 Hz, matching the periodic
+> timer's `LS_PREP_TICKS`). Both pods healthy, **0 restarts**. The mapping is made by tid 0 — a
+> genuine poll thread — from `INIT_LATE`, and written from the timer callback on that thread.
+>
+> So the producer side is ordinary engineering. **What is still unmeasured is the per-record cost:**
+> `mmap` happens once at startup, off the hot path, and this probe exercises none of the
+> `memcpy`-plus-release-store that a real emit does.
+>
+> **One finding that changes the spec, and only running found it: the segment's mode matters.**
+> The probe created it `0600`, and the drain agent could not read it — **TMM runs as uid 0 while the
+> `debug` sidecar runs as uid 2000**. Step 0a missed this because it ran both processes as the same
+> user. So §5.7 must specify that the producer creates the segment **`0644`** (world-readable,
+> owner-writable), or the deployment must align uid/gid across the containers. A `0600` segment
+> fails *silently* in the direction that looks like "the ring is empty".
+
 
 
 **Mapping — and which single word the consumer must be allowed to write.** Own `mmap`'d, named shm segment(s) (not Boost). A small **header** carries a build-id, `layout_version`, the ring's declared policy (§5.1), and a **generation** counter, so a consumer verifies ABI and provenance before draining. Consumers map the **data area and the producer page read-only**; on a `STREAM` ring the **consumer page is writable**, because it has to be — draining means publishing `consumer_pos` (§5.4 step 6), and a wholly read-only mapping makes drain impossible. That one word is the entire writable surface exposed to the drainer. If even that is unacceptable for a given consumer, the alternative is to keep the drain position in a private state file outside the shm and declare the ring **`RECORD`**, so the producer never consults a reader position at all.

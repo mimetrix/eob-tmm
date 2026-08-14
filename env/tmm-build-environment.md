@@ -90,7 +90,7 @@ appliance, VE and containerized builds come from the same source?* Yes, and the 
   flags in the shared TMM, so this tree knows about form factors it does not package for.
 - **CBIP modules are present verbatim** — `src/modules/hudfilter/http/http_psm.c`, the
   file carrying the real vulnerable pattern behind
-  [`../big-ip-live-shield-design.md`](../big-ip-live-shield-design.md) §14, is right here.
+  [`../big-ip-live-surface-design.md`](../big-ip-live-surface-design.md) §14, is right here.
 - **Only `tmm-mbip.spec` exists.** Appliance and VE packaging lives on the Perforce side.
 
 **What that licenses and what it does not.** It licenses reading TMM *source* here and
@@ -930,7 +930,7 @@ cache, no contention, `ubpf_exec` only — no `ctx` build, no trampoline, no pol
 
 ### Three things it settles
 
-**The "tens of nanoseconds" claim holds.** `big-ip-live-shield-design.md` §11 says an
+**The "tens of nanoseconds" claim holds.** `big-ip-live-surface-design.md` §11 says an
 invocation is *"order tens of nanoseconds — which is emphatically not 'comparable to a C
 `if`'"*. Measured ~50 ns. Both halves survive: it is tens of ns, and against a sub-nanosecond
 C `if` it is **roughly two orders of magnitude** more expensive.
@@ -1131,7 +1131,7 @@ was discarding. The benchmark now prints which path it measured, precisely so th
 Same program, same box, one environment variable apart. The tail improves too — max falls by an
 order of magnitude, which matters more for a p99 argument than the floor does.
 
-**Against `big-ip-live-shield-design.md` §11's "order tens of nanoseconds":** the JIT is 10 ns,
+**Against `big-ip-live-surface-design.md` §11's "order tens of nanoseconds":** the JIT is 10 ns,
 at the low end of tens; the interpreter is 48 ns. Both survive the claim. Against a
 sub-nanosecond C `if`, the JIT is still **roughly an order of magnitude** more expensive, so the
 "emphatically not comparable to a C `if`" half also stands.
