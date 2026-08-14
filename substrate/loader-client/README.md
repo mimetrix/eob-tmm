@@ -35,6 +35,22 @@ the right long-term answer, and is part of item 11.
 | `arm_client.py` | one arm/disarm against one instance |
 | `arm_all.py` | arms one function across **every** TMM instance in the pod |
 
+> **The production image has no Python.** These clients only ever ran against debug builds — and a
+> debug build is precisely one that *cannot* be armed, because the debug variant overrides
+> `CFLAGS_OPTIMIZE` and so carries no entry pads on TMM-core functions. So the whole directory
+> worked only where the mechanism does not, which went unnoticed until a production image was
+> finally shipped.
+>
+> Against a production build, drive the socket with **`ncat -U`** and a message built off-box —
+> no client in the container at all:
+>
+> ```sh
+> python3 -c 'import struct,sys; m=struct.pack("<IIBxxxI",3,0,2,0)+b"\0"*32+b"\0"*64+b"\0"*16+b"\0"*64; sys.stdout.buffer.write(m)' > /tmp/status.bin
+> kubectl exec -i <pod> -c f5-tmm -- ncat -U -w5 /tmp/ls_load.sock.<n> < /tmp/status.bin
+> ```
+>
+> Verified working: `OK armed=1 mode=2 fired=0 …`. The 192-byte layout is in `ls_client.py`.
+
 ## Running
 
 The loader must be on — TMM started with `LS_LOAD_SOCKET` set. It names one socket per instance,
