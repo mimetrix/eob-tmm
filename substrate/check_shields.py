@@ -34,6 +34,10 @@ CASES = [
      "unbounded trip count, body -O2 cannot fold -- must fail the termination gate"),
     ("folded_loop.bpf.c", "fentry/folded_loop", True,
      "PASSES because -O2 folded its loop to closed form -- verify the object, not the source"),
+    ("parse_watch.bpf.c", "fentry/http_parse_client_headers", True,
+     "the tmm:l7:parse_error tracepoint: reads the host-built flat ctx and reports "
+     "whether any of the five parse-violation bits is set. The first program here that "
+     "reads real TMM state rather than ignoring its input."),
 ]
 
 
