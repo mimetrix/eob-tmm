@@ -102,10 +102,12 @@ where you think it is.
 
 ## What you will not be able to reproduce, and why
 
-- **A CVE actually mitigated on live traffic.** The worked-example target is unreachable on BNK:
-  `prot_transfer_log_profile` has no Kubernetes CRD field, so the check-then-reread window cannot be
-  driven from outside. Every program armed live so far returns `FALLTHROUGH` by construction, which
-  means the *mechanism* is demonstrated and the *mitigation* is not. See
+- **A CVE actually mitigated on live traffic.** Every program armed live so far returns
+  `FALLTHROUGH` by construction, so the *mechanism* is demonstrated and the *mitigation* is not.
+  Whether the worked-example target is reachable on BNK is **open**: the lookup is dispatched from a
+  log-key dictionary with no guard, so a NULL `prot_transfer_log_profile` is sufficient — no race —
+  and BNK never populating that field may make it *more* reachable, not less. The experiment that
+  would settle it deliberately crashes a TMM pod and has not been run. See
   [`bnk-integration-map.md`](bnk-integration-map.md) §6.
 - **A per-call cost number.** The counter mean is dominated by preemption artifacts, and the bench
   op that would give a clean minimum still runs on the loader thread and wedges it.

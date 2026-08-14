@@ -116,18 +116,32 @@ must avoid the allocator.** Use `mmap`.
 
 **Still stubbed:** the entry address comes from configuration, not a signed hook map. Item 5.
 
-## 6 · Triggering a real CVE — blocked on BNK
+## 6 · Triggering a real CVE — open, and previously mis-analysed
 
-The demonstration needs a CVE whose trigger is drivable from outside a BNK pod: on a code path
-reachable through the supported configuration surface — CRDs and traffic — with no dependency on a
-knob this form factor does not expose. An SPK advisory list is what would settle which candidates
-qualify.
+**Status: untested, not blocked.** An earlier reading of this held that the worked-example fault
+needed a check-then-reread race and could not be driven on BNK. Reading the code settles it
+differently, and the correction matters because it changes what to try next.
+
+`http_psm_profile_name_lookup` is installed into a dictionary indexed by log key
+(`http_psm_log_keys`, wired up by `http_psm_publisher_template_create`) and is called for every
+occurrence of `${profile_name}` in a PSM log template. **That path has no guard**, and the template
+is built from *every* key in the table rather than from a user-supplied format. So a single NULL
+`prot_transfer_log_profile` is enough: `ptlp->name` dereferences address zero and takes the process
+down. No race, no timing window.
+
+The consequence for BNK inverts the earlier conclusion. Having no CRD field for
+`prot_transfer_log_profile` means the pointer is **always** NULL, which makes the fault *more*
+reachable. The CRD does expose `protocolInspection.enabled` and `protocolInspection.publisher`.
+
+**The open question is narrow and testable:** does enabling protocol-inspection logging produce a
+PSM log record on ordinary HTTP traffic? If it does, the four-step demonstration runs here. That
+experiment deliberately crashes a TMM pod, so it is a decision rather than a task.
 
 Failing that: appliance or VE, which first needs the source-tree question answered
-([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10); or driving a trigger from
-inside via a test-only hook, reported as synthetic.
+([`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) §10); or a different CVE whose
+trigger is drivable through the supported configuration surface.
 
-Until one lands, **"it stops the crash" is unproven end to end.**
+Until one is run, **"it stops the crash" is unproven end to end.**
 
 ## 7 · Cost and the runtime guard
 

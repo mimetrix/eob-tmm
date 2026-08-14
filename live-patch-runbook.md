@@ -129,13 +129,17 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
   program armed so far returns `FALLTHROUGH` by construction, so what has been shown is the
   *mechanism* on live traffic, not the *mitigation*. This is live-patched and live-exercised, not yet
   live-shielded.
-- **And the remaining step is blocked, not merely pending.** Steps 13–16 need the CVE triggered on
-  live traffic, and on BNK it cannot be: `prot_transfer_log_profile` has **no Kubernetes CRD field**,
-  so the profile cannot be attached and the check-then-reread window cannot be driven from outside.
-  (The earlier premise here — "leave the protocol-transfer profile unset" — was wrong as well: the
-  caller guards its local, so an unset profile is not the trigger.) Closing this needs a different
-  target CVE that is reachable on BNK, or an appliance/VE where the profile is configurable. See
-  [`bnk-integration-map.md`](bnk-integration-map.md) §6.
+- **The remaining step may not be blocked after all — the earlier analysis here was wrong.**
+  `http_psm_profile_name_lookup` is dispatched from a dictionary indexed by log key
+  (`http_psm_log_keys`, installed by `http_psm_publisher_template_create`), and **nothing guards
+  that path**. The template is built from *every* key in the table, so any PSM log record formats
+  `${profile_name}` and calls the lookup. With no protocol-transfer log profile on the listener,
+  `ptlp` is NULL and `ptlp->name` dereferences address zero. **No race is required.**
+  BNK exposing no CRD field for `prot_transfer_log_profile` therefore makes `ptlp` *always* NULL,
+  which makes the fault more reachable rather than less. The CRD does expose
+  `protocolInspection.enabled` and `protocolInspection.publisher`. **Whether enabling those produces
+  a PSM log record on HTTP traffic is untested** — that experiment deliberately crashes a TMM pod
+  and has not been run.
 - **Per-call hook cost remains unmeasured** — the counter mean is dominated by preemption artifacts,
   and the bench op that would give a clean minimum still runs on the loader thread and wedges it.
 
