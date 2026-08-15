@@ -4,10 +4,15 @@ This repo holds the substrate **sources**; they are compiled into TMM **elsewher
 build tree. That split is the reason someone can read every file here and still not be able to
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
-**The headline property, and the one worth checking first: this modifies no F5 source file.** It
-adds new files, `filelist` and whitelist entries, and one compiler flag. `git status` in the TMM
-tree should show **no `M` on any pre-existing file** — only additions and the three build-config
-files below. If it shows more, something has regressed.
+**The headline property — and read the scope carefully, because it changed.** The **shield**
+modifies no F5 source file: it adds new files, `filelist` and whitelist entries, and one compiler
+flag. That constraint is real and load-bearing, because the shield targets a TMM that is *already
+running*.
+
+The **tracepoint** (§6b) does edit two F5 source files, deliberately, because a tracepoint is a
+build-time decision about what TMM should expose and a call site is the correct mechanism for one.
+So `git status` in the TMM tree should show `M` on exactly five files — three build-config, plus
+`http.c` and `http1x.c`. **Any other `M` is a regression.**
 
 Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, built with
 `make tmm-gdb`. Paths below are relative to `src/`.
@@ -131,7 +136,8 @@ paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`)
 | this repo | TMM tree |
 |---|---|
 | `substrate/ls_tp.h` | `base/` — the boundary declaration, dependency-free |
-| `substrate/ls_tp_emit.c` | `base/` — STDINC side, forwards to `ls_vm_call` |
+| `substrate/ls_tp_emit.c` | `base/` — STDINC side: forwards to `ls_vm_call`, then publishes to the ring |
+| `substrate/ls_tp_ring.h` | `base/` — the shared-memory segment: layout, per-thread claim |
 | `substrate/ls_tp_http.h` | `modules/hudfilter/http/` — record + builder, `static inline` |
 
 `filelist` gains one line. No whitelist entries: `ls_tp_emit.c` declares no globals.
@@ -150,25 +156,31 @@ Both call sites live in [`tmm-tree-callsites.patch`](tmm-tree-callsites.patch), 
 `git diff` in the TMM tree. The new files are recoverable from this directory; the call sites are
 two lines each and existed **only** in a build box's working tree until that patch was committed.
 
-### The edit to `http1x.c`
+### The two call sites — and why there are two
 
-Two lines, in `http_process_client_headers()`. Every path through that function — clean parse and
-every rejection — converges on `out:` and one `return err`, so a single call there sees the whole
-outcome exactly once per request.
+**There are two different static functions named `http_process_client_headers`**: `http1x.c:1031`
+taking `struct http1x_pcb *`, and `http.c:7767` taking `struct http_scb *`. Both are file-scope, so
+nothing collides and nothing warns. Both call `http_parse_client_headers`, which is why an entry
+hook on the parser fires for either and **cannot tell them apart**.
+
+Only `http.c`'s survives as a symbol — `addr2line` on `0xca5c80` resolves to `http.c:7769`. The
+first version of this tracepoint went into the `http1x.c` one and never fired: 9 requests returned
+200 with `fired=0`.
+
+So the builder takes **scalars, not a pcb**, and one tracepoint serves both sites:
 
 ```c
- #include "ls_tp.h"
- #include "ls_tp_http.h"          /* AFTER http1x.h etc: it includes nothing itself */
+ #include <local/base/ls_tp.h>
+ #include "ls_tp_http.h"      /* AFTER the file's own headers: it includes nothing itself */
  ...
- out:
+ out:                          /* every path converges here */
      ...
-+    ls_tp_http_hdrs_emit(pcb, (int)err, (int)*passthru);
++    ls_tp_http_hdrs_emit(hd, (int)err, (int)*passthru, (int)scb->reject_reason);
      return err;
 ```
 
-`git status` in the TMM tree will now show **`M src/modules/hudfilter/http/http1x.c`** alongside the
-three build-config files. That is expected here and nowhere else — if any *other* F5 source file
-shows `M`, something has regressed.
+`http1x.c` passes `pcb->hd` and `pcb->reject_reason` instead. Binding the builder to a pcb type is
+what forced the wrong choice the first time.
 
 ### Why the call site cannot alter traffic
 
