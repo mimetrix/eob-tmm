@@ -169,11 +169,12 @@ def main():
 
         doc = {
             "_comment": ("PHASE A: addresses and pad status only, read from the binary. "
-                         "NOTE pad_offset: ls_arm.c currently REQUIRES endbr64 and arms at "
-                         "entry+4, so it can arm only the pad_offset==4 entries. The "
-                         "pad_offset==0 entries are real and armable in principle, but need "
-                         "ls_arm to honour pad_offset first; today it refuses them, which is "
-                         "the safe direction. Filter on pad_offset==4 for what works now. "
+                         "pad_offset is 4 (endbr64 + 5 nops, indirect-call targets) or 0 "
+                         "(5 nops, direct-call-only: file-scope statics and .isra/.constprop "
+                         "clones, which -fcf-protection gives no landing pad). ls_arm.c "
+                         "honours BOTH as of 2026-08-15 -- it previously refused pad_offset==0, "
+                         "and those 4,611 entries are not a random slice: they are "
+                         "disproportionately the internal, file-local logic worth probing. "
                          "arg_btf (the typed argument layout a program is verified against) "
                          "is NOT emitted --- that needs DWARF parameter classification. "
                          "Enough to arm a function by name; not enough to write a program "

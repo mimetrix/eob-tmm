@@ -42,9 +42,23 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-/* The pad, as -fpatchable-function-entry=5,0 emits it under IBT: endbr64 then
- * five single-byte nops. Arming replaces the nops; the endbr64 stays, so the
- * function remains a valid indirect-branch target throughout. */
+/* TWO PAD SHAPES, and the second one is not an edge case.
+ *
+ *   endbr64 + 5 nops   pad at +4   --- indirect-call targets
+ *   5 nops             pad at +0   --- direct-call-only functions
+ *
+ * -fcf-protection emits endbr64 only where an indirect branch can land. A
+ * function reached solely by direct calls needs no landing pad, so
+ * -fpatchable-function-entry=5,0 puts its five bytes at offset 0 with nothing in
+ * front. That is most file-scope statics and every .isra/.constprop clone.
+ *
+ * Handling only the +4 shape refused 4,611 functions, and they are NOT a random
+ * slice: they are disproportionately the internal, file-local logic worth
+ * probing. Measured on the shipped binary, http_ingress_initialize,
+ * http_process_client_headers and format_via_info all carry a +0 pad and were
+ * unreachable; http_parse_client_headers carries +4 and was not. Three of four
+ * candidates for a developer probe were refused for a reason that has nothing to
+ * do with whether the function is interesting. */
 #define LS_ENDBR   "\xf3\x0f\x1e\xfa"
 #define LS_ENDBR_LEN 4
 #define LS_PAD_LEN 5
@@ -64,11 +78,49 @@ ls_find_pad(void *fn)
 {
     uint8_t *p = (uint8_t *)fn;
 
-    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) != 0)
-        return NULL;                       /* not an IBT entry --- refuse       */
-    if (memcmp(p + LS_ENDBR_LEN, LS_NOPS, LS_PAD_LEN) != 0)
-        return NULL;                       /* not the nop pad --- already armed */
-    return p + LS_ENDBR_LEN;
+    /* Order matters. Test endbr64 FIRST and do not fall through on failure: if
+     * the entry has an endbr64 whose following bytes are not nops it is already
+     * armed (or not padded), and checking +0 next would compare the endbr64
+     * bytes themselves against nops --- which cannot match, but the reasoning
+     * should not depend on that accident. */
+    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) == 0) {
+        if (memcmp(p + LS_ENDBR_LEN, LS_NOPS, LS_PAD_LEN) != 0)
+            return NULL;                   /* already armed, or no pad          */
+        return p + LS_ENDBR_LEN;           /* +4 shape                          */
+    }
+
+    /* No endbr64: a direct-call-only function, pad at +0. Five nops as the first
+     * instruction of a function is the pad --- the flag is applied to every
+     * translation unit, so an unpadded function does not begin this way. Arming
+     * an address that is not a function entry remains the caller's error, and is
+     * what the hook map exists to prevent. */
+    if (memcmp(p, LS_NOPS, LS_PAD_LEN) == 0)
+        return p;                          /* +0 shape                          */
+
+    return NULL;
+}
+
+/*
+ * The armed counterpart: find the `call rel32` a previous arm wrote, in whichever
+ * shape this entry uses. Returns NULL unless the entry really looks armed.
+ *
+ * The +0 case is weaker evidence than the +4 case and it is worth saying so. At
+ * +4 the endbr64 confirms a function entry before we look at the call. At +0
+ * there is nothing in front, so a function whose genuine first instruction is
+ * `call rel32` would be misread as armed, and disarming it would write nops over
+ * a real instruction. Two things bound that: the address must have come from the
+ * hook map, and you cannot reach the armed state without a successful arm, which
+ * required a nop pad. Verifying the displacement points at the trampoline is the
+ * real fix and belongs with per-site arm state, which does not exist yet.
+ */
+static uint8_t *
+ls_find_armed(void *fn)
+{
+    uint8_t *p = (uint8_t *)fn;
+
+    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) == 0)
+        return p[LS_ENDBR_LEN] == 0xe8 ? p + LS_ENDBR_LEN : NULL;
+    return p[0] == 0xe8 ? p : NULL;
 }
 
 /*
@@ -173,11 +225,8 @@ ls_arm(void *fn, void *trampoline)
 int
 ls_disarm(void *fn)
 {
-    uint8_t *p = (uint8_t *)fn;
-    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) != 0)
-        return -1;
-    uint8_t *pad = p + LS_ENDBR_LEN;
-    if (pad[0] != 0xe8)
+    uint8_t *pad = ls_find_armed(fn);
+    if (pad == NULL)
         return -1;                          /* not armed --- refuse             */
 
     /* Nop the opcode first (0x90) so no core enters a half-restored call, then
@@ -240,11 +289,8 @@ ls_arm_live(void *fn, void *trampoline, int slot)
 int
 ls_disarm_live(void *fn)
 {
-    uint8_t *p = (uint8_t *)fn;
-    if (memcmp(p, LS_ENDBR, LS_ENDBR_LEN) != 0)
-        return -1;
-    uint8_t *pad = p + LS_ENDBR_LEN;
-    if (pad[0] != 0xe8)
+    uint8_t *pad = ls_find_armed(fn);       /* +4 or +0, whichever this entry uses */
+    if (pad == NULL)
         return -1;
     static const uint8_t nops[LS_PAD_LEN] = { 0x90,0x90,0x90,0x90,0x90 };
     if (ls_swap_write5(pad, nops) != 0)

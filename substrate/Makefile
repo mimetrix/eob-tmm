@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -177,6 +177,16 @@ check-tp:
 # four consumer behaviours (absent / crashed / stalled / healthy) plus a hostile
 # consumer_pos, and measures MAX SINGLE-EMIT LATENCY. Back-pressure would appear
 # there and nowhere else; record counts alone would not prove it.
+# BOTH pad shapes. check_arm.c executes a real patch so it is x86_64-only; the
+# decision about WHERE the five bytes are is pure byte matching and must be tested
+# everywhere, because getting it wrong writes a call over a live instruction.
+# The drift guard matters as much as the assertions: check_pad_shapes.c mirrors
+# ls_arm.c, and a mirrored test that has drifted reports confidence it has not
+# earned.
+check-pads:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .pads.out check_pad_shapes.c && ./.pads.out && rm -f .pads.out
+	@$(PYTHON) ./check_pad_drift.py
+
 check-drain:
 	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .drain.out drain/check_drain.c && ./.drain.out && rm -f .drain.out
 	@$(CC) -O2 -Wall -Wextra -Werror -o .lsd.out drain/ls_drain.c \
