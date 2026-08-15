@@ -32,7 +32,12 @@
  * default and the shipped state: LS_TP_RING unset costs a load and a branch. */
 static struct ls_tp_seg *g_tp_seg;
 static int               g_tp_seg_tried;
-static unsigned long     g_tp_seq;
+/* Atomic, and the live run is why. Two TMM threads reach this call site --- the
+ * segment showed claimed=2 --- so a plain ++ is a data race that silently hands
+ * two records the same seq. It did not collide in an 18-record sample, which is
+ * exactly how this class of bug survives testing. A consumer ordering or
+ * de-duplicating by seq would be quietly wrong under load. */
+static _Atomic unsigned long long g_tp_seq;
 
 /*
  * Bring up the segment. Called from the tracepoint path rather than from init,
@@ -89,6 +94,7 @@ ls_tp_emit(int slot, const void *rec, unsigned long len)
     if (g_tp_seg != NULL)
         (void)ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_HTTP_HDRS,
                                  LS_TP_SCHEMA_HTTP, (unsigned)slot,
-                                 (unsigned long long)(g_tp_seq++),
+                                 atomic_fetch_add_explicit(&g_tp_seq, 1,
+                                                           memory_order_relaxed),
                                  rec, (unsigned int)len);
 }
