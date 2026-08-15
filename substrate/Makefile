@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-hook-map
+       check-selfpatch check-ring check-tp check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -159,6 +159,14 @@ check-hook-map:
 # reaching them there means engineering a stalled consumer and a full ring, and a
 # wrong answer looks like "records are occasionally odd" inside a poll loop.
 # STREAM drop-and-count, RECORD overwrite-oldest, SPSC exactness, wraparound.
+# The designed-in tracepoint record (ls_tp_http.h). Compiles the builder against
+# MOCK TMM structs -- the real ones live in TMM's -nostdinc world and are not here
+# -- and pins the layout both the host and the eBPF program depend on. Cannot
+# prove the field names match TMM's; only the TMM build does that, which is why
+# the flags are composed by name rather than masked out of a byte offset.
+check-tp:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .tp.out check_tp.c && ./.tp.out && rm -f .tp.out
+
 check-ring:
 	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .ring.out check_ring.c && ./.ring.out >/dev/null \
 	  && echo "ok    ls_ring.h  (15 assertions: SPSC exact, both full-policies, wraparound)" \

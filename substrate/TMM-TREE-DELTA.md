@@ -112,6 +112,82 @@ An earlier version put 26 lines of bootstrap in `http_psm_init()`. That worked a
 bringing up a general-purpose VM has nothing to do with HTTP protocol security, and it was an edit
 to F5's source. `http_psm.c` is now pristine.
 
+## 6b. The tracepoint — the one place an F5 source file IS edited
+
+Everything above adds files. This section does not, and the distinction is the point.
+
+**The shield modifies no F5 source, and must not.** It targets a TMM that is *already running* —
+the binary exists, so the only way in is patching a function entry. That constraint is what makes
+the shield claim worth anything.
+
+**A tracepoint is a build-time decision about what TMM should expose**, so a deliberate call site is
+the correct mechanism, not a compromise. Two attempts to synthesise one from a patched entry failed
+structurally: an entry runs *before* the function writes its outputs, and the interesting failure
+paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`) are defined in
+`http1x.h`, so the compiler folds them into their callers and there is no symbol to arm.
+
+### New files
+
+| this repo | TMM tree |
+|---|---|
+| `substrate/ls_tp.h` | `base/` — the boundary declaration, dependency-free |
+| `substrate/ls_tp_emit.c` | `base/` — STDINC side, forwards to `ls_vm_call` |
+| `substrate/ls_tp_http.h` | `modules/hudfilter/http/` — record + builder, `static inline` |
+
+`filelist` gains one line. No whitelist entries: `ls_tp_emit.c` declares no globals.
+
+```
+base/ls_tp_emit.c     STDINC UBPF
+```
+
+`ls_tp_http.h` is a header compiled *inside* `http1x.c`, so it inherits that file's include world
+exactly — no `-I` to guess and no separate object needing to be taught where TMM's headers live.
+That is why the builder is a `static inline` rather than its own translation unit.
+
+### The edit to `http1x.c`
+
+Two lines, in `http_process_client_headers()`. Every path through that function — clean parse and
+every rejection — converges on `out:` and one `return err`, so a single call there sees the whole
+outcome exactly once per request.
+
+```c
+ #include "ls_tp.h"
+ #include "ls_tp_http.h"          /* AFTER http1x.h etc: it includes nothing itself */
+ ...
+ out:
+     ...
++    ls_tp_http_hdrs_emit(pcb, (int)err, (int)*passthru);
+     return err;
+```
+
+`git status` in the TMM tree will now show **`M src/modules/hudfilter/http/http1x.c`** alongside the
+three build-config files. That is expected here and nowhere else — if any *other* F5 source file
+shows `M`, something has regressed.
+
+### Why the call site cannot alter traffic
+
+`ls_tp_emit` returns `void`, so the call site has no way to receive a verdict and therefore no way
+to act on one. A program loaded behind this tracepoint cannot change the request **even if armed in
+ENFORCE**. That is structural rather than a mode setting, and it is deliberate: relying on MONITOR
+alone has already gone wrong once, when a tracepoint armed under a stale ENFORCE setting turned 200s
+into 404s.
+
+### Validating it
+
+The record is only worth having if it can be fired on demand. Each row is an input chosen in advance
+and a counter movement predicted before running it:
+
+| send | expected |
+|---|---|
+| `curl http://vip/` | `fired`+1, `safe_returns`+0 |
+| `curl -X BOGUS http://vip/` | `fired`+1, `safe_returns`+1, `reason=METHOD` |
+| 200 × `-H` | `fired`+1, `safe_returns`+1, `reason=HEADER_NUMBER` |
+
+`make check` runs `check_tp.c` — 18 assertions over mock structs: the record is 40 bytes on both the
+host and program sides, the five `f_invalid_*` bits compose **by name**, and a null `hd` emits a
+well-formed row instead of faulting. It cannot prove the field names match TMM's; only the TMM build
+does that, which is exactly why they are composed by name rather than masked from a byte offset.
+
 ## 7. Packaging traps
 
 **`make clean_rpms` between `make tmm` and `make container`, or the image ships a stale binary.**

@@ -35,9 +35,16 @@ CASES = [
     ("folded_loop.bpf.c", "fentry/folded_loop", True,
      "PASSES because -O2 folded its loop to closed form -- verify the object, not the source"),
     ("parse_watch.bpf.c", "fentry/http_parse_client_headers", True,
-     "the tmm:l7:parse_error tracepoint: reads the host-built flat ctx and reports "
-     "whether any of the five parse-violation bits is set. The first program here that "
-     "reads real TMM state rather than ignoring its input."),
+     "SUPERSEDED, kept because the failure is the lesson: it verifies clean and is "
+     "useless. Armed at http_parse_client_headers' ENTRY it reads header_count, "
+     "status_code and the f_invalid_* bits BEFORE that function writes them, so every "
+     "field is legitimately zero. A verifiable program over a struct that does not yet "
+     "hold data. Replaced by http_hdrs_watch.bpf.c."),
+    ("http_hdrs_watch.bpf.c", "fentry/tmm_l7_http_headers", True,
+     "tmm:l7:http_headers: the designed-in tracepoint. Reads the record built at the "
+     "one point every request reaches after the parse, so the fields are filled, and "
+     "counts rejected or malformed requests. Validated by triggering it -- curl -X "
+     "BOGUS must move safe_returns, a plain GET must not."),
 ]
 
 

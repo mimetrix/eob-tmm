@@ -763,15 +763,40 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     struct ls_slot *live = &g_slots[slot];
     struct ls_slot *new  = &g_slots[staged];
 
-    /* The publish. One store, release-ordered so the VM's contents are visible
-     * to any core that observes the new pointer. */
+    /* The publish. Release-ordered so each object's contents are visible to any
+     * core that observes the pointer.
+     *
+     * jit_fn MUST be published with vm, and this is not a detail. ls_vm_call
+     * prefers jit_fn whenever it is non-NULL and only falls back to the
+     * interpreter when it is NULL --- so a swap that replaced vm alone left the
+     * PREVIOUS program's compiled code executing while the new program sat in an
+     * interpreter nothing ever consulted. Every load over the socket appeared to
+     * succeed, the counters moved, and the resident program kept answering. The
+     * two observable symptoms were a verdict that ignored the loaded program and
+     * a slot whose behaviour never changed no matter what was sent to it.
+     *
+     * Order matters for a core already inside ls_vm_call:
+     *   1. mode  -> DISABLE   readers take the early-out and fall through
+     *   2. jit_fn-> NULL      no reader can enter the OLD compiled code
+     *   3. vm    -> new       the interpreter now backs this slot
+     *   4. jit_fn-> new       compiled path returns, matching the new vm
+     *   5. mode  -> m         the slot goes live again
+     * Steps 2-4 are what make (vm, jit_fn) observably one program rather than
+     * two. A reader that sampled the old jit_fn before step 2 runs old compiled
+     * code to completion, which is safe only because the old VM is leaked rather
+     * than destroyed --- the code it points at stays mapped. That known debt
+     * (item 0c) is load-bearing here; reclaiming it needs the quiescence pass,
+     * not a free() in this function. */
     __atomic_store_n(&live->mode, LS_MODE_DISABLE, __ATOMIC_RELAXED);
+    __atomic_store_n(&live->jit_fn, NULL, __ATOMIC_RELEASE);
     __atomic_store_n(&live->vm, new->vm, __ATOMIC_RELEASE);   /* old VM leaked */
+    __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->armed = true;
 
     new->armed = false;                   /* the staging slot goes back */
     new->vm = NULL;
+    new->jit_fn = NULL;
 
     fprintf(stderr, "ls_vm: RELOADED slot=%d mode=%d bytes=%lu "
                     "(previous VM leaked --- reclamation is item 0c)\n",
