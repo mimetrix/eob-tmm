@@ -138,13 +138,20 @@ paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`)
 | `substrate/ls_tp.h` | `base/` — the boundary declaration, dependency-free |
 | `substrate/ls_tp_emit.c` | `base/` — STDINC side: forwards to `ls_vm_call`, then publishes to the ring |
 | `substrate/ls_tp_ring.h` | `base/` — the shared-memory segment: layout, per-thread claim |
+| `substrate/ls_ring.h` | `base/` — the ring itself. **Was bench-only**; the producer needs it in the tree |
 | `substrate/ls_tp_http.h` | `modules/hudfilter/http/` — record + builder, `static inline` |
 
-`filelist` gains one line. No whitelist entries: `ls_tp_emit.c` declares no globals.
+`filelist` gains one line:
 
 ```
 base/ls_tp_emit.c     STDINC UBPF
 ```
+
+**And three whitelist entries, in *both* files** — `g_tp_seg`, `g_tp_seg_tried`, `g_tp_seq`. This
+section previously said `ls_tp_emit.c` declares no globals. That was true before the ring producer
+and false after it, and the build caught it exactly as §3 describes: `diff-globals` fails the link
+with a diff, not a compile error. Adding a file-scope static to this substrate always costs a
+whitelist edit.
 
 `ls_tp_http.h` is a header compiled *inside* `http1x.c`, so it inherits that file's include world
 exactly — no `-I` to guess and no separate object needing to be taught where TMM's headers live.
