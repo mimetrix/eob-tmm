@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -172,6 +172,16 @@ check-tp:
 # geometry a consumer can navigate, a DISTINCT ring per thread (ls_ring is
 # single-producer, which is correctness not tuning), and a SECOND MAPPING reading
 # the records, since the drain agent is another process sharing only these bytes.
+# THE GOVERNING CONSTRAINT: TMM must not depend on the drain agent -- not on it
+# running, keeping up, exiting cleanly, or behaving. Drives a producer through
+# four consumer behaviours (absent / crashed / stalled / healthy) plus a hostile
+# consumer_pos, and measures MAX SINGLE-EMIT LATENCY. Back-pressure would appear
+# there and nowhere else; record counts alone would not prove it.
+check-drain:
+	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .drain.out drain/check_drain.c && ./.drain.out && rm -f .drain.out
+	@$(CC) -O2 -Wall -Wextra -Werror -o .lsd.out drain/ls_drain.c \
+	  && echo "ok    ls_drain.c  (the agent itself compiles, -Wall -Wextra clean)" && rm -f .lsd.out
+
 check-tp-ring:
 	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .tpr.out check_tp_ring.c && ./.tpr.out && rm -f .tpr.out
 
