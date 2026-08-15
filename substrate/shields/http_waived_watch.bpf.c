@@ -1,16 +1,32 @@
 /* tmm:l7:http_headers --- counts WAIVED requests: malformed AND forwarded anyway.
  *
- * This is the class with no existing observability in TMM at all. When
- * passthru_unknown_method, passthru_excess_client_headers or
- * passthru_oversize_client_headers is set, a request TMM has ALREADY JUDGED
- * malformed is proxied to the origin. Because it is a configured waiver rather
- * than an error, nothing logs it: no reset, no error counter, no log line. The
- * only record that it happened is the config, which says it may happen --- not
- * that it did, or how often, or to which origin.
+ * TWO CORRECTIONS TO WHAT THIS FILE ORIGINALLY CLAIMED. Both were asserted
+ * without checking, and both are wrong:
  *
- * Refused traffic at least leaves a reset behind. Waived traffic leaves nothing,
- * which makes it the more useful thing to count and the harder one to notice is
- * missing.
+ * 1. "Nothing records a waiver." FALSE. mcp/stats.h exports
+ *    passthrough_unknown_method, passthrough_excess_client_headers,
+ *    passthrough_oversize_client_headers and siblings as UINT64 counters,
+ *    incremented per waiver at http.c:6890-6915. Aggregate counts already
+ *    exist. What does NOT exist is a per-request record: the counters say how
+ *    many were waived, never WHICH request, what was malformed about it, or
+ *    what the parse verdict was. That is a real gap and a much narrower one
+ *    than "no observability at all".
+ *
+ * 2. "Set a passthru_* flag and this fires." NOT ON A REVERSE PROXY. Every
+ *    client-side waiver is gated on proxy_type == TRANSPARENT; anywhere else
+ *    the profile value is overridden and a config-time log fires instead:
+ *
+ *        if (proxy_type != TRANSPARENT && enabled == PASSTHROUGH) {
+ *            enabled = ALLOW;
+ *            HTTPERR_PROFILE_PROXY_LOG("passthrough.unknown_method");
+ *        }
+ *
+ *    BNK is a reverse proxy, so this program CANNOT be demonstrated there. It
+ *    verifies, it decodes, and it has never selected a live record.
+ *
+ * The class that does hold up on this deployment is `refused` --- see
+ * http_hdrs_watch.bpf.c. Rejected requests never reach the origin, so no origin
+ * log can contain them, and TMM keeps no per-request record of why.
  *
  * Load this INSTEAD of http_hdrs_watch to switch what safe_returns counts ---
  * same tracepoint, same record, different question. That is what makes the class

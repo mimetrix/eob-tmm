@@ -46,10 +46,12 @@ CASES = [
      "counts rejected or malformed requests. Validated by triggering it -- curl -X "
      "BOGUS must move safe_returns, a plain GET must not."),
     ("http_waived_watch.bpf.c", "fentry/tmm_l7_http_headers", True,
-     "the WAIVED class: malformed AND forwarded anyway. TMM logs nothing when a "
-     "passthru_* waiver fires, so this is the only record that it happened. Same "
-     "tracepoint and record as http_hdrs_watch --- a different question, chosen "
-     "at load time rather than compiled in."),
+     "the WAIVED class: malformed AND forwarded anyway. Verifies and decodes, but "
+     "has NEVER selected a live record: every client-side waiver is gated on "
+     "proxy_type == TRANSPARENT and BNK is a reverse proxy. Note also that TMM "
+     "already counts waivers (mcp/stats.h passthrough_*); the gap is per-request "
+     "detail, not observability as such. Same tracepoint and record as "
+     "http_hdrs_watch --- a different question, chosen at load time."),
 ]
 
 

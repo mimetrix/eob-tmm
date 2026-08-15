@@ -123,11 +123,16 @@ struct ls_tp_http_hdrs {
  *   refused     malformed AND passthru == 0     --- TMM declined to proxy it
  *   waived      malformed AND passthru != 0     --- TMM KNEW and forwarded anyway
  *
- * `waived` is its own class and the most valuable of the three. TMM has
- * passthru_unknown_method, passthru_excess_client_headers and
- * passthru_oversize_client_headers; when one is set, a request TMM has already
- * judged malformed is proxied to the origin, and nothing anywhere records that
- * decision. It is not an error, so no log line fires.
+ * `waived` is its own class, and two things first claimed about it were wrong.
+ * TMM DOES count waivers --- mcp/stats.h exports passthrough_unknown_method,
+ * passthru_excess_client_headers and siblings as UINT64 counters incremented at
+ * http.c:6890-6915. The gap is narrower than "no observability": the counters
+ * give totals, never which request, what was malformed, or the parse verdict.
+ *
+ * And it cannot occur on a reverse proxy. Every client-side waiver is gated on
+ * proxy_type == TRANSPARENT; elsewhere the profile value is overridden and a
+ * config-time log fires. BNK is a reverse proxy, so `waived` is representable
+ * and decodable here but not reachable. It has never been observed live.
  *
  * Note what is NOT a class: a request the ORIGIN rejects. `curl -X BOGUSMETHOD`
  * returns 501 while parse_err is ERR_OK --- extension methods are legal, TMM
