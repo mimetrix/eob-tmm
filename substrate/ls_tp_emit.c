@@ -1,19 +1,66 @@
 /* ls_tp_emit.c --- the STDINC side of the tracepoint boundary.
  *
- * Six lines of real work. It exists as its own translation unit because the
- * caller cannot reach ls_vm.h: every file in modules/hudfilter/http compiles in
- * TMM's -nostdinc world, and ls_vm.h needs stdint/stddef. This file is marked
- * STDINC in src/compile/filelist and is the only place the two worlds meet for
- * telemetry --- the same shape ls_prep.c already uses for the bootstrap.
+ * It exists as its own translation unit because the caller cannot reach ls_vm.h:
+ * every file in modules/hudfilter/http compiles in TMM's -nostdinc world, and
+ * ls_vm.h needs stdint/stddef. This file is marked STDINC in src/compile/filelist
+ * and is the only place the two worlds meet for telemetry --- the same shape
+ * ls_prep.c already uses for the bootstrap.
+ *
+ * TWO CONSUMERS, ONE RECORD. The record built at the call site goes to:
+ *
+ *   1. the VM, which answers a question about it (counted in fired/safe_returns)
+ *   2. the shared-memory ring, which carries the bytes themselves off-box
+ *
+ * They are independent. The VM answers "how many were malformed" with two
+ * counters and no transport. The ring answers "show me that request", which
+ * needs a drain agent and a segment. Neither is a substitute for the other, and
+ * the ring is off unless LS_TP_RING names a path.
  *
  * WHY THE VERDICT IS DISCARDED HERE. ls_vm_call returns one, because the shield
  * path needs it. A tracepoint does not, and giving the call site no way to
- * receive it means no future edit at that call site can accidentally start
- * acting on it. The cast to void is the entire safety property, and it is
- * cheaper and more durable than a mode check --- see ls_tp.h.
+ * receive it means no future edit there can accidentally start acting on it. The
+ * cast to void is the entire safety property, and it is cheaper and more durable
+ * than a mode check --- see ls_tp.h.
  */
 #include "ls_tp.h"
+#include "ls_tp_ring.h"
 #include "ls_vm.h"
+
+#include <stdlib.h>
+
+/* Segment handle, resolved once. NULL means "ring disabled", which is the
+ * default and the shipped state: LS_TP_RING unset costs a load and a branch. */
+static struct ls_tp_seg *g_tp_seg;
+static int               g_tp_seg_tried;
+static unsigned long     g_tp_seq;
+
+/*
+ * Bring up the segment. Called from the tracepoint path rather than from init,
+ * because INIT_LATE runs once per TMM thread and the map only needs to happen
+ * once --- the guard below is simpler than a second election, and open/mmap on
+ * the very first request is a one-time cost, not a per-record one.
+ *
+ * Every failure is silent and permanent for the process. Telemetry that keeps
+ * retrying a failed mmap on the hot path is worse than telemetry that is off.
+ */
+static void
+ls_tp_seg_bootstrap(void)
+{
+    const char *path;
+
+    if (g_tp_seg_tried)
+        return;
+    g_tp_seg_tried = 1;
+
+    path = getenv("LS_TP_RING");
+    if (path == NULL || *path == '\0')
+        return;
+
+    g_tp_seg = ls_tp_seg_open(path, 1);
+    fprintf(stderr, "ls_tp: ring %s %s (%u rings x %u bytes)\n", path,
+            g_tp_seg ? "mapped" : "FAILED --- telemetry off, traffic unaffected",
+            (unsigned)LS_TP_MAX_RINGS, (unsigned)LS_TP_RING_BYTES);
+}
 
 void
 ls_tp_emit(int slot, const void *rec, unsigned long len)
@@ -32,4 +79,16 @@ ls_tp_emit(int slot, const void *rec, unsigned long len)
      * mechanism into a way to modify the parsed request.
      */
     (void)ls_vm_call(slot, (void *)(unsigned long)rec, (size_t)len);
+
+    /*
+     * Then the bytes. AFTER the VM, deliberately: the program may write to the
+     * record, and what a consumer should see is what the program left, not a
+     * pre-program copy that disagrees with the counters.
+     */
+    ls_tp_seg_bootstrap();
+    if (g_tp_seg != NULL)
+        (void)ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_HTTP_HDRS,
+                                 LS_TP_SCHEMA_HTTP, (unsigned)slot,
+                                 (unsigned long long)(g_tp_seq++),
+                                 rec, (unsigned int)len);
 }

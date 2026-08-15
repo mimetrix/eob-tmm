@@ -144,6 +144,12 @@ base/ls_tp_emit.c     STDINC UBPF
 exactly — no `-I` to guess and no separate object needing to be taught where TMM's headers live.
 That is why the builder is a `static inline` rather than its own translation unit.
 
+### The edits to F5 source — also captured as a patch
+
+Both call sites live in [`tmm-tree-callsites.patch`](tmm-tree-callsites.patch), regenerated with
+`git diff` in the TMM tree. The new files are recoverable from this directory; the call sites are
+two lines each and existed **only** in a build box's working tree until that patch was committed.
+
 ### The edit to `http1x.c`
 
 Two lines, in `http_process_client_headers()`. Every path through that function — clean parse and
@@ -171,6 +177,34 @@ to act on one. A program loaded behind this tracepoint cannot change the request
 ENFORCE**. That is structural rather than a mode setting, and it is deliberate: relying on MONITOR
 alone has already gone wrong once, when a tracepoint armed under a stale ENFORCE setting turned 200s
 into 404s.
+
+### The ring producer
+
+`ls_tp_emit` publishes the same record twice, to two independent consumers:
+
+| | answers | needs |
+|---|---|---|
+| the VM | "how many were malformed" — two counters | nothing |
+| the shared-memory ring | "show me that request" — the bytes | a drain agent |
+
+The ring is **off unless `LS_TP_RING` names a path**, the same discipline as the loader socket;
+unset costs a load and a branch. Two new files: `base/ls_tp_ring.h` (segment layout, per-thread
+claim) and the rewritten `base/ls_tp_emit.c`. No filelist change — `ls_tp_ring.h` is a header.
+
+**One ring per thread, by construction.** `ls_ring.h` is single-producer, and that is a correctness
+precondition, not a tuning choice. `g_slots` in `ls_vm.c` is a plain process-global despite
+`ls_prep.c` describing "per-thread VM state", and the TMM process here runs three threads. Each
+thread claims its own ring by atomic index, so the precondition holds whatever the thread model
+turns out to be — and `check_tp_ring.c` asserts the rings are distinct rather than assuming it.
+
+**`STREAM`, not `RECORD`.** Full means drop the new record and count it. A streaming feed must never
+have a record pulled from under a mid-read consumer, and the poll loop must never wait on that
+consumer. A counted gap, never a silent one.
+
+**The Kubernetes trap.** A sidecar sharing `/dev/shm` needs an `emptyDir` with `medium: Memory`
+mounted at the same path in *both* containers. Without it the sidecar maps its own empty tmpfs and
+sees a valid, empty segment — which reads as "no traffic" rather than as a misconfiguration.
+`check_tp_ring.c` covers the adjacent case: an uninitialised segment is refused, not decoded.
 
 ### Validating it
 

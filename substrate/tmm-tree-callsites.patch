@@ -1,0 +1,83 @@
+diff --git a/src/compile/filelist b/src/compile/filelist
+index 43ec8bb78d..2e102c24a0 100644
+--- a/src/compile/filelist
++++ b/src/compile/filelist
+@@ -19,6 +19,7 @@ ALLOW_ADR_PKD_MEM = CFLAGS += -Wno-address-of-packed-member
+ ALLOW_ARRAY_BOUNDS = CFLAGS+= -Wno-error=array-bounds
+ ALLOW_ZERO_LEN = CFLAGS += -Wno-zero-length-bounds
+ ALLOW_BRACES = CFLAGS += -Wno-error=missing-braces
++UBPF = CFLAGS += -I$(TOPDIR)/.ubpf/vm/inc -I$(TOPDIR)/.ubpf/build/vm
+ OPT = CFLAGS += -O3
+ 
+ #
+@@ -31,6 +32,15 @@ OPT = CFLAGS += -O3
+ + PGO
+ 
+ base/adm_ssl_flow.c                                 TMM STDINC
++base/ls_vm_config.c                                                            STDINC UBPF
++base/ls_vm_load.c                                                            STDINC UBPF
++base/ls_vm.c                                                                STDINC UBPF
++base/ls_tp_emit.c     STDINC UBPF
++base/ls_tramp.c                                                STDINC UBPF
++base/ls_tramp_asm.c                                            STDINC
++base/ls_swap.c                                                 STDINC
++base/ls_arm.c                                                  STDINC
++base/ls_prep.c
+ base/adm_flow.c                                     ALLOW_ADR_PKD_MEM
+ base/adm_stats.c                                    TMM STDINC
+ base/sharedsrcip.c                                  STDINC
+diff --git a/src/modules/hudfilter/http/http.c b/src/modules/hudfilter/http/http.c
+index 4fd04a3f21..856ee79411 100644
+--- a/src/modules/hudfilter/http/http.c
++++ b/src/modules/hudfilter/http/http.c
+@@ -85,6 +85,11 @@
+ #include <local/modules/hudfilter/http2/http2.h>
+ #include <local/modules/hudfilter/http3/http3.h>
+ 
++/* tmm:l7:http_headers --- see base/ls_tp.h. Included last: ls_tp_http.h
++ * includes nothing itself and needs http.h types complete. */
++#include <local/base/ls_tp.h>
++#include "ls_tp_http.h"
++
+ #define VIA_HTTP_VERSION "1.1 "
+ #define VIA_HTTP_VERSION_APPEND ", " VIA_HTTP_VERSION
+ 
+@@ -8089,6 +8094,10 @@ out:
+         http_sflow_sample_request(scb);
+     }
+ 
++    /* Every path above converges here. Returns void: the call site cannot
++     * receive a verdict, so it cannot act on one. See base/ls_tp.h. */
++    ls_tp_http_hdrs_emit(hd, (int)err, (int)*passthru,
++                         (int)scb->reject_reason);
+     return err;
+ }
+ 
+diff --git a/src/modules/hudfilter/http/http1x.c b/src/modules/hudfilter/http/http1x.c
+index fef9597906..8c501526ee 100644
+--- a/src/modules/hudfilter/http/http1x.c
++++ b/src/modules/hudfilter/http/http1x.c
+@@ -60,6 +60,11 @@
+ #include "http_unchunking.h"
+ #include "http1x.h"
+ 
++/* tmm:l7:http_headers --- designed-in tracepoint. Included last: ls_tp_http.h
++ * includes nothing itself and needs http1x.h/http.h types complete. */
++#include <local/base/ls_tp.h>
++#include "ls_tp_http.h"
++
+ enum http1x_action {
+     EV_INGRESS,
+     EV_SHUTDOWN,
+@@ -1184,6 +1189,11 @@ out:
+         http_update_request_stats(&cfg->http_cfg, hd);
+     }
+ 
++    /* Every path above --- clean parse and every rejection --- reaches here.
++     * Returns void: the call site cannot receive a verdict, so it cannot act
++     * on one. See base/ls_tp.h. */
++    ls_tp_http_hdrs_emit(pcb->hd, (int)err, (int)*passthru,
++                         (int)pcb->reject_reason);
+     return err;
+ }
+ 

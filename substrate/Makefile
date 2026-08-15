@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -166,6 +166,14 @@ check-hook-map:
 # the flags are composed by name rather than masked out of a byte offset.
 check-tp:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .tp.out check_tp.c && ./.tp.out && rm -f .tp.out
+
+# The tracepoint's shared-memory SEGMENT --- the part check_ring.c does not cover.
+# ls_ring.h is the ring and was already proven; this is the segment around it:
+# geometry a consumer can navigate, a DISTINCT ring per thread (ls_ring is
+# single-producer, which is correctness not tuning), and a SECOND MAPPING reading
+# the records, since the drain agent is another process sharing only these bytes.
+check-tp-ring:
+	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .tpr.out check_tp_ring.c && ./.tpr.out && rm -f .tpr.out
 
 check-ring:
 	@$(CC) -O2 -Wall -Wextra -Werror -pthread -o .ring.out check_ring.c && ./.ring.out >/dev/null \
