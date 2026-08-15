@@ -69,7 +69,14 @@ struct ls_rec {
     uint64_t seq;
     uint32_t tmm_id;
     uint32_t len;                    /* payload bytes following this header         */
+    uint64_t ts_ns;                  /* CLOCK_REALTIME at capture, ns since epoch   */
 };
+
+/* WHY ts_ns LIVES HERE AND NOT IN THE PAYLOAD. It describes the capture, not the
+ * thing captured, so it belongs with hook_id and seq rather than inside any one
+ * hook's record --- which means an HTTP/2 or HTTP/3 call site inherits it without
+ * a second schema bump. seq gives ordering; a clock is what lets a feed compute
+ * rate, correlate with other systems, and detect a stalled producer. */
 
 static inline uint8_t *ls_ring_data(struct ls_ring *r) { return (uint8_t *)(r + 1); }
 static inline uint32_t ls_ring_round(uint32_t n) { return (n + LS_RING_ALIGN - 1) & ~(LS_RING_ALIGN - 1); }
@@ -201,7 +208,7 @@ ls_ring_consume(struct ls_ring *r, struct ls_rec *rec, void *out, uint32_t out_m
 _Static_assert(LS_RING_HDR_SZ == 8, "kernel BPF-ringbuf record header is 8 bytes");
 _Static_assert(LS_RING_BUSY == 0x80000000u, "BUSY is bit 31, as in the kernel");
 _Static_assert(LS_RING_DISCARD == 0x40000000u, "DISCARD is bit 30, as in the kernel");
-_Static_assert(sizeof(struct ls_rec) == 24, "ls_rec is fixed at 24 bytes");
+_Static_assert(sizeof(struct ls_rec) == 32, "ls_rec is fixed at 32 bytes (24 + ts_ns)");
 _Static_assert(sizeof(struct ls_ring) % 8 == 0, "control block keeps the data area 8-aligned");
 
 #endif /* LS_RING_H */

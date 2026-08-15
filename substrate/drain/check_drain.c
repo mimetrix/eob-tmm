@@ -105,8 +105,8 @@ run(enum consumer mode, unsigned long long *landed, unsigned long long *dropped)
     g_go = 1;
 
     for (i = 0; i < EMITS; i++) {
-        struct ls_rec h = { LS_TP_HOOK_HTTP_HDRS, LS_TP_SCHEMA_HTTP,
-                            (uint64_t)i, 1, REC_BYTES };
+        struct ls_rec h = { LS_TP_HOOK_HTTP1_HDRS, LS_TP_SCHEMA_HTTP,
+                            (uint64_t)i, 1, REC_BYTES, 0 };
         uint64_t t0, dt;
         memset(rec, 0, sizeof rec);
         rec[0] = (unsigned int)i;
@@ -181,7 +181,7 @@ main(void)
     {
         struct ls_ring *r = ls_tp_seg_ring(g_seg, 0);
         unsigned int rec[REC_BYTES / 4];
-        struct ls_rec h = { LS_TP_HOOK_HTTP_HDRS, LS_TP_SCHEMA_HTTP, 0, 1, REC_BYTES };
+        struct ls_rec h = { LS_TP_HOOK_HTTP1_HDRS, LS_TP_SCHEMA_HTTP, 0, 1, REC_BYTES, 0 };
         uint64_t t0, dt;
         int k, ok = 0;
 

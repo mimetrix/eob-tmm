@@ -57,9 +57,9 @@ claimer(void *arg)
         memset(rec, 0, sizeof rec);
         rec[0] = (unsigned int)id;
         rec[1] = (unsigned int)i;
-        assert(ls_tp_ring_publish(g_seg, LS_TP_HOOK_HTTP_HDRS,
+        assert(ls_tp_ring_publish(g_seg, LS_TP_HOOK_HTTP1_HDRS,
                                   LS_TP_SCHEMA_HTTP, (unsigned int)id,
-                                  (unsigned long long)i, rec, REC_BYTES) == 1);
+                                  (unsigned long long)i, 1234567890ull, rec, REC_BYTES) == 1);
     }
     return NULL;
 }
@@ -116,7 +116,7 @@ main(void)
     for (i = 0; i < (long)consumer->n_rings; i++) {
         r = ls_tp_seg_ring(consumer, (unsigned int)i);
         while ((got = ls_ring_consume(r, &h, out, sizeof out)) > 0) {
-            assert(h.hook_id == LS_TP_HOOK_HTTP_HDRS);
+            assert(h.hook_id == LS_TP_HOOK_HTTP1_HDRS);
             assert(h.schema_id == LS_TP_SCHEMA_HTTP);
             assert(h.len == REC_BYTES);
             total++;
@@ -129,7 +129,7 @@ main(void)
     r = ls_tp_seg_ring(g_seg, 15);    /* untouched ring, known empty */
     memset(rec, 0, sizeof rec);
     {
-        struct ls_rec hh = { LS_TP_HOOK_HTTP_HDRS, LS_TP_SCHEMA_HTTP, 0, 0, REC_BYTES };
+        struct ls_rec hh = { LS_TP_HOOK_HTTP1_HDRS, LS_TP_SCHEMA_HTTP, 0, 0, REC_BYTES, 0 };
         int landed = 0, dropped = 0, k;
         for (k = 0; k < 100000; k++) {
             if (ls_ring_emit(r, &hh, rec, REC_BYTES)) landed++;

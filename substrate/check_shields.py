@@ -45,6 +45,11 @@ CASES = [
      "one point every request reaches after the parse, so the fields are filled, and "
      "counts rejected or malformed requests. Validated by triggering it -- curl -X "
      "BOGUS must move safe_returns, a plain GET must not."),
+    ("http_waived_watch.bpf.c", "fentry/tmm_l7_http_headers", True,
+     "the WAIVED class: malformed AND forwarded anyway. TMM logs nothing when a "
+     "passthru_* waiver fires, so this is the only record that it happened. Same "
+     "tracepoint and record as http_hdrs_watch --- a different question, chosen "
+     "at load time rather than compiled in."),
 ]
 
 

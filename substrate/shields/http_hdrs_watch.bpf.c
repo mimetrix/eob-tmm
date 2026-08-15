@@ -28,17 +28,22 @@ __attribute__((section("fentry/tmm_l7_http_headers"), used))
 unsigned long long
 shield(struct ls_tp_http_hdrs *c)
 {
-    /* reject_reason is set on every path that refuses the request; the five
-     * invalid_flags bits catch malformations the parser records without
-     * rejecting outright. Either one puts the request in the counted set.
+    /* MALFORMED: the parser found a protocol violation.
      *
-     * Read as separate tests rather than folded together: they answer different
-     * questions, and a later version that reports WHICH class will need them
-     * apart anyway. */
-    if (c->reject_reason != 0)
-        return LS_SAFE_RETURN;
-
-    if (c->invalid_flags != 0)
+     * Two earlier versions of this predicate were wrong, and both looked right:
+     *
+     *   reject_reason != 0    never assigned inside http_process_client_headers,
+     *                         so it reads 0 even on a refused request.
+     *   invalid_flags != 0    HTTP/2+3 pseudo-header validity; never written on
+     *                         the 1.x path, so it read uninitialised memory. It
+     *                         produced the RIGHT COUNT for the wrong reason.
+     *   err != 0              `err` is reassigned a dozen times after the parse,
+     *                         and ERR_MORE_DATA is 17 --- so this counts every
+     *                         header block spanning two packets as a fault.
+     *
+     * parse_err is snapshotted straight out of the parser, and the classes are
+     * enumerated rather than range-tested because ERR_MORE_DATA sits above them. */
+    if (LS_TP_MALFORMED(c))
         return LS_SAFE_RETURN;
 
     return LS_FALLTHROUGH;

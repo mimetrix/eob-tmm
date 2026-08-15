@@ -76,17 +76,64 @@
  * and asserts its own size.
  */
 struct ls_tp_http_hdrs {
-    unsigned int err;            /* parse verdict: ERR_OK / REJECT / BOUNDS / VAL / MORE_DATA */
+    unsigned int parse_err;      /* THE PARSER'S OWN VERDICT --- see note below     */
+    unsigned int err;            /* what the filter finally decided (NOT the parse) */
     unsigned int reject_reason;  /* enum http1x_reject_reason, 0 when not rejected */
     unsigned int passthru;       /* enum http_passthru_reason: which check was waived */
     unsigned int version;        /* hd->ci.http.version      (2-bit field, widened)  */
     unsigned int method;         /* hd->ci.http.method       (BYTE)                  */
     unsigned int header_count;   /* hd->ci.http.header_count (UINT16)                */
     unsigned int status_code;    /* hd->ci.http.status_code  (int)                   */
-    unsigned int invalid_flags;  /* composed below --- see LS_TP_INVALID_*           */
+    unsigned int invalid_flags;  /* HTTP/2+3 ONLY --- see the note below            */
     unsigned int body_pos;       /* hd->ci.http.body_pos: offset to body start       */
     unsigned int hdr_bytes;      /* hd->ci.xb_hdrs.len: header bytes actually seen   */
 };
+
+/*
+ * TWO VERDICTS, AND THEY ARE NOT THE SAME ONE.
+ *
+ * `err` at the convergence point is NOT the parse result. Inside
+ * http_process_client_headers it is reassigned twelve or more times after the
+ * parse --- ERR_ARG on two rejection paths, ERR_OK on several waivers, then the
+ * results of http_ingress_initialize, http_header_insert_profiles,
+ * format_via_info and http_process_clientside_profile_rules. By the time this
+ * record is emitted it reports the LAST thing that happened, not why the request
+ * was refused. Every rejected record we captured before this change carried
+ * ERR_ARG(4), a value that does not appear anywhere in http_parser.c.
+ *
+ * So `parse_err` is snapshotted immediately after http_parse_client_headers
+ * returns, before any of that. It is the field that answers "why".
+ *
+ * ERR_MORE_DATA IS NOT A REJECTION, and this is the trap worth naming: it is 17,
+ * so a `parse_err != 0` predicate counts every set of headers that spans two
+ * packets --- the most ordinary thing HTTP does --- as a fault. Classify with the
+ * values below, never with a zero test.
+ */
+#define LS_ERR_OK          0u
+#define LS_ERR_VAL         3u   /* illegal value --- CR/LF in a header      */
+#define LS_ERR_BOUNDS      5u   /* out of bounds --- header count exceeded  */
+#define LS_ERR_REJECT     16u   /* traffic rejected --- unknown method      */
+#define LS_ERR_MORE_DATA  17u   /* NORMAL: headers span packets             */
+
+/*
+ * THE THREE CLASSES. They come apart in practice, which is why the record
+ * carries the pieces and lets a loaded program choose the predicate:
+ *
+ *   malformed   parse_err in {VAL, BOUNDS, REJECT}
+ *   refused     malformed AND passthru == 0     --- TMM declined to proxy it
+ *   waived      malformed AND passthru != 0     --- TMM KNEW and forwarded anyway
+ *
+ * `waived` is its own class and the most valuable of the three. TMM has
+ * passthru_unknown_method, passthru_excess_client_headers and
+ * passthru_oversize_client_headers; when one is set, a request TMM has already
+ * judged malformed is proxied to the origin, and nothing anywhere records that
+ * decision. It is not an error, so no log line fires.
+ *
+ * Note what is NOT a class: a request the ORIGIN rejects. `curl -X BOGUSMETHOD`
+ * returns 501 while parse_err is ERR_OK --- extension methods are legal, TMM
+ * forwarded it, and the backend refused. Client-visible failure, zero TMM
+ * involvement. Counting those as rejections would be wrong.
+ */
 
 /*
  * The five parse-violation bits, composed into one word.
@@ -113,9 +160,14 @@ struct ls_tp_http_hdrs {
  * trade. The record is filled unconditionally first, so the verdict is never
  * lost just because a pointer was missing.
  */
+/*
+ * SNAPSHOT, called immediately after http_parse_client_headers returns. Captures
+ * the parser's verdict and the parse info AS THE PARSER LEFT IT --- both are
+ * destroyed by the rest of the function.
+ */
 static inline void
-ls_tp_http_hdrs_emit(const struct http_data *hd, int err, int passthru,
-                     int reject_reason)
+ls_tp_http_hdrs_snap(struct ls_tp_http_hdrs *cp, const struct http_data *hd,
+                     int parse_err)
 {
     struct ls_tp_http_hdrs c;
     unsigned int i;
@@ -123,9 +175,10 @@ ls_tp_http_hdrs_emit(const struct http_data *hd, int err, int passthru,
     /* No memset(): string.h is not in this include world. Ten explicit stores
      * also mean adding a field to the record without filling it is a visible
      * omission rather than a silent zero. */
-    c.err           = (unsigned int)err;
-    c.reject_reason = (unsigned int)reject_reason;
-    c.passthru      = (unsigned int)passthru;
+    c.parse_err     = (unsigned int)parse_err;
+    c.err           = 0;            /* filled at emit, after the filter decides */
+    c.reject_reason = 0;
+    c.passthru      = 0;
     c.version       = 0;
     c.method        = 0;
     c.header_count  = 0;
@@ -151,7 +204,21 @@ ls_tp_http_hdrs_emit(const struct http_data *hd, int err, int passthru,
         c.invalid_flags = i;
     }
 
-    ls_tp_emit(LS_TP_SLOT_HTTP_HDRS, &c, (unsigned long)sizeof c);
+    *cp = c;
+}
+
+/*
+ * EMIT, at the single convergence point every path reaches. Adds what the filter
+ * decided to what the parser found, then publishes.
+ */
+static inline void
+ls_tp_http_hdrs_emit(struct ls_tp_http_hdrs *cp, int err, int passthru,
+                     int reject_reason)
+{
+    cp->err           = (unsigned int)err;
+    cp->passthru      = (unsigned int)passthru;
+    cp->reject_reason = (unsigned int)reject_reason;
+    ls_tp_emit(LS_TP_SLOT_HTTP_HDRS, cp, (unsigned long)sizeof *cp);
 }
 
 #endif /* LS_TP_HTTP_H */

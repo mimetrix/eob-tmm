@@ -107,10 +107,11 @@ main(void)
     struct http_data hd;
     struct http1x_pcb pcb;
     const struct ls_tp_http_hdrs *r;
+    struct ls_tp_http_hdrs snap;
     int n = 0;
 
     /* 1. layout, both sides */
-    assert(sizeof(struct ls_tp_http_hdrs) == 40);                              n++;
+    assert(sizeof(struct ls_tp_http_hdrs) == 44);   /* +parse_err */                              n++;
     assert(sizeof(struct ls_tp_http_hdrs) == sizeof(struct ls_tp_http_hdrs_prog)); n++;
 
     /* 2. a clean request: verdict recorded, nothing flagged */
@@ -125,10 +126,11 @@ main(void)
     hd.ci.xb_hdrs.len = 256;
 
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 0);
+    ls_tp_http_hdrs_emit(&snap, 0, 0, (int)pcb.reject_reason);
     assert(g_emit.calls == 1);                                                 n++;
     assert(g_emit.slot == LS_TP_SLOT_HTTP_HDRS);                               n++;
-    assert(g_emit.len == 40);                                                  n++;
+    assert(g_emit.len == 44);                                                  n++;
 
     r = (const struct ls_tp_http_hdrs *)g_emit.rec;
     assert(r->version == 1 && r->method == 3 && r->header_count == 7);         n++;
@@ -139,13 +141,16 @@ main(void)
      *    renamed upstream this block stops compiling --- which is the entire
      *    reason it is written this way instead of masking a byte offset. */
     pi->f_invalid_method = 1;
-    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 0);
+    ls_tp_http_hdrs_emit(&snap, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == LS_TP_INVALID_METHOD);                          n++;
     pi->f_invalid_method = 0; pi->f_invalid_authority = 1;
-    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 0);
+    ls_tp_http_hdrs_emit(&snap, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == LS_TP_INVALID_AUTHORITY);                       n++;
     pi->f_invalid_path = 1;
-    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 0);
+    ls_tp_http_hdrs_emit(&snap, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == (LS_TP_INVALID_AUTHORITY | LS_TP_INVALID_PATH)); n++;
     pi->f_invalid_authority = 0; pi->f_invalid_path = 0;
 
@@ -153,9 +158,10 @@ main(void)
      *    tracepoint exists for, and the one an entry hook could never see
      *    because the functions that set it are inlined away. */
     pcb.reject_reason = HTTP1X_REJECT_METHOD;
-    ls_tp_http_hdrs_emit(pcb.hd, 5, 0, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 5);
+    ls_tp_http_hdrs_emit(&snap, 5, 0, (int)pcb.reject_reason);
     assert(r->reject_reason == (unsigned)HTTP1X_REJECT_METHOD);                n++;
-    assert(r->err == 5);                                                       n++;
+    assert(r->parse_err == 5 && r->err == 5);                                                       n++;
 
     /* 5. THE GUARD. A pcb without http_data must still emit a well-formed
      *    record carrying the verdict --- never fault. A tracepoint that can
@@ -163,9 +169,10 @@ main(void)
     pcb.hd = 0;
     pcb.reject_reason = HTTP1X_REJECT_HEADER_CRNL;
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(pcb.hd, 9, 2, (int)pcb.reject_reason);
+    ls_tp_http_hdrs_snap(&snap, pcb.hd, 9);
+    ls_tp_http_hdrs_emit(&snap, 9, 2, (int)pcb.reject_reason);
     assert(g_emit.calls == 1);                                                 n++;
-    assert(r->err == 9 && r->passthru == 2);                                   n++;
+    assert(r->parse_err == 9 && r->err == 9 && r->passthru == 2);                                   n++;
     assert(r->reject_reason == (unsigned)HTTP1X_REJECT_HEADER_CRNL);           n++;
     assert(r->version == 0 && r->method == 0 && r->header_count == 0 &&
            r->status_code == 0 && r->body_pos == 0 && r->hdr_bytes == 0 &&
@@ -178,11 +185,12 @@ main(void)
      *    http1x.c's http_process_client_headers, which is what the first version
      *    got wrong by binding to struct http1x_pcb. */
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(0, 7, 1, 3);
+    ls_tp_http_hdrs_snap(&snap, 0, 7);
+    ls_tp_http_hdrs_emit(&snap, 7, 1, 3);
     assert(g_emit.calls == 1);                                                 n++;
-    assert(r->err == 7 && r->passthru == 1 && r->reject_reason == 3);          n++;
+    assert(r->parse_err == 7 && r->err == 7 && r->passthru == 1 && r->reject_reason == 3);          n++;
 
-    printf("ok    ls_tp_http.h  (%d assertions: 40-byte record both sides, flags by "
-           "name, null-hd guard)\n", n);
+    printf("ok    ls_tp_http.h  (%d assertions: 44-byte record both sides, parse_err vs err, "
+           "flags by name, null-hd guard)\n", n);
     return 0;
 }

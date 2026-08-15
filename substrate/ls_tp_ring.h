@@ -39,16 +39,34 @@
 #include "ls_ring.h"
 
 #define LS_TP_SEG_MAGIC   0x4c53534547303031ull   /* "LSSEG001" */
+/* Segment format version. ls_rec gained ts_ns, so a consumer built against
+ * version 1 walks records at the wrong stride --- it must be REFUSED, not left to
+ * decode plausible garbage. Checked in ls_tp_seg_open below. */
+#define LS_TP_SEG_VERSION   2u
 #define LS_TP_MAX_RINGS    16u
 #define LS_TP_RING_BYTES   (64u * 1024u)          /* power of two --- ls_ring requires it */
 
-/* Hook and schema identity. The consumer needs these to pick a layout: the ring
- * carries bytes, not types. Bump LS_TP_SCHEMA_HTTP whenever the 40-byte record
- * changes shape, or a drain built against the old layout silently misreads the
- * new one --- the same class of failure as the hardcoded field offsets this
- * tracepoint already had to unlearn. */
-#define LS_TP_HOOK_HTTP_HDRS   1u
-#define LS_TP_SCHEMA_HTTP      1u
+/* ONE SCHEMA, THREE HOOKS. struct http_parse_info is shared by all three HTTP
+ * implementations --- http/ (1.x), http2/ and http3/ all fill ci->http --- so the
+ * 40-byte record shape is identical and only the call site differs. The hook id
+ * is what tells a consumer which protocol produced a record, and which fields of
+ * it are load-bearing:
+ *
+ *   HTTP/1.x   version, method, header_count, body_pos, hdr_bytes, err
+ *   HTTP/2,3   the five f_invalid_* pseudo-header bits (invalid_flags)
+ *
+ * Those bits are set ONLY by http2/ and http3/ code --- struct http_parse_info
+ * documents them as "HTTP/2 pseudo-headers are invalid". On the 1.x path they
+ * are never written, so invalid_flags there is uninitialised and must not be
+ * read. It is kept in the record rather than dropped precisely because it is the
+ * right field the moment an h2 or h3 call site lands. */
+#define LS_TP_HOOK_HTTP1_HDRS  1u
+#define LS_TP_HOOK_HTTP2_HDRS  2u      /* http2_stream_process_ingress_headers  */
+#define LS_TP_HOOK_HTTP3_HDRS  3u      /* http3_process_stream_ingress_headers  */
+
+/* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
+ * the wrong stride now, so it must fail rather than decode plausible garbage. */
+#define LS_TP_SCHEMA_HTTP      2u
 
 /* Segment header, at offset 0. Rings follow at a fixed stride so a consumer can
  * find ring i without walking anything. */
@@ -107,16 +125,17 @@ ls_tp_seg_open(const char *path, int create)
 
     s = (struct ls_tp_seg *)p;
     if (!create) {
-        if (s->magic != LS_TP_SEG_MAGIC) {
+        if (s->magic != LS_TP_SEG_MAGIC || s->version != LS_TP_SEG_VERSION ||
+            s->ring_stride != LS_TP_STRIDE) {
             munmap(p, LS_TP_SEG_SZ);
-            return NULL;
+            return NULL;             /* wrong magic, wrong version, or wrong geometry */
         }
         return s;
     }
 
     /* Initialise every ring before publishing the magic, so a consumer that
      * opens mid-setup either sees no segment or sees a complete one. */
-    s->version        = 1;
+    s->version        = LS_TP_SEG_VERSION;
     s->n_rings        = LS_TP_MAX_RINGS;
     s->ring_stride    = LS_TP_STRIDE;
     s->ring_data_size = LS_TP_RING_BYTES;
@@ -175,7 +194,8 @@ ls_tp_my_ring(struct ls_tp_seg *s)
  */
 static inline int
 ls_tp_ring_publish(struct ls_tp_seg *seg, uint32_t hook_id, uint32_t schema_id,
-                   uint32_t tmm_id, uint64_t seq, const void *rec, uint32_t len)
+                   uint32_t tmm_id, uint64_t seq, uint64_t ts_ns,
+                   const void *rec, uint32_t len)
 {
     struct ls_ring *r = ls_tp_my_ring(seg);
     struct ls_rec h;
@@ -188,6 +208,7 @@ ls_tp_ring_publish(struct ls_tp_seg *seg, uint32_t hook_id, uint32_t schema_id,
     h.seq       = seq;
     h.tmm_id    = tmm_id;
     h.len       = len;
+    h.ts_ns     = ts_ns;
     return ls_ring_emit(r, &h, rec, len);
 }
 

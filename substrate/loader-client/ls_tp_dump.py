@@ -26,15 +26,17 @@ import sys
 SEG_MAGIC = 0x4C53534547303031          # "LSSEG001"
 SEG_HDR   = 32                          # struct ls_tp_seg
 RING_HDR  = 56                          # struct ls_ring
-REC_HDR   = 24                          # struct ls_rec
+REC_HDR   = 32                          # struct ls_rec (24 + ts_ns)
 RING_BUSY    = 1 << 31
 RING_DISCARD = 1 << 30
 RING_LENMASK = ~(RING_BUSY | RING_DISCARD) & 0xFFFFFFFF
 
 # The 40-byte tmm:l7:http_headers record, in order. Bump alongside
 # LS_TP_SCHEMA_HTTP whenever this changes shape.
-SCHEMA_HTTP = 1
-HTTP_FIELDS = ["err", "reject_reason", "passthru", "version", "method",
+SCHEMA_HTTP = 2          # bumped with ts_ns
+SEG_VERSION = 2
+HOOKS = {1: "http1", 2: "http2", 3: "http3"}
+HTTP_FIELDS = ["parse_err", "err", "reject_reason", "passthru", "version", "method",
                "header_count", "status_code", "invalid_flags", "body_pos",
                "hdr_bytes"]
 
@@ -72,6 +74,11 @@ def main():
         sys.exit(f"*** {a.segment}: {len(d)} bytes --- too small to be a segment")
 
     magic, ver, n_rings, stride, dsz, claimed = struct.unpack_from("<QIIIII", d, 0)
+    if magic != SEG_MAGIC or (ver and ver != SEG_VERSION):
+        if magic == SEG_MAGIC:
+            sys.exit(f"*** segment is format version {ver}, this decoder speaks "
+                     f"{SEG_VERSION}. ls_rec changed size, so walking it would decode "
+                     f"garbage at a plausible-looking stride. Rebuild one side.")
     if magic != SEG_MAGIC:
         sys.exit(f"*** not a tracepoint segment (magic {magic:#x}).\n"
                  f"    An all-zero file here usually means the sidecar mapped its OWN\n"
@@ -109,22 +116,24 @@ def main():
             body = hdr & RING_LENMASK
             if body == 0:
                 break
-            hook, schema, seq, tmm, ln = struct.unpack_from("<IIQII", d, data + off + 8)
+            hook, schema, seq, tmm, ln, ts = struct.unpack_from("<IIQIIQ", d, data + off + 8)
             payload = data + off + 8 + REC_HDR
-            recs.append((seq, hook, schema, tmm, ln, payload))
+            recs.append((seq, hook, schema, tmm, ln, payload, ts))
             off += (8 + REC_HDR + ln + 7) & ~7
         total += len(recs)
         print(f"\nring {i}  producer={prod} consumer={cons} drops={dr} "
               f"policy={'STREAM' if pol == 0 else 'RECORD'}  records={len(recs)}")
         if a.quiet:
             continue
-        for (seq, hook, schema, tmm, ln, off_p) in (recs if a.max == 0 else recs[:a.max]):
-            if schema == SCHEMA_HTTP and ln == 40:
-                f = decode_http(struct.unpack_from("<10I", d, off_p))
-                print(f"  seq={seq:<5} tmm={tmm} {f['version_name']:8} "
+        for (seq, hook, schema, tmm, ln, off_p, ts) in (recs if a.max == 0 else recs[:a.max]):
+            if schema == SCHEMA_HTTP and ln == 44:
+                f = decode_http(struct.unpack_from("<11I", d, off_p))
+                import datetime as _dt
+                when = _dt.datetime.fromtimestamp(ts / 1e9).strftime("%H:%M:%S.%f")[:-3]
+                print(f"  {when} seq={seq:<5} {HOOKS.get(hook,'?'):5} tmm={tmm} {f['version_name']:8} "
                       f"method={f['method']:<3} hdrs={f['header_count']:<3} "
-                      f"bytes={f['hdr_bytes']:<5} err={f['err']} "
-                      f"reject={f['reject_reason']} invalid={f['invalid_names']}")
+                      f"parse_err={f['parse_err']:<3} err={f['err']:<3} "
+                      f"class={'normal' if f['parse_err'] not in (3,5,16) else ('waived' if f['passthru'] else 'refused')}")
             else:
                 print(f"  seq={seq:<5} tmm={tmm} hook={hook} schema={schema} len={ln} "
                       f"(no decoder --- raw)")

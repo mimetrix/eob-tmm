@@ -65,20 +65,51 @@ static const char *VERSION_NAME[4] = { "UNKNOWN", "HTTP/0.9", "HTTP/1.1", "HTTP/
  * substrate/ls_tp_http.h; schema_id in each record is what authorises this
  * decode, and an unknown schema is emitted as raw rather than guessed at. */
 struct http_rec {
-    uint32_t err, reject_reason, passthru, version, method;
+    uint32_t parse_err;          /* the PARSER's verdict --- classify with this */
+    uint32_t err;                /* the filter's final disposition, NOT the parse */
+    uint32_t reject_reason, passthru, version, method;
     uint32_t header_count, status_code, invalid_flags, body_pos, hdr_bytes;
 };
+
+/* ERR_MORE_DATA is 17 --- headers spanning two packets. Not a fault, and the
+ * reason `parse_err != 0` is the wrong test. */
+#define ERR_VAL 3u
+#define ERR_BOUNDS 5u
+#define ERR_REJECT 16u
+#define MALFORMED(r) ((r)->parse_err == ERR_VAL || (r)->parse_err == ERR_BOUNDS || \
+                      (r)->parse_err == ERR_REJECT)
+
+/* The three classes come apart, so name them rather than collapsing them. */
+static const char *
+klass(const struct http_rec *r)
+{
+    if (!MALFORMED(r))       return "normal";
+    return r->passthru ? "waived" : "refused";
+}
+
+static const char *
+hook_name(uint32_t id)
+{
+    switch (id) {
+    case LS_TP_HOOK_HTTP1_HDRS: return "http1";
+    case LS_TP_HOOK_HTTP2_HDRS: return "http2";
+    case LS_TP_HOOK_HTTP3_HDRS: return "http3";
+    default:                    return "?";
+    }
+}
 
 static void
 emit_http(const struct ls_rec *h, const struct http_rec *r)
 {
-    printf("{\"seq\":%llu,\"tmm\":%u,\"hook\":%u,\"schema\":%u,"
-           "\"err\":%u,\"reject_reason\":%u,\"passthru\":%u,"
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"%s\",\"schema\":%u,"
+           "\"class\":\"%s\",\"parse_err\":%u,\"err\":%u,"
+           "\"reject_reason\":%u,\"passthru\":%u,"
            "\"version\":\"%s\",\"method\":%u,\"header_count\":%u,"
            "\"status_code\":%u,\"invalid_flags\":%u,\"body_pos\":%u,"
            "\"hdr_bytes\":%u}\n",
-           (unsigned long long)h->seq, h->tmm_id, h->hook_id, h->schema_id,
-           r->err, r->reject_reason, r->passthru,
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           hook_name(h->hook_id), h->schema_id,
+           klass(r), r->parse_err, r->err, r->reject_reason, r->passthru,
            VERSION_NAME[r->version & 3], r->method, r->header_count,
            r->status_code, r->invalid_flags, r->body_pos, r->hdr_bytes);
 }
@@ -87,8 +118,9 @@ static void
 emit_raw(const struct ls_rec *h, const unsigned char *p, int n)
 {
     int i;
-    printf("{\"seq\":%llu,\"tmm\":%u,\"hook\":%u,\"schema\":%u,\"raw\":\"",
-           (unsigned long long)h->seq, h->tmm_id, h->hook_id, h->schema_id);
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"%s\",\"schema\":%u,\"raw\":\"",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           hook_name(h->hook_id), h->schema_id);
     for (i = 0; i < n; i++)
         printf("%02x", p[i]);
     printf("\"}\n");

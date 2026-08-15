@@ -27,6 +27,7 @@
 #include "ls_vm.h"
 
 #include <stdlib.h>
+#include <time.h>
 
 /* Segment handle, resolved once. NULL means "ring disabled", which is the
  * default and the shipped state: LS_TP_RING unset costs a load and a branch. */
@@ -91,10 +92,20 @@ ls_tp_emit(int slot, const void *rec, unsigned long len)
      * pre-program copy that disagrees with the counters.
      */
     ls_tp_seg_bootstrap();
-    if (g_tp_seg != NULL)
-        (void)ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_HTTP_HDRS,
+    if (g_tp_seg != NULL) {
+        struct timespec ts;
+        /* CLOCK_REALTIME resolves through the vDSO --- no syscall, tens of ns ---
+         * and wall clock is what a feed needs to correlate with anything else.
+         * CLOCK_REALTIME_COARSE is a few ns cheaper at ~4ms granularity, which
+         * would be fine for rates and useless for latency; revisit if the
+         * per-call budget ever demands it. Read only when the ring is on. */
+        clock_gettime(CLOCK_REALTIME, &ts);
+        (void)ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_HTTP1_HDRS,
                                  LS_TP_SCHEMA_HTTP, (unsigned)slot,
                                  atomic_fetch_add_explicit(&g_tp_seq, 1,
                                                            memory_order_relaxed),
+                                 (unsigned long long)ts.tv_sec * 1000000000ull
+                                     + (unsigned long long)ts.tv_nsec,
                                  rec, (unsigned int)len);
+    }
 }
