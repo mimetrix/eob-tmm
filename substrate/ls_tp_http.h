@@ -19,10 +19,23 @@
  * A deliberate call site has neither problem: it sits after the parse, where the
  * data exists, and inlining is irrelevant because we own the site.
  *
- * WHERE IT SITS. http_process_client_headers() in http1x.c. Every path through
- * that function --- clean parse and every rejection --- converges on `out:` and
- * a single `return err`. One call there sees the whole outcome exactly once per
- * request.
+ * WHERE IT SITS --- AND WHY IT TAKES SCALARS, NOT A pcb. There are TWO static
+ * functions named http_process_client_headers: one in http1x.c taking
+ * struct http1x_pcb *, one in http.c taking struct http_scb *. Both are
+ * file-scope, so nothing collides and nothing warns, and both call
+ * http_parse_client_headers --- which is why an entry hook on the parser fires
+ * for either and cannot tell them apart.
+ *
+ * The first version of this tracepoint went into the http1x.c one and never
+ * fired: 9 requests returned 200 with fired=0. Only http.c's survives as a
+ * symbol (addr2line on 0xca5c80 -> http.c:7769), and that is the one this
+ * traffic executes.
+ *
+ * So the builder takes the pieces it needs rather than a pcb, and one
+ * tracepoint serves BOTH call sites --- each passing its own reject_reason.
+ * Binding to a pcb type would have forced two near-identical builders and a
+ * second chance to instrument the wrong one. Both functions converge on a
+ * single `return err`, so one call each sees the whole outcome per request.
  *
  * WHAT IT EXPOSES, AND WHY THAT IS NEEDFUL. TMM computes all of this per
  * request and keeps none of it. Today the only trace of a malformed request is
@@ -94,24 +107,24 @@ struct ls_tp_http_hdrs {
 /*
  * Build and emit. Called once per request, from the single convergence point.
  *
- * pcb is never NULL at the call site (it is the function's own argument), but
- * pcb->hd is guarded: the record is zeroed first, so a request that somehow
- * arrives without http_data still emits a well-formed row carrying the verdict
- * rather than faulting inside a tracepoint. Crashing TMM to observe it would be
- * an unusually poor trade.
+ * `hd` is guarded rather than assumed: a request that somehow arrives without
+ * http_data still emits a well-formed row carrying the verdict instead of
+ * faulting. Crashing TMM in order to observe it would be an unusually poor
+ * trade. The record is filled unconditionally first, so the verdict is never
+ * lost just because a pointer was missing.
  */
 static inline void
-ls_tp_http_hdrs_emit(const struct http1x_pcb *pcb, int err, int passthru)
+ls_tp_http_hdrs_emit(const struct http_data *hd, int err, int passthru,
+                     int reject_reason)
 {
     struct ls_tp_http_hdrs c;
-    const struct http_data *hd;
     unsigned int i;
 
     /* No memset(): string.h is not in this include world. Ten explicit stores
      * also mean adding a field to the record without filling it is a visible
      * omission rather than a silent zero. */
     c.err           = (unsigned int)err;
-    c.reject_reason = 0;
+    c.reject_reason = (unsigned int)reject_reason;
     c.passthru      = (unsigned int)passthru;
     c.version       = 0;
     c.method        = 0;
@@ -121,12 +134,6 @@ ls_tp_http_hdrs_emit(const struct http1x_pcb *pcb, int err, int passthru)
     c.body_pos      = 0;
     c.hdr_bytes     = 0;
 
-    if (pcb == 0)
-        return;
-
-    c.reject_reason = (unsigned int)pcb->reject_reason;
-
-    hd = pcb->hd;
     if (hd != 0) {
         c.version      = (unsigned int)hd->ci.http.version;
         c.method       = (unsigned int)hd->ci.http.method;

@@ -299,7 +299,13 @@ handle(int fd)
         /* Handed to a TMM thread: preparing here would hang this thread in
          * TMM's allocator. See ls_prep above. */
         const char *why = "unknown";
-        int slot = ls_prep_submit(0, m->prog, m->prog_len, section, "shield",
+        /* The slot comes from the request. Hardcoding 0 here meant every LOAD
+         * landed on slot 0 no matter what was asked for, so a program written
+         * for a tracepoint on another slot loaded "successfully" and then never
+         * ran --- the call site emits to its own slot, which stayed empty. The
+         * comment under STATUS below already claimed LOAD did this; it did not.
+         * Same reasoning for SET_MODE and REVOKE. */
+        int slot = ls_prep_submit((int)m->epoch, m->prog, m->prog_len, section, "shield",
                                   m->mode, &why);
         if (slot < 0)
             reply(fd, "ERR load refused (%s)\n", why);
@@ -308,7 +314,7 @@ handle(int fd)
         break;
     }
     case SHIELD_OP_SET_MODE:
-        ls_vm_set_mode(0, (enum ls_mode)m->mode);
+        ls_vm_set_mode((int)m->epoch, (enum ls_mode)m->mode);
         reply(fd, "OK mode=%d\n", m->mode);
         break;
 
@@ -395,7 +401,7 @@ handle(int fd)
         /* Disarm is the honest half of revocation. The other half --- reclaiming
          * the program's memory --- needs item 0c. Mode DISABLE stops it running;
          * it does not remove it. */
-        ls_vm_set_mode(0, LS_MODE_DISABLE);
+        ls_vm_set_mode((int)m->epoch, LS_MODE_DISABLE);
         reply(fd, "OK disabled (not reclaimed --- see item 0c)\n");
         break;
 

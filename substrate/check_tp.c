@@ -125,7 +125,7 @@ main(void)
     hd.ci.xb_hdrs.len = 256;
 
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(&pcb, 0, 0);
+    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
     assert(g_emit.calls == 1);                                                 n++;
     assert(g_emit.slot == LS_TP_SLOT_HTTP_HDRS);                               n++;
     assert(g_emit.len == 40);                                                  n++;
@@ -139,13 +139,13 @@ main(void)
      *    renamed upstream this block stops compiling --- which is the entire
      *    reason it is written this way instead of masking a byte offset. */
     pi->f_invalid_method = 1;
-    ls_tp_http_hdrs_emit(&pcb, 0, 0);
+    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == LS_TP_INVALID_METHOD);                          n++;
     pi->f_invalid_method = 0; pi->f_invalid_authority = 1;
-    ls_tp_http_hdrs_emit(&pcb, 0, 0);
+    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == LS_TP_INVALID_AUTHORITY);                       n++;
     pi->f_invalid_path = 1;
-    ls_tp_http_hdrs_emit(&pcb, 0, 0);
+    ls_tp_http_hdrs_emit(pcb.hd, 0, 0, (int)pcb.reject_reason);
     assert(r->invalid_flags == (LS_TP_INVALID_AUTHORITY | LS_TP_INVALID_PATH)); n++;
     pi->f_invalid_authority = 0; pi->f_invalid_path = 0;
 
@@ -153,7 +153,7 @@ main(void)
      *    tracepoint exists for, and the one an entry hook could never see
      *    because the functions that set it are inlined away. */
     pcb.reject_reason = HTTP1X_REJECT_METHOD;
-    ls_tp_http_hdrs_emit(&pcb, 5, 0);
+    ls_tp_http_hdrs_emit(pcb.hd, 5, 0, (int)pcb.reject_reason);
     assert(r->reject_reason == (unsigned)HTTP1X_REJECT_METHOD);                n++;
     assert(r->err == 5);                                                       n++;
 
@@ -163,7 +163,7 @@ main(void)
     pcb.hd = 0;
     pcb.reject_reason = HTTP1X_REJECT_HEADER_CRNL;
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(&pcb, 9, 2);
+    ls_tp_http_hdrs_emit(pcb.hd, 9, 2, (int)pcb.reject_reason);
     assert(g_emit.calls == 1);                                                 n++;
     assert(r->err == 9 && r->passthru == 2);                                   n++;
     assert(r->reject_reason == (unsigned)HTTP1X_REJECT_HEADER_CRNL);           n++;
@@ -171,10 +171,16 @@ main(void)
            r->status_code == 0 && r->body_pos == 0 && r->hdr_bytes == 0 &&
            r->invalid_flags == 0);                                             n++;
 
-    /* 6. a null pcb emits nothing at all, rather than dereferencing it */
+    /* 6. THE CONTRACT AFTER THE REFACTOR. The builder takes scalars, not a pcb,
+     *    so there is no pcb to be null and a record is ALWAYS emitted --- the
+     *    verdict is never silently dropped because a pointer was missing. This
+     *    is the shape that lets one tracepoint serve both http.c's and
+     *    http1x.c's http_process_client_headers, which is what the first version
+     *    got wrong by binding to struct http1x_pcb. */
     g_emit.calls = 0;
-    ls_tp_http_hdrs_emit(0, 0, 0);
-    assert(g_emit.calls == 0);                                                 n++;
+    ls_tp_http_hdrs_emit(0, 7, 1, 3);
+    assert(g_emit.calls == 1);                                                 n++;
+    assert(r->err == 7 && r->passthru == 1 && r->reject_reason == 3);          n++;
 
     printf("ok    ls_tp_http.h  (%d assertions: 40-byte record both sides, flags by "
            "name, null-hd guard)\n", n);
