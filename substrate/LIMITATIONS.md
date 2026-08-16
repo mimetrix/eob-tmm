@@ -4,9 +4,19 @@ Written to be checked against, not read once. If you are asking "can we shield
 CVE X" or "can we probe Y", work down the relevant list — most candidates fail on
 the first two items, and it costs minutes to find out rather than a week.
 
-Everything here is a property of the mechanism, not a backlog. Items that are
-merely unbuilt are marked as such and kept separate, because conflating "cannot"
-with "not yet" is how a capability gets oversold.
+Items are marked as one of three things, and the distinction is the point —
+conflating them is how a capability gets oversold in one direction and written off
+in the other:
+
+| | |
+|---|---|
+| **structural** | a property of the approach; will not change |
+| **unbuilt** | known how, not done |
+| **gap with an identified path** | thought structural until something showed otherwise |
+
+The third category exists because §1.1 was in the first until 2026-08-16, when the
+literature showed it was really the second. Assume anything here labelled
+structural may move if someone checks.
 
 ---
 
@@ -16,10 +26,31 @@ A shield runs a verified eBPF program at a function entry and lets the host appl
 its verdict. The verdict is binary: fall through, or return the hook's declared
 safe value.
 
-### 1.1 The decision must be makeable at a function entry
+### 1.1 The decision must be makeable at a function entry — *with our current attach*
 
 The program runs **before the function body**. Anything computed inside is not
 available to it.
+
+> **Corrected 2026-08-16.** This section previously called the constraint
+> structural. **It is not** — it is a property of the attach mechanism we chose,
+> and the literature shows the alternative.
+>
+> [RapidPatch (USENIX Security '22)](https://www.usenix.org/conference/usenixsecurity22/presentation/he-yi)
+> hotpatches firmware with a userspace eBPF VM — architecturally our design — and
+> reports **over 90% of CVEs hotpatchable**, against our 0 of 5. The difference is
+> not the VM. It is that RapidPatch **combines hardware breakpoints with
+> instrumentation** (the ARM FPB unit, Kprobes on Linux) and treats function-entry
+> patch points as only *one* of its deployment methods. A hardware breakpoint sits
+> at the instruction where a dangerous condition becomes computable, which is where
+> most memory-safety bugs actually live.
+>
+> x86_64 gives four hardware debug registers, and `ls_swap.c` already handles
+> `SIGTRAP` for the arming path — so arbitrary-address attach is a new *use* of
+> machinery we have, not a new mechanism. Four simultaneous arbitrary patch points
+> is ample for CVE work.
+>
+> Until that exists, everything in this section holds. It is a **known gap with an
+> identified path**, not a property of the approach.
 
 This is the filter people underestimate. A vulnerability that only becomes
 apparent after three transformations inside a 400-line function has nowhere to
@@ -59,6 +90,15 @@ So a program inspects **at most ~88 bytes of attacker-controlled input directly*
 Anything larger must be reduced by the host — into a verdict, a summary, or a
 truncation flag the program can refuse on — before the program sees it.
 
+### 1.3b It can refuse, but it cannot redirect
+
+The verdict is binary: fall through, or return the hook's declared safe value.
+
+RapidPatch's patches carry `OP_DROP`, `OP_REDIRECT` and `OP_PASS` — they can send
+execution somewhere else, not merely decline. Several fix shapes that are
+expressible as a redirect are not expressible as a refusal, so this narrows the
+addressable set independently of §1.1. Also unbuilt rather than impossible.
+
 ### 1.4 It cannot write
 
 A shield selects an outcome. It cannot repair a structure, fix up a length field,
@@ -69,6 +109,23 @@ The ctx is a per-invocation **stack copy** for this reason. PREVAIL cannot expre
 a read-only region (finding O1), so a verified program may write every byte it is
 handed. Handing it a view onto live TMM state would turn the safety mechanism into
 an argument-injection primitive.
+
+### 1.4b What the comparable systems do
+
+Two reference points worth holding, because both are narrower than "eBPF patches
+CVEs" and both are honest about it:
+
+- **Cloudflare** mitigated CVE-2022-0492 in production by attaching to the
+  **`cred_prepare` LSM hook** — a purpose-built security decision point, not an
+  arbitrary function — and checking syscall number, `CLONE_NEWUSER` and
+  `CAP_SYS_ADMIN`. ~10% overhead on that path. They state the limit directly:
+  this works "for syscall interception at LSM hooks, not all vulnerability types."
+  TMM has no LSM equivalent; the nearest thing is a designed-in call site, which
+  costs a build.
+- **livepatch / kpatch** remains the mainstream answer for real kernel CVEs:
+  full **function replacement** via ftrace. Strictly more powerful than either
+  approach and correspondingly heavier — and it fails on gcc inter-procedural
+  optimisation, which is the same inlining problem in §1.6.
 
 ### 1.5 Fix shapes that work, and that do not
 
