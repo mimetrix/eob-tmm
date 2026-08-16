@@ -6,7 +6,7 @@
  * and is the only place the two worlds meet for telemetry --- the same shape
  * ls_prep.c already uses for the bootstrap.
  *
- * TWO CONSUMERS, ONE RECORD. The record built at the call site goes to:
+ * TWO CONSUMERS, ONE RECORD. Every record reaching this function goes to:
  *
  *   1. the VM, which answers a question about it (counted in fired/safe_returns)
  *   2. the shared-memory ring, which carries the bytes themselves off-box
@@ -68,9 +68,11 @@ ls_tp_seg_bootstrap(void)
             (unsigned)LS_TP_MAX_RINGS, (unsigned)LS_TP_RING_BYTES);
 }
 
-void
-ls_tp_emit(int slot, const void *rec, unsigned long len)
+int
+ls_tp_dispatch(int slot, const void *rec, unsigned long len, unsigned int hook_id)
 {
+    enum ls_verdict v;
+
     /*
      * ls_vm_call takes void*, not const void*, because a verified program may
      * legally write every byte of what it is handed: PREVAIL does not consume a
@@ -84,7 +86,7 @@ ls_tp_emit(int slot, const void *rec, unsigned long len)
      * TMM state. Handing a program a pointer into hd->ci would turn a telemetry
      * mechanism into a way to modify the parsed request.
      */
-    (void)ls_vm_call(slot, (void *)(unsigned long)rec, (size_t)len);
+    v = ls_vm_call(slot, (void *)(unsigned long)rec, (size_t)len);
 
     /*
      * Then the bytes. AFTER the VM, deliberately: the program may write to the
@@ -100,12 +102,15 @@ ls_tp_emit(int slot, const void *rec, unsigned long len)
          * would be fine for rates and useless for latency; revisit if the
          * per-call budget ever demands it. Read only when the ring is on. */
         clock_gettime(CLOCK_REALTIME, &ts);
-        (void)ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_HTTP1_HDRS,
-                                 LS_TP_SCHEMA_HTTP, (unsigned)slot,
+        (void)ls_tp_ring_publish(g_tp_seg, hook_id,
+                                 hook_id == LS_TP_HOOK_RST ? LS_TP_SCHEMA_RST
+                                                           : LS_TP_SCHEMA_HTTP,
+                                 (unsigned)slot,
                                  atomic_fetch_add_explicit(&g_tp_seq, 1,
                                                            memory_order_relaxed),
                                  (unsigned long long)ts.tv_sec * 1000000000ull
                                      + (unsigned long long)ts.tv_nsec,
                                  rec, (unsigned int)len);
     }
+    return (int)v;
 }

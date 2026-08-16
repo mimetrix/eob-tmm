@@ -87,6 +87,25 @@ klass(const struct http_rec *r)
     return r->passthru ? "waived" : "refused";
 }
 
+/* struct ls_ctx_rst --- substrate/ls_ctx_rst.h. The teardown record: which line
+ * of TMM's own source decided to close this connection. */
+struct rst_rec {
+    uint32_t lineno, err, reason, file_len;
+    char     file[48];
+};
+
+static void
+emit_rst(const struct ls_rec *h, const struct rst_rec *r)
+{
+    char f[49];
+    uint32_t n = r->file_len < 48 ? r->file_len : 48;
+    memcpy(f, r->file, n); f[n] = 0;
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"reset\","
+           "\"schema\":%u,\"file\":\"%s\",\"line\":%u,\"err\":%u,\"reason\":%u}\n",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           h->schema_id, f, r->lineno, r->err, r->reason);
+}
+
 static const char *
 hook_name(uint32_t id)
 {
@@ -94,6 +113,7 @@ hook_name(uint32_t id)
     case LS_TP_HOOK_HTTP1_HDRS: return "http1";
     case LS_TP_HOOK_HTTP2_HDRS: return "http2";
     case LS_TP_HOOK_HTTP3_HDRS: return "http3";
+    case LS_TP_HOOK_RST:        return "reset";
     default:                    return "?";
     }
 }
@@ -208,7 +228,9 @@ main(int argc, char **argv)
              * reader. A STREAM ring that is read but never acknowledged fills,
              * and TMM starts counting drops that nothing caused. */
             while ((n = ls_ring_consume(r, &h, buf, sizeof buf)) >= 0) {
-                if (h.schema_id == LS_TP_SCHEMA_HTTP && n == (int)sizeof(struct http_rec))
+                if (h.hook_id == LS_TP_HOOK_RST && n == (int)sizeof(struct rst_rec))
+                    emit_rst(&h, (const struct rst_rec *)buf);
+                else if (h.schema_id == LS_TP_SCHEMA_HTTP && n == (int)sizeof(struct http_rec))
                     emit_http(&h, (const struct http_rec *)buf);
                 else
                     emit_raw(&h, buf, n);

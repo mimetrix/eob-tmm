@@ -63,10 +63,12 @@
 #define LS_TP_HOOK_HTTP1_HDRS  1u
 #define LS_TP_HOOK_HTTP2_HDRS  2u      /* http2_stream_process_ingress_headers  */
 #define LS_TP_HOOK_HTTP3_HDRS  3u      /* http3_process_stream_ingress_headers  */
+#define LS_TP_HOOK_RST         4u      /* rst_why --- connection teardown       */
 
 /* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
  * the wrong stride now, so it must fail rather than decode plausible garbage. */
 #define LS_TP_SCHEMA_HTTP      2u
+#define LS_TP_SCHEMA_RST       1u      /* struct ls_ctx_rst, 64 bytes           */
 
 /* Segment header, at offset 0. Rings follow at a fixed stride so a consumer can
  * find ring i without walking anything. */

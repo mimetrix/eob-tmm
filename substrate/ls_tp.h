@@ -19,24 +19,30 @@
 #define LS_TP_H
 
 /*
- * Hand a built tracepoint record to the VM. Returns nothing --- ON PURPOSE.
+ * Run the slot's program over `rec`, publish the same bytes to the ring, and
+ * return the verdict.
  *
- * A tracepoint is an observer. Giving the call site no way to receive a verdict
- * means it has no way to act on one, so the tracepoint cannot alter traffic even
- * if the program loaded behind it is armed in ENFORCE. That is a structural
- * guarantee rather than a mode setting, and it is the difference between this
- * and a shield: a shield exists precisely to change the outcome, so it takes the
- * verdict and the host decides whether to apply it.
+ * RETURNS THE VERDICT, unlike the void ls_tp_emit it replaces. That function
+ * existed for the designed-in HTTP call site, which was rolled back on
+ * 2026-08-16 as redundant --- iRules already read every field it captured. What
+ * remains is entry-armed hooks reached through the trampoline, and those need
+ * the verdict: a shield's whole purpose is to act on it.
  *
- * This matters because relying on MONITOR mode alone has already gone wrong once
- * --- a tracepoint armed while an earlier ENFORCE setting was still in effect
- * turned 200s into 404s. A void return makes that class of accident impossible
- * here instead of merely unlikely.
+ * The structural guarantee moves rather than disappearing. A tracepoint is now a
+ * hook whose program always returns LS_FALLTHROUGH and whose slot is in MONITOR;
+ * it cannot alter traffic because it never selects, not because the plumbing
+ * discards the answer. That is weaker than the old void return and is the
+ * honest cost of having one path instead of two.
+ *
+ * Publishing happens AFTER the program runs, deliberately: the program may write
+ * to the record, and a consumer should see what the program left rather than a
+ * pre-program copy that disagrees with the counters.
  *
  * Safe to call from any TMM thread at any point: it does not allocate, does not
  * lock, does not enter the kernel, and falls through when the slot is empty.
  */
-void ls_tp_emit(int slot, const void *rec, unsigned long len);
+int ls_tp_dispatch(int slot, const void *rec, unsigned long len,
+                   unsigned int hook_id);
 
 /*
  * Slot assignment. Slot 0 is the shield --- the built-in program compiled into
@@ -45,6 +51,6 @@ void ls_tp_emit(int slot, const void *rec, unsigned long len);
  * and so a STATUS query can report them independently (ls_vm_load.c takes the
  * slot from the request rather than assuming 0).
  */
-#define LS_TP_SLOT_HTTP_HDRS 1
+#define LS_TP_SLOT_HTTP_HDRS 1   /* retired --- the designed-in HTTP site is gone */
 
 #endif /* LS_TP_H */
