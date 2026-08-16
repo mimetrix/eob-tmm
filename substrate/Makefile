@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -183,6 +183,15 @@ check-tp:
 # The drift guard matters as much as the assertions: check_pad_shapes.c mirrors
 # ls_arm.c, and a mirrored test that has drifted reports confidence it has not
 # earned.
+# The ALPN shield and its host builder, run against the exact payloads
+# alpn_trigger.py emits. Neither half can be exercised on the cluster until a TLS
+# listener exists, so this is where they are proven to AGREE -- two halves in
+# different languages, different compilers, different targets. The control
+# matters as much as the catch: real ALPN must fall through, or arming this in
+# enforce breaks TLS for everyone.
+check-alpn:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .alpn.out check_alpn.c && ./.alpn.out && rm -f .alpn.out
+
 check-pads:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .pads.out check_pad_shapes.c && ./.pads.out && rm -f .pads.out
 	@$(PYTHON) ./check_pad_drift.py
