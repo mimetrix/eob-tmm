@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -189,6 +189,13 @@ check-tp:
 # different languages, different compilers, different targets. The control
 # matters as much as the catch: real ALPN must fall through, or arming this in
 # enforce breaks TLS for everyone.
+# The reset record. The builder runs on a TEARDOWN path, where state is already
+# unusual and a faulting tracepoint does the most damage -- so the guards are
+# asserted, and the boundary cases (no slash, trailing slash, over-long name) are
+# the ones that would produce plausible wrong output rather than obvious failure.
+check-rst:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .rst.out check_rst.c && ./.rst.out && rm -f .rst.out
+
 check-alpn:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .alpn.out check_alpn.c && ./.alpn.out && rm -f .alpn.out
 
