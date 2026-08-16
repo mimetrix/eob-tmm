@@ -12,8 +12,22 @@
 >
 > The code has said this since it was written: the `ls_` prefix throughout `substrate/` expands to
 > **live surface**. The documents were the lagging half. Where the text below says *shield*, it
-> still means a CVE mitigation — that use case is unchanged and is still what most of this document
-> works through, because it remains the hardest case and the one that justifies the surface.
+> still means a CVE mitigation.
+>
+> **Second correction, 2026-08-16, and this one reverses a claim rather than renaming one.** The
+> sentence that used to end this note said the shield "remains the hardest case and the one that
+> justifies the surface." The first half is right; the second is backwards.
+>
+> Five CVE candidates were screened against a live TMM and **all five failed** — none on the
+> mechanism, all on reachability. Meanwhile debugging/RCA and the data probe both worked, and neither
+> needs signature verification, a safe-return policy table, a runtime budget guard, or a TMA-grade
+> argument. **Every one of those exists because a shield acts; observation only reads.**
+>
+> So the continuous cases justify the machinery, and the shield is what the same machinery enables
+> when an emergency arrives on a reachable path. Most of this document still works through the shield
+> because it is the hardest case and therefore the one worth designing against — but "hardest" and
+> "the justification" are not the same claim, and treating them as one put the least demonstrable use
+> case at the front of the argument. See [`substrate/LIMITATIONS.md`](substrate/LIMITATIONS.md).
 
 **Status:** Draft for architecture review — **with the data-plane mechanism now proven on a running TMM (2026-08-13)**
 

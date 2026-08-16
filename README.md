@@ -25,17 +25,47 @@ all cost the same thing. This changes the unit of change from **a release** to
 **a signed artifact** — one that applies with **no restart and no failover**, and that `REVOKE` reverses by
 restoring the original bytes at a safe point. The verifier is what makes that safe enough to allow on the
 data-plane path.
-**CVE mitigation is the first use case because it is the most urgent, not because it is the only one** —
-see [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §3–§4 for the rest.
+**The use cases, ordered by what is proven rather than by what is urgent** (this ordering was
+reversed until 2026-08-16, and the reversal cost real time):
+
+| | status |
+|---|---|
+| **Debugging and root-cause analysis** — arm any armable function on a running TMM, count invocations, disarm | **works today.** Needs nothing unbuilt |
+| **Data probe** — a chosen structure at a chosen point, counters plus records out through shared memory | **works today.** One build to place a tracepoint |
+| **CVE mitigation** — the same mechanism pointed at an emergency | mechanism proven; **no mitigation demonstrated.** See below |
+
+The first two need almost none of the hard machinery. Signature verification, the safe-return policy
+table, a runtime budget guard and the TMA-grade argument exist because a shield **acts**; observation
+only reads. So the continuous cases justify the machinery and the shield is what the same machinery
+enables when an emergency arrives — not the reason to build any of it. See
+[`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) §3–§4.
 
 The second hook kind is what makes an *unforeseen* CVE addressable: **no bug-specific tracepoint has to
 have been anticipated**, and no recompile is needed once the enabling build ships. Note carefully that
-this is narrower than "any CVE is shieldable," and deliberately so — a reachable boundary must exist
-before the fault, expose the triggering condition through a declared walk, offer a safe outcome, and fit
-its budget (design §10.1). **What fraction of real data-plane advisories clear those bars is not yet
-known** — nobody has checked published F5 advisories one by one, so *enough of them do* is an assumption
-the proposal rests on (design §1.1, assumption 8). The retrospective study that would settle it needs no
-engineering and has not been done.
+this is narrower than "any CVE is shieldable," and deliberately so.
+
+**That assumption now has data, and it is not encouraging.** Five candidates were screened against a
+live TMM on 2026-08-15/16. **All five failed**, none of them on the mechanism:
+
+| candidate | why it failed |
+|---|---|
+| `prot_transfer_log` | no CRD exposes the gate |
+| `hudproxy/memcached` | hudproxy never entered on BNK |
+| `hudfilter/http/http_psm.c` | PSM does not run |
+| `hudfilter/quic` | no QUIC listener |
+| `ssl_alpn_match` (ALPN overread) | function runs 2×/handshake — but **malformed input never reaches it**; TMM rejects the ClientHello earlier |
+
+A candidate must clear **seven** gates: compiled in → the function executes → **the malformed input
+reaches it** → the fix is a bounded predicate → it fits in 88 bytes → it is decidable at function entry
+→ the function is not inlined. Nothing in a CVE description predicts gates 2 and 3, which is what
+killed all five. Note also that the last one failed a gate that was not on the checklist until it
+failed — "the function executes" and "an attacker can steer malformed input into it" are different
+questions.
+
+The retrospective study across published advisories still has not been done, and would now be
+worth more than another candidate. See [`substrate/LIMITATIONS.md`](substrate/LIMITATIONS.md) for the
+full constraint list, and note that **OpenSSL is linked in without entry pads** — 1,781 symbols, none
+armable — so the crypto library underneath F5's TLS handling is out of reach entirely.
 
 This repo holds design proposals, visual explainers, and the **substrate sources that are built into
 TMM**, plus candidate ABI (application binary interface) artifacts that compile and check themselves.

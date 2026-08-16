@@ -2,11 +2,19 @@
 
 > **Accuracy note (2026-08-13).** These pages were written when this was a proposal. The data-plane
 > mechanism now **runs on a live TMM** — load, arm, disarm, no restart — and designed-in call sites
-> have been **removed** in favour of patched function entries. Any page still written in
-> "embed this and you get…" voice about *those* parts is describing something that now exists, and is
-> being corrected page by page. Two things are still genuinely unproven and must stay in the
-> conditional: **no CVE has been mitigated on live traffic**, and **per-call hook cost is
-> unmeasured** ([`../load-path-scope.md`](../load-path-scope.md) §7).
+> have been **removed** as the shield mechanism in favour of patched function entries. (They returned
+> for *tracepoints*, which are a different thing: a chosen structure at a chosen point, and the one
+> place an F5 source file is edited.)
+>
+> **Ordering correction (2026-08-16).** These pages lead with CVE mitigation. That ordering is wrong
+> and the pages have not yet been rewritten to match. What is proven today is **debugging/RCA** and
+> the **data probe** — both work, both need none of the hard machinery. **Five CVE candidates were
+> screened against a live TMM and all five failed on reachability**, not on the mechanism. Read the
+> CVE pages as *the hardest case the surface was designed against*, not as the thing it demonstrably
+> does. Full constraint list: [`../substrate/LIMITATIONS.md`](../substrate/LIMITATIONS.md).
+>
+> Still genuinely unproven and must stay conditional: **no CVE has been mitigated on live traffic**,
+> and **per-call hook cost is unmeasured** ([`../load-path-scope.md`](../load-path-scope.md) §7).
 
 | Page | What it covers | Read |
 |---|---|---|
@@ -15,9 +23,11 @@
 | [`cve-shield-walkthrough.html`](cve-shield-walkthrough.html) | A real TMM NULL-deref crash class end to end: 4 build steps, 9 runtime steps, the eBPF program line by line | 20 min |
 | [`engine-hard-problems.html`](engine-hard-problems.html) | The engineering register — time safety, the `ctx` ABI, shared state, the trust surface, thirteen further concerns, day-one vs. deferred sequencing, honest scope | 20 min |
 
-Order: engine → cve-mitigation → walkthrough → hard-problems. The engine page is
-generic on purpose; **if** read after the CVE pages, it reads as a security feature rather than the
-programmability surface it is.
+Order: **engine → hard-problems → cve-mitigation → walkthrough.** The engine page is generic on
+purpose; read after the CVE pages it reads as a security feature rather than the programmability
+surface it is. The CVE pages moved to the end on 2026-08-16 — they describe the least demonstrable
+use case, and putting them second made the whole set look like a security proposal whose central
+claim has not been shown.
 
 ## Elsewhere in the repo
 
