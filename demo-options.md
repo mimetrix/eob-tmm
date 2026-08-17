@@ -97,8 +97,17 @@ The gap the whole exercise keeps rediscovering: TMM counts in aggregate and cann
 link a counter to a request. With maps plus the ring, a program can stamp a record
 with a key derived from the flow and emit both sides of a decision.
 
-This is the *general* form of what the reset feed does specifically, and it is the
-most defensible claim we have: **not "we see more", but "we can attribute".**
+This is the *general* form of what the reset feed does specifically --- and it is NOT
+what the reset feed does today. Checked 2026-08-17: `struct ls_ctx_rst` carries no
+flow, connection or client field, so records correlate by timestamp and thread only.
+"We can attribute to a code site and a reason" is supportable now; "we can attribute
+to a request" needs the work below and should not be said before it lands.
+
+`rst_why`'s first argument IS the flow handle, forwarded and currently ignored, so
+this is a host-side dereference rather than new plumbing. The constraint is the
+96-byte ctx ceiling: at 92 bytes there is room for an 8-byte flow HASH (a correlation
+key, not an identity) if `cause[]` shrinks to 32, but not for a 5-tuple. A full tuple
+needs the ring record decoupled from the program ctx --- Phase 4.
 
 ### 3c. Latency attribution inside TMM — needs exit hooks (Phase 2)
 

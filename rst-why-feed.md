@@ -124,6 +124,40 @@ rate settled to one per two, which is a counter crossing its threshold.
 
 ---
 
+### What the record does NOT carry: any flow identity
+
+**There is no per-request, per-connection or per-client field.** The record is
+`lineno`, `err`, `reason`, `file`, `cause`, plus the ring header's `ts_ns`, `seq`,
+`tmm` and `schema`. So a record can be correlated **by time** (nanosecond), **by
+thread**, and **by ordering** --- and not to the request that caused it.
+
+This matters because "correlate a reset to the request that caused it" was claimed
+several times while building this, including in earlier drafts of this file. What is
+true is narrower and still useful: **per-event granularity with an exact site and an
+exact cause**, where TMM otherwise offers a total. "We can attribute to a line and a
+reason" is supportable. "We can attribute to a request" is not, yet.
+
+**The handle is right there, which is what makes this worth fixing.** `rst_why`'s
+FIRST argument is `uf`, the flow. The trampoline forwards it as `a0` and
+`ls_ctx_rst_build` ignores it. Adding identity is a host-side dereference of a
+pointer we already receive --- the same pattern `ls_ctx_alpn.c` already uses to hand a
+program flat bytes derived from `sc`.
+
+The obstacle is the ctx budget, not access. The record is 92 of PREVAIL's 96 bytes,
+so a full 5-tuple (12 bytes for IPv4, 36 for IPv6) does not fit. Two ways out:
+
+- **An 8-byte flow hash**, shrinking `cause[]` from 40 to 32. Not an identity, but a
+  correlation KEY: equal keys mean the same flow, which is what joining records
+  across a session actually requires. Fits today.
+- **Decouple the ring record from the program ctx** (`LIMITATIONS.md` 2.3, and the
+  ring-output helper in `widening-plan.md` Phase 4). Then egress size stops being
+  capped by what the verifier can reason over, and the full tuple fits.
+
+Until one of those lands, describe the feed as per-event with exact attribution to a
+code site --- never as request correlation.
+
+---
+
 ## 4. Limits, plainly
 
 **`err` and `reason` carry nothing on these paths.** Every record above has
