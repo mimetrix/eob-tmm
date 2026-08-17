@@ -103,8 +103,7 @@ ls_tp_dispatch(int slot, const void *rec, unsigned long len, unsigned int hook_i
          * per-call budget ever demands it. Read only when the ring is on. */
         clock_gettime(CLOCK_REALTIME, &ts);
         (void)ls_tp_ring_publish(g_tp_seg, hook_id,
-                                 hook_id == LS_TP_HOOK_RST ? LS_TP_SCHEMA_RST
-                                                           : LS_TP_SCHEMA_HTTP,
+                                 ls_tp_schema_for(hook_id),
                                  (unsigned)slot,
                                  atomic_fetch_add_explicit(&g_tp_seq, 1,
                                                            memory_order_relaxed),

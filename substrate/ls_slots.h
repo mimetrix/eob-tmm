@@ -23,7 +23,9 @@
 
 #define LS_CTX_SLOT_SHIELD  0   /* generic 5-register ctx --- no derivation      */
 #define LS_CTX_SLOT_TP      1   /* tracepoint                                    */
-#define LS_CTX_SLOT_DEV_A   2   /* dev probe                                     */
+/* slot 2 reassigned from a dev probe to rst_why_preserve_va, so each of the four
+ * reset functions has its own slot and the record can name which one fired. */
+#define LS_CTX_SLOT_RST_PRE_VA 2
 /* slot 3 reassigned from a dev probe to rst_why_preserve --- the dev probes were
  * never used for anything that outlived a session. */
 #define LS_CTX_SLOT_ALPN    4   /* ssl_alpn_match --- ls_ctx_alpn_build_v         */
@@ -82,5 +84,12 @@ _Static_assert(LS_CTX_SLOT_PARSE   != LS_CTX_SLOT_RST_VA,  "slot collision: pars
 _Static_assert(LS_CTX_SLOT_PARSE   != LS_CTX_SLOT_RST_PRE, "slot collision: parse/rst_pre");
 _Static_assert(LS_CTX_SLOT_TP      != LS_CTX_SLOT_RST_VA,  "slot collision: tp/rst_va");
 _Static_assert(LS_CTX_SLOT_TP      != LS_CTX_SLOT_RST_PRE, "slot collision: tp/rst_pre");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_RST,     "slot collision: rst_pre_va/rst");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_RST_VA,  "slot collision: rst_pre_va/rst_va");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_RST_PRE, "slot collision: rst_pre_va/rst_pre");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_SHIELD,  "slot collision: rst_pre_va/shield");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_TP,      "slot collision: rst_pre_va/tp");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_ALPN,    "slot collision: rst_pre_va/alpn");
+_Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_PARSE,   "slot collision: rst_pre_va/parse");
 
 #endif /* LS_SLOTS_H */

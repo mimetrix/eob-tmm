@@ -159,6 +159,20 @@ main(void)
     assert(ls_tp_seg_open(NULL, 0) == NULL);                                n++;
 
     unlink(path);
+    /* hook -> schema, every id. A reset id mapping to LS_TP_SCHEMA_HTTP is not
+     * hypothetical: three of the four did, because the producer tested a single
+     * equality. The payload was a correct 92-byte reset record labelled HTTP, and the
+     * consumer refused it --- right answer, wrong component blamed. */
+    assert(ls_tp_schema_for(LS_TP_HOOK_RST)        == LS_TP_SCHEMA_RST);     n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_RST_VA)     == LS_TP_SCHEMA_RST);     n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_RST_PRE)    == LS_TP_SCHEMA_RST);     n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_RST_PRE_VA) == LS_TP_SCHEMA_RST);     n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_HTTP1_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_HTTP2_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_HTTP3_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
+    /* and an unknown id must NOT resolve to a real schema */
+    assert(ls_tp_schema_for(999u) == 0u);                                    n++;
+
     printf("ok    ls_tp_ring.h  (%d assertions: distinct ring per thread, second "
            "mapping reads records, drop-and-count, bad segment refused)\n", n);
     return 0;

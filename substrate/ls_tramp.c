@@ -115,8 +115,8 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         ls_ctx_build_parse(&pc, (const void *)a0, (const void *)a2);
         if (ls_vm_call(slot, &pc, sizeof pc) != LS_SAFE_RETURN)
             return r;
-    } else if (slot == LS_CTX_SLOT_RST || slot == LS_CTX_SLOT_RST_VA ||
-               slot == LS_CTX_SLOT_RST_PRE) {
+    } else if (slot == LS_CTX_SLOT_RST     || slot == LS_CTX_SLOT_RST_VA ||
+               slot == LS_CTX_SLOT_RST_PRE || slot == LS_CTX_SLOT_RST_PRE_VA) {
         /* rst_why(uf, file, lineno, err, reason, rst_cause) --- every field is a
          * direct argument, so no derivation and nothing to snapshot before it is
          * overwritten.
@@ -149,19 +149,29 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
          * the cause is a4 (r8), not a5 (r9). Reading a5 there would hand the record
          * whatever the caller happened to leave in r9 --- a plausible-looking pointer
          * dereferenced as a string, which is the worst shape of wrong. */
-        if (slot == LS_CTX_SLOT_RST_PRE)
+        /* TWO SHAPES, FOUR SLOTS. The preserve pair has no `reason`, so everything
+         * after `err` shifts down one and the cause is a4 rather than a5. The other
+         * pair takes the full six. Each function has its OWN slot so the record can
+         * name which fired --- possible only since the trampoline became per-slot. */
+        unsigned int hook;
+
+        if (slot == LS_CTX_SLOT_RST_PRE || slot == LS_CTX_SLOT_RST_PRE_VA) {
             ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
                              (unsigned int)a3, 0u, (const char *)a4,
                              (unsigned long long)ls_uflow_cookie((void *)a0));
-        else
+            hook = (slot == LS_CTX_SLOT_RST_PRE) ? LS_TP_HOOK_RST_PRE
+                                                 : LS_TP_HOOK_RST_PRE_VA;
+        } else {
             ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
                              (unsigned int)a3, (unsigned int)a4, (const char *)a5,
                              (unsigned long long)ls_uflow_cookie((void *)a0));
+            hook = (slot == LS_CTX_SLOT_RST) ? LS_TP_HOOK_RST : LS_TP_HOOK_RST_VA;
+        }
         /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
          * record to the shared-memory ring, so an entry-armed hook produces a
          * stream rather than only counters. The ring is off unless LS_TP_RING
          * names a segment. */
-        if (ls_tp_dispatch(slot, &rc, sizeof rc, LS_TP_HOOK_RST) != LS_SAFE_RETURN)
+        if (ls_tp_dispatch(slot, &rc, sizeof rc, hook) != LS_SAFE_RETURN)
             return r;
     } else if (slot == LS_CTX_SLOT_ALPN) {
         /* ssl_alpn_match(sc, skip_ext, skip_ext_len): the ALPN bytes are NOT an

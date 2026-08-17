@@ -105,6 +105,23 @@ struct rst_rec {
     char     cause[36];              /* rst_why's 6th argument (Phase 3)     */
 };
 
+/* Which of the four RST_WHY* functions produced this record. `hook` stays "reset"
+ * for all of them so a consumer keying on it does not break; this is the additive
+ * detail. Knowing the function matters because they differ in ARGUMENT SHAPE --- the
+ * preserve pair has no `reason` --- and because a site's macro is otherwise only
+ * discoverable by reading TMM's source. */
+static const char *
+rst_fn_name(uint32_t id)
+{
+    switch (id) {
+    case LS_TP_HOOK_RST:        return "rst_why";
+    case LS_TP_HOOK_RST_VA:     return "rst_why_va";
+    case LS_TP_HOOK_RST_PRE:    return "rst_why_preserve";
+    case LS_TP_HOOK_RST_PRE_VA: return "rst_why_preserve_va";
+    default:                    return "?";
+    }
+}
+
 static void
 emit_rst(const struct ls_rec *h, const struct rst_rec *r)
 {
@@ -112,9 +129,9 @@ emit_rst(const struct ls_rec *h, const struct rst_rec *r)
     uint32_t cn = r->cause_len < sizeof r->cause ? r->cause_len : (uint32_t)sizeof r->cause;
 
     printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"reset\","
-           "\"schema\":%u,\"file\":\"",
+           "\"fn\":\"%s\",\"schema\":%u,\"file\":\"",
            (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
-           h->schema_id);
+           rst_fn_name(h->hook_id), h->schema_id);
     ls_json_str(r->file, fn);
     printf("\",\"line\":%u,\"err\":%u,\"reason\":%u,",
            r->lineno, r->err, r->reason);
@@ -135,7 +152,10 @@ hook_name(uint32_t id)
     case LS_TP_HOOK_HTTP1_HDRS: return "http1";
     case LS_TP_HOOK_HTTP2_HDRS: return "http2";
     case LS_TP_HOOK_HTTP3_HDRS: return "http3";
-    case LS_TP_HOOK_RST:        return "reset";
+    case LS_TP_HOOK_RST:
+    case LS_TP_HOOK_RST_VA:
+    case LS_TP_HOOK_RST_PRE:
+    case LS_TP_HOOK_RST_PRE_VA: return "reset";
     default:                    return "?";
     }
 }
