@@ -17,6 +17,9 @@
 #define LS_MAP_GLUE_H
 
 #include "ls_map.h"
+#include <stdatomic.h>
+#include <stdio.h>
+#include <sys/mman.h>
 #include "ubpf.h"
 
 /*
@@ -31,27 +34,58 @@
  * allocates its own STORAGE from those shapes the first time a helper runs on it.
  * Threads never share a table, so there is still no locking on the hot path.
  */
-static struct ls_map_def g_ls_shapes[LS_MAP_MAX];
-static uint32_t          g_ls_nshapes;
+static struct ls_map_def  g_ls_shapes[LS_MAP_MAX];
+static _Atomic uint32_t   g_ls_nshapes;      /* published with release ordering */
 
-static __thread struct ls_map_set  g_ls_maps_storage;
+/* A pointer, mmap'd on first use --- NOT a __thread object. sizeof(struct
+ * ls_map_set) is ~50 KB, and putting that in thread-local storage was both a
+ * large TLS demand on every TMM thread and a direct contradiction of what this
+ * file claims two paragraphs up ("mmap'd", because TMM's malloc is unusable on
+ * threads it did not create). The claim was right; the code was not. */
 static __thread struct ls_map_set *g_ls_maps;
+static __thread int                g_ls_maps_failed;
 
 /* Lazily bring this thread's storage up to the recorded shapes. Idempotent, and
  * cheap after the first call: a pointer test. */
 static inline struct ls_map_set *
 ls_map_current(void)
 {
-    if (g_ls_maps == 0) {
-        uint32_t i;
-        if (g_ls_nshapes == 0)
-            return 0;                 /* no maps declared --- nothing to build */
-        for (i = 0; i < g_ls_nshapes; i++) {
-            if (ls_map_create(&g_ls_maps_storage, &g_ls_shapes[i]) < 0)
-                return 0;             /* shape we cannot honour --- fail safe  */
-        }
-        g_ls_maps = &g_ls_maps_storage;
+    uint32_t n, i;
+    void *p;
+
+    if (g_ls_maps != 0)
+        return g_ls_maps;
+    if (g_ls_maps_failed)
+        return 0;                     /* tried once, failed --- do not retry on
+                                       * the hot path, and do not leak a mapping
+                                       * per invocation */
+
+    /* ACQUIRE, paired with the release store in ls_map_reloc. Relocation runs on
+     * the LOADER thread; without the pairing a data-plane thread on another core
+     * has no guarantee of seeing either the count or the shapes it indexes, and
+     * the failure is silent --- every lookup misses and the feature looks like a
+     * map that is simply always empty. Same class as ls_vm_reload publishing vm
+     * without jit_fn. */
+    n = atomic_load_explicit(&g_ls_nshapes, memory_order_acquire);
+    if (n == 0)
+        return 0;                     /* no maps declared --- nothing to build */
+
+    p = mmap(0, sizeof(struct ls_map_set), PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (p == MAP_FAILED) {
+        g_ls_maps_failed = 1;
+        return 0;
     }
+    memset(p, 0, sizeof(struct ls_map_set));
+
+    for (i = 0; i < n; i++) {
+        if (ls_map_create((struct ls_map_set *)p, &g_ls_shapes[i]) < 0) {
+            munmap(p, sizeof(struct ls_map_set));
+            g_ls_maps_failed = 1;     /* a shape we cannot honour --- fail safe */
+            return 0;
+        }
+    }
+    g_ls_maps = (struct ls_map_set *)p;
     return g_ls_maps;
 }
 
@@ -79,7 +113,7 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
     struct ls_map_def d;
     int idx;
 
-    (void)ctx; (void)symbol_name;
+    (void)ctx;
     if (data == 0)
         return (uint64_t)LS_MAP_MAX + 1u;
     if (symbol_offset + sizeof d > data_size || symbol_size < sizeof d)
@@ -92,8 +126,8 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
      * shape per reference would exhaust the table and, worse, give two references
      * to the same declared map separate storage. */
     {
-        uint32_t i;
-        for (i = 0; i < g_ls_nshapes; i++) {
+        uint32_t i, have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
+        for (i = 0; i < have; i++) {
             if (g_ls_shapes[i].key_size == d.key_size &&
                 g_ls_shapes[i].value_size == d.value_size &&
                 g_ls_shapes[i].max_entries == d.max_entries)
@@ -104,10 +138,19 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
     /* Record the SHAPE only. Storage is per thread and built on first use --- see
      * ls_map_current(). Refuse here rather than at first use, so a descriptor we
      * cannot honour fails at load time where somebody is watching. */
-    if (!ls_map_check_descriptor(&d) || g_ls_nshapes >= LS_MAP_MAX)
-        return (uint64_t)LS_MAP_MAX + 1u;
-    idx = (int)g_ls_nshapes;
-    g_ls_shapes[g_ls_nshapes++] = d;
+    {
+        uint32_t have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
+        if (!ls_map_check_descriptor(&d) || have >= LS_MAP_MAX)
+            return (uint64_t)LS_MAP_MAX + 1u;
+        idx = (int)have;
+        g_ls_shapes[have] = d;
+        /* Fill the shape BEFORE publishing the count: a reader that observes the
+         * count must be guaranteed to see the entry it indexes. */
+        atomic_store_explicit(&g_ls_nshapes, have + 1u, memory_order_release);
+    }
+    fprintf(stderr, "ls_map: reloc %s -> idx %d (key=%u val=%u max=%u)\n",
+            symbol_name ? symbol_name : "?", idx,
+            d.key_size, d.value_size, d.max_entries);
     return (uint64_t)idx;
 }
 
