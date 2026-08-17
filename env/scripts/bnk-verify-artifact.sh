@@ -63,6 +63,44 @@ else
     exit 2
 fi
 
+# ---- IS THIS THE BINARY THAT CAN BE ARMED? ---------------------------------
+#
+# -fpatchable-function-entry=5,0 is in CFLAGS_OPTIMIZE, which the DEBUG build does
+# not use, so functions in tmm64.debug have no entry pad --- rst_why there is
+# endbr64 followed straight by push %rbp. Dockerfile.runtime points /usr/bin/tmm at
+# tmm.debug whenever a debug build is present, so an image can carry a perfectly
+# good no_pgo binary and run one nothing can be armed in. Three images shipped that
+# way with every token present: tmm:0b, tmm:cve1, tmm:maps1.
+#
+# THE GATE IS THE BINARY NAME, NOT A PAD COUNT. Two attempts at counting pads both
+# gave healthy-looking numbers for the debug binary (11,025 by disassembly window,
+# 2,093 by exact byte pattern) because some translation units do carry the flag and
+# alignment nops look similar. A metric that passes the exact artifact it exists to
+# reject is worse than none. Which binary is running is unambiguous.
+case "$R" in
+    *debug*)
+        cat >&2 <<EOT
+
+  *** REFUSING. /usr/bin/tmm resolves to $R --- a DEBUG binary.
+
+      -fpatchable-function-entry is in CFLAGS_OPTIMIZE, which the debug build does
+      not use, so its functions have no entry pad and NOTHING can be armed. Token
+      checks pass anyway, which is how tmm:0b, tmm:cve1 and tmm:maps1 shipped
+      unarmable.
+
+      Fix, no rebuild needed --- tmm.default is the no_pgo binary:
+          printf 'FROM <image>\\nRUN ln -sfn /usr/bin/tmm.default /usr/bin/tmm\\n' \\
+            | docker build -t <image>-armable -
+EOT
+        [ -n "$CLEANUP" ] && rm -f "$CLEANUP"
+        exit 1
+        ;;
+esac
+
+# Per-FUNCTION armability is a different question and this cannot answer it: a pad
+# at the entry of the function you intend to arm. bnk-entry-address.sh checks that,
+# against the binary resolved above.
+
 rc=0
 for tok in "$@"; do
     n=$(strings "$BIN" 2>/dev/null | grep -c -- "$tok" || true)

@@ -1,0 +1,63 @@
+# The backend the Gateway's HTTPRoute points at, in namespace spk-app-1.
+#
+# WHY THIS IS IN THE REPO. On 2026-08-17 traffic to the VIP timed out and the
+# Gateway still reported PROGRAMMED=True with address 11.11.11.99 --- because the
+# GATEWAY was fine and the BACKEND was gone. spk-app-1 had no deployment, no
+# replicaset and no `http-pool` service; nothing recorded what had been there, so
+# there was nothing to reapply. The eBPF work sat blocked behind a missing nginx.
+#
+# A programmed Gateway with no backend looks identical to a working data path until
+# you send a request, which is the same failure shape as everything else here: the
+# control plane reports success for a thing that cannot serve.
+#
+# alpine is used because it is ALREADY imported into both kind nodes' containerd
+# (busybox httpd is in it), so this applies with no registry pull. Check with:
+#   docker exec datkube-control-plane ctr -n k8s.io images ls | grep alpine
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: http-pool
+  namespace: spk-app-1
+  labels: { app: http-pool }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: http-pool }
+  template:
+    metadata:
+      labels: { app: http-pool }
+    spec:
+      containers:
+        - name: httpd
+          image: artifactory.f5net.com/dockerhub-remote/alpine:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            # A block scalar, deliberately. Written as a flow-style list item the
+            # "Content-Length: 3" inside the printf made YAML read a mapping and the
+            # whole file failed to parse --- while the previous, crashlooping spec
+            # stayed live, so `kubectl apply` errored and the cluster looked unchanged.
+            #
+            # busybox httpd is NOT in this alpine ("httpd: applet not found", exit
+            # 127). nc is. nc -l serves ONE connection and exits, so the loop is not
+            # decoration: without it the container exits after the first request and
+            # CrashLoopBackOff looks like a broken image rather than a finished job.
+            - |
+              while true; do
+                printf 'HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nok\n' \
+                  | nc -l -p 8080 >/dev/null 2>&1 || sleep 0.2
+              done
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: http-pool
+  namespace: spk-app-1
+spec:
+  selector: { app: http-pool }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
