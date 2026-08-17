@@ -108,12 +108,76 @@ that one internal decision dominates your reset volume.
 
 ## 3. What this gives that TMM does not already have
 
-TMM counts resets. It cannot say **which** internal decision produced **this**
-connection's reset. The feed can: `http_mr_proxy.c:993` is a normal proxy teardown,
-`tcp.c:4999` is the remote system sending a RST. Those are different support answers
-and today they are indistinguishable in a counter.
+**CORRECTION FIRST, because earlier drafts of this file overclaimed.** BIG-IP already
+puts the reset cause ON THE WIRE. `tcp_common.c` calls, unconditionally, in the
+RST-send path immediately before `ip_output`:
 
-It is also not reachable from iRules or WASM: `RST_WHY` is an internal macro on an
+```c
+rst_cause_append(uflow_fromconnflow(cf), pkt, rst_cause_getinfo(uflow_fromconnflow(cf)));
+```
+
+HTTP/2 has `rst_cause_serialize`, QUIC puts it in the reason field. So **a packet
+capture does show the reason today.** Any framing that implies "the reason is
+invisible without this" is wrong. What is left is narrower and still real:
+
+- **`file:line`, which the wire cannot carry.** The packet gets the human string only,
+  and strings are ambiguous: `"Closing"` is BOTH `http_mr_proxy.c:993` and `:994`;
+  `"TCP RST from remote system"` is BOTH `tcp.c:4689` and `:4999`. The feed separates
+  them, a capture cannot.
+- **Decisions that never become a packet.** Forty of the records in one sample were
+  proxy teardown — a graceful close. No RST is sent, so `rst_cause_append` never runs
+  and nothing reaches the wire. The feed sees the decision anyway.
+- **Always on.** tcpdump cannot run continuously in production at volume. This is a
+  bounded-cost stream with counted drops.
+- **No customer payload.** 92 bytes of metadata rather than captured traffic.
+
+That is "better instrumentation of something partially visible", not "revealing the
+invisible" — and it is worth stating that way before a reviewer does.
+
+### The reframing that follows from it: the feed is the capture TRIGGER
+
+Duplicating tcpdump is worth nothing; TMM already has capture. The inversion is worth
+something: **tcpdump filters on wire attributes** — addresses, ports, flags — and
+cannot express
+
+> capture the packets around the moment `flow_table.c:2618` fires with cause
+> `"Connection limit exceeded"`
+
+because that predicate does not exist on the wire. It exists only inside the code, and
+a hook at the decision plus a ring to write to is exactly what we have. Selective
+capture keyed on an internal code path is not reproducible by any existing tool, and it
+puts `file:line` precision to work instead of competing with a string already on the
+wire.
+
+Not built. It needs the ring record decoupled from the program ctx
+(`widening-plan.md` Phase 4), since a packet slice will not fit in 96 bytes.
+
+### Coverage: how much of "why a RST?" this actually answers
+
+Counted in the tree, not estimated. **1,116 reset-decision call sites across 200
+files**, funnelling into three different functions:
+
+| funnels into | sites | armed by this hook |
+|---|---|---|
+| `rst_why` | **966 (87%)** | **yes** |
+| `rst_why_va` (varargs forms) | 131 (12%) | no |
+| `rst_why_preserve` | 19 (2%) | no |
+
+So one hook covers **87% of every reset decision in TMM**. Not comprehensive, and the
+gap is bounded and named:
+
+- **`rst_why_preserve`** is 19 sites with the same six-argument shape. Arming it is a
+  second address and nothing else.
+- **`rst_why_va` is the real limit.** 131 sites, and `trampoline_x86_64.S` lists
+  varargs as an explicit non-goal: `rax` carries the vector-register count and the
+  trampoline does not preserve or forward it. Those sites also format their cause at
+  runtime, so the string is not a literal there either.
+
+One file, `tcp_common.c`, sends a RST without calling `RST_WHY` — but that is the
+emitter (it holds `rst_cause_append` and the send path), not a decision site. Worth
+confirming rather than assuming.
+
+Not reachable from iRules or WASM either way: `RST_WHY` is an internal macro on an
 internal path, not an event F5 exposed. Nothing had to be designed in — the hook was
 chosen after the binary shipped and armed into a running process with no restart.
 

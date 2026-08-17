@@ -34,10 +34,30 @@ The last two are the ones that change the demo set.
 The reset feed (`rst-why-feed.md`). For every connection TMM resets, a record naming
 the exact source line that decided it, live, with the human-readable cause.
 
-Why it lands: "why did BIG-IP reset my connection" is a standing support question
-whose current answer is aggregate counters plus a packet capture. One live sample
-already showed `82` of `116` records coming from a single site that none of the four
-triggers was aimed at — a ranking no counter can produce.
+Why it lands: "why did BIG-IP reset my connection" is a standing support question. One
+live sample showed `82` of `116` records from a single site none of the four triggers
+was aimed at — a ranking no counter can produce.
+
+**Scoped honestly, because the first framing overclaimed.** BIG-IP already appends the
+reset cause to the RST packet (`rst_cause_append`, unconditional, right before
+`ip_output`), so a packet capture DOES show the reason. What the feed adds over a
+capture is: `file:line` (the wire carries only the string, and `"Closing"` maps to two
+different sites), decisions that never emit a packet at all (40 of that sample were
+graceful proxy teardowns), always-on operation where tcpdump cannot run, and metadata
+instead of customer traffic.
+
+**Coverage is 87%, counted not estimated.** 1,116 reset-decision sites across 200
+files; 966 funnel into `rst_why` and are caught by this one hook. 131 go to
+`rst_why_va` (varargs — an explicit trampoline non-goal, since `rax` carries the
+vector-register count) and 19 to `rst_why_preserve` (same 6-arg shape, so one more
+address away).
+
+**And the sharper story this suggests: the feed as a capture TRIGGER.** tcpdump filters
+on wire attributes and cannot express "capture the packets around the moment
+`flow_table.c:2618` fires with cause `Connection limit exceeded`" — that predicate only
+exists inside the code. Selective capture keyed on an internal code path is not
+reproducible by any existing tool. Needs Phase 4 (ring record decoupled from the
+96-byte program ctx). This anticipates the requirement people actually have.
 
 Not reproducible with iRules or WASM: `RST_WHY` is an internal macro on an internal
 path, not an exposed event.
