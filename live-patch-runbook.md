@@ -17,7 +17,7 @@ Two outcomes the program can select, applied by the host:
 
 | Tag | Meaning |
 |---|---|
-| **[reuse]** | reused open source as-is — uBPF (`508d5e4b`), PREVAIL (`v0.2.6`), clang |
+| **[reuse]** | reused open source as-is — uBPF (`c900ed9`), PREVAIL (`v0.2.5`), clang |
 | **[built]** | built and proven (bench and/or pod) this program of work |
 | **[dev-stub]** | present but simplified in the dev environment; production needs the fuller form |
 | **[not-yet]** | remaining work, scoped but not built |
@@ -53,7 +53,7 @@ build/sign side) or *runtime* (in the pod, in TMM's address space).
    Small — a few lines for a null-check restoration. **[built]**
 6. **Compile** to eBPF bytecode: `clang -O2 -target bpf`. **[reuse]**
 7. **Verify with PREVAIL** — memory-safe, bounded/terminating, stays within `ctx`; **reject** if not.
-   Termination and memory are independent gates; both must fire. **[reuse: PREVAIL v0.2.6]**
+   Termination and memory are independent gates; both must fire. **[reuse: PREVAIL v0.2.5]**
 8. **Budget pass** — worst-case cycle estimate (control-flow longest path over the *verified* bytecode)
    vs. the hook's rate-class budget; **reject** if too costly for that path. Note: *verified ⇒
    terminates*, which is **not** the same as a bounded worst-case execution time — the budget pass is

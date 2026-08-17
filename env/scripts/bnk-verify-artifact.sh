@@ -124,8 +124,23 @@ if [ "$rc" -ne 0 ]; then
 
       1. Root-owned stale objects. The build container writes
          obj_x86_64.*/*.o as root; `rm` fails with Permission denied and make
-         relinks the old object while reporting success. Needs sudo:
-             sudo rm -f ~/code/tmm/src/compile/obj_x86_64.*/<file>.o
+         relinks the old object while reporting success.
+         `touch` THE SOURCE INSTEAD --- no sudo needed. The build container runs
+         as root and CAN overwrite the object; the problem is only that make
+         never decides to, because it compares mtimes. Touching the .c (and any
+         header whose layout changed) makes it decide to:
+             touch ~/code/tmm/src/base/<file>.c
+         Confirmed 2026-08-17: ls_tp_emit.o sat three hours stale through a
+         successful build, `rm` was refused, and a touch rebuilt it.
+             sudo rm -f ~/code/tmm/src/compile/obj_x86_64.*/<file>.o   # also works
+
+      1b. AND THIS CHECK CANNOT SEE THAT CASE. Tokens are strings. A struct
+         layout change --- ls_ctx_rst going 64 to 92 bytes --- has no string to
+         grep for, so every token passed while the binary emitted the old record.
+         What caught it was the CONSUMER: ls_drain's length check refused to
+         decode a 64-byte record as a 92-byte one and printed it as raw hex.
+         For a layout change, verify the consumer decodes it, not that a token
+         is present.
       2. The source edit landed AFTER the build started. Copying a file while a
          build runs races it -- the TU may already have compiled. Copy, verify
          mtimes, then build.
