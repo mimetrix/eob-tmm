@@ -171,6 +171,38 @@ the signal-context restrictions are survivable before proposing it near a data p
 
 ---
 
+## 2.5 Do pads survive, once other hook types exist?
+
+Asked directly: if watchpoints can attach anywhere, is pad-based arming still needed?
+
+**Yes, and the discriminator is FREQUENCY, not capability.** A watchpoint at a function
+entry sees exactly what a pad hook sees --- same registers, same arguments. Nothing is
+uniquely *visible* through a pad. What is unique is being cheap enough to run at
+per-request rates, on an unbounded number of sites, with no privilege.
+
+| | pad-based | hardware watchpoint |
+|---|---|---|
+| Concurrency | unbounded (4 armed today; the hook catalogue proposes 41) | **4 per thread** --- DR0-DR3, and they are per-thread context |
+| Per-hit cost | a direct `call`; the trampoline is in the same `.text` | kernel trap + signal delivery |
+| Privilege | none --- TMM patches its own text | `ptrace` or `perf_event_open` |
+| Execution context | ordinary thread | signal context, async-signal-safety rules |
+| Reach | padded functions only (TMM core) | any address |
+
+The ratio on per-hit cost is large --- a kernel trap and signal delivery against a call
+instruction --- but it is UNMEASURED here and no number should be quoted for it.
+
+**This is the observability-versus-CVE split, and it explains the whole struggle.**
+`rst_why` fires on every teardown; a per-request hook needs the cheap path and needs
+more than four sites. A CVE shield on an unpadded OpenSSL function fires rarely and
+needs reach above all. **We spent weeks trying to do a rare-event job with a
+high-frequency mechanism.** The property that makes pads good at the first is exactly
+what makes them bad at the second.
+
+So extending hook types does not retire pad-based arming. It stops one mechanism being
+asked to serve two jobs with opposite requirements.
+
+---
+
 ## 3. Recommended order
 
 1. **The `(kind, slot)` dispatch refactor.** Cheap now, and it is the thing that makes
@@ -180,8 +212,10 @@ the signal-context restrictions are survivable before proposing it near a data p
 3. **Timer hook.** Small, reuses existing machinery, turns a record stream into rates.
 4. **Exit probes** --- after the borrow-or-build question is answered by experiment
    rather than argument.
-5. **Watchpoints** --- prototype outside TMM first. Highest value, and the only one
-   whose delivery path is genuinely alien to everything built so far.
+5. **Watchpoints** --- prototype outside TMM first. Its delivery path is genuinely
+   alien to everything built so far, and per §2.5 it is **the mechanism the CVE use
+   case actually requires**. No amount of widening the pad-based path substitutes for
+   it, because the pad requirement IS the reachability limit.
 
 ---
 
