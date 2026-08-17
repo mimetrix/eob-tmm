@@ -58,19 +58,30 @@
 #ifndef LS_CTX_RST_H
 #define LS_CTX_RST_H
 
-#define LS_RST_FILE_MAX  32u
-#define LS_RST_CAUSE_MAX 40u
+#define LS_RST_FILE_MAX  28u
+#define LS_RST_CAUSE_MAX 36u
 
-/* 92 bytes, inside PREVAIL's 96-byte fentry ctx (LIMITATIONS.md 1.3). check_rst.c
+/* Still 92 bytes after adding the flow cookie: file[] 32->28 and cause[] 40->36 paid
+ * for it. Longest observed basename is "http_mr_proxy.c" (15) and longest common
+ * cause is "TCP RST from remote system" (26), so both keep margin.
+ * Inside PREVAIL's 96-byte fentry ctx (LIMITATIONS.md 1.3). check_rst.c
  * asserts the ceiling, so growing either array past it fails the build rather than
  * failing verification later with "Upper bound must be at most 96". */
 struct ls_ctx_rst {
+    /* TMM's flow cookie, SPLIT INTO TWO 32-BIT HALVES on purpose. As a uint64_t the
+     * struct's alignment becomes 8, so sizeof rounds 92 up to 96 --- landing exactly
+     * on PREVAIL's ceiling with no margin. Two uint32s keep the alignment at 4 and
+     * the size at 92. Programs also read 4-byte fields more comfortably.
+     * Reassemble as ((uint64)cookie_hi << 32) | cookie_lo. Zero means NO FLOW,
+     * which is legitimate --- see ls_flow_cookie.c. */
+    unsigned int cookie_lo;
+    unsigned int cookie_hi;
     unsigned int lineno;        /* __LINE__ of the RST_WHY that fired        */
     unsigned int err;           /* err_t; ERR_UNKNOWN(32) when unattributed  */
     unsigned int reason;        /* reason code, 0 for the plain RST_WHY form */
     unsigned int file_len;      /* bytes of file[] used, 0 if unavailable    */
-    char         file[LS_RST_FILE_MAX];
     unsigned int cause_len;     /* bytes of cause[] used, 0 if unavailable   */
+    char         file[LS_RST_FILE_MAX];
     char         cause[LS_RST_CAUSE_MAX];   /* rst_why's 6th argument        */
 };
 
@@ -94,10 +105,13 @@ struct ls_ctx_rst {
  */
 static inline void
 ls_ctx_rst_build(struct ls_ctx_rst *c, const char *file, unsigned int lineno,
-                 unsigned int err, unsigned int reason, const char *cause)
+                 unsigned int err, unsigned int reason, const char *cause,
+                 unsigned long long cookie)
 {
     unsigned int i, start = 0, n = 0;
 
+    c->cookie_lo = (unsigned int)(cookie & 0xffffffffu);
+    c->cookie_hi = (unsigned int)(cookie >> 32);
     c->lineno    = lineno;
     c->err       = err;
     c->reason    = reason;

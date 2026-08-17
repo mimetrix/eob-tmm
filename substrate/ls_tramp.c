@@ -18,6 +18,7 @@
 #include "ls_ctx_parse.h"
 #include "ls_ctx_alpn_abi.h"
 #include "ls_ctx_rst.h"
+#include "ls_flow_cookie.h"
 #include "ls_tp.h"
 
 /* Slot numbers live in ls_slots.h, checked for collisions by the compiler. They
@@ -123,9 +124,14 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
          * the trampoline forwarded five arguments; file:line identifies the site,
          * but at flow_table.c:2618 the cause is flow_reject_cause[flow_reject_code]
          * --- a runtime table lookup that no amount of reading the source recovers. */
+        /* a0 is `uf`, the flow. It was forwarded and ignored until now. The cookie
+         * comes from ls_flow_cookie.c because UFLOW_COOKIE() needs TMM's flow types
+         * and this file is STDINC. A NULL uf yields 0, which is a legitimate answer:
+         * flow_table.c rejects flows before one exists. */
         struct ls_ctx_rst rc;
         ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
-                         (unsigned int)a3, (unsigned int)a4, (const char *)a5);
+                         (unsigned int)a3, (unsigned int)a4, (const char *)a5,
+                         (unsigned long long)ls_uflow_cookie((void *)a0));
         /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
          * record to the shared-memory ring, so an entry-armed hook produces a
          * stream rather than only counters. The ring is off unless LS_TP_RING

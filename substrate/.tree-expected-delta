@@ -30,6 +30,8 @@
 ?? src/base/ls_ctx_http_psm.h
 ?? src/base/ls_ctx_parse.h
 ?? src/base/ls_ctx_rst.h
+?? src/base/ls_flow_cookie.c
+?? src/base/ls_flow_cookie.h
 ?? src/base/ls_map.h
 ?? src/base/ls_map_glue.h
 ?? src/base/ls_prep.c

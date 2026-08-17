@@ -44,7 +44,7 @@
  * built against schema 1 would read `line` out of the middle of a filename. The
  * version is the only thing standing between a layout change and silently wrong
  * decoded output --- bump it in the SAME edit as the struct, every time. */
-#define LS_TP_SCHEMA_RST       2u      /* struct ls_ctx_rst, 92 bytes           */
+#define LS_TP_SCHEMA_RST       3u      /* struct ls_ctx_rst, 92 bytes + cookie  */
 
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and

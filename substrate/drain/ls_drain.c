@@ -99,10 +99,10 @@ klass(const struct http_rec *r)
 /* struct ls_ctx_rst --- substrate/ls_ctx_rst.h. The teardown record: which line
  * of TMM's own source decided to close this connection. */
 struct rst_rec {
-    uint32_t lineno, err, reason, file_len;
-    char     file[32];
-    uint32_t cause_len;
-    char     cause[40];              /* rst_why's 6th argument (Phase 3)     */
+    uint32_t cookie_lo, cookie_hi;   /* TMM's flow cookie, split (align 4)   */
+    uint32_t lineno, err, reason, file_len, cause_len;
+    char     file[28];
+    char     cause[36];              /* rst_why's 6th argument (Phase 3)     */
 };
 
 static void
@@ -116,8 +116,14 @@ emit_rst(const struct ls_rec *h, const struct rst_rec *r)
            (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
            h->schema_id);
     ls_json_str(r->file, fn);
-    printf("\",\"line\":%u,\"err\":%u,\"reason\":%u,\"cause\":\"",
+    printf("\",\"line\":%u,\"err\":%u,\"reason\":%u,",
            r->lineno, r->err, r->reason);
+    /* The cookie as ONE hex string, reassembled from the two halves. Hex rather than
+     * decimal because it is an opaque identifier to be compared, never arithmetic on,
+     * and "flow":"0" reads clearly as "no flow" --- which is a legitimate case, not a
+     * missing field. */
+    printf("\"flow\":\"%08x%08x\",\"cause\":\"",
+           r->cookie_hi, r->cookie_lo);
     ls_json_str(r->cause, cn);
     printf("\"}\n");
 }

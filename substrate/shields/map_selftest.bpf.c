@@ -27,10 +27,10 @@ static long (*bpf_map_update_elem)(void *, const void *, const void *, __u64) = 
 
 /* 92 bytes; must match the host --- see substrate/ls_ctx_rst.h. */
 struct ls_ctx_rst {
-    __u32 lineno, err, reason, file_len;
-    char  file[32];
-    __u32 cause_len;
-    char  cause[40];
+    __u32 cookie_lo, cookie_hi;      /* TMM's flow cookie; 0 = no flow */
+    __u32 lineno, err, reason, file_len, cause_len;
+    char  file[28];
+    char  cause[36];
 };
 _Static_assert(sizeof(struct ls_ctx_rst) == 92, "host/program record mismatch");
 

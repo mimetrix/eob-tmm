@@ -4,16 +4,18 @@
 #ifndef LS_CTX_RST_BPF_H
 #define LS_CTX_RST_BPF_H
 
-#define LS_RST_CAUSE_MAX 40u
-#define LS_RST_FILE_MAX  32u
+#define LS_RST_CAUSE_MAX 36u
+#define LS_RST_FILE_MAX  28u
 
 struct ls_ctx_rst {
+    unsigned int cookie_lo;     /* TMM's flow cookie, split to keep align 4 */
+    unsigned int cookie_hi;     /* 0 = no flow, which is legitimate         */
     unsigned int lineno;
     unsigned int err;
     unsigned int reason;
     unsigned int file_len;
-    char         file[LS_RST_FILE_MAX];
     unsigned int cause_len;
+    char         file[LS_RST_FILE_MAX];
     char         cause[LS_RST_CAUSE_MAX];   /* rst_why's 6th arg (Phase 3)   */
 };
 
