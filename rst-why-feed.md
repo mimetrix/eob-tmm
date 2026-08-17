@@ -163,8 +163,19 @@ files**, funnelling into three different functions:
 | `rst_why_va` (varargs forms) | 131 (12%) | no |
 | `rst_why_preserve` | 19 (2%) | no |
 
-So one hook covers **87% of every reset decision in TMM**. Not comprehensive, and the
-gap is bounded and named:
+**READ THAT AS CODE SITES, NOT RESETS.** It counts places in the source that can
+decide a reset, not resets that happen. One hook sees *every* reset flowing through
+`rst_why` and *none* flowing through the other two functions.
+
+What fraction of ACTUAL resets that is depends on which of the 1,116 sites execute
+under real traffic, and **that is unmeasured**. In the demo it was complete: every
+reset produced by the traffic driven came through `rst_why`, and the counts matched
+1:1 (15 requests, 15 pairs; 5 closed-port connects, 5 rejects). The 131 varargs sites
+format their cause at runtime, which usually marks unusual or diagnostic conditions,
+so they may well be rare --- but that is a guess and should not be stated as a finding.
+
+So: **87% of the decision sites, with the runtime fraction unknown and complete in the
+one sample taken.** The gap is bounded and named:
 
 - **`rst_why_preserve`** is 19 sites with the same six-argument shape. Arming it is a
   second address and nothing else.
