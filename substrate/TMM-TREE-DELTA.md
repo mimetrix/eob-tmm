@@ -139,6 +139,9 @@ paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`)
 | `substrate/ls_tp_emit.c` | `base/` — STDINC side: forwards to `ls_vm_call`, then publishes to the ring |
 | `substrate/ls_tp_ring.h` | `base/` — the shared-memory segment: layout, per-thread claim |
 | `substrate/ls_ring.h` | `base/` — the ring itself. **Was bench-only**; the producer needs it in the tree |
+| `substrate/ls_ctx_rst.h` | `base/` — the reset record + builder |
+| `substrate/ls_map.h` | `base/` — per-thread map storage |
+| `substrate/ls_map_glue.h` | `base/` — the three uBPF callbacks (relocation, bounds, helpers 1/2/3) |
 | `substrate/ls_tp_http.h` | `modules/hudfilter/http/` — record + builder, `static inline` |
 
 `filelist` gains one line:
@@ -147,11 +150,16 @@ paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`)
 base/ls_tp_emit.c     STDINC UBPF
 ```
 
-**And three whitelist entries, in *both* files** — `g_tp_seg`, `g_tp_seg_tried`, `g_tp_seq`. This
-section previously said `ls_tp_emit.c` declares no globals. That was true before the ring producer
-and false after it, and the build caught it exactly as §3 describes: `diff-globals` fails the link
-with a diff, not a compile error. Adding a file-scope static to this substrate always costs a
-whitelist edit.
+**And whitelist entries, in *both* files.** So far: `g_tp_seg`, `g_tp_seg_tried`, `g_tp_seq` from the
+ring producer, then `g_ls_shapes`, `g_ls_nshapes` from the map glue.
+
+This has now cost three builds. **Adding any file-scope static to this substrate costs a whitelist
+edit in both files**, and `diff-globals` reports it as a link failure with a diff rather than a
+compile error, so it does not look like the thing it is. Check before building, not after.
+
+Useful detail learned the third time: `__thread` variables do **not** appear in the globals list.
+`g_ls_maps` and `g_ls_maps_storage` are thread-local and needed no entry; only the two process-wide
+ones did.
 
 `ls_tp_http.h` is a header compiled *inside* `http1x.c`, so it inherits that file's include world
 exactly — no `-I` to guess and no separate object needing to be taught where TMM's headers live.

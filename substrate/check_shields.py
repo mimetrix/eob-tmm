@@ -45,6 +45,12 @@ CASES = [
      "one point every request reaches after the parse, so the fields are filled, and "
      "counts rejected or malformed requests. Validated by triggering it -- curl -X "
      "BOGUS must move safe_returns, a plain GET must not."),
+    ("rate_watch.bpf.c", "fentry/rst_why", True,
+     "THE MAP PROGRAM. Counts per reset site across invocations and selects over a "
+     "threshold -- a question no stateless program can express, since it has no way "
+     "to know this is the sixth. Declares a standard SEC(\"maps\") hash and calls "
+     "helpers 1/2/3; PREVAIL verifies it UNCHANGED, which is why maps needed no "
+     "verifier work at all."),
     ("http_waived_watch.bpf.c", "fentry/tmm_l7_http_headers", True,
      "the WAIVED class: malformed AND forwarded anyway. Verifies and decodes, but "
      "has NEVER selected a live record: every client-side waiver is gated on "

@@ -20,6 +20,43 @@
 #include "ubpf.h"
 
 /*
+ * SHAPE IS GLOBAL, STORAGE IS PER THREAD, and the split is forced rather than
+ * chosen. g_slots in ls_vm.c is a plain process-global, so one VM is shared by
+ * every TMM thread --- but relocation runs ONCE, on the loader thread, when the
+ * ELF is loaded. If the map set were purely thread-local, the loader thread would
+ * get the maps and every data-plane thread would find none: lookups return NULL
+ * forever and the feature looks like a map that is always empty.
+ *
+ * So relocation records only the SHAPE in a process-global table, and each thread
+ * allocates its own STORAGE from those shapes the first time a helper runs on it.
+ * Threads never share a table, so there is still no locking on the hot path.
+ */
+static struct ls_map_def g_ls_shapes[LS_MAP_MAX];
+static uint32_t          g_ls_nshapes;
+
+static __thread struct ls_map_set  g_ls_maps_storage;
+static __thread struct ls_map_set *g_ls_maps;
+
+/* Lazily bring this thread's storage up to the recorded shapes. Idempotent, and
+ * cheap after the first call: a pointer test. */
+static inline struct ls_map_set *
+ls_map_current(void)
+{
+    if (g_ls_maps == 0) {
+        uint32_t i;
+        if (g_ls_nshapes == 0)
+            return 0;                 /* no maps declared --- nothing to build */
+        for (i = 0; i < g_ls_nshapes; i++) {
+            if (ls_map_create(&g_ls_maps_storage, &g_ls_shapes[i]) < 0)
+                return 0;             /* shape we cannot honour --- fail safe  */
+        }
+        g_ls_maps = &g_ls_maps_storage;
+    }
+    return g_ls_maps;
+}
+
+
+/*
  * uBPF hands us the maps section and the symbol's offset within it. We read the
  * descriptor clang wrote there, check we can honour it, create the map, and
  * return the INDEX to plant in the instruction.
@@ -39,44 +76,52 @@ static inline uint64_t
 ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
              const char *symbol_name, uint64_t symbol_offset, uint64_t symbol_size)
 {
-    struct ls_map_set *s = (struct ls_map_set *)ctx;
     struct ls_map_def d;
     int idx;
 
-    (void)symbol_name;
-    if (s == 0 || data == 0)
+    (void)ctx; (void)symbol_name;
+    if (data == 0)
         return (uint64_t)LS_MAP_MAX + 1u;
     if (symbol_offset + sizeof d > data_size || symbol_size < sizeof d)
         return (uint64_t)LS_MAP_MAX + 1u;   /* truncated descriptor --- refuse */
 
     memcpy(&d, data + symbol_offset, sizeof d);
 
-    /* Already created? clang emits one relocation per REFERENCE, so the same map
-     * arrives several times --- three, in the experiment program. Creating one
-     * map per reference would exhaust the table and, worse, give two references
+    /* Already recorded? clang emits one relocation per REFERENCE, so the same map
+     * arrives several times --- three, in the experiment program. Recording one
+     * shape per reference would exhaust the table and, worse, give two references
      * to the same declared map separate storage. */
     {
         uint32_t i;
-        for (i = 0; i < s->n; i++) {
-            if (s->m[i].key_sz == d.key_size && s->m[i].val_sz == d.value_size &&
-                s->m[i].entries == d.max_entries)
+        for (i = 0; i < g_ls_nshapes; i++) {
+            if (g_ls_shapes[i].key_size == d.key_size &&
+                g_ls_shapes[i].value_size == d.value_size &&
+                g_ls_shapes[i].max_entries == d.max_entries)
                 return (uint64_t)i;
         }
     }
 
-    idx = ls_map_create(s, &d);
-    if (idx < 0)
+    /* Record the SHAPE only. Storage is per thread and built on first use --- see
+     * ls_map_current(). Refuse here rather than at first use, so a descriptor we
+     * cannot honour fails at load time where somebody is watching. */
+    if (!ls_map_check_descriptor(&d) || g_ls_nshapes >= LS_MAP_MAX)
         return (uint64_t)LS_MAP_MAX + 1u;
+    idx = (int)g_ls_nshapes;
+    g_ls_shapes[g_ls_nshapes++] = d;
     return (uint64_t)idx;
 }
 
 /* uBPF permits only the ctx and the stack. This extends it to map values --- and
  * note the JIT does not bounds-check at all, so without this the interpreter and
  * the JIT disagree: the program works in production and fails in test. */
+/* This runs on the thread doing the access, so ls_map_current() gives that
+ * thread's own storage --- which is the only storage its program can legally
+ * reach. */
 static inline bool
 ls_map_bounds(void *ctx, uint64_t addr, uint64_t size)
 {
-    struct ls_map_set *s = (struct ls_map_set *)ctx;
+    struct ls_map_set *s = ls_map_current();
+    (void)ctx;
     return s != 0 && ls_map_addr_ok(s, addr, size) != 0;
 }
 
@@ -93,19 +138,6 @@ ls_map_bounds(void *ctx, uint64_t addr, uint64_t size)
  * helper invoked on a thread that never did so finds NULL and returns failure ---
  * which is the safe direction: no map, no state, program falls through.
  */
-static __thread struct ls_map_set *g_ls_maps;
-
-static inline void
-ls_map_set_current(struct ls_map_set *s)
-{
-    g_ls_maps = s;
-}
-
-static inline struct ls_map_set *
-ls_map_current(void)
-{
-    return g_ls_maps;
-}
 
 
 static inline uint64_t
