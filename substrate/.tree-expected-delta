@@ -1,0 +1,59 @@
+# The exact set of changes the substrate makes to a clean TMM tree.
+#
+# WHY A MANIFEST AND NOT A PATCH. Four F5 files are MODIFIED (two whitelists,
+# filelist, ssl.c). Their diffs are build configuration and, for ssl.c, a
+# deliberate security regression -- and this repo pushes to GitHub. So what is
+# recorded here is NAMES AND STATUS, not F5 source. The whitelist symbol list and
+# the filelist entries are in TMM-TREE-DELTA.md; the ssl.c revert is described in
+# VULNERABLE-BUILD.md and deliberately NOT reproduced anywhere.
+#
+# WHY IT EXISTS AT ALL. Asked "if the build VM died could we continue", the answer
+# was mostly-yes with gaps that took an audit to find: harness.c existed only on
+# the build box, 8 whitelist symbols were undocumented, and
+# tmm-tree-callsites.patch still patched http.c/http1x.c after that tracepoint had
+# been rolled back. None of those were visible from either side alone.
+#
+# Checked by env/scripts/bnk-check-tree-sync.sh. A tree entry missing here, or an
+# entry here missing from the tree, fails the run -- the same both-ways discipline
+# as TMM's own globals whitelist, which is the only thing that caught the lost map
+# registration.
+#
+#   M  = an F5 file we modify (diff NOT stored here -- see above)
+#   ?? = a file we add; every one of these must also exist in substrate/
+#
+# Base: tmm/tmm at e2104734a9. Regenerate with:
+#   ssh <build-box> 'cd ~/code/tmm && git status --porcelain src/' | sed 's/^ *//' | sort
+?? src/base/harness.c
+?? src/base/ls_arm.c
+?? src/base/ls_arm.h
+?? src/base/ls_ctx_alpn_abi.h
+?? src/base/ls_ctx_http_psm.h
+?? src/base/ls_ctx_parse.h
+?? src/base/ls_ctx_rst.h
+?? src/base/ls_map.h
+?? src/base/ls_map_glue.h
+?? src/base/ls_prep.c
+?? src/base/ls_ring.h
+?? src/base/ls_shield_blob.h
+?? src/base/ls_slots.h
+?? src/base/ls_swap.c
+?? src/base/ls_tp.h
+?? src/base/ls_tp_emit.c
+?? src/base/ls_tp_ring.h
+?? src/base/ls_tramp.c
+?? src/base/ls_tramp_asm.c
+?? src/base/ls_vm.c
+?? src/base/ls_vm.h
+?? src/base/ls_vm_config.c
+?? src/base/ls_vm_config.h
+?? src/base/ls_vm_load.c
+?? src/base/shield_abi.h
+?? src/base/vm_stack_policy.h
+?? src/compile/debug_whitelist_x86_64.pre-ubpf
+?? src/compile/default_whitelist_x86_64.pre-ubpf
+?? src/modules/hudfilter/ssl/ls_ctx_alpn.c
+?? src/modules/hudfilter/ssl/ls_ctx_alpn.h
+M src/compile/debug_whitelist_x86_64
+M src/compile/default_whitelist_x86_64
+M src/compile/filelist
+M src/modules/hudfilter/ssl/ssl.c

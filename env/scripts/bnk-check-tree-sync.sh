@@ -172,6 +172,45 @@ for f in "$SRC"/ls_*.c "$SRC"/ls_*.h; do
     fi
 done
 
+# ---- the tree DELTA, not just the substrate file contents -------------------
+#
+# Everything above compares files we own. It cannot see the other half of the
+# integration: the four F5 files we MODIFY, and any file we add that does not match
+# the ls_* naming pattern. harness.c hid in exactly that gap --- it existed only on
+# the build box and no check looked for it.
+#
+# So compare the tree's own change list against a manifest, both ways. Names and
+# status only; the diffs of F5 files are deliberately not stored (see the manifest).
+EXPECT="$SRC/.tree-expected-delta"
+if [ -f "$EXPECT" ]; then
+    ssh -o StrictHostKeyChecking=no "$BUILD_BOX" \
+        "cd $TREE/.. 2>/dev/null && git status --porcelain src/ 2>/dev/null" \
+        | sed 's/^ *//' | sort > "$TMPD/actual_delta" 2>/dev/null || : > "$TMPD/actual_delta"
+    grep -v '^#' "$EXPECT" | grep -v '^$' | sed 's/^ *//' | sort > "$TMPD/want_delta"
+
+    if [ ! -s "$TMPD/actual_delta" ]; then
+        echo "  DELTA          could not read the tree's change list --- treat as diverged"
+        differ=1
+    else
+        newd=$(comm -13 "$TMPD/want_delta" "$TMPD/actual_delta")
+        gone=$(comm -23 "$TMPD/want_delta" "$TMPD/actual_delta")
+        if [ -n "$newd" ]; then
+            echo "  DELTA: IN TREE, NOT IN THE MANIFEST (would be lost if the VM died):"
+            echo "$newd" | sed 's/^/    /'
+            differ=1
+        fi
+        if [ -n "$gone" ]; then
+            echo "  DELTA: IN THE MANIFEST, NOT IN THE TREE (stale manifest, or a change reverted):"
+            echo "$gone" | sed 's/^/    /'
+            differ=1
+        fi
+        [ -z "$newd$gone" ] && echo "  delta          $(wc -l < "$TMPD/want_delta") tree changes, all accounted for"
+    fi
+else
+    echo "  DELTA          no $EXPECT --- the F5-file and non-ls_* additions are unchecked"
+    differ=1
+fi
+
 d=$(dupes)
 if [ -n "$d" ]; then
     echo

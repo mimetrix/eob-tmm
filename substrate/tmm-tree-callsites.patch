@@ -1,3 +1,16 @@
+# HISTORICAL IN PART --- READ BEFORE APPLYING.
+#
+# The filelist hunk is current. The http.c and http1x.c hunks are NOT: they added
+# the HTTP-header tracepoint call sites, and that tracepoint was rolled back. The
+# tree modifies exactly four F5 files today (two whitelists, filelist, ssl.c) and
+# http.c/http1x.c are not among them, so `git apply` of this file will not
+# reproduce the current build.
+#
+# This was found by auditing what would survive the build VM dying. The authority
+# on what the tree changes is substrate/.tree-expected-delta, checked both ways by
+# env/scripts/bnk-check-tree-sync.sh. Kept as the record of how the tracepoint was
+# wired, because that is worth having and is not recorded anywhere else.
+#
 diff --git a/src/compile/filelist b/src/compile/filelist
 index 43ec8bb78d..2e102c24a0 100644
 --- a/src/compile/filelist
