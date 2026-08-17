@@ -94,3 +94,49 @@ The next question is no longer "does Frida work in TMM" — it does — but **"w
 fraction of TMM's ~74,000 function entries can Frida relocate safely?"** That is
 measurable statically against the real binary and is the thing that should be measured
 before anything is built on this.
+
+---
+
+## Supply chain — the gate this experiment skipped
+
+Asked "how do I know there isn't backdoor code in this framework", and the honest
+answer is **you don't, and nothing done here would tell you.** The library was
+`curl`'d as an 89MB prebuilt binary from a GitHub release and linked into a security
+appliance with no verification of any kind.
+
+**What came in — 753 object files, nine upstream projects:**
+
+| component | exported symbols | what it is |
+|---|---|---|
+| GLib | 4,539 | full runtime: main loops, threads, file I/O, spawn |
+| gum | 1,073 | the instrumentation core --- the only part actually wanted |
+| PCRE2 | 73 | regex engine |
+| libunwind | 67 | stack unwinding |
+| Capstone | 45 | multi-arch disassembler, incl. AArch64 tables on an x86-64 appliance |
+| GIO / GObject / GVDB | 27 | I/O, object system, embedded database |
+| zlib, liblzma | --- | `adler32`, `tuklib_*` |
+
+Artifact sha256 `0987dd51e9901a6dddd9d55bc9ef02cd90d95012a4947e29dab942ec7f5348b7`,
+**checked against nothing**. No signature, no reproducible build, no SBOM, no CVE scan.
+
+**One check was run and came back clean:** no listener on frida's default control ports
+(27042/27043) inside the running TMM --- only F5's own `qkview-collect`. Consistent
+with `gum` being the library rather than `frida-server`, but that is one negative
+result, not a clearance.
+
+**What diligence would require:** verify against a published digest or build from
+source; SBOM across all nine upstreams with CVE tracking (GLib and PCRE2 both have
+histories); audit what `gum_init_embedded()` starts, since it brings a GLib main loop
+and thread machinery into a run-to-completion data plane; and strip what is unused.
+
+### The strategic consequence, which runs OPPOSITE to the capability result
+
+- **Capability gate: Frida wins.** It reaches OpenSSL. Pads structurally cannot.
+- **Trust gate: uBPF wins, and not narrowly.** A few thousand dependency-free lines one
+  person can read in a week, against 753 objects across nine projects.
+
+Both gates are real and this experiment only ran the first. The position worth
+defending is therefore narrower than "adopt bpftime": **keep uBPF as the runtime**, and
+if unpadded reach is needed, ask whether the ATTACH MECHANISM alone can be borrowed ---
+Frida's relocator is a small fraction of those 753 objects --- rather than adopting the
+whole stack. That is a far smaller thing to audit.
