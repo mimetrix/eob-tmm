@@ -60,13 +60,21 @@ mkdir -p "$TMPD/tree"
 # Flattening to basenames means a file copied into TWO include worlds collapses to
 # one entry and only the first is compared. That is reported below rather than
 # hidden, because two copies of one header in a build is itself a defect.
+# Two things this deliberately does NOT do: write to a fixed filename under the
+# build box's /tmp, and leave anything behind. An earlier version used
+# /tmp/.tsync_paths, which both littered a shared box and raced a second
+# concurrent run. mktemp plus a trap on the remote side, so a guard about stale
+# artifacts stops creating them.
 ssh -o StrictHostKeyChecking=no "$BUILD_BOX" "
     cd $TREE 2>/dev/null || exit 1
+    L=\$(mktemp) || exit 1
+    trap 'rm -f \"\$L\"' EXIT INT TERM
     find . \( -name 'obj_*' -o -name 'BUILD_*' \) -prune -o \
          -type f \( -name 'ls_*.c' -o -name 'ls_*.h' -o -name 'vm_stack_policy.h' \) -print \
-      2>/dev/null > /tmp/.tsync_paths
-    tar cf - --transform 's|.*/||' -T /tmp/.tsync_paths 2>/dev/null
-" > "$TMPD/tree.tar" 2>/dev/null || true
+      2>/dev/null > \"\$L\"
+    tar cf - --transform 's|.*/||' -T \"\$L\" 2>/dev/null
+    { echo '--PATHS--'; cat \"\$L\"; } >&2
+" > "$TMPD/tree.tar" 2>"$TMPD/stderr" || true
 
 if [ ! -s "$TMPD/tree.tar" ]; then
     echo "  VERDICT : CANNOT COMPARE --- nothing readable under $TREE. Treat as diverged."
@@ -75,8 +83,9 @@ fi
 tar xf "$TMPD/tree.tar" -C "$TMPD/tree" 2>/dev/null || true
 
 # Where each file actually lives, so a difference can be resolved without hunting.
-ssh -o StrictHostKeyChecking=no "$BUILD_BOX" 'cat /tmp/.tsync_paths 2>/dev/null' \
-    > "$TMPD/paths" 2>/dev/null || : > "$TMPD/paths"
+# Carried back on stderr in the SAME round trip as the tar --- one ssh instead of
+# two, and no remote file to leave behind.
+sed -n '/^--PATHS--$/,$p' "$TMPD/stderr" 2>/dev/null | tail -n +2 > "$TMPD/paths" || : > "$TMPD/paths"
 
 # -F because a basename is a literal, not a pattern: "ls_vm.c" as a regex also
 # matches ls_vmXc. Anchored by prefixing the separator and comparing the tail.
