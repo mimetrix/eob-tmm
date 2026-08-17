@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-glue check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-glue check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -199,6 +199,17 @@ check-tp:
 # right. Both are ours. The REFUSALS matter more than the successes: a descriptor
 # we cannot honour must be rejected, never clamped, or the verifier has proved
 # bounds for a shape we do not enforce.
+# The five uBPF registrations that make maps work were LOST once, silently ---
+# they existed only in the build box's tree and a repo copy overwrote them. The
+# programs still loaded, verified and ran; their maps were just always empty.
+# check-glue links two TUs against the glue and asserts the sequence, so losing
+# it again is a test failure rather than a live result that quietly means nothing.
+check-glue:
+	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
+	 $(CC) -O2 -Wall -Wextra -I. -I ../ubpf/vm/inc -I "$$CFG" -o .glue.out \
+	   check_glue_owner.c check_glue_user.c check_glue_stubs.c \
+	 && ./.glue.out && rm -f .glue.out
+
 check-map:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .map.out check_map.c && ./.map.out && rm -f .map.out
 	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \

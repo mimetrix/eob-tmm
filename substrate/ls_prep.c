@@ -52,6 +52,7 @@ extern int  ls_prep_timer_on;
 
 void ls_prep_timer_start(void);
 
+
 /* Loads are rare and a human is waiting on the reply, so this trades a little
  * latency for a negligible idle cost. */
 #define LS_PREP_TICKS (TICKS_PER_SEC / 100 ? TICKS_PER_SEC / 100 : 1)

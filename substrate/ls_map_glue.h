@@ -7,6 +7,17 @@
  *   bounds check  permit reads of map VALUE memory
  *   helpers 1/2/3 the standard BPF map helpers, which PREVAIL already knows
  *
+ * ALL FIVE REGISTRATIONS GO THROUGH ls_map_glue_install(), AND THAT IS THE POINT.
+ * On 2026-08-17 the registration calls existed only in the build box's copy of
+ * ls_vm.c and were never carried back here; copying this tree over that one
+ * deleted them. Every symptom pointed elsewhere. The programs still loaded, still
+ * ran, still verified --- their maps were simply always empty, which is
+ * indistinguishable from a predicate that never matches. What caught it was the
+ * build's globals manifest: with nothing calling ls_map_reloc, the compiler
+ * removed g_ls_shapes as dead, and the manifest noticed a name it expected was
+ * gone. A five-call sequence spread across two arm paths is a sequence that can
+ * be half-applied; one function cannot.
+ *
  * ORDER MATTERS AND IS EASY TO GET WRONG. ubpf_register_data_relocation must
  * precede ubpf_load_elf_ex; registered after, the maps section has already been
  * walked and every `lddw` still holds the zero clang emitted. The program then
@@ -34,16 +45,34 @@
  * allocates its own STORAGE from those shapes the first time a helper runs on it.
  * Threads never share a table, so there is still no locking on the hot path.
  */
-static struct ls_map_def  g_ls_shapes[LS_MAP_MAX];
-static _Atomic uint32_t   g_ls_nshapes;      /* published with release ordering */
+/* ONE TU DEFINES THESE, EVERY OTHER TU SEES EXTERNS. They were `static`, which
+ * in a header means each including TU gets its OWN copy --- the shapes written by
+ * relocation would be invisible to a helper compiled elsewhere. That never bit us
+ * only because exactly one file happened to include this header; the install
+ * function below means two now do. The owner defines LS_MAP_GLUE_IMPL before
+ * including (ls_vm_load.c). If a second file ever does, the link fails on a
+ * duplicate symbol --- loudly, at build time, which is the whole reason to prefer
+ * extern here over a comment asking people to be careful. */
+#ifdef LS_MAP_GLUE_IMPL
+struct ls_map_def  g_ls_shapes[LS_MAP_MAX];
+_Atomic uint32_t   g_ls_nshapes;             /* published with release ordering */
+#else
+extern struct ls_map_def g_ls_shapes[LS_MAP_MAX];
+extern _Atomic uint32_t  g_ls_nshapes;
+#endif
 
 /* A pointer, mmap'd on first use --- NOT a __thread object. sizeof(struct
  * ls_map_set) is ~50 KB, and putting that in thread-local storage was both a
  * large TLS demand on every TMM thread and a direct contradiction of what this
  * file claims two paragraphs up ("mmap'd", because TMM's malloc is unusable on
  * threads it did not create). The claim was right; the code was not. */
-static __thread struct ls_map_set *g_ls_maps;
-static __thread int                g_ls_maps_failed;
+#ifdef LS_MAP_GLUE_IMPL
+__thread struct ls_map_set *g_ls_maps;
+__thread int                g_ls_maps_failed;
+#else
+extern __thread struct ls_map_set *g_ls_maps;
+extern __thread int                g_ls_maps_failed;
+#endif
 
 /* Lazily bring this thread's storage up to the recorded shapes. Idempotent, and
  * cheap after the first call: a pointer test. */
@@ -256,6 +285,50 @@ ls_map_glue_abi_check(void)
     f = (external_function_t)ls_h_map_lookup; (void)f;
     f = (external_function_t)ls_h_map_update; (void)f;
     f = (external_function_t)ls_h_map_delete; (void)f;
+}
+
+/*
+ * THE ONE CALL. Every VM that will run a program with maps goes through here,
+ * before ubpf_load_elf_ex --- see the ordering note in the banner. Returns 0, or
+ * -1 with a reason on stderr.
+ *
+ * Registration is all-or-nothing on purpose. A VM with the relocation callback
+ * but no bounds check would resolve map indices and then refuse every read of a
+ * value; a VM with helpers but no relocation would hand every helper map=0. Both
+ * produce a program that loads, verifies and runs while its maps do nothing. So a
+ * partial install is treated as a failed install.
+ */
+static inline int
+ls_map_glue_install(struct ubpf_vm *vm)
+{
+    if (vm == 0)
+        return -1;
+
+    /* Order: relocation first, because ubpf_load_elf_ex walks the maps section
+     * and consults it there. Registered afterwards it is simply never asked. */
+    if (ubpf_register_data_relocation(vm, 0, ls_map_reloc) != 0) {
+        fprintf(stderr, "ls_map: relocation callback refused\n");
+        return -1;
+    }
+    if (ubpf_register_data_bounds_check(vm, 0, ls_map_bounds) != 0) {
+        fprintf(stderr, "ls_map: bounds callback refused\n");
+        return -1;
+    }
+
+    /* ids 1/2/3 with the standard names and semantics, which is what lets
+     * PREVAIL verify these programs with no platform work at all. */
+    if (ubpf_register(vm, 1, "bpf_map_lookup_elem",
+                      (external_function_t)ls_h_map_lookup) != 0 ||
+        ubpf_register(vm, 2, "bpf_map_update_elem",
+                      (external_function_t)ls_h_map_update) != 0 ||
+        ubpf_register(vm, 3, "bpf_map_delete_elem",
+                      (external_function_t)ls_h_map_delete) != 0) {
+        fprintf(stderr, "ls_map: helper registration refused\n");
+        return -1;
+    }
+
+    ls_map_glue_abi_check();     /* compile-time signature pin, no run cost */
+    return 0;
 }
 
 #endif /* LS_MAP_GLUE_H */

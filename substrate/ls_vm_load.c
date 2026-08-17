@@ -40,6 +40,9 @@
 
 #include "ls_vm.h"
 #include "ls_map.h"
+/* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
+ * define this; a second one fails the link on a duplicate symbol. */
+#define LS_MAP_GLUE_IMPL 1
 #include "ls_map_glue.h"
 #include "ls_arm.h"
 #include "ls_shield_blob.h"

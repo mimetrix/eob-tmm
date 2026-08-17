@@ -60,6 +60,8 @@
 #include "ls_vm.h"
 #include "ls_vm_config.h"
 #include "vm_stack_policy.h"
+#include "ls_map.h"
+#include "ls_map_glue.h"
 
 #include <elf.h>
 #include <stdio.h>
@@ -360,6 +362,11 @@ ls_vm_bench_program(const void *elf, size_t elf_len,
         return -1;
     if (ubpf_register_stack_usage_calculator(vm, ls_stack_usage, (void *)&g_policy) != 0)
         goto out;
+    /* Maps, before the load --- the bench path needs it for the same reason the
+     * arm path does: a program with maps must measure with its maps working, or
+     * the number describes a program that fell through every lookup. */
+    if (ls_map_glue_install(vm) != 0)
+        goto out;
     if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
         goto out;
 
@@ -495,6 +502,13 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * regardless of what the program was verified against, and a calculator
      * that returns 0 gets a ZERO-byte frame (finding O13). */
     if (ubpf_register_stack_usage_calculator(vm, ls_stack_usage, (void *)&g_policy) != 0)
+        goto fail;
+
+    /* Maps. MUST precede ubpf_load_elf_ex: the relocation callback is consulted
+     * while uBPF walks the maps section, and a VM without it hands every helper
+     * map=0 --- a program that loads, verifies, runs, and whose maps are silently
+     * always empty. That is exactly the state this build was in. */
+    if (ls_map_glue_install(vm) != 0)
         goto fail;
 
     /* Interpreter by default. The JIT is reachable by env var so its cost can be

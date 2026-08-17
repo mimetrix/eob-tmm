@@ -52,7 +52,20 @@ base/ls_prep.c
 ## 3. `src/compile/default_whitelist_x86_64` and `debug_whitelist_x86_64`
 
 TMM's build fails if a global appears that the whitelist does not list. It is a manifest checked
-**both ways**, so a stale entry fails as loudly as a missing one. 23 symbols are added to **each**
+**both ways**, so a stale entry fails as loudly as a missing one.
+
+**That bidirectionality caught a real bug on 2026-08-17, and nothing else did.** The five
+`ubpf_register*` calls that make maps work existed only in the build box's copy of `ls_vm.c` and were
+never carried back here; copying `substrate/` over that tree deleted them. With nothing calling
+`ls_map_reloc`, the compiler removed `g_ls_shapes` as dead and the manifest reported a name it
+expected but could not find. Every other signal said the system was fine: programs loaded, PREVAIL
+verified them, they ran, and every map lookup returned empty --- indistinguishable from a program
+whose predicate never matches.
+
+So: **run `env/scripts/bnk-check-tree-sync.sh` BEFORE copying `substrate/` into the tree, every
+time.** After the copy the evidence is gone, because the tree matches the repo by construction. That
+run also found the trampoline assembly (`ls_tramp_asm.c`) and the whole per-hook ctx dispatch
+existing only on the build box --- 12 divergences, 5 files carried back into git. 23 symbols are added to **each**
 file:
 
 ```

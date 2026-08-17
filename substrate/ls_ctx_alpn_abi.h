@@ -19,6 +19,14 @@
 int ls_ctx_alpn_build_v(void *out, void *sc);
 
 #define LS_CTX_ALPN_SZ    72u   /* sizeof(struct ls_ctx_alpn); asserted below */
-#define LS_CTX_SLOT_ALPN   4    /* slot 0 shield, 1 tracepoint, 2/3 dev probes */
+/* Slot numbers are NOT here. They moved to ls_slots.h --- one copy, distinctness
+ * checked by the compiler --- because duplicating them is what let PARSE and
+ * SHIELD both be 0 without anything noticing.
+ *
+ * Not #included from here either: this header is pulled into the ssl module as
+ * <local/base/ls_ctx_alpn_abi.h>, a -nostdinc include world where a quoted
+ * include depends on which directory the header was staged into. ls_ctx_alpn.c
+ * never uses a slot number, so ls_tramp.c --- the only dispatcher --- includes
+ * ls_slots.h directly and nothing crosses include worlds to get it. */
 
 #endif

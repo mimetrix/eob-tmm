@@ -14,6 +14,16 @@
 
 #include "ls_vm.h"
 #include "ls_arm.h"
+#include "ls_slots.h"
+#include "ls_ctx_parse.h"
+#include "ls_ctx_alpn_abi.h"
+#include "ls_ctx_rst.h"
+#include "ls_tp.h"
+
+/* Slot numbers live in ls_slots.h, checked for collisions by the compiler. They
+ * were here as a bare macro whose value (0, the shield slot) contradicted the
+ * comment above it (7) --- so slot 0 got the parse ctx instead of the generic
+ * register ctx. See ls_slots.h. */
 
 #include <stdint.h>
 #include <string.h>
@@ -69,8 +79,52 @@ ls_tramp_dispatch(int slot, uint64_t a0, uint64_t a1, uint64_t a2,
     ctx.arg[3] = a3;
     ctx.arg[4] = a4;
 
-    if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN)
+    /* Per-hook ctx. The generic five-register form above is what an untyped
+     * program sees and is useless for most hooks, because nearly every TMM
+     * function takes pointers and a verified program cannot chase one. So the
+     * dereferencing happens HERE, in the host, and the program receives flat
+     * scalars --- which is the canonical case PREVAIL already proves.
+     *
+     * Slot-selected rather than table-driven: one generated ctx, deliberately,
+     * until this shape is proven end to end. LS_CTX_SLOT_PARSE is the hook
+     * survey found to be the only one on this traffic's path
+     * (http_parse_client_headers, 1:1 with requests). */
+    if (slot == LS_CTX_SLOT_PARSE) {
+        struct ls_ctx_parse pc;
+        ls_ctx_build_parse(&pc, (const void *)a0, (const void *)a2);
+        if (ls_vm_call(slot, &pc, sizeof pc) != LS_SAFE_RETURN)
+            return r;
+    } else if (slot == LS_CTX_SLOT_RST) {
+        /* rst_why(uf, file, lineno, err, reason, rst_cause) --- every field is a
+         * direct argument, so no derivation and nothing to snapshot before it is
+         * overwritten. a5 (rst_cause) is NOT here: System V puts it in r9 and the
+         * trampoline forwards only five. file:line identifies the site anyway. */
+        struct ls_ctx_rst rc;
+        ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
+                         (unsigned int)a3, (unsigned int)a4);
+        /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
+         * record to the shared-memory ring, so an entry-armed hook produces a
+         * stream rather than only counters. The ring is off unless LS_TP_RING
+         * names a segment. */
+        if (ls_tp_dispatch(slot, &rc, sizeof rc, LS_TP_HOOK_RST) != LS_SAFE_RETURN)
+            return r;
+    } else if (slot == LS_CTX_SLOT_ALPN) {
+        /* ssl_alpn_match(sc, skip_ext, skip_ext_len): the ALPN bytes are NOT an
+         * argument --- the function derives them from `sc` in its first ten
+         * lines. The builder repeats that derivation one step earlier, in the
+         * ssl module's include world (ls_ctx_alpn.c), and hands back flat bytes.
+         *
+         * A zero return means there is no ALPN list to judge. Fall through
+         * WITHOUT running the program: judging bytes that do not exist would
+         * make the verdict noise rather than a finding. */
+        unsigned char ac[LS_CTX_ALPN_SZ];
+        if (ls_ctx_alpn_build_v(ac, (void *)a0) == 0)
+            return r;
+        if (ls_vm_call(slot, ac, sizeof ac) != LS_SAFE_RETURN)
+            return r;
+    } else if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN) {
         return r;
+    }
 
     /*
      * TODO(f5): the safe value belongs to the slot, from the safe-return policy
