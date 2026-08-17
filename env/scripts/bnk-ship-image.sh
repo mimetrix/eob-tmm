@@ -8,7 +8,8 @@
 # image on the datkube host finds nothing and, with `set -e`, dies without saying
 # why. (That is exactly how the first version of this script failed.)
 #
-#   bnk-ship-image.sh verify [tag]     on the BUILD BOX  --- is this image shippable?
+#   bnk-ship-image.sh verify [tag] [token]  on the BUILD BOX  --- shippable, and does
+#                                           it actually contain your change?
 #   bnk-ship-image.sh deploy [tag]     on the DATKUBE HOST --- import per node, roll
 #
 # THREE MORE TRAPS THIS ENCODES, each of which cost a build or a wrong conclusion:
@@ -71,6 +72,22 @@ print(f"  VM linked      : {b'ls_vm: init  build=' in d}")
 print("  VERDICT        :", "READY" if n > 1000 else "*** NOT PADDED --- check Makefile.overrides")
 PY
     rm -f /tmp/.shipcheck
+    echo "=== 3. does the binary CONTAIN the change? ==="
+    if [ -n "$3" ]; then
+        sh "$(dirname "$0")/bnk-verify-artifact.sh" "$TAG" "$3" || {
+            echo "*** REFUSING TO PROCEED --- see bnk-verify-artifact.sh output above."
+            exit 1
+        }
+    else
+        cat <<'EOT'
+  *** NO TOKEN GIVEN, so this step was SKIPPED and the build is unverified.
+      Pass a string unique to your change:
+          bnk-ship-image.sh verify <tag> 'ls_map: reloc'
+      On 2026-08-17 four builds shipped without this check and none of them
+      contained the code being tested. Hours of cluster measurements were taken
+      against a binary compiled before the fixes. One grep would have caught it.
+EOT
+    fi
     echo
     echo "  Next: docker save $TAG | ssh <datkube> 'cat > /tmp/$TAG.tar'"
     echo "        then  bnk-ship-image.sh deploy $TAG  on the datkube host."
