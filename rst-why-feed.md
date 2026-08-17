@@ -78,6 +78,32 @@ The client-abort sites resolve the same way:
                       RST_WHY_CF(cf, "TCP RST from remote system"));
 ```
 
+### Sites seen so far, ranked, from one live sample
+
+Fifteen requests (twelve normal, three client-aborted) produced:
+
+```
+   82  tcp.c:4689           RST_WHY_CF(cf, "TCP RST from remote system")   passive-failure path
+   12  http_mr_proxy.c:994  RST_WHY(peer_scb->uf, "Closing")               proxy teardown, peer side
+   12  http_mr_proxy.c:993  RST_WHY(scb->uf, "Closing")                    proxy teardown, near side
+    8  flow_table.c:2618    RST_WHY_CF(&cf_static, flow_reject_cause[flow_reject_code])
+    2  http_mr_proxy.c:973  RST_WHY(scb->uf, "Closing")                    CX_WAIT close
+```
+
+Produced with `ls_drain | jq -r '"\(.file):\(.line)"' | sort | uniq -c | sort -rn`.
+
+**`flow_table.c:2618` is the most valuable site found so far and the strongest
+argument for Phase 3.** Its cause is not a literal, it is
+`flow_reject_cause[flow_reject_code]` --- an *enumerated table* of reject reasons.
+That is precisely the field an engineer wants when asking why a flow was rejected,
+it already exists in TMM, and it is the sixth argument the trampoline drops. The
+feed can currently say "a flow was rejected at flow_table.c:2618" but not which of
+the enumerated causes applied.
+
+Note also that ranking is itself information: 82 of 116 records came from one site,
+and none of the four triggers was designed to produce it. A counter cannot tell you
+that one internal decision dominates your reset volume.
+
 ---
 
 ## 3. What this gives that TMM does not already have
@@ -128,7 +154,39 @@ demonstrated; the memory-safety property is not.
 
 ---
 
-## 5. Reproducing it
+## 5. How it is emitted, and how it is viewed
+
+**TMM emits binary, not JSON.** Per record it writes a fixed-size header plus a
+64-byte `struct ls_ctx_rst` into its own per-thread ring: a bounds check, two
+`memcpy`s and one release store. No allocation, no syscall, no string formatting,
+and no dependence on a reader --- `ls_ring_emit` on a full ring returns 0 and counts
+a drop rather than blocking. Formatting JSON on the data path would be exactly the
+wrong place to spend the time.
+
+**JSON is produced outside TMM**, by `ls_drain`, a separate process reading the
+shared segment. That boundary is the whole design: the agent can be absent, killed
+mid-batch or stalled forever and the worst outcome is that rings fill and TMM counts
+drops. `substrate/drain/check_drain.c` asserts this rather than assuming it, across
+consumer states ABSENT / CRASHED / STALLED / HEALTHY / HOSTILE.
+
+Three ways to view it, all just consuming stdout:
+
+```bash
+# raw records
+ls_drain --segment /tmp/ls_tp_ring
+
+# which internal decisions are firing, ranked --- the support question
+ls_drain --segment /tmp/ls_tp_ring \
+  | jq -r 'select(.hook=="reset") | "\(.file):\(.line)"' | sort | uniq -c | sort -rn
+
+# straight to a broker; no client is linked into the agent, deliberately
+ls_drain --segment /tmp/ls_tp_ring | nats pub --stdin tmm.l7.reset
+```
+
+Delivery is **at-least-once**: records are written before `consumer_pos` advances, so
+a crash mid-batch re-delivers rather than loses. Dedupe on `seq`.
+
+## 6. Reproducing it
 
 ```bash
 # ls_drain must be built for the pod's arch on the build box, and STATIC ---
