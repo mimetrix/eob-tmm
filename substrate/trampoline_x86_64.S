@@ -78,9 +78,38 @@
  * Status: candidate artifact.  It assembles.  Nothing calls it.
  */
 
+/* ===================================================================
+ *  ONE TRAMPOLINE PER SLOT --- why this is a macro
+ * ===================================================================
+ *
+ * There used to be ONE trampoline whose slot arrived as a patched immediate
+ * (ls_tramp_slot_insn). That meant the slot was global: arming a second hook with a
+ * different slot rewrote the immediate for every hook already armed, silently
+ * re-pointing all of them at the new slot's ctx builder and program.
+ *
+ * On 2026-08-17 four reset functions were armed with slots 5, 6, 3, 3. The immediate
+ * ended at 3, so rst_why dispatched through the rst_why_preserve builder, which reads
+ * the cause from a4 rather than a5 --- a4 is `reason`, which is 0 --- and every record
+ * came back with an empty cause. Nothing failed and nothing logged.
+ *
+ * The header above already said the design assumed "one trampoline per armed hook, so
+ * the slot is known when the trampoline is created". This makes that true.
+ *
+ * WHY STATIC COPIES RATHER THAN ALLOCATED ONES. Copying a trampoline into mmap'd
+ * memory needs PROT_EXEC, needs to land within +/-2GB of .text for `call rel32` (see
+ * REACH above), and needs the internal `call ls_tramp_dispatch` relocated by hand
+ * because a copied rel32 points at the wrong place. Emitting one per slot at assembly
+ * time has none of those problems: each copy's dispatch call is assembled correctly,
+ * every copy is in .text so reach is guaranteed, and the slot is an immediate the
+ * assembler wrote. The cost is ~70 bytes of .text per slot.
+ *
+ * The slot is now ASSEMBLED IN, so nothing patches it and there is no shared mutable
+ * state left for a second arm to corrupt.
+ */
     .text
-    .globl  ls_trampoline_entry
-    .type   ls_trampoline_entry, @function
+    .macro LS_TRAMP n
+    .globl  ls_trampoline_slot\n
+    .type   ls_trampoline_slot\n, @function
 
 /*
  * Reached by the 5-byte `call rel32` written over the patch nops.  On entry the
@@ -96,7 +125,7 @@
  * cannot.  That constraint belongs to item 2 and is easy to miss until a large
  * ASLR offset makes it intermittent.
  */
-ls_trampoline_entry:
+ls_trampoline_slot\n:
     .cfi_startproc
     endbr64                         /* fact 1: IBT. Without this, the indirect
                                      * branch faults on CET hardware. */
@@ -168,9 +197,7 @@ ls_trampoline_entry:
      * from the return address --- possible, slower, and a trade that belongs to
      * item 2 rather than here.
      */
-    .globl  ls_tramp_slot_insn
-ls_tramp_slot_insn:                 /* arming rewrites the 4 bytes at +1        */
-    movl    $0x7fffffff, %edi       /* slot --- placeholder, patched at arm     */
+    movl    $\n, %edi              /* slot: ASSEMBLED IN, never patched */
     /*
      * The label sits on the INSTRUCTION, not on the immediate.  An earlier draft
      * used `ls_tramp_slot_imm = . + 1` to point straight at the four bytes;
@@ -230,7 +257,7 @@ ls_tramp_slot_insn:                 /* arming rewrites the 4 bytes at +1        
     .cfi_adjust_cfa_offset -8
 
     testl   %eax, %eax
-    jnz     .Lsafe_return
+    jnz     1f                      /* numeric local: reusable per expansion */
 
     /*
      * Fall through: restore everything and continue into the hooked function's
@@ -259,7 +286,7 @@ ls_tramp_slot_insn:                 /* arming rewrites the 4 bytes at +1        
     .cfi_adjust_cfa_offset -8
     ret
 
-.Lsafe_return:
+1:
     /*
      * Safe return: the hooked function's body must NOT run.  Discard the saved
      * registers, drop the return address that points into the body, and return
@@ -284,7 +311,45 @@ ls_tramp_slot_insn:                 /* arming rewrites the 4 bytes at +1        
     ret                             /* -> the hooked function's caller         */
 
     .cfi_endproc
-    .size   ls_trampoline_entry, .-ls_trampoline_entry
+    .size   ls_trampoline_slot\n, .-ls_trampoline_slot\n
+    .endm
+
+/* One per slot in ls_slots.h (0..7). Adding a slot there means adding an expansion
+ * here AND extending the table below --- the _Static_asserts in ls_slots.h cannot see
+ * this file, so ls_arm.c range-checks the index against LS_TRAMP_SLOTS instead. */
+    LS_TRAMP 0
+    LS_TRAMP 1
+    LS_TRAMP 2
+    LS_TRAMP 3
+    LS_TRAMP 4
+    LS_TRAMP 5
+    LS_TRAMP 6
+    LS_TRAMP 7
+
+/* Kept as an alias so anything still referencing the old single entry point links,
+ * and so a reader grepping for it finds this note rather than nothing. Slot 0 is the
+ * shield slot; using this symbol for a hook of any other shape is the bug above. */
+    .globl  ls_trampoline_entry
+    .set    ls_trampoline_entry, ls_trampoline_slot0
+
+/* Address table, so C indexes by slot instead of hard-coding eight symbol names.
+ * .rodata: nothing writes it at run time, and a trampoline table in writable memory
+ * would be a control-flow target sitting in mutable storage. */
+    .section .rodata
+    .globl  ls_trampoline_table
+    .type   ls_trampoline_table, @object
+    .align  8
+ls_trampoline_table:
+    .quad   ls_trampoline_slot0
+    .quad   ls_trampoline_slot1
+    .quad   ls_trampoline_slot2
+    .quad   ls_trampoline_slot3
+    .quad   ls_trampoline_slot4
+    .quad   ls_trampoline_slot5
+    .quad   ls_trampoline_slot6
+    .quad   ls_trampoline_slot7
+    .size   ls_trampoline_table, .-ls_trampoline_table
+    .text
 
 /*
  * FP/SIMD, deliberately absent.

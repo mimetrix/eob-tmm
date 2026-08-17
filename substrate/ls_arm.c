@@ -249,12 +249,24 @@ ls_disarm(void *fn)
  * core can observe a torn or stale instruction. No rebuild, no restart.
  * ------------------------------------------------------------------------ */
 extern void ls_trampoline_entry(void);
-extern unsigned char ls_tramp_slot_insn[];
 
-/* Which slot the single shared immediate currently holds, and how many hooks depend
- * on it. See the refusal in ls_arm_live. */
-static int g_armed_slot  = -1;
-static int g_armed_count;
+/*
+ * ONE TRAMPOLINE PER SLOT, indexed by slot, each carrying its slot as an immediate
+ * the ASSEMBLER wrote. Nothing patches it, so there is no shared mutable state for a
+ * second arm to corrupt --- which means hooks of DIFFERENT shapes can be armed at the
+ * same time. In trampoline_x86_64.S, .rodata there and const here.
+ *
+ * This replaced a single trampoline whose slot arrived as a patched immediate, and
+ * that arrangement had a silent failure worth remembering: the slot was effectively
+ * global, so arming a second hook with a different slot re-pointed EVERY armed hook
+ * at the new slot's ctx builder and program. On 2026-08-17 slots 5, 6, 3, 3 were
+ * armed in order; the immediate ended at 3; rst_why then dispatched through the
+ * rst_why_preserve builder, which reads the cause from a4 rather than a5. a4 is
+ * `reason`, which is 0, so every record came back with an empty cause. Nothing
+ * failed and nothing logged.
+ */
+#define LS_TRAMP_SLOTS 8
+extern void *const ls_trampoline_table[LS_TRAMP_SLOTS];
 
 int
 ls_arm_live(void *fn, void *trampoline, int slot)
@@ -265,57 +277,35 @@ ls_arm_live(void *fn, void *trampoline, int slot)
                 (unsigned long long)(uintptr_t)fn);
         return -1;
     }
-    int64_t disp = (int64_t)((uint8_t *)trampoline - (pad + LS_PAD_LEN));
-    if (disp < INT32_MIN || disp > INT32_MAX) {
-        fprintf(stderr, "ls_arm: trampoline out of rel32 range --- refusing\n");
-        return -1;
-    }
-    /* bake the slot into the trampoline immediate, then swap in the call */
-    /* The slot immediate is 4 bytes, and nothing is calling the trampoline yet
-     * (the target is still unarmed), so a plain write is correct. The INT3 swap
-     * is only for the 5 bytes that ARE being executed. */
-    /*
-     * ONE TRAMPOLINE, ONE SLOT IMMEDIATE --- AND THAT IS A HARD CONSTRAINT.
-     *
-     * There is a single ls_trampoline_entry in .text with a single
-     * ls_tramp_slot_insn. Writing the slot here rewrites it for EVERY hook already
-     * armed, so arming a second hook with a DIFFERENT slot silently re-points all
-     * of them at the new slot's ctx builder.
-     *
-     * That is not theoretical. On 2026-08-17 four reset functions were armed with
-     * slots 5, 6, 3, 3 in that order. The immediate ended at 3, so every armed
-     * site --- including rst_why --- dispatched through the rst_why_preserve
-     * builder, which reads the cause from a4 instead of a5. a4 is `reason`, which
-     * is 0, so every record came back with an empty cause. Nothing failed, nothing
-     * logged, and the wrong field was blamed for an hour.
-     *
-     * The trampoline's own header anticipated this: it says "one trampoline per
-     * armed hook, so the slot is known when the trampoline is created", and notes
-     * that a SHARED trampoline "would have to recover the slot from the return
-     * address". The code took the shared route without taking that consequence.
-     *
-     * Until it is per-hook, hooks armed together MUST share a slot. Refused rather
-     * than warned: a warning on a data-plane path nobody is reading is the same as
-     * silence, and the failure it prevents is silently-wrong records.
-     */
-    if (g_armed_count > 0 && g_armed_slot != slot) {
-        fprintf(stderr,
-                "ls_arm: REFUSING slot %d --- %d hook(s) already armed on slot %d, "
-                "and there is ONE shared slot immediate. Arming this would re-point "
-                "every armed hook at slot %d's ctx builder and silently corrupt their "
-                "records. Disarm first, or arm both on the same slot (legal only if "
-                "their argument shapes match).\n",
-                slot, g_armed_count, g_armed_slot, slot);
+    /* The caller's `trampoline` argument is vestigial: which trampoline to use is
+     * now determined by the slot, and using the passed one would reintroduce the
+     * possibility of a mismatch between the code jumped to and the slot it assumes. */
+    (void)trampoline;
+
+    if (slot < 0 || slot >= LS_TRAMP_SLOTS) {
+        fprintf(stderr, "ls_arm: slot %d out of range (0..%d) --- refusing. Adding a "
+                        "slot needs an LS_TRAMP expansion AND a table entry in "
+                        "trampoline_x86_64.S.\n", slot, LS_TRAMP_SLOTS - 1);
         return -1;
     }
 
-    int32_t imm = slot;
-    if (ls_write_text(ls_tramp_slot_insn + 1, (const uint8_t *)&imm, 4) != 0) {
-        fprintf(stderr, "ls_arm: could not set slot immediate --- refusing\n");
+    void *tramp = ls_trampoline_table[slot];
+    if (tramp == NULL) {
+        fprintf(stderr, "ls_arm: slot %d has no trampoline --- refusing\n", slot);
         return -1;
     }
-    __builtin___clear_cache((char *)ls_tramp_slot_insn,
-                            (char *)ls_tramp_slot_insn + 8);
+
+    /* Reach is checked against the trampoline actually written into the pad. Each
+     * per-slot copy lives in .text like the original, so this holds for the same
+     * reason it did before --- but it is checked rather than assumed, because the
+     * eight copies are at eight different addresses. */
+    int64_t disp = (int64_t)((uint8_t *)tramp - (pad + LS_PAD_LEN));
+    if (disp < INT32_MIN || disp > INT32_MAX) {
+        fprintf(stderr, "ls_arm: slot %d trampoline out of rel32 range --- refusing\n",
+                slot);
+        return -1;
+    }
+
     uint8_t patch[LS_PAD_LEN];
     patch[0] = 0xe8;
     int32_t d32 = (int32_t)disp;
@@ -323,13 +313,8 @@ ls_arm_live(void *fn, void *trampoline, int slot)
     if (ls_swap_write5(pad, patch) != 0)
         return -1;
 
-    /* Only now, after the patch actually landed. Counting an arm that failed would
-     * make the guard refuse a slot nothing is using. */
-    g_armed_slot = slot;
-    g_armed_count++;
-
-    fprintf(stderr, "ls_arm: ARMED LIVE entry=%p slot=%d tramp=%p (armed=%d)\n",
-            fn, slot, trampoline, g_armed_count);
+    fprintf(stderr, "ls_arm: ARMED LIVE entry=%p slot=%d tramp=%p\n",
+            fn, slot, tramp);
     return 0;
 }
 
@@ -343,16 +328,9 @@ ls_disarm_live(void *fn)
     if (ls_swap_write5(pad, nops) != 0)
         return -1;
 
-    /* Release the shared slot once the last hook goes. Clamped at zero rather than
-     * asserted: ls_find_armed already refused anything not actually armed, so a
-     * negative count would mean this file's own bookkeeping drifted, and dropping to
-     * a state where NO slot is reserved is the safe direction --- it permits the next
-     * arm rather than locking the mechanism out. */
-    if (g_armed_count > 0)
-        g_armed_count--;
-    if (g_armed_count == 0)
-        g_armed_slot = -1;
-
-    fprintf(stderr, "ls_arm: DISARMED LIVE entry=%p (armed=%d)\n", fn, g_armed_count);
+    /* No bookkeeping to unwind. With one trampoline per slot there is no shared
+     * state that a disarm has to release --- the pad goes back to nops and the
+     * per-slot trampoline is simply no longer reached from here. */
+    fprintf(stderr, "ls_arm: DISARMED LIVE entry=%p\n", fn);
     return 0;
 }
