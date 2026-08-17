@@ -7,11 +7,16 @@
 #ifndef LS_FLOW_COOKIE_H
 #define LS_FLOW_COOKIE_H
 
-#include <stdint.h>
+/* NO #include, deliberately. This header is read from BOTH include worlds: from
+ * ls_tramp.c (STDINC, standard C) and from ls_flow_cookie.c (TMM's -nostdinc world,
+ * where <stdint.h> resolves to the system header and dies on
+ * bits/libc-header-start.h). `unsigned long long` is a builtin and needs no header,
+ * so it is the only portable choice across the boundary. It is >= 64 bits by the
+ * C standard, which is all the cookie requires. */
 
 /* TMM's own cookie for this flow, or 0 when there is no flow. Zero is a legitimate
  * answer, not a failure --- flow_table.c rejects flows before one exists, and
  * rst_why() itself reports those with a zero cookie. */
-uint64_t ls_uflow_cookie(void *uf);
+unsigned long long ls_uflow_cookie(void *uf);
 
 #endif /* LS_FLOW_COOKIE_H */

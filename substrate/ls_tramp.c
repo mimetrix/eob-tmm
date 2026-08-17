@@ -115,7 +115,8 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         ls_ctx_build_parse(&pc, (const void *)a0, (const void *)a2);
         if (ls_vm_call(slot, &pc, sizeof pc) != LS_SAFE_RETURN)
             return r;
-    } else if (slot == LS_CTX_SLOT_RST) {
+    } else if (slot == LS_CTX_SLOT_RST || slot == LS_CTX_SLOT_RST_VA ||
+               slot == LS_CTX_SLOT_RST_PRE) {
         /* rst_why(uf, file, lineno, err, reason, rst_cause) --- every field is a
          * direct argument, so no derivation and nothing to snapshot before it is
          * overwritten.
@@ -129,9 +130,33 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
          * and this file is STDINC. A NULL uf yields 0, which is a legitimate answer:
          * flow_table.c rejects flows before one exists. */
         struct ls_ctx_rst rc;
-        ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
-                         (unsigned int)a3, (unsigned int)a4, (const char *)a5,
-                         (unsigned long long)ls_uflow_cookie((void *)a0));
+
+        /* ALL THREE reset functions land here. RST_WHY* macros expand to three
+         * different functions covering 1,116 call sites between them, and hooking
+         * only rst_why saw 966 of them:
+         *
+         *   rst_why         (uf, file, lineno, err, reason, cause)
+         *   rst_why_va      (uf, file, lineno, err, reason, cause, fmt, ...)
+         *   rst_why_preserve(uf, file, lineno, err, cause)
+         *
+         * rst_why_va's first six arguments are IDENTICAL to rst_why's --- its varargs
+         * start at the seventh, and this dispatcher only ever reads the first six ---
+         * so it shares this builder verbatim. The header confirms the cause is a
+         * static string even there; the varargs carry additional detail we do not
+         * read, which is why nothing here has to understand them.
+         *
+         * rst_why_preserve has NO `reason`, so everything after `err` shifts down one:
+         * the cause is a4 (r8), not a5 (r9). Reading a5 there would hand the record
+         * whatever the caller happened to leave in r9 --- a plausible-looking pointer
+         * dereferenced as a string, which is the worst shape of wrong. */
+        if (slot == LS_CTX_SLOT_RST_PRE)
+            ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
+                             (unsigned int)a3, 0u, (const char *)a4,
+                             (unsigned long long)ls_uflow_cookie((void *)a0));
+        else
+            ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
+                             (unsigned int)a3, (unsigned int)a4, (const char *)a5,
+                             (unsigned long long)ls_uflow_cookie((void *)a0));
         /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
          * record to the shared-memory ring, so an entry-armed hook produces a
          * stream rather than only counters. The ring is off unless LS_TP_RING

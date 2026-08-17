@@ -32,12 +32,19 @@
  * question --- are these two records the same flow --- which is what turns "82 resets"
  * into "82 resets across 3 flows" and therefore into a diagnosis.
  */
+/* THIS PREAMBLE IS COPIED FROM base/adm_flow.c, not minimised. flow_table.h is not
+ * self-contained: it needs FLOW_TRACE defined (else -Werror=undef fires on its own
+ * `#if FLOW_TRACE`) and DBG_ASSERT declared (from <local/sys/debug.h>). A shorter
+ * list compiled to three errors; the working set is cheaper to copy than to derive,
+ * and a comment is cheaper than someone re-deriving it later. */
 #include <local/sys/cpu.h>
+#include <local/sys/debug.h>
 #include <local/sys/def.h>
 #include <local/sys/err.h>
+#include <local/sys/init.h>
 #include <local/sys/lib.h>
-#include <local/sys/queue.h>
-#include <local/sys/time.h>
+#include <local/sys/types.h>
+#include <local/sys/umem.h>
 
 #include <local/base/flow_table.h>
 
@@ -51,11 +58,11 @@
  * attributed to a code site without a flow ever existing --- flow_table.c rejects a
  * flow before one is created --- so 0 must mean "no flow", never "lookup failed".
  */
-uint64_t
+unsigned long long
 ls_uflow_cookie(void *uf)
 {
     if (uf == NULL)
         return 0;
 
-    return (uint64_t)UFLOW_COOKIE((union uflow *)uf);
+    return (unsigned long long)UFLOW_COOKIE((union uflow *)uf);
 }
