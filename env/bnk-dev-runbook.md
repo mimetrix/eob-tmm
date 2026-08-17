@@ -22,7 +22,15 @@ own topology — the fast-cycling page assumes a build machine and a Datkube mac
 | gcc, gdb | yes | no |
 | kind, kubectl, helm, datkube CLI | no | yes |
 | runs the `f5-tmm` pod | no | yes |
-| flavor | `datkube-dev-large` (16 / 32 GB / 250 GB) | smaller is fine |
+| flavor | `datkube-dev-large` (16 / 32 GB / 250 GB) | `datkube-dev-large` — same |
+| as actually built | 16 vCPU · 31 GB · 242 GB · Ubuntu 24.04 · 6.8.0-38 | identical, both boxes |
+
+**Both boxes were provisioned identically**, and that is recorded here because the row
+above used to read "smaller is fine" for the Datkube box — advice about what would
+work, not a record of what exists. Rebuilding from advice gives you a box that is
+probably adequate; rebuilding from the line above gives you the one the measurements
+were taken on. The image is `Ubuntu2404-server-pristine` (§2), so the kernel comes
+with it rather than being chosen.
 
 ---
 
