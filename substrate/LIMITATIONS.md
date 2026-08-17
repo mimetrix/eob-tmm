@@ -65,6 +65,30 @@ Corollary that cost us a day: hooking a parser at entry and reading its
 **outputs** returns zeros, correctly. `parse_watch.bpf.c` is kept as the worked
 example of a program that verifies clean and is useless.
 
+### 1.1b No maps, no helpers — *unimplemented, not unsupported*
+
+> **Corrected 2026-08-17.** This document and several design docs described maps
+> and helpers as things our eBPF *does not support*. They are things we **never
+> implemented**. uBPF has `ubpf_register()`; we never called it.
+>
+> And the assumption that made it look expensive was wrong. Tested directly
+> (`substrate/shields/exp/map_probe.bpf.c`): a program declaring a standard
+> `SEC("maps")` hash and calling `bpf_map_lookup_elem` / `bpf_map_update_elem`
+> **passes PREVAIL unchanged**, with every gate on. PREVAIL parsed the maps
+> section, resolved the descriptor, type-checked both helpers against its built-in
+> prototypes, tracked the null check, and proved the accesses in bounds — no
+> custom platform, no prototype table, no patch.
+>
+> Helper IDs 1/2/3 are the standard BPF map helpers and PREVAIL's linux platform
+> already knows their signatures. Implementing those IDs with those semantics
+> needs **no verifier work at all**.
+>
+> This matters because "a program cannot keep state" is the single biggest
+> constraint on what any of this can express — rate limiting, "has this client
+> done this before", correlation across requests are all currently inexpressible.
+> It was recorded as a ceiling; it is a gap. See
+> [`../widening-plan.md`](../widening-plan.md) Phase 1.
+
 ### 1.2 The predicate must be bounded, and the verifier means it
 
 PREVAIL refuses:

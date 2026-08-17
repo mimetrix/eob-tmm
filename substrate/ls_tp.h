@@ -18,6 +18,30 @@
 #ifndef LS_TP_H
 #define LS_TP_H
 
+/* ONE SCHEMA, THREE HOOKS. struct http_parse_info is shared by all three HTTP
+ * implementations --- http/ (1.x), http2/ and http3/ all fill ci->http --- so the
+ * 40-byte record shape is identical and only the call site differs. The hook id
+ * is what tells a consumer which protocol produced a record, and which fields of
+ * it are load-bearing:
+ *
+ *   HTTP/1.x   version, method, header_count, body_pos, hdr_bytes, err
+ *   HTTP/2,3   the five f_invalid_* pseudo-header bits (invalid_flags)
+ *
+ * Those bits are set ONLY by http2/ and http3/ code --- struct http_parse_info
+ * documents them as "HTTP/2 pseudo-headers are invalid". On the 1.x path they
+ * are never written, so invalid_flags there is uninitialised and must not be
+ * read. It is kept in the record rather than dropped precisely because it is the
+ * right field the moment an h2 or h3 call site lands. */
+#define LS_TP_HOOK_HTTP1_HDRS  1u
+#define LS_TP_HOOK_HTTP2_HDRS  2u      /* http2_stream_process_ingress_headers  */
+#define LS_TP_HOOK_HTTP3_HDRS  3u      /* http3_process_stream_ingress_headers  */
+#define LS_TP_HOOK_RST         4u      /* rst_why --- connection teardown       */
+
+/* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
+ * the wrong stride now, so it must fail rather than decode plausible garbage. */
+#define LS_TP_SCHEMA_HTTP      2u
+#define LS_TP_SCHEMA_RST       1u      /* struct ls_ctx_rst, 64 bytes           */
+
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and
  * return the verdict.
