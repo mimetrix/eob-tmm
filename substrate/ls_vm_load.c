@@ -295,6 +295,44 @@ handle(int fd)
     char section[96];
     snprintf(section, sizeof section, "fentry/%.63s", m->binding.hook);
 
+    /*
+     * THE CTX ABI GATE. Checked for every op that loads or arms, before anything
+     * else is looked at.
+     *
+     * A program is verified by PREVAIL against a ctx STRUCT it was compiled with.
+     * The running TMM's builders produce a struct of their own shape. Nothing
+     * connected those two facts until now, so a program built against a different
+     * layout loaded cleanly, verified cleanly, and read adjacent fields as its own.
+     * That is not hypothetical: ls_ctx_rst went 64 -> 92 bytes and gained a flow
+     * cookie on 2026-08-17, and the mismatch is silent in both directions.
+     *
+     * ZERO IS ACCEPTED, DELIBERATELY, AND IT IS A TRANSITION MEASURE. Every client
+     * written before this field existed sends a zeroed binding, and refusing those
+     * would break the loader the moment this ships while proving nothing --- the
+     * problem it guards is a layout mismatch, not an old client. It is logged so the
+     * silence is visible, and the acceptance should be removed once ls-load.py and
+     * the control plane both set it. TODO(f5): make 0 a refusal.
+     *
+     * Unsigned, and that is correct for this check. Refusing a forged target needs
+     * signature verification (item 4); refusing a mismatched layout does not, because
+     * both parties are us and the failure is an honest mistake.
+     */
+    if (m->binding.ctx_abi_version != 0 &&
+        m->binding.ctx_abi_version != SHIELD_CTX_ABI_VERSION) {
+        reply(fd, "ERR ctx abi mismatch: program built for %u, this TMM builds %u. "
+                  "Recompile the program against this build's headers.\n",
+              (unsigned)m->binding.ctx_abi_version,
+              (unsigned)SHIELD_CTX_ABI_VERSION);
+        fprintf(stderr, "ls_vm: REFUSED --- ctx abi %u, expected %u\n",
+                (unsigned)m->binding.ctx_abi_version,
+                (unsigned)SHIELD_CTX_ABI_VERSION);
+        return;
+    }
+    if (m->binding.ctx_abi_version == 0)
+        fprintf(stderr, "ls_vm: ctx abi UNDECLARED (0) --- accepted, but this TMM "
+                        "builds %u and a mismatch would be silent\n",
+                (unsigned)SHIELD_CTX_ABI_VERSION);
+
     switch (m->op) {
     case SHIELD_OP_LOAD: {
         fprintf(stderr,

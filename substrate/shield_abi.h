@@ -117,6 +117,35 @@ struct shield_binding {
      * layout -- adding it moves every offset below, so it is a deliberate decision
      * rather than a silent edit. */
     uint8_t  mode_ceiling;                     /* enum shield_mode: may it enforce?*/
+    /*
+     * CTX ABI VERSION --- placed in the THREE PADDING BYTES that already sat between
+     * mode_ceiling (uint8 at 104) and expires_with (4-aligned at 108). sizeof stays
+     * 112 and SHIELD_BINDING_WIRE_MAX stays 128, so the header's warning above about
+     * "adding one field moves every offset below" does not apply: padding is free.
+     * The _Static_asserts below prove it rather than trusting the arithmetic.
+     *
+     * WHY IT IS SEPARATE FROM build_min/build_max, which look like they should cover
+     * it. They cannot --- see the O12 note above. A TMOS build range says nothing
+     * about whether a hook's CONTEXT LAYOUT changed, because TMM is assembled from
+     * ~two dozen independently versioned components and one can move underneath a
+     * fixed TMOS version.
+     *
+     * WHY IT IS CHECKED EVEN THOUGH NOTHING IS SIGNED YET. Two different jobs were
+     * being conflated. SECURITY binding --- stopping a forged target or a promotion
+     * past mode_ceiling --- does need signing, because a field the client sets proves
+     * nothing against an adversary. CORRECTNESS binding --- refusing a program built
+     * against a different ctx layout --- does not: it guards an honest mistake, and
+     * the two parties are both us.
+     *
+     * That distinction was learned the hard way on 2026-08-17. struct ls_ctx_rst went
+     * 64 -> 92 bytes and gained a flow cookie; a program compiled against one layout
+     * and loaded into a TMM emitting the other passes PREVAIL --- verified against the
+     * WRONG shape --- and reads adjacent fields as its own. The record schema caught
+     * the analogous case downstream in the drain agent, but nothing stood between the
+     * program and the ctx. This is that check.
+     */
+    uint8_t  ctx_abi_version;                  /* must equal the running builder's  */
+    uint8_t  _pad0[2];                         /* named, so it is not re-used blind */
     uint32_t expires_with;                     /* encoded build id -> auto-retire  */
 };
 
@@ -162,8 +191,20 @@ _Static_assert(offsetof(struct shield_binding, hook)         ==  32, "binding la
 _Static_assert(offsetof(struct shield_binding, build_min)    ==  96, "binding layout");
 _Static_assert(offsetof(struct shield_binding, build_max)    == 100, "binding layout");
 _Static_assert(offsetof(struct shield_binding, mode_ceiling) == 104, "binding layout");
+/* ctx_abi_version and its two pad bytes occupy 105..108, which WAS padding. These
+ * three assertions are the whole argument that adding the field cost nothing: the
+ * field sits above 108, expires_with did not move, and sizeof is unchanged. If any
+ * of them ever fails, the wire format broke and every signed binding in the field
+ * became unverifiable --- which is why they are asserts and not a comment. */
+_Static_assert(offsetof(struct shield_binding, ctx_abi_version) == 105, "ctx abi in pad");
 _Static_assert(offsetof(struct shield_binding, expires_with) == 108, "binding pad");
 _Static_assert(sizeof(struct shield_binding)                 == 112, "binding size");
+_Static_assert(sizeof(struct shield_binding) <= SHIELD_BINDING_WIRE_MAX - 16,
+               "binding no longer fits the signed region");
+
+/* The value the running TMM's ctx builders produce. Bumped whenever ANY ctx struct
+ * changes shape --- ls_ctx_rst gaining the flow cookie is exactly such a change. */
+#define SHIELD_CTX_ABI_VERSION 3u
 
 _Static_assert(offsetof(struct shield_msg, op)       ==   0, "shield_msg layout");
 _Static_assert(offsetof(struct shield_msg, epoch)    ==   4, "shield_msg layout");

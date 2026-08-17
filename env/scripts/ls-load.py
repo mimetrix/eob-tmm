@@ -37,6 +37,22 @@ import sys
 HDR = 192
 OFF_OP, OFF_EPOCH, OFF_MODE, OFF_PROGLEN, OFF_HOOK = 0, 4, 8, 12, 48
 
+# struct shield_binding sits at msg offset 16; ctx_abi_version is at binding offset
+# 105, in what used to be padding between mode_ceiling (uint8 at 104) and
+# expires_with (4-aligned at 108). So 16 + 105.
+#
+# WHAT IT IS FOR. PREVAIL verifies a program against the ctx STRUCT it was compiled
+# with; the running TMM's builders produce a struct of their own shape. Nothing
+# connected those until this field existed, so a program built against a different
+# layout loaded and verified cleanly and read adjacent fields as its own --- which is
+# exactly what happened when ls_ctx_rst went 64 -> 92 bytes and gained a flow cookie.
+#
+# Bump this WITH the header, in the same edit. A client that lies about it is worse
+# than one that sends 0, because 0 is accepted-with-a-warning and a wrong value is
+# refused outright.
+OFF_CTX_ABI = 16 + 105
+CTX_ABI_VERSION = 3
+
 OP_LOAD, OP_SET_MODE, OP_STATUS, OP_REVOKE = 1, 2, 3, 4
 OP_ARM, OP_DISARM = 0x1003, 0x1004
 
@@ -74,6 +90,7 @@ def msg(op, slot=0, mode=0, hook=b"", prog=b""):
     struct.pack_into("<I", b, OFF_EPOCH, slot)
     struct.pack_into("<I", b, OFF_MODE, mode)
     struct.pack_into("<I", b, OFF_PROGLEN, len(prog))
+    b[OFF_CTX_ABI] = CTX_ABI_VERSION
     if hook:
         if len(hook) > 64:
             sys.exit("hook name/address longer than the 64-byte field")
