@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -193,6 +193,18 @@ check-tp:
 # unusual and a faulting tracepoint does the most damage -- so the guards are
 # asserted, and the boundary cases (no slash, trailing slash, over-long name) are
 # the ones that would produce plausible wrong output rather than obvious failure.
+# Maps -- state that survives between invocations. PREVAIL proves the program
+# passed a map descriptor and reads at most value_size bytes; it cannot prove the
+# HOST resolves an index to a map of that shape, nor that the bounds callback is
+# right. Both are ours. The REFUSALS matter more than the successes: a descriptor
+# we cannot honour must be rejected, never clamped, or the verifier has proved
+# bounds for a shape we do not enforce.
+check-map:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .map.out check_map.c && ./.map.out && rm -f .map.out
+	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
+	 $(CC) -fsyntax-only -Wall -Wextra -Werror -I. -I ../ubpf/vm/inc -I "$$CFG" ls_map_glue.h \
+	 && echo "ok    ls_map_glue.h  (3 uBPF callbacks; helper signatures match external_function_t)"
+
 check-rst:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .rst.out check_rst.c && ./.rst.out && rm -f .rst.out
 
