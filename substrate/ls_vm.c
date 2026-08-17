@@ -290,15 +290,6 @@ ls_vm_init(void)
     if (g_cfg.verbose)
         fprintf(stderr, "ls_vm: init  build=%s %s  jit=%d fuel=%u timing=%d\n",
                 __DATE__, __TIME__, (int)g_cfg.jit, g_cfg.fuel, (int)g_cfg.timing);
-
-    /* EXPERIMENT, off unless LS_FRIDA_TARGET is set. Does frida-gum work inside TMM,
-     * on an unpadded function? A standalone harness said yes but could not test TMM's
-     * allocator, its .text layout, or its real instruction sequences --- which is
-     * where the risk actually lives. See substrate/ls_frida_probe.c. */
-    {
-        extern void ls_frida_probe_init(void);
-        ls_frida_probe_init();
-    }
     return true;
 }
 
