@@ -15,14 +15,20 @@
  *     outcome is that rings fill and TMM counts drops --- a counted gap, which
  *     is the designed behaviour, not a failure.
  *
- * WHY NO BROKER CLIENT IS LINKED IN. Writing JSON lines to stdout and piping to
- * `nats pub` (or a ZeroMQ publisher, or a file) keeps the *agent* free of a
+ * WHY NO BROKER CLIENT IS LINKED IN. Writing JSON lines to stdout and piping to a
+ * publisher (or a file) keeps the *agent* free of a
  * broker dependency too. If the downstream pipe breaks, this process dies on
  * EPIPE, and TMM still does not care. Linking a reconnecting client here would
  * put retry logic one process closer to the data plane for no benefit, since the
  * decoupling that matters already happened at the shared-memory boundary.
  *
- *   ls_drain --segment /dev/shm/ls_tp_ring | nats pub --stdin tmm.l7.http
+ *   ls_drain --segment /dev/shm/ls_tp_ring | <publisher>
+ *
+ * ON WHICH BROKER: BNK already runs RabbitMQ --- the f5-rabbit pod, reachable at
+ * amqps://rabbitmq-server.default:5671. NATS appeared in earlier examples here and
+ * is NOT deployed anywhere in the cluster, which made the comment read as a
+ * recommendation for something absent. The choice stays outside this file either
+ * way; that is the whole point of writing to stdout.
  *   ls_drain --segment /dev/shm/ls_tp_ring > records.jsonl
  *
  * DELIVERY IS AT-LEAST-ONCE. Records are written BEFORE consumer_pos advances,
@@ -178,7 +184,7 @@ main(int argc, char **argv)
                 "Consumes tracepoint records from the shared segment and writes\n"
                 "JSON lines to stdout. Pipe them anywhere:\n"
                 "\n"
-                "  %s -s /dev/shm/ls_tp_ring | nats pub --stdin tmm.l7.http\n"
+                "  %s -s /dev/shm/ls_tp_ring | <publisher>   (BNK runs RabbitMQ, not NATS)\n"
                 "  %s -s /dev/shm/ls_tp_ring > records.jsonl\n"
                 "\n"
                 "TMM does not depend on this process. Killing it, stalling it, or\n"

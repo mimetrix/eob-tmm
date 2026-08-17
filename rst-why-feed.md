@@ -17,7 +17,7 @@ measured output, not a design sketch.
 ```
 
 Read out of the segment by `substrate/drain/ls_drain.c`, which writes JSON lines to
-stdout and nothing else — pipe it to `nats pub`, a file, or `jq`.
+stdout and nothing else — pipe it to a file, `jq`, or a broker publisher.
 
 `seq` is a process-global counter while the rings are per-thread, so **gaps in `seq`
 within one ring are normal** and mean another thread emitted in between. A gap is not
@@ -179,9 +179,22 @@ ls_drain --segment /tmp/ls_tp_ring
 ls_drain --segment /tmp/ls_tp_ring \
   | jq -r 'select(.hook=="reset") | "\(.file):\(.line)"' | sort | uniq -c | sort -rn
 
-# straight to a broker; no client is linked into the agent, deliberately
-ls_drain --segment /tmp/ls_tp_ring | nats pub --stdin tmm.l7.reset
+# to a broker. No client is linked into the agent, deliberately, so the transport
+# is chosen here rather than in the code.
+#
+# BNK ALREADY RUNS ONE, and it is RabbitMQ, not NATS: the f5-rabbit pod has been up
+# since the cluster was built, reachable at amqps://rabbitmq-server.default:5671
+# (helm release rabbitmq-0.10.4). Earlier drafts of this doc used `nats pub` as the
+# example, which read as a recommendation for something not installed while the bus
+# the product actually ships went unmentioned.
+ls_drain --segment /tmp/ls_tp_ring | <amqp-publisher> --uri amqps://rabbitmq-server.default:5671
 ```
+
+**Publishing to that bus is untested here.** It is mTLS (`QK_TLS_CA_BUNDLE`,
+`amqps`), so it needs a client cert and a routing key --- and whether data-plane
+telemetry belongs on BNK's control-plane bus is a design decision for F5, not an
+implementation detail. What is settled is that the agent does not care: stdout is
+stdout.
 
 Delivery is **at-least-once**: records are written before `consumer_pos` advances, so
 a crash mid-batch re-delivers rather than loses. Dedupe on `seq`.
