@@ -40,7 +40,11 @@
 /* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
  * the wrong stride now, so it must fail rather than decode plausible garbage. */
 #define LS_TP_SCHEMA_HTTP      2u
-#define LS_TP_SCHEMA_RST       1u      /* struct ls_ctx_rst, 64 bytes           */
+/* 2, not 1: Phase 3 added cause[] and shrank file[] from 48 to 32, so a consumer
+ * built against schema 1 would read `line` out of the middle of a filename. The
+ * version is the only thing standing between a layout change and silently wrong
+ * decoded output --- bump it in the SAME edit as the struct, every time. */
+#define LS_TP_SCHEMA_RST       2u      /* struct ls_ctx_rst, 92 bytes           */
 
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and

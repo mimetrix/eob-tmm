@@ -146,7 +146,7 @@ ls_trampoline_entry:
     .cfi_adjust_cfa_offset 8
 
     /*
-     * ls_tramp_dispatch(slot, arg0..arg5) --- plain C, in ls_tramp.c.
+     * ls_tramp_dispatch(slot, regs) --- plain C, in ls_tramp.c.
      *
      * The ctx build lives in C on purpose.  It is per-hook, generated from the
      * build's DWARF (item 6), and changes whenever a hook's signature does;
@@ -195,11 +195,26 @@ ls_tramp_slot_insn:                 /* arming rewrites the 4 bytes at +1        
      * rdi, rdx as rsi, and so on.  That does not crash; it silently hands the
      * shield the wrong arguments, which is the worst way for this to be wrong.
      */
-    movq    72(%rsp), %rsi          /* saved rdi = hooked function's arg0      */
-    movq    64(%rsp), %rdx          /* saved rsi = arg1                        */
-    movq    56(%rsp), %rcx          /* saved rdx = arg2                        */
-    movq    48(%rsp), %r8           /* saved rcx = arg3                        */
-    movq    40(%rsp), %r9           /* saved r8  = arg4                        */
+    /*
+     * ONE leaq, NOT five movq --- this is Phase 3.
+     *
+     * The five movq that were here loaded arg0..arg4 into the ABI argument
+     * registers, forwarding exactly FIVE arguments because rdi carries the slot.
+     * A sixth would have landed on the stack, and rst_cause --- the human-written
+     * reason string, and at flow_table.c a lookup into an ENUMERATED cause table
+     * --- is the sixth. It was simply dropped.
+     *
+     * Passing the ADDRESS of the saved block hands the C side all nine saved
+     * registers, so no future hook signature touches this file again. It is also
+     * strictly less work than the five loads it replaces.
+     *
+     * 8(%rsp) is r11, the LOWEST saved register --- struct ls_regs in ls_arm.h has
+     * its fields in exactly this order. 0(%rsp) is the alignment gap and must NOT
+     * be included: pointing there shifts every field by eight and hands the shield
+     * arg1 where it expects arg0, silently. An earlier draft of this file made
+     * exactly that off-by-eight mistake with the movq forms.
+     */
+    leaq    8(%rsp), %rsi           /* -> struct ls_regs, r11 first            */
 
     /*
      * Returns a {int verdict; uint64_t safe_value} pair, which System V returns

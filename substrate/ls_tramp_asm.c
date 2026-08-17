@@ -1,5 +1,10 @@
 /* ls_tramp_asm.c --- the validated trampoline_x86_64.S, wrapped in a file-scope
-   asm block because the TMM filelist compiles C only. Generated; do not hand-edit. */
+   asm block because the TMM filelist compiles C only.
+
+   GENERATED from trampoline_x86_64.S by `make tramp-asm`. Do not hand-edit: on
+   2026-08-17 Phase 3 was applied to THIS file and not to the .S, so the two
+   disagreed and the next regeneration would have silently reverted the change.
+   check-tramp-mirror now fails the build if they drift. */
 #if defined(__x86_64__)
 __asm__(
 "/*\n"
@@ -150,7 +155,7 @@ __asm__(
 "    .cfi_adjust_cfa_offset 8\n"
 "\n"
 "    /*\n"
-"     * ls_tramp_dispatch(slot, arg0..arg5) --- plain C, in ls_tramp.c.\n"
+"     * ls_tramp_dispatch(slot, regs) --- plain C, in ls_tramp.c.\n"
 "     *\n"
 "     * The ctx build lives in C on purpose.  It is per-hook, generated from the\n"
 "     * build's DWARF (item 6), and changes whenever a hook's signature does;\n"
@@ -199,11 +204,26 @@ __asm__(
 "     * rdi, rdx as rsi, and so on.  That does not crash; it silently hands the\n"
 "     * shield the wrong arguments, which is the worst way for this to be wrong.\n"
 "     */\n"
-"    movq    72(%rsp), %rsi          /* saved rdi = hooked function's arg0      */\n"
-"    movq    64(%rsp), %rdx          /* saved rsi = arg1                        */\n"
-"    movq    56(%rsp), %rcx          /* saved rdx = arg2                        */\n"
-"    movq    48(%rsp), %r8           /* saved rcx = arg3                        */\n"
-"    movq    40(%rsp), %r9           /* saved r8  = arg4                        */\n"
+"    /*\n"
+"     * ONE leaq, NOT five movq --- this is Phase 3.\n"
+"     *\n"
+"     * The five movq that were here loaded arg0..arg4 into the ABI argument\n"
+"     * registers, forwarding exactly FIVE arguments because rdi carries the slot.\n"
+"     * A sixth would have landed on the stack, and rst_cause --- the human-written\n"
+"     * reason string, and at flow_table.c a lookup into an ENUMERATED cause table\n"
+"     * --- is the sixth. It was simply dropped.\n"
+"     *\n"
+"     * Passing the ADDRESS of the saved block hands the C side all nine saved\n"
+"     * registers, so no future hook signature touches this file again. It is also\n"
+"     * strictly less work than the five loads it replaces.\n"
+"     *\n"
+"     * 8(%rsp) is r11, the LOWEST saved register --- struct ls_regs in ls_arm.h has\n"
+"     * its fields in exactly this order. 0(%rsp) is the alignment gap and must NOT\n"
+"     * be included: pointing there shifts every field by eight and hands the shield\n"
+"     * arg1 where it expects arg0, silently. An earlier draft of this file made\n"
+"     * exactly that off-by-eight mistake with the movq forms.\n"
+"     */\n"
+"    leaq    8(%rsp), %rsi           /* -> struct ls_regs, r11 first            */\n"
 "\n"
 "    /*\n"
 "     * Returns a {int verdict; uint64_t safe_value} pair, which System V returns\n"
@@ -289,5 +309,6 @@ __asm__(
 " * it.  Choosing silently is how a rare, data-dependent corruption gets shipped.\n"
 " */\n"
 "    .section .note.GNU-stack,\"\",@progbits\n"
+"\n"
 );
 #endif

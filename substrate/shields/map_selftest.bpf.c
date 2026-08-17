@@ -25,7 +25,14 @@ struct bpf_map_def probe __attribute__((section("maps"), used)) = {
 static void *(*bpf_map_lookup_elem)(void *, const void *) = (void *)1;
 static long (*bpf_map_update_elem)(void *, const void *, const void *, __u64) = (void *)2;
 
-struct ls_ctx_rst { __u32 lineno, err, reason, file_len; char file[48]; };
+/* 92 bytes; must match the host --- see substrate/ls_ctx_rst.h. */
+struct ls_ctx_rst {
+    __u32 lineno, err, reason, file_len;
+    char  file[32];
+    __u32 cause_len;
+    char  cause[40];
+};
+_Static_assert(sizeof(struct ls_ctx_rst) == 92, "host/program record mismatch");
 
 __attribute__((section("fentry/rst_why"), used))
 __u64

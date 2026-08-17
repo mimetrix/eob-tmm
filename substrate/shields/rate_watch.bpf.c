@@ -41,11 +41,15 @@ struct bpf_map_def rate __attribute__((section("maps"), used)) = {
 static void *(*bpf_map_lookup_elem)(void *, const void *) = (void *)1;
 static long (*bpf_map_update_elem)(void *, const void *, const void *, __u64) = (void *)2;
 
-/* struct ls_ctx_rst --- see substrate/ls_ctx_rst.h. 64 bytes. */
+/* struct ls_ctx_rst --- see substrate/ls_ctx_rst.h. 92 bytes after Phase 3 added
+ * cause[]; file[] shrank from 48 to 32 to stay inside PREVAIL's 96-byte ceiling. */
 struct ls_ctx_rst {
     __u32 lineno, err, reason, file_len;
-    char  file[48];
+    char  file[32];
+    __u32 cause_len;
+    char  cause[40];
 };
+_Static_assert(sizeof(struct ls_ctx_rst) == 92, "host/program record mismatch");
 
 #define THRESHOLD 5ull
 

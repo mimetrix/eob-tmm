@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-glue check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-map check-glue check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -204,6 +204,37 @@ check-tp:
 # programs still loaded, verified and ran; their maps were just always empty.
 # check-glue links two TUs against the glue and asserts the sequence, so losing
 # it again is a test failure rather than a live result that quietly means nothing.
+# The agent emitted string fields with a bare %s until Phase 3, which was safe only
+# because the one string in a record was a __FILE__ basename. Forwarding rst_why's
+# cause string makes escaping load-bearing, and a broken escaper fails in the
+# CONSUMER, not here. Asserted, then piped through a real JSON parser --- a
+# hand-written escaper passing a hand-written test proves little alone.
+# ls_tramp_asm.c is the .S wrapped for a C-only filelist. Nothing regenerated it, so
+# on 2026-08-17 Phase 3 landed in the .c and not the .S --- the two disagreed and any
+# future regeneration would have silently reverted the change. Compare them.
+tramp-asm:
+	@python3 -c "import sys;b=open('trampoline_x86_64.S').read();\
+h=open('.tramp_hdr','r').read() if False else None;\
+w=''.join('\"%s\\\\n\"\n'%l.replace(chr(92),chr(92)*2).replace('\"','\\\\\"') for l in b.split(chr(10)));\
+open('ls_tramp_asm.c','w').write(open('ls_tramp_asm.c').read().split('__asm__(')[0]+'__asm__(\n'+w+');\n#endif\n')"
+	@echo "ok    ls_tramp_asm.c regenerated from trampoline_x86_64.S"
+
+check-tramp-mirror:
+	@python3 -c "\
+import sys;\
+b=open('trampoline_x86_64.S').read();\
+c=open('ls_tramp_asm.c').read();\
+w=''.join('\"%s\\\\n\"\n'%l.replace(chr(92),chr(92)*2).replace('\"','\\\\\"') for l in b.split(chr(10)));\
+ok = w.strip() in c;\
+print('ok    ls_tramp_asm.c matches trampoline_x86_64.S' if ok else 'FAIL  ls_tramp_asm.c has DRIFTED from trampoline_x86_64.S --- run make tramp-asm');\
+sys.exit(0 if ok else 1)"
+
+check-json:
+	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .json.out check_json.c && ./.json.out && rm -f .json.out
+	@$(CC) -O2 -I. -DLS_JSON_DUMP -o .jd.out check_json.c 2>/dev/null && ./.jd.out > .j.jsonl && \
+	 python3 -c "import json;[json.loads(l) for l in open('.j.jsonl') if l.strip()];print('ok    ls_json.h  every escaped line round-trips through python json.loads')" && \
+	 rm -f .j.jsonl .jd.out
+
 check-glue:
 	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
 	 $(CC) -O2 -Wall -Wextra -I. -I ../ubpf/vm/inc -I "$$CFG" -o .glue.out \

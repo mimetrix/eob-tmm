@@ -159,6 +159,10 @@ for f in "$SRC"/ls_*.c "$SRC"/ls_*.h; do
     b=$(basename "$f")
     case "$b" in
         ls_ctx_*_bpf.h) continue ;;   # program-side headers, never in the tree
+        ls_json.h)                    # JSON escaping for the drain agent's output.
+            continue ;;               # Host-side only --- included by ls_drain.c and
+                                      # check_json.c, never by anything TMM compiles.
+                                      # TMM emits binary; nothing in it formats JSON.
         ls_tp_http.h)                 # HTTP record schema: read by the drain agent,
             continue ;;               # check_tp.c and the .bpf.c programs. The
                                       # tracepoint that emitted those records was

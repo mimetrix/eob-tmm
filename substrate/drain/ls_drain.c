@@ -60,6 +60,9 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Escaping lives in its own header so check_json.c can test it. */
+#include "../ls_json.h"
+
 #include "../ls_tp_ring.h"
 
 static volatile sig_atomic_t g_stop;
@@ -97,19 +100,26 @@ klass(const struct http_rec *r)
  * of TMM's own source decided to close this connection. */
 struct rst_rec {
     uint32_t lineno, err, reason, file_len;
-    char     file[48];
+    char     file[32];
+    uint32_t cause_len;
+    char     cause[40];              /* rst_why's 6th argument (Phase 3)     */
 };
 
 static void
 emit_rst(const struct ls_rec *h, const struct rst_rec *r)
 {
-    char f[49];
-    uint32_t n = r->file_len < 48 ? r->file_len : 48;
-    memcpy(f, r->file, n); f[n] = 0;
+    uint32_t fn = r->file_len  < sizeof r->file  ? r->file_len  : (uint32_t)sizeof r->file;
+    uint32_t cn = r->cause_len < sizeof r->cause ? r->cause_len : (uint32_t)sizeof r->cause;
+
     printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"reset\","
-           "\"schema\":%u,\"file\":\"%s\",\"line\":%u,\"err\":%u,\"reason\":%u}\n",
+           "\"schema\":%u,\"file\":\"",
            (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
-           h->schema_id, f, r->lineno, r->err, r->reason);
+           h->schema_id);
+    ls_json_str(r->file, fn);
+    printf("\",\"line\":%u,\"err\":%u,\"reason\":%u,\"cause\":\"",
+           r->lineno, r->err, r->reason);
+    ls_json_str(r->cause, cn);
+    printf("\"}\n");
 }
 
 static const char *

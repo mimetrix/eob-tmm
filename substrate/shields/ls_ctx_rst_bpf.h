@@ -4,7 +4,8 @@
 #ifndef LS_CTX_RST_BPF_H
 #define LS_CTX_RST_BPF_H
 
-#define LS_RST_FILE_MAX 48u
+#define LS_RST_CAUSE_MAX 40u
+#define LS_RST_FILE_MAX  32u
 
 struct ls_ctx_rst {
     unsigned int lineno;
@@ -12,10 +13,12 @@ struct ls_ctx_rst {
     unsigned int reason;
     unsigned int file_len;
     char         file[LS_RST_FILE_MAX];
+    unsigned int cause_len;
+    char         cause[LS_RST_CAUSE_MAX];   /* rst_why's 6th arg (Phase 3)   */
 };
 
-_Static_assert(sizeof(struct ls_ctx_rst) == 64,
-               "reset record must be 64 bytes --- host and program disagree");
+_Static_assert(sizeof(struct ls_ctx_rst) == 92,
+               "reset record must be 92 bytes --- host and program disagree");
 _Static_assert(sizeof(struct ls_ctx_rst) <= 96,
                "PREVAIL's fentry ctx is 96 bytes; a larger struct cannot be read");
 

@@ -54,10 +54,30 @@
 /* struct ls_tramp_result lives in ls_arm.h */
 
 struct ls_tramp_result
-ls_tramp_dispatch(int slot, uint64_t a0, uint64_t a1, uint64_t a2,
-                  uint64_t a3, uint64_t a4)
+ls_tramp_dispatch(int slot, const struct ls_regs *regs)
 {
     struct ls_tramp_result r = { LS_TRAMP_FALLTHROUGH, 0 };
+
+    /*
+     * ALL SIX arguments, via a pointer to the block the trampoline already saved
+     * (Phase 3). The named accessors in ls_arm.h exist because the block is in
+     * STACK order, which is the reverse of ABI order --- indexing it by argument
+     * position would silently swap arguments rather than fail.
+     *
+     * regs is NULL only if something other than the trampoline called this. Guard
+     * rather than trust: a fall-through is always a safe answer.
+     */
+    uint64_t a0, a1, a2, a3, a4, a5;
+
+    if (regs == 0)
+        return r;
+
+    a0 = LS_ARG0(regs);
+    a1 = LS_ARG1(regs);
+    a2 = LS_ARG2(regs);
+    a3 = LS_ARG3(regs);
+    a4 = LS_ARG4(regs);
+    a5 = LS_ARG5(regs);
     /*
      * The ctx is a per-invocation stack copy, never a view onto the argument
      * registers or onto TMM state. PREVAIL cannot express a read-only region,
@@ -97,11 +117,15 @@ ls_tramp_dispatch(int slot, uint64_t a0, uint64_t a1, uint64_t a2,
     } else if (slot == LS_CTX_SLOT_RST) {
         /* rst_why(uf, file, lineno, err, reason, rst_cause) --- every field is a
          * direct argument, so no derivation and nothing to snapshot before it is
-         * overwritten. a5 (rst_cause) is NOT here: System V puts it in r9 and the
-         * trampoline forwards only five. file:line identifies the site anyway. */
+         * overwritten.
+         *
+         * a5 IS rst_cause, and it arrives now. It was dropped until Phase 3 because
+         * the trampoline forwarded five arguments; file:line identifies the site,
+         * but at flow_table.c:2618 the cause is flow_reject_cause[flow_reject_code]
+         * --- a runtime table lookup that no amount of reading the source recovers. */
         struct ls_ctx_rst rc;
         ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
-                         (unsigned int)a3, (unsigned int)a4);
+                         (unsigned int)a3, (unsigned int)a4, (const char *)a5);
         /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
          * record to the shared-memory ring, so an entry-armed hook produces a
          * stream rather than only counters. The ring is off unless LS_TP_RING
