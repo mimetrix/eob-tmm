@@ -80,9 +80,17 @@ ssh -o StrictHostKeyChecking=no "$BUILD_BOX" 'cat /tmp/.tsync_paths 2>/dev/null'
 
 # -F because a basename is a literal, not a pattern: "ls_vm.c" as a regex also
 # matches ls_vmXc. Anchored by prefixing the separator and comparing the tail.
+# The i > 0 test is load-bearing. index() returns 0 when the basename is not in
+# the line, and when the basename is LONGER than the line
+# length($0) - length(b) + 1 is also <= 0 --- so 0 == 0 matched, and this reported
+# base/ls_tp.h as the home of ls_tramp_asm.c. Caught by deleting a file from a
+# throwaway copy of the repo and reading the output, which is the only reason it
+# was caught at all.
 where() {
-    awk -v b="/$1" 'index($0, b) == length($0) - length(b) + 1 { sub(/^\.\//, ""); print; exit }' \
-        "$TMPD/paths" 2>/dev/null
+    awk -v b="/$1" '{ i = index($0, b)
+                      if (i > 0 && i == length($0) - length(b) + 1) {
+                          sub(/^\.\//, ""); print; exit
+                      } }' "$TMPD/paths" 2>/dev/null
 }
 
 # How many tree paths share a basename --- see the flattening note above.
@@ -93,6 +101,13 @@ dupes() {
 differ=0
 only_tree=0
 only_repo=0
+acked=0
+
+# Differences that are known and chosen. Reported, never silent, but not a
+# failure --- see substrate/.tree-sync-known for why that distinction matters.
+KNOWN="$SRC/.tree-sync-known"
+is_known() { [ -f "$KNOWN" ] && awk -v b="$1" '$1 == b { found = 1 } END { exit !found }' "$KNOWN"; }
+known_why() { awk -v b="$1" '$1 == b { $1 = ""; sub(/^ +/, ""); print; exit }' "$KNOWN" 2>/dev/null; }
 
 for f in "$TMPD"/tree/*; do
     [ -f "$f" ] || continue
@@ -108,6 +123,11 @@ for f in "$TMPD"/tree/*; do
         # Say so, because "hand-carry the tree's version back" is the wrong repair
         # for one -- but do NOT excuse it: ls_shield_blob.h is what TMM arms at
         # startup, so a stale one in the tree means a stale shield in the binary.
+        if is_known "$b"; then
+            printf '  ACKNOWLEDGED   %-24s %s\n' "$b" "$(known_why "$b" | cut -c1-70)"
+            acked=$((acked + 1))
+            continue
+        fi
         if head -3 "$SRC/$b" | grep -qi 'GENERATED'; then
             printf '  DIFFERS (gen)  %-24s %s\n' "$b" "regenerate, do not hand-merge"
             differ=1
@@ -155,7 +175,11 @@ fi
 
 echo
 if [ "$differ" -eq 0 ]; then
-    echo "  VERDICT : IN SYNC --- the tree holds exactly what git holds"
+    if [ "$acked" -gt 0 ]; then
+        echo "  VERDICT : IN SYNC --- apart from $acked acknowledged difference(s) above"
+    else
+        echo "  VERDICT : IN SYNC --- the tree holds exactly what git holds"
+    fi
     exit 0
 fi
 

@@ -1,0 +1,11 @@
+# Differences between this repo and the TMM build tree that are KNOWN and CHOSEN.
+#
+# One line: <filename> <reason>. A file listed here is reported as ACKNOWLEDGED
+# rather than failing the check, so an UNEXPECTED difference still stands out.
+#
+# This list exists because a guard that is always red is a guard nobody reads,
+# which is exactly the failure bnk-check-tree-sync.sh was written to prevent.
+# Keep it short and keep the reasons current --- a stale entry here hides a real
+# divergence, the same way the stale whitelist entry did.
+
+ls_shield_blob.h  Generated. The tree's copy is an older shield; the repo's is generated from ls_2026_http_psm.bpf.c. Both are outputs, so this is resolved by regenerating (make -C substrate shield-blob), not by hand-merging. Left alone deliberately: this blob is what TMM arms at startup, and the working demos ran against the tree's version. Regenerate only together with re-verifying those demos.
