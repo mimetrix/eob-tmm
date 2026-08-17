@@ -55,7 +55,10 @@ PODS=$(kubectl get pods -l app=f5-tmm --no-headers | grep Running | awk '{print 
 
 # --- 0. is there a data path at all? ----------------------------------------------
 say "0 · the data path answers"
-CODE=$(kubectl exec client -- curl -s -m 8 -o /dev/null -w '%{http_code}' "http://$VIP/" 2>/dev/null || echo 000)
+# `|| echo 000` on a command that ALREADY printed 000 concatenates to "000000". curl
+# writes the code even when it fails, so capture it and default only if empty.
+CODE=$(kubectl exec client -- curl -s -m 8 -o /dev/null -w '%{http_code}' "http://$VIP/" 2>/dev/null) || true
+CODE=${CODE:-000}
 echo "  GET http://$VIP/  ->  HTTP $CODE"
 if [ "$CODE" != "200" ]; then
     cat >&2 <<EOT
