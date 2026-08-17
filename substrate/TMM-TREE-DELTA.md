@@ -68,6 +68,10 @@ run also found the trampoline assembly (`ls_tramp_asm.c`) and the whole per-hook
 existing only on the build box --- 12 divergences, 5 files carried back into git. 23 symbols are added to **each**
 file:
 
+**Two more since that audit:** `g_armed_count` and `g_armed_slot`, added to both
+whitelists by the shared-slot guard in `ls_arm.c`. That brings the tree's additions to
+32.
+
 **The list below is prose and drifted.** An audit on 2026-08-17 found the tree adds
 **30** symbols, not the 22 written here: `g_ls_shapes`, `g_ls_nshapes`, `g_tp_seg`,
 `g_tp_seg_tried`, `g_tp_seq` and `_ubpf_instruction_filter` were added to the tree

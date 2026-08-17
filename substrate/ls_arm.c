@@ -251,6 +251,11 @@ ls_disarm(void *fn)
 extern void ls_trampoline_entry(void);
 extern unsigned char ls_tramp_slot_insn[];
 
+/* Which slot the single shared immediate currently holds, and how many hooks depend
+ * on it. See the refusal in ls_arm_live. */
+static int g_armed_slot  = -1;
+static int g_armed_count;
+
 int
 ls_arm_live(void *fn, void *trampoline, int slot)
 {
@@ -269,6 +274,41 @@ ls_arm_live(void *fn, void *trampoline, int slot)
     /* The slot immediate is 4 bytes, and nothing is calling the trampoline yet
      * (the target is still unarmed), so a plain write is correct. The INT3 swap
      * is only for the 5 bytes that ARE being executed. */
+    /*
+     * ONE TRAMPOLINE, ONE SLOT IMMEDIATE --- AND THAT IS A HARD CONSTRAINT.
+     *
+     * There is a single ls_trampoline_entry in .text with a single
+     * ls_tramp_slot_insn. Writing the slot here rewrites it for EVERY hook already
+     * armed, so arming a second hook with a DIFFERENT slot silently re-points all
+     * of them at the new slot's ctx builder.
+     *
+     * That is not theoretical. On 2026-08-17 four reset functions were armed with
+     * slots 5, 6, 3, 3 in that order. The immediate ended at 3, so every armed
+     * site --- including rst_why --- dispatched through the rst_why_preserve
+     * builder, which reads the cause from a4 instead of a5. a4 is `reason`, which
+     * is 0, so every record came back with an empty cause. Nothing failed, nothing
+     * logged, and the wrong field was blamed for an hour.
+     *
+     * The trampoline's own header anticipated this: it says "one trampoline per
+     * armed hook, so the slot is known when the trampoline is created", and notes
+     * that a SHARED trampoline "would have to recover the slot from the return
+     * address". The code took the shared route without taking that consequence.
+     *
+     * Until it is per-hook, hooks armed together MUST share a slot. Refused rather
+     * than warned: a warning on a data-plane path nobody is reading is the same as
+     * silence, and the failure it prevents is silently-wrong records.
+     */
+    if (g_armed_count > 0 && g_armed_slot != slot) {
+        fprintf(stderr,
+                "ls_arm: REFUSING slot %d --- %d hook(s) already armed on slot %d, "
+                "and there is ONE shared slot immediate. Arming this would re-point "
+                "every armed hook at slot %d's ctx builder and silently corrupt their "
+                "records. Disarm first, or arm both on the same slot (legal only if "
+                "their argument shapes match).\n",
+                slot, g_armed_count, g_armed_slot, slot);
+        return -1;
+    }
+
     int32_t imm = slot;
     if (ls_write_text(ls_tramp_slot_insn + 1, (const uint8_t *)&imm, 4) != 0) {
         fprintf(stderr, "ls_arm: could not set slot immediate --- refusing\n");
@@ -282,7 +322,14 @@ ls_arm_live(void *fn, void *trampoline, int slot)
     memcpy(patch + 1, &d32, 4);
     if (ls_swap_write5(pad, patch) != 0)
         return -1;
-    fprintf(stderr, "ls_arm: ARMED LIVE entry=%p slot=%d tramp=%p\n", fn, slot, trampoline);
+
+    /* Only now, after the patch actually landed. Counting an arm that failed would
+     * make the guard refuse a slot nothing is using. */
+    g_armed_slot = slot;
+    g_armed_count++;
+
+    fprintf(stderr, "ls_arm: ARMED LIVE entry=%p slot=%d tramp=%p (armed=%d)\n",
+            fn, slot, trampoline, g_armed_count);
     return 0;
 }
 
@@ -295,6 +342,17 @@ ls_disarm_live(void *fn)
     static const uint8_t nops[LS_PAD_LEN] = { 0x90,0x90,0x90,0x90,0x90 };
     if (ls_swap_write5(pad, nops) != 0)
         return -1;
-    fprintf(stderr, "ls_arm: DISARMED LIVE entry=%p\n", fn);
+
+    /* Release the shared slot once the last hook goes. Clamped at zero rather than
+     * asserted: ls_find_armed already refused anything not actually armed, so a
+     * negative count would mean this file's own bookkeeping drifted, and dropping to
+     * a state where NO slot is reserved is the safe direction --- it permits the next
+     * arm rather than locking the mechanism out. */
+    if (g_armed_count > 0)
+        g_armed_count--;
+    if (g_armed_count == 0)
+        g_armed_slot = -1;
+
+    fprintf(stderr, "ls_arm: DISARMED LIVE entry=%p (armed=%d)\n", fn, g_armed_count);
     return 0;
 }
