@@ -85,10 +85,21 @@ Cheapest high-value item on this page.
 The RapidPatch route (USENIX Sec '22). A debug register watches an arbitrary address,
 so **no compiler pad is needed**.
 
-That matters more than it sounds: the pad requirement is the single biggest structural
-limit here. Entry-padding reach is **48.9%** across the whole binary — 82–97% inside
-the TMM tree, **0%** in independently built components — which is why OpenSSL's 1,781
-linked symbols are all unarmable regardless of what CVE exists in them.
+That matters more than it sounds: the pad requirement is what fixes the SCOPE of this
+mechanism. Inside the **TMM core** --- the code F5 compiles with
+`-fpatchable-function-entry` --- the flag pads **100% of translation units**, and
+**82–97% of functions** are hookable (the rest are inlined or folded at `-O2`, so they
+are not functions at run time to hook).
+
+Outside the TMM core there are **no pads at all**. TMM links ~two dozen independently
+built components, and their builds never saw the flag --- which is why OpenSSL's 1,781
+linked symbols are unarmable regardless of what CVE exists in them.
+
+**Do not quote a whole-binary percentage.** It averages the TMM core against
+components that were never in scope, and understates reach where the mechanism
+actually applies while implying coverage where it never claimed any. This paragraph
+said "48.9% across the whole binary" in its first draft, which is precisely that
+mistake --- see `mechanism-tradeoff.md` §"scopes that should stay separate".
 
 Cost: `ptrace` or `perf_event_open`, i.e. privilege, which is the catch inside an
 ordinary pod. Four debug registers on x86-64, so a hard concurrency ceiling. In
