@@ -120,13 +120,19 @@ HTTP/2 has `rst_cause_serialize`, QUIC puts it in the reason field. So **a packe
 capture does show the reason today.** Any framing that implies "the reason is
 invisible without this" is wrong. What is left is narrower and still real:
 
-- **`file:line`, which the wire cannot carry.** The packet gets the human string only,
-  and strings are ambiguous: `"Closing"` is BOTH `http_mr_proxy.c:993` and `:994`;
-  `"TCP RST from remote system"` is BOTH `tcp.c:4689` and `:4999`. The feed separates
-  them, a capture cannot.
-- **Decisions that never become a packet.** Forty of the records in one sample were
-  proxy teardown — a graceful close. No RST is sent, so `rst_cause_append` never runs
-  and nothing reaches the wire. The feed sees the decision anyway.
+- **The file identity --- and this bullet used to claim more.** It said "`file:line`,
+  which the wire cannot carry". A packet capture DISPROVED that: the RST payload reads
+  `BIG-IP: [0x235ef8f:2618] No local listener`, so the LINE NUMBER is on the wire next
+  to the cause. What is absent is the file NAME --- the wire carries an opaque
+  identifier instead. So this differentiator is far weaker than claimed, and the
+  correction is recorded rather than the sentence quietly softened.
+- **Decisions that never become a packet --- the real differentiator, and now a
+  MEASUREMENT rather than an argument.** In one capture taken while driving known
+  traffic, ~32 records were produced and only **5** had a corresponding RST on the
+  wire. The 12 `Closing` records are graceful proxy teardowns where no RST is sent at
+  all; the 14 `TCP RST from remote system` records are resets TMM RECEIVED rather than
+  sent. `rst_cause_append` runs for neither. Five of thirty-two have a wire
+  counterpart; the rest exist only in the feed.
 - **Always on.** tcpdump cannot run continuously in production at volume. This is a
   bounded-cost stream with counted drops.
 - **No customer payload.** 92 bytes of metadata rather than captured traffic.
@@ -307,6 +313,43 @@ stdout.
 
 Delivery is **at-least-once**: records are written before `consumer_pos` advances, so
 a crash mid-batch re-delivers rather than loses. Dedupe on `seq`.
+
+## Validating it --- against an independent oracle
+
+Everything that went wrong while building this went wrong the same way: a status line
+reported success while the underlying property was false. `OK ARMED LIVE` on the wrong
+function. Tokens present in a binary with no entry pads. A build that succeeded into an
+image carrying a cached older binary. `fired=0` that meant the wrong pod. So validation
+must use checks that cannot report success without being true.
+
+**1. Falsifiable counts.** Drive exactly N of a known trigger, expect exactly N records.
+15 requests give 15 `:993` AND 15 `:994`, because the code calls `RST_WHY` on adjacent
+lines. A wrong hook, a wrong pod or a stale binary each break the arithmetic.
+
+**2. Negative control.** Disarm, drive identical traffic, records must STOP. If they do
+not, they were never coming from the hook.
+
+**3. THE INDEPENDENT ORACLE, which is the strongest available.** `rst_cause_append`
+puts the cause on the wire, so the same fact exists in two places sharing no code ---
+TMM's packet output and this feed:
+
+```bash
+kubectl exec client -- sh -c 'timeout 20 tcpdump -i any -s0 -w /tmp/rst.pcap \
+    "tcp[tcpflags] & tcp-rst != 0"' &
+# ...drive five connects to a closed port...
+kubectl exec client -- sh -c 'strings /tmp/rst.pcap | grep -a "BIG-IP:"'
+```
+
+Measured 2026-08-17:
+
+```
+wire :  5 x  BIG-IP: [0x235ef8f:2618] No local listener
+feed :  5 x  "line":2618, "cause":"No local listener"
+```
+
+Five driven triggers, five wire RSTs, five records --- same cause, same line number,
+from two paths with no common code. This is the check that actually validates the feed,
+and it is also the one that disproved the `file:line` claim above.
 
 ## 6. Reproducing it
 
