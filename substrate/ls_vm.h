@@ -89,6 +89,12 @@ struct ls_slot {
     uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
     uint64_t     cycles;        /* only when timing is enabled          */
     uint64_t     cycles_max;    /* the tail is what bounds a hot hook   */
+    uint32_t     gen;           /* bumped per reload. Counters above are
+                                 * per SLOT and SURVIVE a program swap ---
+                                 * on 2026-08-17 a safe_returns=246 left by
+                                 * one program was twice read as evidence
+                                 * about the next. `gen` lets a reader tell
+                                 * residue from result. */
     struct ls_ctx_sample samples[LS_CTX_SAMPLES];
     uint32_t     sample_next;
 };
@@ -103,6 +109,7 @@ struct ls_stats {
     int      mode;
     uint64_t fired;
     uint64_t safe_returns;
+    uint32_t gen;            /* increments per reload --- see ls_vm_stats */
     uint64_t errors;
     uint64_t cycles;
     uint64_t cycles_max;

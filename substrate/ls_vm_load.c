@@ -39,6 +39,8 @@
  */
 
 #include "ls_vm.h"
+#include "ls_map.h"
+#include "ls_map_glue.h"
 #include "ls_arm.h"
 #include "ls_shield_blob.h"
 #include <stdlib.h>
@@ -325,9 +327,9 @@ handle(int fd)
          * mechanism whose whole point is arming several things at once. */
         int qslot = (int)m->epoch;
         if (!ls_vm_stats(qslot, &st)) { reply(fd, "ERR no such slot %d\n", qslot); break; }
-        reply(fd, "OK armed=%d mode=%d fired=%llu safe_returns=%llu errors=%llu "
+        reply(fd, "OK armed=%d mode=%d gen=%u fired=%llu safe_returns=%llu errors=%llu "
                   "cycles=%llu cycles_max=%llu\n",
-              (int)st.armed, st.mode,
+              (int)st.armed, st.mode, st.gen,
               (unsigned long long)st.fired, (unsigned long long)st.safe_returns,
               (unsigned long long)st.errors, (unsigned long long)st.cycles,
               (unsigned long long)st.cycles_max);
@@ -402,6 +404,11 @@ handle(int fd)
          * the program's memory --- needs item 0c. Mode DISABLE stops it running;
          * it does not remove it. */
         ls_vm_set_mode((int)m->epoch, LS_MODE_DISABLE);
+        /* Release the revoked program's map shapes. Shapes are recorded per LOAD
+         * and LS_MAP_MAX is 4, so without this the fifth program loaded finds the
+         * table full and its maps silently do not exist --- indistinguishable from
+         * a program whose predicate never matches. */
+        ls_map_reset_shapes();
         reply(fd, "OK disabled (not reclaimed --- see item 0c)\n");
         break;
 

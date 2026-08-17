@@ -301,6 +301,11 @@ ls_vm_stats(int slot, struct ls_stats *out)
     out->mode = (int)s->mode;
     out->fired = s->fired;
     out->safe_returns = s->safe_returns;
+    /* Counters are per SLOT and survive a program swap. That residue was read as
+     * a result twice on 2026-08-17 --- a safe_returns=246 left by one program was
+     * taken as evidence about the next. `gen` increments on every reload, so a
+     * reader can tell whether the counts belong to the program it just loaded. */
+    out->gen = s->gen;
     out->errors = s->errors;
     out->cycles = s->cycles;
     out->cycles_max = s->cycles_max;
@@ -793,6 +798,7 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->armed = true;
+    live->gen++;              /* so STATUS can distinguish residue from result */
 
     new->armed = false;                   /* the staging slot goes back */
     new->vm = NULL;

@@ -53,12 +53,29 @@ ls_map_current(void)
     uint32_t n, i;
     void *p;
 
-    if (g_ls_maps != 0)
-        return g_ls_maps;
     if (g_ls_maps_failed)
         return 0;                     /* tried once, failed --- do not retry on
                                        * the hot path, and do not leak a mapping
                                        * per invocation */
+
+    /* CATCH UP ON SHAPES ADDED SINCE THIS THREAD INITIALISED, and note why this
+     * is not merely tidiness. Shapes are recorded at LOAD time and indices are
+     * global; storage is built per thread on FIRST USE. So loading a second
+     * program mid-life gives it a higher index than any thread has storage for,
+     * and ls_map_get() returns NULL for it --- every lookup misses, and the
+     * program behaves exactly like one whose counter never reaches its threshold.
+     *
+     * Observed: rate_watch worked at idx 0 on a fresh pod and silently never
+     * worked at idx 1 after map_selftest had claimed idx 0. "Works on the first
+     * program loaded, never on the second" is a bad failure to leave in place. */
+    if (g_ls_maps != 0) {
+        n = atomic_load_explicit(&g_ls_nshapes, memory_order_acquire);
+        for (i = g_ls_maps->n; i < n; i++) {
+            if (ls_map_create(g_ls_maps, &g_ls_shapes[i]) < 0)
+                return g_ls_maps;     /* table full --- existing maps still work */
+        }
+        return g_ls_maps;
+    }
 
     /* ACQUIRE, paired with the release store in ls_map_reloc. Relocation runs on
      * the LOADER thread; without the pairing a data-plane thread on another core
@@ -157,6 +174,22 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
 /* uBPF permits only the ctx and the stack. This extends it to map values --- and
  * note the JIT does not bounds-check at all, so without this the interpreter and
  * the JIT disagree: the program works in production and fails in test. */
+/*
+ * Release every recorded shape. Called when a slot is revoked.
+ *
+ * Without this, shapes accumulate for the process lifetime: each load records
+ * its own and LS_MAP_MAX is 4, so the fifth program loaded finds the table full
+ * and its maps silently do not exist. Per-thread STORAGE is not reclaimed here
+ * --- a data-plane thread may be inside a helper --- so the mapping is left and
+ * the thread rebuilds from the new shapes on its next call. Bounded: it is one
+ * mapping per thread, not per load.
+ */
+static inline void
+ls_map_reset_shapes(void)
+{
+    atomic_store_explicit(&g_ls_nshapes, 0, memory_order_release);
+}
+
 /* This runs on the thread doing the access, so ls_map_current() gives that
  * thread's own storage --- which is the only storage its program can legally
  * reach. */
