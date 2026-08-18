@@ -19,8 +19,27 @@ are not remembered, they were read out of the compiler:
 `epoch` carries the SLOT. That field name is a wart --- three ops once hardcoded
 slot 0 while reporting success, so a load landed where nothing ran.
 
-  arm   <slot> <addr>   0x1003  patch a live function entry, address as hex text
-  disarm      <addr>    0x1004  restore the nops
+  arm   <slot> <name|0xaddr>  0x1003  patch a live function entry
+  disarm      <name|0xaddr>   0x1004  restore the nops
+
+ARM BY NAME, NOT BY ADDRESS --- and the build-id gate is the reason this exists.
+A bare hex address is still accepted, and still prints a warning, because it
+cannot be checked against anything. Passing a NAME resolves it through the index
+baked into the image ($LS_HOOK_INDEX, default /usr/share/ls/hook-index.tsv),
+whose header carries the build id of the binary it was generated from. That is
+compared against the build id of the binary THIS PROCESS IS ACTUALLY RUNNING,
+read out of /proc/<pid>/exe, and a mismatch is refused.
+
+Two real failures this closes, both of which reported success at the time:
+
+  - A stale address armed rst_cause_match_peer instead of rst_why. It is the
+    neighbouring function and it also carries a nop pad, so the patch succeeded,
+    "OK ARMED LIVE" was printed, and fired stayed 0 under 16,000 requests. A pad
+    cannot distinguish itself from another pad; a build id can.
+  - An image shipped with /usr/bin/tmm pointing at tmm64.debug, which overrides
+    CFLAGS_OPTIMIZE and therefore has NO pads at all. Reading the build id from
+    /proc/<pid>/exe rather than from the /usr/bin/tmm symlink catches that,
+    because it asks what is running instead of what is installed.
   load  <slot> <file> [mode]  1  load an ELF (default mode 2 = enforce)
   status <slot>               3  armed/mode/gen/fired/safe_returns
   mode  <slot> <mode>         2  0 disable, 1 monitor, 2 enforce
@@ -56,6 +75,142 @@ CTX_ABI_VERSION = 3
 OP_LOAD, OP_SET_MODE, OP_STATUS, OP_REVOKE = 1, 2, 3, 4
 OP_ARM, OP_DISARM = 0x1003, 0x1004
 
+HOOK_INDEX = os.environ.get("LS_HOOK_INDEX", "/usr/share/ls/hook-index.tsv")
+
+
+def elf_build_id(path):
+    """Read NT_GNU_BUILD_ID out of an ELF's PT_NOTE segments.
+
+    Pure Python on purpose: the f5-tmm container has no readelf, no objdump and no
+    nm, and `strings` is absent too --- the runbook records that it silently
+    returns zero for everything, which is worse than being missing. python3 IS
+    present, because this script runs under it.
+    """
+    with open(path, "rb") as f:
+        e = f.read(64)
+        if e[:4] != b"\x7fELF":
+            return None
+        if e[4] != 2:                              # ELFCLASS64 only
+            return None
+        phoff, = struct.unpack_from("<Q", e, 0x20)
+        phentsize, phnum = struct.unpack_from("<HH", e, 0x36)
+        for i in range(phnum):
+            f.seek(phoff + i * phentsize)
+            ph = f.read(phentsize)
+            p_type, = struct.unpack_from("<I", ph, 0)
+            if p_type != 4:                        # PT_NOTE
+                continue
+            off, = struct.unpack_from("<Q", ph, 0x08)
+            sz,  = struct.unpack_from("<Q", ph, 0x20)
+            f.seek(off)
+            note = f.read(sz)
+            j = 0
+            while j + 12 <= len(note):
+                nsz, dsz, ntype = struct.unpack_from("<III", note, j)
+                name = note[j + 12: j + 12 + nsz].rstrip(b"\x00")
+                doff = j + 12 + ((nsz + 3) & ~3)
+                if ntype == 3 and name == b"GNU":  # NT_GNU_BUILD_ID
+                    return note[doff: doff + dsz].hex()
+                j = doff + ((dsz + 3) & ~3)
+    return None
+
+
+def running_binary():
+    """The binary this container is ACTUALLY executing.
+
+    Deliberately not readlink(/usr/bin/tmm): an image can carry both tmm64.no_pgo
+    (padded) and tmm64.debug (no pads, because the debug build overrides
+    CFLAGS_OPTIMIZE), and /usr/bin/tmm has pointed at the wrong one. Asking /proc
+    asks the kernel what is running rather than what is installed.
+    """
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        try:
+            exe = os.readlink("/proc/%s/exe" % d)
+        except OSError:
+            continue                               # not ours, or already gone
+        if os.path.basename(exe).startswith("tmm"):
+            return exe
+    return None
+
+
+def read_index(path):
+    """-> (meta dict, {name: (arm_at, arm_method, pad_offset)})."""
+    meta, syms = {}, {}
+    with open(path) as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            if line.startswith("#"):
+                p = line[1:].split("\t")
+                if len(p) >= 2 and p[0] != "name":
+                    meta[p[0]] = p[1]
+                continue
+            p = line.split("\t")
+            if len(p) >= 3:
+                syms[p[0]] = (p[1], p[2], p[3] if len(p) > 3 else "-")
+    return meta, syms
+
+
+def resolve_hook(spec):
+    """A name -> a checked address. A 0x... address -> itself, with a warning.
+
+    Refuses rather than guesses on every failure. An unresolvable name that fell
+    back to *something* would reproduce the exact bug this closes.
+    """
+    if spec.startswith("0x") or spec.startswith("0X"):
+        try:
+            int(spec, 16)
+        except ValueError:
+            sys.exit("*** %r is not a hex address and not a symbol name" % spec)
+        print("warning: raw address --- NOT checked against the running binary's "
+              "build id. A stale address arms whatever is there, and a nop pad "
+              "exists in plenty of wrong places.", file=sys.stderr)
+        return spec
+
+    if not os.path.exists(HOOK_INDEX):
+        sys.exit("*** no hook index at %s, so %r cannot be resolved.\n"
+                 "    Generate it with substrate/mk_hook_map.py --index and bake it\n"
+                 "    into the image, or pass a 0x address and accept it is unchecked."
+                 % (HOOK_INDEX, spec))
+
+    meta, syms = read_index(HOOK_INDEX)
+
+    exe = running_binary()
+    if exe is None:
+        sys.exit("*** cannot find the running tmm binary under /proc, so the index\n"
+                 "    cannot be shown to describe it. Refusing to resolve a name.")
+    live = elf_build_id(exe)
+    want = meta.get("build_id")
+    if live is None:
+        sys.exit("*** %s carries no GNU build id, so the index cannot be matched to it."
+                 % exe)
+    if want is None:
+        sys.exit("*** %s has no #build_id header --- regenerate it." % HOOK_INDEX)
+    if live != want:
+        sys.exit("*** BUILD ID MISMATCH --- refusing to arm.\n"
+                 "    running   %s\n              %s\n"
+                 "    index for %s\n\n"
+                 "    Every address in the index is wrong for this binary. This is the\n"
+                 "    check that was missing when a stale address armed the function\n"
+                 "    NEXT to rst_why, reported OK ARMED LIVE, and never fired.\n"
+                 "    Rebuild the index from the binary this pod actually runs."
+                 % (exe, live, want))
+
+    if spec not in syms:
+        sys.exit("*** %r is not in the index (%d symbols, build %s).\n"
+                 "    Either it does not exist in this build, or it is neither padded\n"
+                 "    nor safely displaceable --- the generator omits those rather than\n"
+                 "    emitting an entry that cannot be armed."
+                 % (spec, len(syms), want[:12]))
+
+    arm_at, method, pad_off = syms[spec]
+    print("%s -> %s  (%s, pad_offset=%s, build %s)"
+          % (spec, arm_at, method, pad_off, want[:12]), file=sys.stderr)
+    return arm_at
+
 def resolve_sock():
     """The loader appends the TMM instance number: LS_LOAD_SOCKET=/tmp/ls_load.sock
     becomes /tmp/ls_load.sock.24. Connecting to the unsuffixed name fails with
@@ -79,7 +234,18 @@ def resolve_sock():
     return found[0]
 
 
-SOCK = resolve_sock()
+# RESOLVED LAZILY, not at import. As a module-level call this exited before main()
+# ran, so the script could not print its own usage without a live loader --- and
+# more importantly it could not be imported by a test at all, which is why the
+# build-id gate below went unexercised until it was made lazy.
+_SOCK = None
+
+
+def sock():
+    global _SOCK
+    if _SOCK is None:
+        _SOCK = resolve_sock()
+    return _SOCK
 
 
 def msg(op, slot=0, mode=0, hook=b"", prog=b""):
@@ -99,12 +265,13 @@ def msg(op, slot=0, mode=0, hook=b"", prog=b""):
 
 
 def send(payload):
+    path = sock()
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(20)
-        s.connect(SOCK)
+        s.connect(path)
     except OSError as e:
-        sys.exit("cannot reach %s: %s  (is LS_LOAD_SOCKET set on the pod?)" % (SOCK, e))
+        sys.exit("cannot reach %s: %s  (is LS_LOAD_SOCKET set on the pod?)" % (path, e))
     s.sendall(payload)
     try:
         s.shutdown(socket.SHUT_WR)          # tell the loader the request is complete
@@ -132,10 +299,14 @@ def main():
 
     if cmd == "arm":
         # The address goes in binding.hook AS TEXT --- the loader strtoull()s it.
-        slot, addr = int(a[1]), a[2]
+        # resolve_hook turns a symbol name into that text, or exits.
+        slot, addr = int(a[1]), resolve_hook(a[2])
         print(send(msg(OP_ARM, slot=slot, hook=addr.encode())))
     elif cmd == "disarm":
-        print(send(msg(OP_DISARM, hook=a[1].encode())))
+        # Disarm resolves the same way. It MUST, or the demo arms by name and
+        # disarms by a hand-typed address --- restoring nops over whatever is at
+        # that address instead, which is a write into live .text.
+        print(send(msg(OP_DISARM, hook=resolve_hook(a[1]).encode())))
     elif cmd == "load":
         slot, path = int(a[1]), a[2]
         mode = int(a[3]) if len(a) > 3 else 2

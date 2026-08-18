@@ -204,6 +204,10 @@ def main():
     ap.add_argument("--debs")
     ap.add_argument("-o", "--out", default="-")
     ap.add_argument("--tmos-version", default=None)
+    ap.add_argument("--index", default=None,
+                    help="also write a compact name->address index for the loader "
+                         "client. This is what gets baked into the image; the full "
+                         "JSON map is ~30x larger and nothing at runtime reads it.")
     a = ap.parse_args()
 
     tmp = tempfile.mkdtemp(prefix="hookmap.")
@@ -308,6 +312,34 @@ def main():
             sys.stdout.write(out + "\n")
         else:
             open(a.out, "w").write(out + "\n")
+
+        # THE INDEX --- what actually ships, and why it is a separate artifact.
+        #
+        # Arming needs four fields per symbol. The full map carries fifteen, plus
+        # prose, and comes to tens of megabytes for ~71k entries; baking that into
+        # a data-plane image to support a name lookup is the wrong trade. More
+        # importantly the index is what makes the BUILD ID checkable at arm time:
+        # the loader client reads this header, reads the running binary's own
+        # build id out of its ELF notes, and REFUSES when they disagree.
+        #
+        # That refusal is the entire point. On 2026-08-17 a stale hand-typed
+        # address armed rst_cause_match_peer instead of rst_why --- a neighbouring
+        # function that also carries a nop pad --- so arming reported OK ARMED LIVE
+        # and fired stayed 0 under traffic. Nothing in the system could tell those
+        # apart, because a pad is a pad. A build id can tell them apart.
+        if a.index:
+            with open(a.index, "w") as fh:
+                fh.write("#ls-hook-index\t1\n")
+                fh.write(f"#build_id\t{bid_b}\n")
+                fh.write(f"#tmos_version\t{doc['tmos_version']}\n")
+                fh.write(f"#ctx_abi_version\t{doc['ctx_abi_version']}\n")
+                fh.write("#name\tarm_at\tarm_method\tpad_offset\tdisplace_bytes\n")
+                for h in padded:
+                    fh.write("%s\t%s\t%s\t%s\t%d\n" % (
+                        h["name"], h["arm_at"], h["arm_method"],
+                        h.get("pad_offset", "-"), h["displace_bytes"]))
+            print(f"  index         : {a.index}  ({len(padded)} symbols)",
+                  file=sys.stderr)
 
         print(f"  build id      : {bid_b}", file=sys.stderr)
         # .get(): displaced entries carry no pad_offset at all, which is the point.

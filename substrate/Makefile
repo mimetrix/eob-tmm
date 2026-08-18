@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -140,6 +140,15 @@ check-shields:
 # lives on the build box -- packaging re-links the binary, so the build tree's
 # addresses are not the pod's. Skips loudly rather than silently passing.
 DEBS ?= $(HOME)/code/tmm/docker_build/DEBS/amd64
+# Arming by NAME, and the build-id gate under it. On 2026-08-17 a stale hex address
+# armed the function 64 bytes past rst_why -- which also carries a nop pad, so the
+# patch succeeded, OK ARMED LIVE was printed, and fired stayed 0 through 16,000
+# requests. A pad cannot distinguish itself from another pad; a build id can. Most
+# of these assertions are REFUSALS, because a resolver that fell back to something
+# plausible would reproduce that bug with extra steps.
+check-ls-load:
+	@python3 check_ls_load.py
+
 check-hook-map:
 	@if [ -d "$(DEBS)" ] && ls $(DEBS)/tmm_*.deb >/dev/null 2>&1; then \
 	  $(PYTHON) ./mk_hook_map.py --debs "$(DEBS)" -o .hookmap.json 2>/dev/null && \
