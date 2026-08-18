@@ -1,5 +1,29 @@
 # Reproducing the live result
 
+> **Status: partially stale, and the specific gaps are listed here rather than left to be
+> discovered.** This page was last tested 2026-08-14. Since then arming moved from a
+> hand-typed hex address to a symbol name resolved through a baked-in index and gated on
+> build ID; the tree sync, the image bake and the drain rebuild all became scripts; and two
+> helpers, two tracepoints and a program-controlled egress path were added. The path below
+> still describes the older workflow.
+>
+> **Three recording gaps would stop a reproducer even inside F5:**
+>
+> 1. **The vendored uBPF revision is not recorded, and the copy has no version-control
+>    history.** `design-review-findings.md` cites `c900ed9…`, `live-patch-runbook.md` cites
+>    `c900ed9` with PREVAIL `v0.2.5`. The tree's copy matches neither, nor the `508d5e4b`
+>    checkout on the build box. Cloning "the pinned revision" therefore yields different code.
+> 2. **uBPF is patched.** `vm/ubpf_jit_support.c` carries
+>    `substrate/ubpf-patches/0001-jit-scratch-rightsize.patch`. The patch is preserved and
+>    documented; several summaries elsewhere describe the vendoring as unmodified, which it
+>    is not. PREVAIL is unmodified, and the binary in use reports **v0.2.6**.
+> 3. **The current workflow is undocumented here.** `bnk-sync-substrate.sh`,
+>    `bnk-bake-tools.sh`, `bnk-preflight.sh`, arming by name and the build-ID gate are all
+>    load-bearing now and appear nowhere below.
+>
+> None of the three is a technical barrier — each is something that was done and not written
+> down. Fixing them is a bounded task and it has not been done.
+
 **The claim to reproduce:** a verified eBPF program is loaded over a socket into an
 already-running TMM, armed at a function entry while traffic flows, and disarmed again — no
 rebuild, no restart.

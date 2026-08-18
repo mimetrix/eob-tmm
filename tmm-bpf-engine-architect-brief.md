@@ -31,8 +31,8 @@ no instruction decoder is required inside the process, and there is no interval 
 another thread's program counter can lie within bytes being rewritten. Disarming restores
 the original bytes exactly, and that equality is asserted rather than assumed.
 
-**Execution.** Two existing open-source components do the work, both vendored unmodified —
-no forks, no divergence from upstream:
+**Execution.** Two existing open-source components do the work, both vendored into the build
+tree:
 
 - **uBPF** — an eBPF bytecode interpreter with a simple JIT, roughly four thousand lines,
   designed to be embedded in a host process. It runs inside TMM.
@@ -41,7 +41,24 @@ no forks, no divergence from upstream:
   third-party program into the data plane arguable at all.
 
 The division matters: PREVAIL runs at admission time, off the data path. uBPF is the only
-part that executes per invocation. For a component entering a Threat Model
+part that executes per invocation.
+
+**uBPF carries one local patch, and the vendored revision is not recorded.** Both facts
+belong in a review of this component rather than in a footnote:
+
+- `vm/ubpf_jit_support.c` is modified. Upstream sizes five JIT scratch arrays to
+  `UBPF_MAX_INSTS` (65,536) on every compile regardless of program size — 5.25 MB per
+  compile, of which faulting the pages in measured at roughly 272 µs, about 90% of compile
+  time for a 4 KB program. The patch sizes them to the program. It is preserved in
+  `substrate/ubpf-patches/` and is an upstream bug, so upstreaming it deletes the patch.
+- A second patch is anticipated and not written: back-edge fuel in the JIT, for a time bound
+  under `ENFORCE` (`development-scope.md` item 15). **The question was never whether to
+  fork, but how many patches and whether each has a way out.**
+- **The vendored copy has no version control history**, so the exact upstream revision it
+  derives from cannot be stated. Two documents cite pins that do not match it. This is a
+  reproducibility defect, not a licensing one, and it is tracked in `REPRODUCING.md`.
+
+PREVAIL is used unmodified. The binary in use reports **v0.2.6**. For a component entering a Threat Model
 Analysis, the reviewable surface is a few thousand auditable lines rather than a compiler
 toolchain, and that was the governing consideration.
 
