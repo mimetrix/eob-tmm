@@ -1,0 +1,4 @@
+# eob-tmm experiment: measure the dark cost of entry padding.
+# Makefile.inc includes this AFTER its own CFLAGS_OPTIMIZE := -O2 and BEFORE
+# CFLAGS += $(CFLAGS_OPTIMIZE), which is exactly what it is for.
+CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0
