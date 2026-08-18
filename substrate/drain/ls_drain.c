@@ -229,6 +229,58 @@ emit_sslerr(const struct ls_rec *h, const struct sslerr_rec *r)
     printf("\"}\n");
 }
 
+/* struct ls_ctx_h2abort --- substrate/ls_ctx_h2abort.h. WHY an HTTP/2 stream was aborted.
+ * 48 bytes. The reason is a literal from http2.c and reaches no log, no iRule event and no
+ * trace in a production build --- the only one of the four hooks for which that is true. */
+struct h2abort_rec {
+    uint32_t stream_id;      /* folded from the stream pointer --- identity, not address */
+    uint32_t error;          /* enum http2_error                                        */
+    uint32_t why_len;
+    char     why[36];
+};
+_Static_assert(sizeof(struct h2abort_rec) == 48,
+               "h2abort_rec must match struct ls_ctx_h2abort (48)");
+
+static void
+emit_h2abort(const struct ls_rec *h, const struct h2abort_rec *r)
+{
+    uint32_t wn = r->why_len < sizeof r->why ? r->why_len : (uint32_t)sizeof r->why;
+
+    /* No file, no line, no alert, no flow --- and the field names say so rather than
+     * borrowing the reset record's vocabulary for different data. `why` IS the site here:
+     * 23 distinct literals over 36 call sites identify the decision more directly than a
+     * line number would. */
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"h2abort\","
+           "\"schema\":%u,\"stream\":\"%08x\",\"error\":%u,\"truncated\":%s,\"why\":\"",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
+           h->schema_id, r->stream_id, r->error,
+           (wn == sizeof r->why - 1) ? "true" : "false");
+    ls_json_str(r->why, wn);
+    printf("\"}\n");
+}
+
+/*
+ * A record a PROGRAM published via bpf_ringbuf_output, not one a hook produced.
+ *
+ * REPORTED AS LENGTH AND HEX, deliberately. The bytes are whatever the program chose; the
+ * host validated the length and nothing else. Naming fields here would put this agent's
+ * authority behind a layout nobody checked --- which is exactly the mistake that had a
+ * 92-byte reset record labelled HTTP. Interpreting these is a contract between the
+ * program's author and their own consumer.
+ */
+static void
+emit_prog(const struct ls_rec *h, const unsigned char *p, int n)
+{
+    int i;
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"prog\","
+           "\"schema\":%u,\"len\":%d,\"data\":\"",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
+           h->schema_id, n);
+    for (i = 0; i < n; i++)
+        printf("%02x", p[i]);
+    printf("\"}\n");
+}
+
 static const char *
 hook_name(uint32_t id)
 {
@@ -241,6 +293,8 @@ hook_name(uint32_t id)
     case LS_TP_HOOK_RST_PRE:
     case LS_TP_HOOK_RST_PRE_VA: return "reset";
     case LS_TP_HOOK_SSLERR:     return "sslerr";
+    case LS_TP_HOOK_H2ABORT:    return "h2abort";
+    case LS_TP_HOOK_PROG:       return "prog";
     default:                    return "?";
     }
 }
@@ -380,6 +434,12 @@ main(int argc, char **argv)
                  * offsets. Falling through to emit_raw makes it visible instead. */
                 else if (h.schema_id == LS_TP_SCHEMA_SSLERR && n == (int)sizeof(struct sslerr_rec))
                     emit_sslerr(&h, (const struct sslerr_rec *)buf);
+                else if (h.schema_id == LS_TP_SCHEMA_H2ABORT && n == (int)sizeof(struct h2abort_rec))
+                    emit_h2abort(&h, (const struct h2abort_rec *)buf);
+                /* Program-emitted: NO length check against a struct, because there is no
+                 * struct. Any length the producer accepted is valid here by construction. */
+                else if (h.schema_id == LS_TP_SCHEMA_PROG)
+                    emit_prog(&h, buf, n);
                 else
                     emit_raw(&h, buf, n);
                 delivered++;

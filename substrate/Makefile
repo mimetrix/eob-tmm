@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -260,6 +260,15 @@ check-map:
 # record. The size assertion is load-bearing: this record is 96 bytes, which is AT
 # PREVAIL's measured ctx ceiling, so growing either array must fail at BUILD time rather
 # than later at verification with a message about a program.
+# The HTTP/2 stream-abort record --- the one hook of the four whose reason reaches no log,
+# no iRule event and no trace in a production build. The stream-id assertions are specific
+# to it: the id is FOLDED from the pointer, so it must be stable per stream (or you cannot
+# group by stream), distinct for a neighbouring allocation (or unrelated aborts group and
+# you conclude one stream is failing), and not either half of the address (or a host
+# address reaches a telemetry stream).
+check-h2abort:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .h2a.out check_h2abort.c && ./.h2a.out && rm -f .h2a.out
+
 check-sslerr:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .sslerr.out check_sslerr.c && ./.sslerr.out && rm -f .sslerr.out
 

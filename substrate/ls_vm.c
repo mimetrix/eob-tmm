@@ -695,6 +695,14 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     if (!s->armed || vm == NULL || mode == LS_MODE_DISABLE)
         return LS_FALLTHROUGH;
 
+    /* PUBLISH WHICH SLOT IS RUNNING, for helpers that need it and cannot be told.
+     * uBPF's external_function_t has no context parameter, so bpf_ringbuf_output has no
+     * way to know which slot invoked it; a thread-local is correct because TMM is
+     * core-pinned and run-to-completion, so exactly one program runs on this thread at
+     * any instant. Set AFTER the early returns so a disabled or unarmed slot never
+     * leaves a stale value behind, and cleared on every exit path below. */
+    g_ls_cur_slot = slot;
+
     /* A non-zero return from ubpf_exec is an execution fault --- fuel exhausted,
      * or a bounds check the interpreter enforces at run time. Fall through: a
      * shield that cannot run must not take the flow with it. Counted, because a

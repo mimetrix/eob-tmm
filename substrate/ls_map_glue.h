@@ -31,7 +31,9 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <sys/mman.h>
+#include "ls_tp.h"
 #include "ubpf.h"
+#include <time.h>
 
 /*
  * SHAPE IS GLOBAL, STORAGE IS PER THREAD, and the split is forced rather than
@@ -96,9 +98,21 @@ extern _Atomic uint32_t  g_ls_nshapes;
 #ifdef LS_MAP_GLUE_IMPL
 __thread struct ls_map_set *g_ls_maps;
 __thread int                g_ls_maps_failed;
+/* WHICH SLOT IS EXECUTING, set by ls_vm_call before it enters the VM.
+ *
+ * uBPF's external_function_t is five uint64_t and NO context parameter --- ubpf.h warns
+ * that a sixth will not match the typedef --- so a helper cannot be told which slot
+ * invoked it. A thread-local is both simpler and cheaper than threading a context
+ * through every call, and it is correct for the same reason the map tables are
+ * per-thread: TMM is core-pinned and run-to-completion, so exactly one program is
+ * executing on this thread at any instant.
+ *
+ * -1 when no program is running, so a helper reached from anywhere else refuses. */
+__thread int                g_ls_cur_slot = -1;
 #else
 extern __thread struct ls_map_set *g_ls_maps;
 extern __thread int                g_ls_maps_failed;
+extern __thread int                g_ls_cur_slot;
 #endif
 
 /* Lazily bring this thread's storage up to the recorded shapes. Idempotent, and
@@ -332,6 +346,81 @@ ls_h_map_delete(uint64_t map, uint64_t key, uint64_t a, uint64_t b, uint64_t c)
     return (uint64_t)ls_map_delete(m, (const uint8_t *)(uintptr_t)key);
 }
 
+/* --- bpf_ktime_get_ns, helper id 5 ---------------------------------------
+ *
+ * WHY A CLOCK IS THE SINGLE MOST USEFUL ADDITION. Without one a program cannot know what
+ * time it is, so it cannot express "N per second", any rate limit, or any decay. That is
+ * why rate_watch's threshold means "this site fired more than 5 times EVER" rather than
+ * recently --- the counter never resets, so safe_returns answers a question nobody asked.
+ *
+ * CLOCK_MONOTONIC, NOT CLOCK_REALTIME, and the difference matters. The ring record's
+ * ts_ns is REALTIME because a feed has to correlate with wall-clock logs. A program doing
+ * rate limiting must NOT be affected by a clock step: on a REALTIME jump backwards every
+ * interval computation would go negative and every limiter would open. Two clocks for two
+ * jobs, deliberately, and a program comparing its own timestamps against a record's ts_ns
+ * would be comparing different clocks --- which is why programs get no access to ts_ns.
+ *
+ * Resolves through the vDSO, so no syscall. It is still a read on the hot path and the
+ * per-call cost of it is UNMEASURED, like everything else on this path.
+ */
+static inline uint64_t
+ls_h_ktime_get_ns(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e)
+{
+    struct timespec ts;
+    (void)a; (void)b; (void)c; (void)d; (void)e;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;      /* 0 is safe: a program comparing against it sees no elapsed time */
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+
+/* --- bpf_ringbuf_output, helper id 130 -----------------------------------
+ *
+ * PROGRAM-CONTROLLED EMISSION. Until now the host published a record for every event,
+ * after the program ran, so a program could not say "this one is not interesting". That
+ * fixed one-record-per-event rate is what the parked timer hook existed to work around;
+ * with this helper and a clock, a program does its own rate limiting and its own
+ * summarising, and the timer is not needed.
+ *
+ * Signature is bpf_ringbuf_output(ringbuf, data, size, flags) --- id 130, which PREVAIL
+ * already knows, so this costs ZERO verifier work. Verified by test 2026-08-18: a program
+ * declaring a BPF_MAP_TYPE_RINGBUF map and calling id 130 passes PREVAIL unchanged.
+ *
+ * WHAT WE VALIDATE, AND WHAT WE CANNOT. `size` is clamped and refused above the cap. The
+ * POINTER is trusted, because PREVAIL proved the program owns [data, data+size) --- and
+ * that is precisely the trust uBPF's own docs/VerifiedPrograms.md warns about: "PREVAIL
+ * assumes that r1 points to a valid memory region" while uBPF "doesn't enforce any
+ * particular context layout" and "memory safety depends on the program". The interpreter
+ * would catch a bad pointer through the bounds callback; THE JIT DOES NOT CONSULT IT, and
+ * the lab runs the JIT. So the real control here is signature verification of the program
+ * (scope item 4, unbuilt), not this function. Stated rather than implied.
+ */
+#define LS_RB_MAX_RECORD 256u   /* the drain reads into a 512-byte buffer; stay well
+                                 * under it, and cap what one program can push per
+                                 * invocation so a hot hook cannot flood the ring in a
+                                 * single call */
+
+static inline uint64_t
+ls_h_ringbuf_output(uint64_t map, uint64_t data, uint64_t size, uint64_t flags,
+                    uint64_t unused)
+{
+    struct ls_map *m = ls_map_get(ls_map_current(), map);
+
+    (void)flags; (void)unused;
+
+    /* Refuse, never clamp. A silently truncated record decodes as a short one and a
+     * consumer cannot tell it from a program that meant to emit that much. */
+    if (m == 0 || !m->is_ring)
+        return (uint64_t)-1;          /* not a ringbuf reference */
+    if (data == 0 || size == 0 || size > LS_RB_MAX_RECORD)
+        return (uint64_t)-1;
+    if (g_ls_cur_slot < 0)
+        return (uint64_t)-1;          /* reached from outside a program run */
+
+    return (uint64_t)(int64_t)ls_tp_publish_raw(g_ls_cur_slot,
+                                                (const void *)(uintptr_t)data,
+                                                (unsigned long)size);
+}
+
 /* Assert the helper signatures really match uBPF's, so a future edit that adds a
  * parameter fails the build rather than corrupting arguments at run time. */
 static inline void
@@ -341,6 +430,8 @@ ls_map_glue_abi_check(void)
     f = (external_function_t)ls_h_map_lookup; (void)f;
     f = (external_function_t)ls_h_map_update; (void)f;
     f = (external_function_t)ls_h_map_delete; (void)f;
+    f = (external_function_t)ls_h_ktime_get_ns; (void)f;
+    f = (external_function_t)ls_h_ringbuf_output; (void)f;
 }
 
 /*
@@ -380,6 +471,18 @@ ls_map_glue_install(struct ubpf_vm *vm)
         ubpf_register(vm, 3, "bpf_map_delete_elem",
                       (external_function_t)ls_h_map_delete) != 0) {
         fprintf(stderr, "ls_map: helper registration refused\n");
+        return -1;
+    }
+
+    /* ids 5 and 130, again with the standard names and semantics so PREVAIL needs no
+     * platform work. All-or-nothing with the three above: a VM that resolved a ringbuf
+     * map and then had no helper to emit through would give a program that verifies,
+     * runs, and silently drops everything it tried to publish. */
+    if (ubpf_register(vm, 5, "bpf_ktime_get_ns",
+                      (external_function_t)ls_h_ktime_get_ns) != 0 ||
+        ubpf_register(vm, 130, "bpf_ringbuf_output",
+                      (external_function_t)ls_h_ringbuf_output) != 0) {
+        fprintf(stderr, "ls_map: clock/ringbuf helper registration refused\n");
         return -1;
     }
 

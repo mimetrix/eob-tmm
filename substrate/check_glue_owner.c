@@ -64,13 +64,13 @@ main(void)
      * map=0. That program loads, verifies and runs with maps always empty. */
     reset();
     assert(owner_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h130 ") == 0);
     printf("ok    install order: %s\n", calls);
 
     /* --- 3. the non-owning TU installs identically ------------------------- */
     reset();
     assert(user_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h130 ") == 0);
     printf("ok    non-owning TU installs identically (no divergence by includer)\n");
 
     /* --- 4. a NULL vm is refused before anything is registered ------------- */
@@ -83,12 +83,16 @@ main(void)
      * refuses every read of a value; one with helpers but no relocation hands
      * every helper map=0. Both look like a working feature. So any single
      * refusal must fail the whole install. */
-    for (k = 0; k < 5; k++) {
+    /* SEVEN registrations now: reloc, bounds, and helpers 1/2/3/5/130. The clock and the
+     * ringbuf helper are part of the same all-or-nothing set on purpose --- a VM that
+     * resolved a ringbuf map and then had no helper to emit through would give a program
+     * that verifies, runs, and silently drops everything it tried to publish. */
+    for (k = 0; k < 7; k++) {
         reset();
         fail_at = k;
         assert(owner_install(&fake_vm) == -1);
     }
-    printf("ok    install is all-or-nothing at each of the 5 registrations\n");
+    printf("ok    install is all-or-nothing at each of the 7 registrations\n");
 
     /* --- 6. MAP IDENTITY IS THE NAME, NOT THE SHAPE -----------------------
      * The dedup used to compare (key_size, value_size, max_entries) only. Correct
@@ -161,6 +165,85 @@ main(void)
                "different name is private, name+other shape REFUSED\n");
     }
 
-    printf("ok    check_glue: 12 assertions\n");
+    /* --- 7. THE CLOCK ------------------------------------------------------
+     * The most useful addition in the inventory, because without it a program cannot
+     * express "N per second" and every threshold means "ever". Two properties matter: it
+     * must not return 0 (a program comparing against 0 sees no elapsed time, so every
+     * limiter opens), and it must not go backwards. */
+    {
+        uint64_t t1 = ls_h_ktime_get_ns(0, 0, 0, 0, 0);
+        uint64_t t2 = ls_h_ktime_get_ns(0, 0, 0, 0, 0);
+        assert(t1 != 0);
+        assert(t2 >= t1);          /* MONOTONIC, so this cannot regress */
+        printf("ok    bpf_ktime_get_ns non-zero and never regresses (MONOTONIC, not "
+               "REALTIME --- a clock step must not open every limiter)\n");
+    }
+
+    /* --- 8. THE EMIT HELPER, and mostly its REFUSALS ------------------------
+     * Every guard returns before touching the ring. The stub counts what gets through, so
+     * "publish did not happen" is asserted rather than assumed. */
+    {
+        extern int ls_tp_publish_calls;
+        extern unsigned long ls_tp_publish_len;
+        const uint64_t REFUSED = (uint64_t)-1;
+        struct ls_map_def rb = { LS_MAP_TYPE_RINGBUF, 0u, 0u, 4096u, 0u };
+        struct ls_map_def hs = { LS_MAP_TYPE_HASH, 4u, 8u, 64u, 0u };
+        unsigned char sec[2 * sizeof(struct ls_map_def)];
+        unsigned char payload[64];
+        uint64_t ring_idx, hash_idx;
+
+        memcpy(sec, &rb, sizeof rb);
+        memcpy(sec + sizeof rb, &hs, sizeof hs);
+        memset(payload, 0x5a, sizeof payload);
+
+        ls_map_reset_shapes();
+        g_ls_maps = 0;                 /* force this thread's storage to be rebuilt */
+        g_ls_maps_failed = 0;
+
+        /* A RINGBUF descriptor must be ADMITTED: key_size and value_size are 0, which the
+         * hash checks correctly refuse, so it needs its own path. */
+        ring_idx = ls_map_reloc(NULL, sec, sizeof sec, "ring", 0, sizeof rb);
+        assert(ring_idx < LS_MAP_MAX);
+        hash_idx = ls_map_reloc(NULL, sec, sizeof sec, "counts", sizeof rb, sizeof hs);
+        assert(hash_idx < LS_MAP_MAX && hash_idx != ring_idx);
+
+        ls_tp_publish_calls = 0;
+        g_ls_cur_slot = 5;
+
+        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 0, 0, 0) == REFUSED);
+        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload,
+                                   LS_RB_MAX_RECORD + 1, 0, 0) == REFUSED);
+        assert(ls_h_ringbuf_output(ring_idx, 0, 8, 0, 0) == REFUSED);
+        /* A HASH map is not a ring --- emitting through one would publish table bytes. */
+        assert(ls_h_ringbuf_output(hash_idx, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
+        assert(ls_h_ringbuf_output(LS_MAP_MAX + 5, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
+        assert(ls_tp_publish_calls == 0);   /* not one of those reached the ring */
+
+        /* No program running --- reached from anywhere else, refuse. */
+        g_ls_cur_slot = -1;
+        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
+        assert(ls_tp_publish_calls == 0);
+
+        /* And the one case that SHOULD publish. */
+        g_ls_cur_slot = 5;
+        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 32, 0, 0) == 0);
+        assert(ls_tp_publish_calls == 1);
+        assert(ls_tp_publish_len == 32);
+
+        /* A hash operation on the RING slot must be an explicit no-op, not zero-size
+         * arithmetic that happens to work out. */
+        {
+            struct ls_map *rm = ls_map_get(ls_map_current(), ring_idx);
+            uint32_t key = 1; uint64_t val = 2;
+            assert(rm != 0 && rm->is_ring);
+            assert(ls_map_lookup(rm, (const uint8_t *)&key) == 0);
+            assert(ls_map_update(rm, (const uint8_t *)&key, (const uint8_t *)&val) != 0);
+            assert(ls_map_delete(rm, (const uint8_t *)&key) != 0);
+        }
+        printf("ok    bpf_ringbuf_output: 6 refusals (size 0, oversize, NULL, hash map, "
+               "bad index, no program), 1 publish, hash ops on a ring refuse\n");
+    }
+
+    printf("ok    check_glue: 24 assertions\n");
     return 0;
 }
