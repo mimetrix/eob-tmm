@@ -55,6 +55,9 @@
 ?? src/compile/default_whitelist_x86_64.pre-ubpf
 ?? src/modules/hudfilter/ssl/ls_ctx_alpn.c
 ?? src/modules/hudfilter/ssl/ls_ctx_alpn.h
+?? src/base/ls_ctx_sslerr.h
+?? src/base/ls_ssl_cookie.h
+?? src/modules/hudfilter/ssl/ls_ssl_cookie.c
 M src/compile/debug_whitelist_x86_64
 M src/compile/default_whitelist_x86_64
 M src/compile/filelist

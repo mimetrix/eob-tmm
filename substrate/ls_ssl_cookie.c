@@ -39,7 +39,10 @@
 #include "ssl.h"
 #include "ssl_magic.h"
 
-#include "ls_ssl_cookie.h"
+/* ANGLE FORM, not "ls_ssl_cookie.h". This file is compiled in modules/hudfilter/ssl/
+ * while the header lives in base/, so the quoted form would look next to THIS file and
+ * fail. ls_ctx_alpn.c reaches base/ the same way: <local/base/ls_ctx_alpn_abi.h>. */
+#include <local/base/ls_ssl_cookie.h>
 
 unsigned long long
 ls_ssl_cookie(void *scv)

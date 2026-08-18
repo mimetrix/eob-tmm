@@ -41,14 +41,28 @@ SRC="$REPO/substrate"
 echo "=== 1. check sync FIRST --- after the copy the evidence is gone"
 # The check is what stands between a routine copy and deleting a change that only
 # exists in the tree. Run it, show it, and stop unless it is clean.
-if ! sh "$(dirname "$0")/bnk-check-tree-sync.sh" > /tmp/.syncout 2>&1; then
-    if grep -q "ONLY IN TREE" /tmp/.syncout; then
-        sed -n '/ONLY IN TREE/,$p' /tmp/.syncout | head -20
-        echo
-        echo "*** REFUSING TO COPY. Files exist only in the tree; copying would delete"
-        echo "    them with no trace, which is how the map registrations were lost."
-        exit 1
-    fi
+sh "$(dirname "$0")/bnk-check-tree-sync.sh" > /tmp/.syncout 2>&1 || true
+
+# READ THE COUNT, NOT THE PROSE. This grepped for the string "ONLY IN TREE" and matched
+# the check's own ADVICE ("do not copy while anything reads DIFFERS or ONLY IN TREE"),
+# which that script prints on every diverged run. So the guard fired on its own help text
+# and refused every legitimate copy. A guard that cries wolf gets deleted, which is worse
+# than not having one.
+#
+# The verdict line ends "(N only-in-tree, M only-in-repo)". N is a number and cannot be
+# confused with commentary.
+ONLY_TREE=$(sed -n 's/.*(\([0-9]*\) only-in-tree.*/\1/p' /tmp/.syncout | head -1)
+if [ -z "$ONLY_TREE" ]; then
+    echo "*** could not read the only-in-tree count from the sync check --- refusing"
+    echo "    rather than copying on an unparsed verdict."
+    exit 1
+fi
+if [ "$ONLY_TREE" -ne 0 ]; then
+    grep -E "^  ONLY IN TREE" /tmp/.syncout | head -20
+    echo
+    echo "*** REFUSING TO COPY. $ONLY_TREE file(s) exist only in the tree; copying would"
+    echo "    delete them with no trace, which is how the map registrations were lost."
+    exit 1
 fi
 grep -E "DIFFERS|ACKNOWLEDGED|VERDICT|delta" /tmp/.syncout | sed 's/^/  /' || true
 rm -f /tmp/.syncout
@@ -62,9 +76,16 @@ if [ -n "$DRY" ]; then
 else
     tar -C "$SRC" -cf - $(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null) \
       | ssh "$BUILD_BOX" "cd $TREE/base && tar -xf -"
-    scp -q "$SRC/ls_ctx_alpn.c" "$SRC/ls_ctx_alpn.h" \
-        "$BUILD_BOX:$TREE/modules/hudfilter/ssl/" 2>/dev/null || true
-    echo "  copied"
+    # SSL-MODULE FILES, listed explicitly. These are the .c files that must compile in
+    # the ssl module's include world because they touch struct ssl_ctx --- a copy in
+    # base/ would need every -I that module has, which is the build-config guessing the
+    # STDINC split exists to avoid. Their HEADERS stay in base/ and are reached as
+    # <local/base/...>, so only the .c moves.
+    for f in ls_ctx_alpn.c ls_ctx_alpn.h ls_ssl_cookie.c; do
+        [ -f "$SRC/$f" ] || { echo "  *** $SRC/$f missing"; exit 1; }
+        scp -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
+    done
+    echo "  copied (base/ + 3 ssl-module files)"
 fi
 
 echo
