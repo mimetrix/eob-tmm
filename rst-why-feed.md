@@ -12,9 +12,26 @@ measured output, not a design sketch.
 ## 1. What a record looks like
 
 ```json
-{"ts_ns":1786983692844260842,"seq":0,"tmm":5,"hook":"reset","schema":1,
- "file":"http_mr_proxy.c","line":993,"err":32,"reason":0}
+{"ts_ns":1787066626925893333,"seq":162,"tmm":5,"hook":"reset","fn":"rst_why","schema":3,
+ "file":"http_mr_proxy.c","line":993,"err":32,"reason":0,
+ "flow":"00003a0c137fafba","cause":"Closing"}
 ```
+
+Twelve fields, drained from a live pod on 2026-08-18. **This section showed a nine-field
+schema-1 record until then**, which is worth flagging rather than quietly replacing: the
+record has GAINED fields, and a reader comparing a current record against the old
+example would reasonably think three had gone missing.
+
+| added | when | why it matters |
+|---|---|---|
+| `cause` | Phase 3, when the trampoline began forwarding all six arguments | At `flow_table.c:2618` the cause is `flow_reject_cause[flow_reject_code]` — a runtime lookup into an 18-entry table. No amount of reading the source recovers which entry applied. |
+| `flow` | the flow cookie, from `UFLOW_COOKIE(uf)` | Gives CARDINALITY: 3 records across 2 flows is one client hammering, 12 across 12 is systemic. Not identity — the 5-tuple does not fit the remaining ctx budget. |
+| `fn` | when each of the four `RST_WHY*` functions got its own slot | `hook` stays `"reset"` for all four so a consumer keyed on it does not break; `fn` names which one fired. |
+
+`schema` went 1 → 3 alongside those, and that is load-bearing: `struct ls_ctx_rst` changed
+layout (`file[]` shrank 48 → 32 → 28 to make room), so a consumer built against schema 1
+would read `line` out of the middle of a filename. The version is the only thing between
+a layout change and silently wrong decoded output.
 
 Read out of the segment by `substrate/drain/ls_drain.c`, which writes JSON lines to
 stdout and nothing else — pipe it to a file, `jq`, or a broker publisher.
