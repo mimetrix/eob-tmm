@@ -51,6 +51,29 @@ CASES = [
      "to know this is the sixth. Declares a standard SEC(\"maps\") hash and calls "
      "helpers 1/2/3; PREVAIL verifies it UNCHANGED, which is why maps needed no "
      "verifier work at all."),
+    ("sslerr_watch.bpf.c", "fentry/ssl__err", True,
+     "tmm:ssl:err. Verifies and works --- and is DISQUALIFIED as a headline by test 2 of "
+     "the uniqueness screen: ssl__err already logs its reason at LOG_WARNING with "
+     "function, line, alert and the INTERPOLATED message, which is more than an entry "
+     "hook gets. Proven from the binary: \"Connection error\" occurs 4 times in "
+     "tmm.no_pgo. Kept as a working artifact and as the record of why a site can pass "
+     "the iRule test and fail the log test."),
+    ("h2abort_watch.bpf.c", "fentry/http2_stream_abort", True,
+     "tmm:http2:abort --- the one hook of the four whose reason reaches NOTHING else. "
+     "http2_stream_abort's only narration is TRACES() inside #if HTTP2_DEBUG, which the "
+     "build leaves undefined, so \"initiates ABORT in\" occurs 0 times in the shipped "
+     "binary. 36 call sites, 23 distinct reason literals. Keyed by error code rather "
+     "than by reason string because a program cannot iterate its own map, so a "
+     "string-keyed table could be filled and never summarised."),
+    ("rate_gate.bpf.c", "fentry/rst_why", True,
+     "WHAT THE CLOCK AND THE EMIT HELPER BOUGHT. Rate, not total: without "
+     "bpf_ktime_get_ns every threshold means \"ever\" (rate_watch's \"over 5\" is true "
+     "on a healthy box after an hour), and without bpf_ringbuf_output the host publishes "
+     "per event so a program cannot decide what is worth emitting. One record per site "
+     "per second instead of one per event. NOTE it carries 4 BACKWARD JUMPS and passes "
+     "--termination anyway: they are clang tail-merging to a shared map_update+return "
+     "block, not iteration. 'Zero backedges' is a proxy that coincides with 'no loops' "
+     "for straight-line programs and is not the test --- --termination is."),
     ("http_waived_watch.bpf.c", "fentry/tmm_l7_http_headers", True,
      "the WAIVED class: malformed AND forwarded anyway. Verifies and decodes, but "
      "has NEVER selected a live record: every client-side waiver is gated on "
