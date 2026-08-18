@@ -149,6 +149,8 @@ cat <<'EOT'
     - Per-invocation cost is UNMEASURED. Quote no per-call number.
     - LS_VM_JIT=1, and uBPF's compiled path never consults the bounds callback, so
       this run does not exercise memory safety --- only functionality.
-    - The record carries NO flow identity. Records correlate by timestamp and
-      thread, not to a request. Site-and-cause attribution is the claim.
+    - The record carries a FLOW COOKIE, not a client identity. That gives
+      CARDINALITY --- 3 records across 2 flows is one client hammering, 12 across
+      12 is systemic --- and it does NOT give you the 5-tuple, so "which client"
+      is still unanswered. Site, cause and same-flow-or-not is the claim.
 EOT

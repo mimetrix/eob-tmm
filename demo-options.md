@@ -171,35 +171,107 @@ error bars.
 
 ---
 
-## 4b. BNK demo focus — CVE work deferred to classic BIG-IP (2026-08-18)
+## 4b. The BNK demo — four parts (2026-08-18)
 
 Decision: **the BNK demo does not include CVE mitigation.** The survey
-(`cve-survey-bnk.md`) showed BNK's 3,068 tracked CVEs are ~99.9% dependency CVEs in
-separate containers — Go stdlib, Python, Istio, OS packages — which a TMM-resident
-mechanism cannot reach, and mitigating a non-CVE internal finding is marginal as a
-business claim. CVE work moves to classic BIG-IP, where the OpenSSL/crypto CVEs
-actually are, once a build/deploy environment exists for it.
+(`cve-survey-bnk.md`) showed BNK's 3,068 tracked CVEs are overwhelmingly dependency
+CVEs in separate containers, and §1.2 there gives the reason that actually settles it
+--- a shield does not change a package version, so the scanner still reports the
+finding. CVE work moves to classic BIG-IP, where the pain is exploitability rather
+than an audit report.
 
-So the BNK story is what the mechanism does that nothing else can, ranked by
-value over cost:
+A second decision, same date: **shielding an internal non-CVE finding is out too.**
+The only BNK-reachable candidate was `ssl_alpn_match`, whose fix F5 shipped on
+2026-07-28 (`c806f1b2e8`, BZ-2407289 / BZ-2407329), so demonstrating it required
+putting the defect back. `substrate/shields/alpn_guard.bpf.c` is written, PREVAIL
+passes it, and its loop is fully unrolled (verified: **zero backward jumps in the
+object**) --- it is kept as a working artifact, not a demo. **The deliberate revert
+has been restored in the build tree**, so no lineage carries the hole from here on.
 
-| # | capability | state | cost |
+The demo is therefore four parts, each making a claim the previous one does not:
+
+| # | part | the claim | state |
 |---|---|---|---|
-| 1 | **Reset feed** — every reset decision, by source line and reason, live | **works** | a scripted walkthrough |
-| 2 | **Rates, not just events** — a timer hook aggregating in place | not built | small; `ls_prep` already runs on a TMM timer |
-| 3 | **Which client** — 5-tuple on top of the flow cookie | cookie landed | needs ctx budget or Phase 4 |
-| 4 | **Admission control decided in the data plane** — §3a | `rate_watch` proves the shape | days |
-| 5 | **Per-call cost** — not a demo, but gates every review | unmeasured | needs `perf_event_paranoid` <= 1 on the node |
+| 1 | **Reset feed** | TMM reports *its own* decisions --- every reset, by source line and reason, attributed to a flow | **works**; blocked only on a rebuild |
+| 2 | **What the 5-byte pad buys** | arm and disarm a live data plane with **nothing displaced** and byte-identical restore | mechanism proven; needs one sharp measurement |
+| 3 | **A tracepoint worth having** | pick a site whose answer *nothing else can give* --- see below | **site chosen**, builder not written |
+| 4 | **Hook an arbitrary function** | the hook was chosen **after the binary shipped**, and is armed on request | mechanism proven; needs name-based arming |
+
+**Part 3's site: `ssl__err` --- why the TLS handshake failed.**
+
+Found by asking what support actually asks, rather than by searching for hook points.
+It is the TLS twin of `rst_why`, and the resemblance is structural, not by analogy:
+
+```c
+#define ssl_err(sc, a, ...) ssl__err(sc, a, __func__, __LINE__, __VA_ARGS__)
+
+err_t ssl__err(struct ssl_ctx *sc, enum ssl_alert alert,
+               const char *func, int line, ...);
+```
+
+| property | value |
+|---|---|
+| call sites | **475**, across 8 files |
+| arguments | all in registers: `sc`=a0, `alert`=a1, `func`=a2, `line`=a3, message=a4 |
+| message is a plain literal | **462 of 475 (97%)** --- so the captured string IS the whole message |
+| message is a format string | 3 (1%) --- there we capture the format, not the interpolation |
+| alert codes | `internal_error` 210, `illegal_parameter` 110, `handshake_failure` 63, `unexpected_message` 20 |
+
+**Why it is worth having, stated as the test the last tracepoint failed.** The HTTP
+tracepoint was rolled back because iRules already saw every field it captured
+(`hook-types.md` §3.4). This one passes that test: an iRule sees
+`CLIENTSSL_HANDSHAKE` fail and does **not** see why. The alert code alone is no help
+--- 210 sites say `internal_error` --- so the diagnosis is the *site plus the
+message*, which is exactly what the macro captures and nothing exposes.
+
+It also needs no new machinery. Same shape as the reset family: direct scalar and
+string arguments, `sc` yields the flow cookie the same way `uf` does, and `__func__`
+is strictly better than `rst_why`'s `__FILE__` because it names the function rather
+than the file.
+
+Two caveats to state rather than discover:
+
+- It is a **varargs** call site, and `trampoline_x86_64.S` does not save xmm0-15 ---
+  the caveat already recorded in `ls_slots.h` for `rst_why_va`. A clobber would
+  corrupt the *formatted* text downstream, not our record.
+- `ssl__err` itself does the `vsnprintf` into the global `ssl_msgbuf`, so the
+  interpolated text exists but only *after* entry. An entry hook sees the format.
+
+**PARKED: the timer hook.** It was going to make part 2 of an earlier plan --- a
+program running on a clock rather than on traffic, so it could roll its own counters
+up into one record per second instead of emitting one per event. Real value when a
+hook is armed on a per-packet site. Parked because the demo produces ~30 records,
+not 30,000, so it optimises a problem nobody has yet, and parts 2 and 4 above make
+strictly stronger claims for the same effort. `ls_prep` already runs on a TMM timer,
+so the event source stays cheap to add later.
 
 **The claim to lead with, which is provable today:**
 
 > A verified program can be loaded into a running TMM and armed at a function entry
-> with no restart — and it reports every reset decision the data plane makes, by
+> with no restart --- and it reports every reset decision the data plane makes, by
 > source line and reason, attributed to a flow.
 
 Nothing about that needs a CVE, and none of it is reachable from iRules or WASM.
 
----
+### 4b.1 What blocks part 1 right now, and it is not the mechanism
+
+The cluster runs `tmm:hookid2`. Its `tmm64.no_pgo` hashes `bd9d88c6...`; the build
+tree's binary hashes `158e4ce0...` --- **same size, 203,401,032 bytes, different
+binary.** The tree was rebuilt after the image was made, and the debuginfo DEBs were
+deleted in the disk cleanup, so the deployed binary (stripped) has **no symbol source
+at all**. `rst_why` is at `0x144e3c0` in the tree; `bnk-demo-reset-feed.sh` documents
+`0x144df40`; neither can be confirmed against the running pods.
+
+So a rebuild is not optional, and the failure mode if it is skipped is the silent one
+from 2026-08-17: a stale address arms a neighbouring function that also carries a nop
+pad, arming reports `OK ARMED LIVE`, and `fired` stays 0.
+
+**The fix worth building instead of working around:** arming takes a hand-typed hex
+address, and `mk_hook_map.py` already resolves every entry address offline. Bake the
+map into the image, resolve by NAME, and refuse when the map's build ID does not match
+the running binary. That removes the hex from parts 1, 2 and 4 --- part 4 in
+particular only lands if resolving an arbitrary name is instant --- and converts a
+silent mis-arm into a hard error.
 
 ## 5. Recommendation
 

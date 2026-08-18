@@ -236,6 +236,9 @@ Full tier breakdown in `rst-why-feed.md`.
 2. **PMU counters as a helper.** Unblocks the number every reviewer asks for. Not a
    hook type, which is why it is fast.
 3. **Timer hook.** Small, reuses existing machinery, turns a record stream into rates.
+   **PARKED 2026-08-18** --- see `demo-options.md` §4b. It optimises record volume, and
+   the BNK demo produces ~30 records rather than 30,000, so there is no volume problem
+   to solve yet. Unpark it when a hook is armed on a per-packet site.
 4. **Exit probes** --- after the borrow-or-build question is answered by experiment
    rather than argument.
 5. **Watchpoints** --- prototype outside TMM first. Its delivery path is genuinely

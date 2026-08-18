@@ -1,5 +1,18 @@
 # `tmm:vuln-alpn` — a deliberately vulnerable build
 
+> **RETIRED 2026-08-18. The revert is no longer in the build tree.** The BNK demo
+> dropped shielding entirely --- CVE work moved to classic BIG-IP, and shielding an
+> internal non-CVE finding was judged marginal as a business claim, so there is no
+> longer any reason to carry the defect. `git checkout
+> src/modules/hudfilter/ssl/ssl.c` has been run on the build box; the bounds check
+> is back and `git status` there is clean for that file. `alpn_guard.bpf.c` is kept
+> as a working artifact (PREVAIL passes it; the object has zero backward jumps, so
+> its loop really is unrolled) but nothing demos it.
+>
+> This page stays as the record of what was done and why, and as the handling rules
+> if the defect is ever reintroduced. **Do not reintroduce it without re-reading the
+> handling rules below.**
+
 **This image contains a known security defect on purpose. It exists to validate a
 mitigation and must never be deployed anywhere but the lab cluster.**
 
