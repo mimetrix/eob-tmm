@@ -35,7 +35,8 @@ clean). On aarch64 those skip loudly rather than silently passing.
 *elsewhere* — `gitswarm.f5net.com/tmm/tmm` (MBIP), built with `make tmm-gdb`. Everything that tree
 needs is in [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md): eight `filelist` entries,
 23 whitelist symbols per variant, one compiler flag, and why `ls_prep.c` is the one file without
-`STDINC`. **No F5 source file is modified** — that is checkable, and worth checking.
+`STDINC`. **No existing F5 function body is modified** — checkable, and worth checking. The tree
+does gain 39 files and three edited build-configuration files; see `DOC-STATUS.md`.
 
 **2. It is not the cluster.** Reproducing the live arm needs a BNK build box and a datkube cluster.
 [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) stands both up from nothing.

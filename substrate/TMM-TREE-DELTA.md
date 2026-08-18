@@ -5,9 +5,12 @@ build tree. That split is the reason someone can read every file here and still 
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
 **The headline property — and read the scope carefully, because it changed.** The **shield**
-modifies no F5 source file: it adds new files, `filelist` and whitelist entries, and one compiler
-flag. That constraint is real and load-bearing, because the shield targets a TMM that is *already
-running*.
+adds 39 files and ~7,200 lines into `src/base/` and `src/modules/hudfilter/ssl/`, edits three
+build-configuration files (`filelist` and the two globals whitelists), and adds a
+`Makefile.overrides`. **No existing F5 function BODY is edited** --- that is the accurate form of
+the claim, and it is smaller than "modifies no F5 source file", which this file used to say: nothing
+is spliced into TMM's own logic, because startup registers through the `INIT_FUNC` linker set. That
+constraint is real and load-bearing, because the shield targets a TMM that is *already running*.
 
 The **tracepoint** (§6b) does edit two F5 source files, deliberately, because a tracepoint is a
 build-time decision about what TMM should expose and a call site is the correct mechanism for one.
@@ -116,13 +119,42 @@ Three traps here, each of which cost a build:
 
 ## 4. `Makefile.overrides`
 
-```
--fpatchable-function-entry=5,0
+A new file, consumed at a sanctioned extension point --- `Makefile.inc:116` includes it when it
+exists. Its whole contents:
+
+```make
+CFLAGS      += -I$(TOPDIR)/.ubpf/vm/inc
+DEVFS_LIBS  += $(TOPDIR)/.ubpf/build/lib/libubpf.a
+CFLAGS_OPTIMIZE += -fpatchable-function-entry=5,0
 ```
 
-Reserves 5 bytes after `endbr64` at every function entry the build emits out-of-line. Applied to
-**every TMM compilation**; it reaches none of the two dozen separately-built components, which is a
-property of how the binary is assembled, not of the flag.
+The flag reserves 5 bytes after `endbr64` at every function entry the build emits out-of-line.
+Applied to **every TMM compilation**; it reaches none of the two dozen separately-built components,
+which is a property of how the binary is assembled, not of the flag.
+
+**The third line was `:=` until 2026-08-18, and that was a defect.** It read
+
+```make
+CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0
+```
+
+which REPLACED the tree's own selection rather than appending to it. `Makefile.inc:96-100` chooses
+`-Os` when `VADC_TRIAL=yes` and `-O2` otherwise, so the override silently forced a VADC trial build
+from `-Os` to `-O2` --- a change in build behaviour well beyond adding a flag, and one nobody asked
+for. It went unnoticed because the default build selects `-O2` anyway, so the common case was
+identical and only the trial variant was affected.
+
+Verified by expanding the variable rather than by rebuilding:
+
+| build | before (`:=`) | after (`+=`) |
+|---|---|---|
+| default | `-O2 -fpatchable-function-entry=5,0` | `-O2 -fpatchable-function-entry=5,0` (unchanged) |
+| `VADC_TRIAL=yes` | `-O2 ...` --- **forced** | `-Os ...` --- the tree's choice preserved |
+
+Ordering that makes `+=` correct: `src/compile/Makefile:46` includes `Makefile.inc`, which sets
+`CFLAGS_OPTIMIZE` at `:96-100` and then includes this file at `:116`, so the append lands on
+whichever level the tree chose. `src/compile/Makefile:69` clears the variable only under
+`DISABLE_OPTIMIZATION=YES`, where losing the pads is the right outcome.
 
 ## 5. Why `ls_prep.c` has no `STDINC` — the include-world split
 

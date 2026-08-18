@@ -18,7 +18,7 @@ here is established for appliance or VE — whether those share this source tree
 | Disarm and re-arm | **runs** | nops restored, fire count stops |
 | The hook is really on the request path | **measured** | `http_parse_client_headers` fired **16,000 across 16,000 requests**, 1:1 |
 | Loading while traffic flows | **measured** | 10 loads during 9,000 requests, 0 failures, percentiles unchanged |
-| Modifies no F5 source file | **holds** | `INIT_FUNC` registration; `http_psm.c` pristine |
+| Splices nothing into TMM's own logic | **holds** | `INIT_FUNC` registration; `http_psm.c` pristine. NOTE: the tree still gains 39 files / ~7,200 lines and three edited build-configuration files --- "modifies no F5 source file" was the old, looser phrasing |
 | A shield changing a request's outcome | **not shown** | every program armed live returns `FALLTHROUGH` by construction |
 | Per-call cost of an armed hook | **unmeasured** | §7 |
 | Runtime time guard (fuel) | **absent** | §7 — the JIT ignores the instruction limit |

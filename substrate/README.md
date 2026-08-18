@@ -21,7 +21,7 @@ is unmeasured**.
 |---|---|
 | [`ls_vm.c`](ls_vm.c), [`ls_vm.h`](ls_vm.h) | The VM wrapper: create, load ELF, JIT-compile, publish into a slot, and the O14 section/symbol identity check. Item **3**. |
 | [`ls_vm_load.c`](ls_vm_load.c) | The runtime load path — the socket loader thread, the `shield_msg` dispatch, and the prepare handoff onto a TMM poll thread (preparation cannot run on a thread we create; TMM aliases `malloc` to a per-core allocator whose spinlock is never initialized there). Item **3**. |
-| [`ls_prep.c`](ls_prep.c) | The TMM-side glue: the periodic timer that drains the handoff, and the `INIT_FUNC(INIT_LATE, …)` registration that is **why no F5 source file is modified**. The one file without `STDINC` — see `TMM-TREE-DELTA.md` §5. |
+| [`ls_prep.c`](ls_prep.c) | The TMM-side glue: the periodic timer that drains the handoff, and the `INIT_FUNC(INIT_LATE, …)` registration that is **why nothing is spliced into TMM's own logic**. The one file without `STDINC` — see `TMM-TREE-DELTA.md` §5. |
 | [`ls_arm.c`](ls_arm.c), [`ls_arm.h`](ls_arm.h) | Writing the patch into live code and taking it back out. Item **2**. |
 | [`ls_swap.c`](ls_swap.c) | The `text_poke_bp` protocol in userspace: INT3, `membarrier(SYNC_CORE)`, tail, sync, real opcode. Item **0b**. |
 | [`ls_tramp.c`](ls_tramp.c), [`trampoline_x86_64.S`](trampoline_x86_64.S) | The trampoline — one of them, shared by every armed hook. Item **1**. |

@@ -19,7 +19,8 @@ effort rather than as a list of things left undone.
 > but the substrate has since moved past every objection in it. It now respects TMM's include-world
 > split (`ls_prep.c` carries the `-nostdinc` half, `ls_vm_load.c` the `STDINC` half, and only a
 > `void(void)` crosses), registers itself through TMM's own `INIT_FUNC` linker set, and **modifies
-> no F5 source file** — `http_psm.c` is pristine. What a submittable change requires is no longer
+> nothing spliced into TMM's own logic** — `http_psm.c` is pristine, though the tree gains 39 files
+> and three edited build-configuration files. What a submittable change requires is no longer
 > only reconnaissance: see [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md).
 
 Scope throughout: **BNK / MBIP**, x86-64, `tmm/tmm` at `e2104734a9`, on an Intel Xeon Gold 6348

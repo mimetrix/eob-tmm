@@ -388,7 +388,8 @@ git status on http_psm.c : clean
 ```
 
 What the substrate adds to the TMM tree is now **new files plus build configuration** — `filelist`
-entries, whitelist entries, and the `-fpatchable-function-entry` flag. No F5 source file is touched.
+entries, whitelist entries, and the `-fpatchable-function-entry` flag. No existing F5 function body
+is touched --- though 39 files are added to the tree and three build-configuration files are edited.
 
 ---
 

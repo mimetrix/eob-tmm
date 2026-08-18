@@ -41,7 +41,10 @@
 > 2. **Designed-in call sites are gone.** This document weighed them against patched function entries
 >    and treated both as live options. They were **removed from the TMM tree**, because their reach is
 >    fixed at build time and therefore cannot cover the unforeseen function a CVE lands on. The
->    substrate now modifies **no F5 source file**. Passages arguing the trade-off are kept as the
+>    substrate now splices **nothing into TMM's own logic** --- startup registers through the
+>    `INIT_FUNC` linker set. The tree does still gain 39 files and ~7,200 lines plus three edited
+>    build-configuration files; "modifies no F5 source file" was the older, looser phrasing.
+>    Passages arguing the trade-off are kept as the
 >    record of why the decision went this way; forward-looking claims that assumed both mechanisms
 >    have been corrected. Where "designed-in" refers to **USDT tracepoints**, it is still accurate and
 >    is left alone.
