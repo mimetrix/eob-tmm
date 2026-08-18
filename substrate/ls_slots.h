@@ -60,6 +60,29 @@
 #define LS_CTX_SLOT_RST_VA  6   /* rst_why_va --- same 6 named args as rst_why   */
 #define LS_CTX_SLOT_RST_PRE 3   /* rst_why_preserve --- 5 args, cause in arg4    */
 
+/*
+ * ssl__err --- why the TLS handshake or record layer failed. 475 call sites.
+ *
+ *   ssl__err(sc, alert, __func__, __LINE__, ...)
+ *      a0 sc      struct ssl_ctx *   -> flow cookie via ls_ssl_cookie()
+ *      a1 alert   enum ssl_alert
+ *      a2 func    const char *       __func__, NOT __FILE__
+ *      a3 line    int
+ *      a4 msg     const char *       the FIRST VARARG
+ *
+ * Slot 8 needed the trampoline expanded from 8 slots to 12 --- see the LS_TRAMP
+ * expansions in trampoline_x86_64.S. Sharing an existing slot was the alternative and
+ * is exactly the 2026-08-17 failure this file was created to prevent: two hooks of
+ * different ctx shapes on one slot means the wrong builder runs and produces a record
+ * of the right length and the wrong meaning.
+ *
+ * VARARGS, like rst_why_va: the message is the first vararg, so it arrives in r8 and
+ * the same xmm caveat applies --- the trampoline saves no xmm registers, and a varargs
+ * site may have passed FP arguments there with rax as the vector count. A clobber
+ * corrupts the formatted text downstream, not our record.
+ */
+#define LS_CTX_SLOT_SSLERR  8   /* ssl__err --- ls_ctx_sslerr_build              */
+
 /* Distinctness, checked by the compiler rather than by reading. Pairwise because
  * the set is small and an enum would not catch a duplicated explicit value. */
 _Static_assert(LS_CTX_SLOT_SHIELD != LS_CTX_SLOT_PARSE,
@@ -91,5 +114,24 @@ _Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_SHIELD,  "slot collision: r
 _Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_TP,      "slot collision: rst_pre_va/tp");
 _Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_ALPN,    "slot collision: rst_pre_va/alpn");
 _Static_assert(LS_CTX_SLOT_RST_PRE_VA != LS_CTX_SLOT_PARSE,   "slot collision: rst_pre_va/parse");
+
+/* Slot 8 against all eight predecessors. The pairwise list is O(n^2) and is starting to
+ * show it --- worth replacing with a designated-initialiser table if a tenth slot
+ * arrives, since a duplicate index there is a compile error too and costs one line per
+ * slot instead of n. Kept pairwise for now because changing the mechanism and adding a
+ * slot in the same edit is how the thing being guarded slips through. */
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_SHIELD,     "slot collision: sslerr/shield");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_TP,         "slot collision: sslerr/tp");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_RST_PRE_VA, "slot collision: sslerr/rst_pre_va");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_RST_PRE,    "slot collision: sslerr/rst_pre");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_ALPN,       "slot collision: sslerr/alpn");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_RST,        "slot collision: sslerr/rst");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_RST_VA,     "slot collision: sslerr/rst_va");
+_Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_PARSE,      "slot collision: sslerr/parse");
+
+/* And that it FITS. A slot number the trampoline never expanded is refused at arm time
+ * by ls_arm.c, but that is a run-time discovery of a build-time mistake. */
+_Static_assert(LS_CTX_SLOT_SSLERR < 12,
+               "slot >= the 12 LS_TRAMP expansions in trampoline_x86_64.S --- expand it");
 
 #endif /* LS_SLOTS_H */

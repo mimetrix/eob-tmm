@@ -54,6 +54,12 @@
 #define LS_TP_HOOK_RST_VA      5u      /* rst_why_va --- varargs form           */
 #define LS_TP_HOOK_RST_PRE     6u      /* rst_why_preserve --- 5 args, no reason*/
 #define LS_TP_HOOK_RST_PRE_VA  7u      /* rst_why_preserve_va                   */
+/* ssl__err --- why the TLS handshake or record layer failed. A DIFFERENT hook family
+ * from the reset four, so it gets its own `hook` string in the drain ("sslerr") rather
+ * than joining "reset": a consumer filtering on hook must be able to separate "TMM tore
+ * the connection down" from "TLS failed", which are different questions with different
+ * owners. */
+#define LS_TP_HOOK_SSLERR      8u      /* ssl__err --- 475 call sites           */
 
 /* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
  * the wrong stride now, so it must fail rather than decode plausible garbage. */
@@ -63,6 +69,11 @@
  * version is the only thing standing between a layout change and silently wrong
  * decoded output --- bump it in the SAME edit as the struct, every time. */
 #define LS_TP_SCHEMA_RST       3u      /* struct ls_ctx_rst, 92 bytes + cookie  */
+/* struct ls_ctx_sslerr, 96 bytes --- AT the measured PREVAIL ctx ceiling, not under it.
+ * A distinct schema rather than a variant of 3: the field layout shares nothing with
+ * the reset record beyond the cookie, so a consumer must not be able to decode one as
+ * the other. That is the whole job of this number. */
+#define LS_TP_SCHEMA_SSLERR    4u
 
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and
@@ -124,6 +135,8 @@ ls_tp_schema_for(unsigned int hook_id)
     case LS_TP_HOOK_HTTP2_HDRS:
     case LS_TP_HOOK_HTTP3_HDRS:
         return LS_TP_SCHEMA_HTTP;
+    case LS_TP_HOOK_SSLERR:
+        return LS_TP_SCHEMA_SSLERR;
     default:
         /* An unknown hook must NOT default to a real schema --- that is exactly how a
          * reset record came out labelled HTTP. 0 is not a valid schema, so the

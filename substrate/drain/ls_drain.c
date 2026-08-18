@@ -145,6 +145,88 @@ emit_rst(const struct ls_rec *h, const struct rst_rec *r)
     printf("\"}\n");
 }
 
+/* SIZES PINNED HERE TOO. Each of these layouts is defined in THREE places --- the host
+ * builder's header, the program's mirror, and this file --- because the drain is a
+ * separate process sharing only bytes. Nothing compared the third against the other two.
+ * A drain struct one byte off decodes every field past the divergence from the wrong
+ * offset and prints plausible values, which is worse than refusing.
+ *
+ * These asserts are cheap and they are the only thing standing between a header edit and
+ * a consumer that silently misreads the feed. */
+_Static_assert(sizeof(struct rst_rec) == 92, "rst_rec must match struct ls_ctx_rst (92)");
+_Static_assert(sizeof(struct http_rec) == 44, "http_rec must match the 44-byte HTTP record");
+
+/* struct ls_ctx_sslerr --- substrate/ls_ctx_sslerr.h. WHY the TLS handshake or record
+ * layer failed, from the site inside TMM that decided it. 96 bytes: AT PREVAIL's ctx
+ * ceiling rather than under it, so this layout cannot grow. */
+struct sslerr_rec {
+    uint32_t cookie_lo, cookie_hi;   /* same cookie the reset record carries */
+    uint32_t lineno, alert, func_len, msg_len;
+    char     func[32];               /* __func__ --- ssl_err passes no __FILE__ */
+    char     msg[40];                /* the first vararg                        */
+};
+
+/* The TLS AlertDescription, named. Rendering it matters more than it looks: the alert is
+ * the ONE part of this a client can also see, so naming it is what lets someone line up
+ * "my browser said handshake_failure" with the site inside TMM that sent it. Numbers are
+ * the wire values from RFC 8446 §6.2 and its predecessors. */
+_Static_assert(sizeof(struct sslerr_rec) == 96,
+               "sslerr_rec must match struct ls_ctx_sslerr (96, AT PREVAIL's ceiling)");
+
+static const char *
+ssl_alert_name(uint32_t a)
+{
+    switch (a) {
+    case 0:   return "close_notify";
+    case 10:  return "unexpected_message";
+    case 20:  return "bad_record_mac";
+    case 22:  return "record_overflow";
+    case 40:  return "handshake_failure";
+    case 42:  return "bad_certificate";
+    case 43:  return "unsupported_certificate";
+    case 46:  return "certificate_unknown";
+    case 47:  return "illegal_parameter";
+    case 48:  return "unknown_ca";
+    case 50:  return "decode_error";
+    case 51:  return "decrypt_error";
+    case 70:  return "protocol_version";
+    case 80:  return "internal_error";
+    case 112: return "unrecognized_name";
+    /* Not a fallback to a plausible name: an alert we do not know is reported as its
+     * number, so a reader sees an unfamiliar value rather than a wrong label. */
+    default:  return "";
+    }
+}
+
+static void
+emit_sslerr(const struct ls_rec *h, const struct sslerr_rec *r)
+{
+    uint32_t fn = r->func_len < sizeof r->func ? r->func_len : (uint32_t)sizeof r->func;
+    uint32_t mn = r->msg_len  < sizeof r->msg  ? r->msg_len  : (uint32_t)sizeof r->msg;
+    const char *an = ssl_alert_name(r->alert);
+
+    /* `fn` here is __func__, so it names the FUNCTION rather than the file --- the
+     * opposite way round from the reset record, which has __FILE__ and no function. Both
+     * fields are emitted under the names that say which is which: "func" not "file". */
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"sslerr\","
+           "\"schema\":%u,\"func\":\"",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           h->schema_id);
+    ls_json_str(r->func, fn);
+    printf("\",\"line\":%u,\"alert\":%u,\"alert_name\":\"%s\",",
+           r->lineno, r->alert, an);
+    /* TRUNCATION REPORTED, not hidden. func_len or msg_len at MAX-1 means the string was
+     * cut --- 4.4% of function names and 11.2% of messages across the 475 sites. A
+     * consumer diffing records needs to know it is comparing a prefix. */
+    printf("\"truncated\":%s,",
+           (fn == sizeof r->func - 1 || mn == sizeof r->msg - 1) ? "true" : "false");
+    /* The SAME cookie the reset record carries for this connection, so the two feeds
+     * join on it: "TLS failed here, then the connection was reset there". */
+    printf("\"flow\":\"%08x%08x\",\"msg\":\"", r->cookie_hi, r->cookie_lo);
+    ls_json_str(r->msg, mn);
+    printf("\"}\n");
+}
+
 static const char *
 hook_name(uint32_t id)
 {
@@ -156,6 +238,7 @@ hook_name(uint32_t id)
     case LS_TP_HOOK_RST_VA:
     case LS_TP_HOOK_RST_PRE:
     case LS_TP_HOOK_RST_PRE_VA: return "reset";
+    case LS_TP_HOOK_SSLERR:     return "sslerr";
     default:                    return "?";
     }
 }
@@ -270,10 +353,31 @@ main(int argc, char **argv)
              * reader. A STREAM ring that is read but never acknowledged fills,
              * and TMM starts counting drops that nothing caused. */
             while ((n = ls_ring_consume(r, &h, buf, sizeof buf)) >= 0) {
-                if (h.hook_id == LS_TP_HOOK_RST && n == (int)sizeof(struct rst_rec))
+                /* DISPATCH ON SCHEMA, NOT HOOK ID. This read `h.hook_id ==
+                 * LS_TP_HOOK_RST`, which is id 4 --- plain rst_why alone. The reset
+                 * family has four ids (4,5,6,7) all sharing schema 3, so records from
+                 * rst_why_va, rst_why_preserve and rst_why_preserve_va never matched and
+                 * fell through to emit_raw as hex.
+                 *
+                 * That is the SECOND HALF of the 2026-08-17 bug, left undone. The
+                 * producer was fixed then --- ls_tp_schema_for() stopped labelling three
+                 * of the four as HTTP --- but the consumer kept keying on one id. So the
+                 * pair still disagreed, just in the other direction, and it went unseen
+                 * because only rst_why was armed in the runs afterwards.
+                 *
+                 * The separation is the fix: SCHEMA decides the LAYOUT (it is the version
+                 * of the byte format), hook_id decides only the LABEL, which is what
+                 * rst_fn_name already does. */
+                if (h.schema_id == LS_TP_SCHEMA_RST && n == (int)sizeof(struct rst_rec))
                     emit_rst(&h, (const struct rst_rec *)buf);
                 else if (h.schema_id == LS_TP_SCHEMA_HTTP && n == (int)sizeof(struct http_rec))
                     emit_http(&h, (const struct http_rec *)buf);
+                /* The LENGTH is checked as well as the schema, for every shape. A schema
+                 * saying "sslerr" over a payload of the wrong size is a producer bug, and
+                 * decoding it anyway would print plausible fields read from the wrong
+                 * offsets. Falling through to emit_raw makes it visible instead. */
+                else if (h.schema_id == LS_TP_SCHEMA_SSLERR && n == (int)sizeof(struct sslerr_rec))
+                    emit_sslerr(&h, (const struct sslerr_rec *)buf);
                 else
                     emit_raw(&h, buf, n);
                 delivered++;

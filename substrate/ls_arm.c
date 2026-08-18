@@ -265,8 +265,23 @@ extern void ls_trampoline_entry(void);
  * `reason`, which is 0, so every record came back with an empty cause. Nothing
  * failed and nothing logged.
  */
-#define LS_TRAMP_SLOTS 8
+#define LS_TRAMP_SLOTS 12
 extern void *const ls_trampoline_table[LS_TRAMP_SLOTS];
+
+/*
+ * PUBLISHED BY THE ASSEMBLY, so this constant is checked rather than trusted.
+ *
+ * The slot count lived in three places that had to agree by hand: the LS_TRAMP
+ * expansions in trampoline_x86_64.S, LS_TRAMP_SLOTS here, and LS_MAX_SLOTS in
+ * ls_vm.c. Nothing compared them. If a C-side constant were ever the larger,
+ * ls_trampoline_table[slot] would read PAST THE END of a .rodata array and arm the
+ * hook at whatever bytes followed --- writing a wild call target into live .text,
+ * which is the worst failure available here.
+ *
+ * An extern array of unspecified size cannot be size-checked by the linker, so the
+ * count crosses as data and is compared below.
+ */
+extern const unsigned long ls_trampoline_slot_count;
 
 int
 ls_arm_live(void *fn, void *trampoline, int slot)
@@ -286,6 +301,18 @@ ls_arm_live(void *fn, void *trampoline, int slot)
         fprintf(stderr, "ls_arm: slot %d out of range (0..%d) --- refusing. Adding a "
                         "slot needs an LS_TRAMP expansion AND a table entry in "
                         "trampoline_x86_64.S.\n", slot, LS_TRAMP_SLOTS - 1);
+        return -1;
+    }
+
+    /* THE TABLE MUST BE AT LEAST AS BIG AS WE THINK. Checked on every arm rather than
+     * once at init: arming is rare and off the data path, and a check that runs only
+     * at startup is a check that a mid-life reload can walk past. Refusing is right ---
+     * indexing past the table writes an arbitrary address into live .text. */
+    if (ls_trampoline_slot_count < (unsigned long)LS_TRAMP_SLOTS) {
+        fprintf(stderr, "ls_arm: trampoline table has %lu slots but this build expects "
+                        "%d --- REFUSING. trampoline_x86_64.S and LS_TRAMP_SLOTS "
+                        "disagree; indexing past the table would arm a wild address.\n",
+                ls_trampoline_slot_count, LS_TRAMP_SLOTS);
         return -1;
     }
 

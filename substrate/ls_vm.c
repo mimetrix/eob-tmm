@@ -70,7 +70,11 @@
 
 #include "ubpf.h"
 
-#define LS_MAX_SLOTS 8
+/* 12, matching the LS_TRAMP expansions in trampoline_x86_64.S. The two are compared
+ * at arm time against the count that file publishes --- see ls_arm.c --- because a
+ * C-side constant larger than the real table indexes past .rodata and arms a wild
+ * address. Raised from 8 on 2026-08-18 for the ssl__err tracepoint plus headroom. */
+#define LS_MAX_SLOTS 12
 
 /*
  * Per-instance program stack, allocated once.

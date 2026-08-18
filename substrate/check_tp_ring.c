@@ -170,6 +170,20 @@ main(void)
     assert(ls_tp_schema_for(LS_TP_HOOK_HTTP1_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
     assert(ls_tp_schema_for(LS_TP_HOOK_HTTP2_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
     assert(ls_tp_schema_for(LS_TP_HOOK_HTTP3_HDRS) == LS_TP_SCHEMA_HTTP);    n++;
+    /* ssl__err maps to its OWN schema, and to neither of the other two. A hook id added
+     * without its schema case would fall to the default and return 0, which the drain
+     * refuses --- correct, but it means a working producer emits undecodable records.
+     * These three assertions are what make adding a hook id and forgetting its schema
+     * a build failure instead of a field report. */
+    assert(ls_tp_schema_for(LS_TP_HOOK_SSLERR)     == LS_TP_SCHEMA_SSLERR);  n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_SSLERR)     != LS_TP_SCHEMA_RST);     n++;
+    assert(ls_tp_schema_for(LS_TP_HOOK_SSLERR)     != LS_TP_SCHEMA_HTTP);    n++;
+    /* And every hook id is distinct from every other --- a duplicate would give two
+     * different record shapes the same label on the wire. */
+    assert(LS_TP_HOOK_SSLERR != LS_TP_HOOK_RST && LS_TP_HOOK_SSLERR != LS_TP_HOOK_RST_VA &&
+           LS_TP_HOOK_SSLERR != LS_TP_HOOK_RST_PRE && LS_TP_HOOK_SSLERR != LS_TP_HOOK_RST_PRE_VA &&
+           LS_TP_HOOK_SSLERR != LS_TP_HOOK_HTTP1_HDRS && LS_TP_HOOK_SSLERR != LS_TP_HOOK_HTTP2_HDRS &&
+           LS_TP_HOOK_SSLERR != LS_TP_HOOK_HTTP3_HDRS);                      n++;
     /* and an unknown id must NOT resolve to a real schema */
     assert(ls_tp_schema_for(999u) == 0u);                                    n++;
 

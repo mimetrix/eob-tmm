@@ -325,6 +325,14 @@ ls_trampoline_slot\n:
     LS_TRAMP 5
     LS_TRAMP 6
     LS_TRAMP 7
+/* Slots 8-11 added 2026-08-18 for the ssl__err tracepoint (slot 8) plus headroom.
+ * Expanding is cheap --- each slot is ~40 bytes of .text whose only per-slot content
+ * is the immediate --- and running out is not, because a hook forced to share a slot
+ * with a different ctx shape is exactly the 2026-08-17 empty-cause bug. */
+    LS_TRAMP 8
+    LS_TRAMP 9
+    LS_TRAMP 10
+    LS_TRAMP 11
 
 /* Kept as an alias so anything still referencing the old single entry point links,
  * and so a reader grepping for it finds this note rather than nothing. Slot 0 is the
@@ -332,7 +340,7 @@ ls_trampoline_slot\n:
     .globl  ls_trampoline_entry
     .set    ls_trampoline_entry, ls_trampoline_slot0
 
-/* Address table, so C indexes by slot instead of hard-coding eight symbol names.
+/* Address table, so C indexes by slot instead of hard-coding twelve symbol names.
  * .rodata: nothing writes it at run time, and a trampoline table in writable memory
  * would be a control-flow target sitting in mutable storage. */
     .section .rodata
@@ -348,7 +356,30 @@ ls_trampoline_table:
     .quad   ls_trampoline_slot5
     .quad   ls_trampoline_slot6
     .quad   ls_trampoline_slot7
+    .quad   ls_trampoline_slot8
+    .quad   ls_trampoline_slot9
+    .quad   ls_trampoline_slot10
+    .quad   ls_trampoline_slot11
     .size   ls_trampoline_table, .-ls_trampoline_table
+
+/*
+ * HOW MANY SLOTS THIS FILE ACTUALLY BUILT, exported so C can check rather than trust.
+ *
+ * The count lived in THREE places that had to agree by hand: the expansions above,
+ * LS_TRAMP_SLOTS in ls_arm.c, and LS_MAX_SLOTS in ls_vm.c. Nothing compared them. If a
+ * C-side constant were ever the larger, `ls_trampoline_table[slot]` would read past the
+ * end of a .rodata array and arm a hook at whatever address followed --- a wild jump
+ * target written into live .text, which is the worst failure this codebase can have.
+ *
+ * An extern array of unspecified size cannot be size-checked by the linker, so the
+ * count is published as data and verified at run time by ls_arm.c.
+ */
+    .globl  ls_trampoline_slot_count
+    .type   ls_trampoline_slot_count, @object
+    .align  8
+ls_trampoline_slot_count:
+    .quad   12
+    .size   ls_trampoline_slot_count, .-ls_trampoline_slot_count
     .text
 
 /*

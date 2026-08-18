@@ -18,7 +18,9 @@
 #include "ls_ctx_parse.h"
 #include "ls_ctx_alpn_abi.h"
 #include "ls_ctx_rst.h"
+#include "ls_ctx_sslerr.h"
 #include "ls_flow_cookie.h"
+#include "ls_ssl_cookie.h"
 #include "ls_tp.h"
 
 /* Slot numbers live in ls_slots.h, checked for collisions by the compiler. They
@@ -172,6 +174,33 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
          * stream rather than only counters. The ring is off unless LS_TP_RING
          * names a segment. */
         if (ls_tp_dispatch(slot, &rc, sizeof rc, hook) != LS_SAFE_RETURN)
+            return r;
+    } else if (slot == LS_CTX_SLOT_SSLERR) {
+        /* ssl__err(sc, alert, __func__, __LINE__, ...) --- the TLS twin of rst_why.
+         *
+         *   a0 sc     struct ssl_ctx *   -> the cookie, via the ssl-world crossing
+         *   a1 alert  enum ssl_alert
+         *   a2 func   __func__           NOT __FILE__, which ssl_err does not pass
+         *   a3 line   __LINE__
+         *   a4 msg    the FIRST VARARG
+         *
+         * The message is a vararg, so it lands in r8 --- within the six registers the
+         * trampoline already forwards, which is the only reason this hook needs no asm
+         * change. 462 of the 475 sites pass a plain literal, so for those the captured
+         * string is the whole message; the 3 that pass a real format give us the format,
+         * and ls_ctx_sslerr.h says so rather than implying otherwise.
+         *
+         * NO SNAPSHOT TIMING PROBLEM, unlike ALPN: every field is a direct argument read
+         * before the function's body runs, so nothing is derived and nothing has been
+         * overwritten by the time we look. The one derivation is the cookie, and a NULL
+         * sc or NULL sc->cf yields 0 --- legitimate, since ssl__err fires on paths where
+         * no connflow is attached yet. */
+        struct ls_ctx_sslerr ec;
+
+        ls_ctx_sslerr_build(&ec, (unsigned int)a1, (const char *)a2,
+                            (unsigned int)a3, (const char *)a4,
+                            (unsigned long long)ls_ssl_cookie((void *)a0));
+        if (ls_tp_dispatch(slot, &ec, sizeof ec, LS_TP_HOOK_SSLERR) != LS_SAFE_RETURN)
             return r;
     } else if (slot == LS_CTX_SLOT_ALPN) {
         /* ssl_alpn_match(sc, skip_ext, skip_ext_len): the ALPN bytes are NOT an

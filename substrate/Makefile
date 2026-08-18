@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -251,6 +251,17 @@ check-map:
 	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
 	 $(CC) -fsyntax-only -Wall -Wextra -Werror -I. -I ../ubpf/vm/inc -I "$$CFG" ls_map_glue.h \
 	 && echo "ok    ls_map_glue.h  (3 uBPF callbacks; helper signatures match external_function_t)"
+
+# The ssl__err record --- the TLS twin of the reset record. Same class of risk and
+# therefore the same class of test: it runs on TLS error paths where a faulting builder
+# does the most damage, and the cases that matter are the ones producing PLAUSIBLE WRONG
+# OUTPUT rather than obvious failure. An over-long __func__ cut without the length saying
+# so, one NULL pointer costing the other field, a string bleeding in from the previous
+# record. The size assertion is load-bearing: this record is 96 bytes, which is AT
+# PREVAIL's measured ctx ceiling, so growing either array must fail at BUILD time rather
+# than later at verification with a message about a program.
+check-sslerr:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .sslerr.out check_sslerr.c && ./.sslerr.out && rm -f .sslerr.out
 
 check-rst:
 	@$(CC) -O2 -Wall -Wextra -Werror -o .rst.out check_rst.c && ./.rst.out && rm -f .rst.out
