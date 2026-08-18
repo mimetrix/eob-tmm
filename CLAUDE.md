@@ -28,6 +28,12 @@ shield." That was true when written and is now superseded. **Replace such claims
 falsified rather than letting them stand — and add the new limit in the same edit**, which is why the
 three bullets above exist.
 
+**Reading order across a repo that spans both eras: see [`DOC-STATUS.md`](DOC-STATUS.md).** It
+classifies every document as current, design (pre-build), record, or procedure, and lists the
+specific claims the build falsified. Older documents are kept rather than rewritten — the design
+reasoning in them is still why the system is shaped as it is — so a reader needs to know which era a
+page belongs to before acting on it.
+
 ## 1. The git repo is the system of record — publishing to claude.ai needs explicit approval
 
 Deliverables (docs, explainers) live and are versioned **here**. Publishing — or **republishing** —

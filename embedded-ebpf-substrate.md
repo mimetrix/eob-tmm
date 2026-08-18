@@ -1,5 +1,13 @@
 # The Embedded eBPF Substrate in TMM
 
+> **Status — pre-build design.** This page was written before anything ran, and still
+> describes a substrate that does not execute. It now does: verified programs load into a
+> running TMM, arm at function entries, fire under traffic, and emit records. The
+> programmability spectrum, use-case families and hook-point catalogue below stand; treat
+> any statement about what *exists* as superseded by
+> [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md). Reading order:
+> [`DOC-STATUS.md`](DOC-STATUS.md).
+
 ### The third programmability surface — verified, dynamic, in the data plane. The CVE shield is its first instance.
 
 **Status:** Strategy / use-case exploration

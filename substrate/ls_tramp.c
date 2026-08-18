@@ -8,8 +8,10 @@
  * signature does. Putting it in assembly would mean regenerating assembly per
  * hook, which is the cost this split exists to avoid.
  *
- * Status: candidate artifact. It compiles. Nothing calls it --- arming (item 2)
- * is what would write the jump that reaches the assembly that reaches this.
+ * Status: LIVE. ls_tramp_dispatch is reached from a patched function entry on every
+ * armed hook, on a running TMM under traffic. This comment read "candidate artifact...
+ * Nothing calls it" until 2026-08-18 --- true before arming was built, and the opposite
+ * of true since.
  */
 
 #include "ls_vm.h"

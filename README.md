@@ -7,9 +7,15 @@ out-of-line body, reached by rewriting its patchable-entry pad into a call to an
 run time. Programs either **observe** internal state (a tracepoint) or **act** on a verdict the host
 applies (a datapath control) — each one **statically proven safe before it loads**.
 
-**The substrate modifies no F5 source file.** It adds new files, `filelist` and whitelist entries, and
-one compiler flag — nothing else. Startup registers itself through TMM's own `INIT_FUNC` linker set,
-the same mechanism `urlcat` and `pem_lib` use, so no existing file calls into the VM.
+**What it costs the TMM tree, stated plainly:** 39 new files and ~7,200 lines under `src/base/`
+and `src/modules/hudfilter/ssl/`, three build-configuration files edited (`filelist` and the two
+globals whitelists), and a new `Makefile.overrides` that adds uBPF's include path and static library
+and sets `CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0` — note `:=`, which replaces the
+tree's own optimisation selection and is a change in build behaviour beyond adding a flag.
+**No existing F5 function body is edited**, because startup registers through TMM's own `INIT_FUNC`
+linker set — the mechanism `urlcat` and `pem_lib` use — so nothing in TMM's logic calls into the VM.
+That is the only sense in which the tree is "unmodified", and it is a smaller claim than it has
+sometimes been made to carry (see [`DOC-STATUS.md`](DOC-STATUS.md)).
 ([`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md) is the complete delta; it is checkable
 in one `git status`.) The single mechanism is the patched entry — the alternative that was also on
 the table, and why it lost, is in [`mechanism-tradeoff.md`](mechanism-tradeoff.md).
