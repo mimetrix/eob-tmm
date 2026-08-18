@@ -120,42 +120,96 @@ def functions(debuginfo):
 _POSDEP = re.compile(r"^(j|call|loop|xbegin)", re.I)
 
 
-def _objdump_text(binary):
+def _objdump_text(binary, func_addrs=None, need=5):
     """One pass over .text, yielding (func_addr, [(nbytes, mnemonic, operands), ...]).
 
     One invocation, not one per function: at ~80,000 functions a per-function objdump
-    would take hours and this takes seconds."""
+    would take hours and this takes seconds.
+
+    FUNCTION BOUNDARIES COME FROM `func_addrs`, NOT FROM OBJDUMP'S LABELS, and that is
+    a fix for a silent wrong answer. objdump prints `<name>:` only where it has a
+    symbol, and the binary that SHIPS is stripped --- the packaged tmm64.no_pgo has
+    zero symbols and yields 133 labels against 119,659 in the debuginfo. Keyed on
+    labels, this function therefore returned data for ~133 of ~74,000 entries, every
+    other address came back "not present in the .text disassembly", and the tool
+    reported 64 displaceable functions instead of tens of thousands. Nothing failed;
+    the number was simply wrong, and only wrong for the input that matters.
+
+    The two halves live in different files and neither is sufficient alone: the
+    debuginfo has the symbol table but its .text is NOBITS (no instruction bytes at
+    all), and the runtime binary has the bytes but no symbols. So addresses come from
+    one and instructions from the other, which is exactly what the pad check already
+    does.
+
+    Streaming rather than accumulating: at ~40 MB of .text a dict of every instruction
+    would cost gigabytes. Since the function addresses are known up front, walk the
+    disassembly in address order and collect only while inside a function entry we
+    care about, stopping as soon as `need` bytes are covered.
+    """
     out = run(["objdump", "-d", "--section=.text", binary])
-    cur, insns = None, []
-    fn_re = re.compile(r"^([0-9a-f]+) <([^>]+)>:")
     in_re = re.compile(r"^\s+([0-9a-f]+):\t([0-9a-f ]+)\t?(.*)$")
+    fn_re = re.compile(r"^([0-9a-f]+) <([^>]+)>:")
+
+    if func_addrs is None:
+        # Legacy path, kept for --binary/--debuginfo on an UNSTRIPPED binary where
+        # objdump's own labels are complete and correct.
+        cur, insns = None, []
+        for line in out.splitlines():
+            m = fn_re.match(line)
+            if m:
+                if cur is not None:
+                    yield cur, insns
+                cur, insns = int(m.group(1), 16), []
+                continue
+            if cur is None:
+                continue
+            m = in_re.match(line)
+            if m:
+                nbytes = len(m.group(2).split())
+                parts = m.group(3).strip().split(None, 1)
+                insns.append((nbytes, parts[0] if parts else "",
+                              parts[1] if len(parts) > 1 else ""))
+        if cur is not None:
+            yield cur, insns
+        return
+
+    want = func_addrs if isinstance(func_addrs, (set, frozenset)) else set(func_addrs)
+    cur, insns, got = None, [], 0
     for line in out.splitlines():
-        m = fn_re.match(line)
-        if m:
+        m = in_re.match(line)
+        if not m:
+            continue
+        addr = int(m.group(1), 16)
+        if addr in want:
             if cur is not None:
                 yield cur, insns
-            cur, insns = int(m.group(1), 16), []
+            cur, insns, got = addr, [], 0
+        elif cur is None:
             continue
-        if cur is None:
+        elif got >= need:
+            # Past what any decision needs. Hold the current function open rather than
+            # closing it, so its instructions are not re-collected.
             continue
-        m = in_re.match(line)
-        if m:
-            nbytes = len(m.group(2).split())
-            text = m.group(3).strip()
-            parts = text.split(None, 1)
-            insns.append((nbytes, parts[0] if parts else "", parts[1] if len(parts) > 1 else ""))
+        nbytes = len(m.group(2).split())
+        parts = m.group(3).strip().split(None, 1)
+        insns.append((nbytes, parts[0] if parts else "",
+                      parts[1] if len(parts) > 1 else ""))
+        got += nbytes
     if cur is not None:
         yield cur, insns
 
 
-def relocatability(binary, need=5):
+def relocatability(binary, need=5, func_addrs=None):
     """{addr: {"copy_bytes": n, "relocatable": bool, "why": str}}
 
     `need` is 5 --- the width of the `jmp rel32` an unpadded hook must write. We must
     displace WHOLE instructions, so copy_bytes is the total length of however many
-    leading instructions it takes to cover 5 bytes, which is usually more than 5."""
+    leading instructions it takes to cover 5 bytes, which is usually more than 5.
+
+    Pass `func_addrs` from the debuginfo's symbol table whenever the binary is
+    stripped, which every shipped one is. See _objdump_text."""
     out = {}
-    for addr, insns in _objdump_text(binary):
+    for addr, insns in _objdump_text(binary, func_addrs, need):
         total, why = 0, None
         for nbytes, mnem, ops in insns:
             if "(bad)" in mnem or not mnem:
@@ -230,11 +284,39 @@ def main():
             f.seek(toff)
             text = f.read(tsize)
 
+        # Function addresses come from the DEBUGINFO's symbol table. Materialised
+        # rather than streamed because relocatability() needs the whole set before it
+        # walks the disassembly, and the loop below needs it again.
+        funcs = list(functions(dbg))
+        in_text = set(a for a, _ in funcs if taddr <= a < taddr + tsize - 9)
+
         # Offline instruction analysis, once. Everything the runtime needs to arm an
         # UNPADDED function is decided here --- see relocatability().
-        reloc = relocatability(binary)
+        #
+        # func_addrs is passed EXPLICITLY because the shipped binary is stripped.
+        # Without it this keyed on objdump's own <name>: labels, of which a stripped
+        # tmm64.no_pgo has 133 against the debuginfo's 119,659 --- so it reported 64
+        # displaceable functions instead of tens of thousands, with no error.
+        reloc = relocatability(binary, func_addrs=in_text)
+
+        # REFUSE A SILENTLY DEGRADED ANSWER. If the disassembly covered only a sliver
+        # of the functions we asked about, every uncovered one is recorded "not
+        # relocatable" and the displaceable count collapses toward zero --- which reads
+        # as a real measurement about the binary rather than a broken pass over it.
+        cov = len(reloc) / float(len(in_text)) if in_text else 0.0
+        if in_text and cov < 0.80:
+            raise SystemExit(
+                "*** DISASSEMBLY COVERED ONLY %.1f%% OF FUNCTIONS (%d of %d).\n"
+                "    Every uncovered entry would be recorded 'not relocatable', so the\n"
+                "    displaceable count would be a broken pass reported as a finding.\n"
+                "    Check that objdump ran on the binary WITH .text bytes (the runtime\n"
+                "    file), while addresses came from the debuginfo's symbol table."
+                % (cov * 100.0, len(reloc), len(in_text)))
+        print("  reloc coverage: %.1f%% (%d of %d functions in .text)"
+              % (cov * 100.0, len(reloc), len(in_text)), file=sys.stderr)
+
         padded, unpadded, callfirst, outside, displaceable = [], 0, 0, 0, 0
-        for addr, name in functions(dbg):
+        for addr, name in funcs:
             if not (taddr <= addr < taddr + tsize - 9):
                 outside += 1
                 continue
