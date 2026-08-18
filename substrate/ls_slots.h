@@ -83,6 +83,25 @@
  */
 #define LS_CTX_SLOT_SSLERR  8   /* ssl__err --- ls_ctx_sslerr_build              */
 
+/*
+ * http2_stream_abort --- why TMM aborted this HTTP/2 stream. 36 call sites.
+ *
+ *   http2_stream_abort(stream, why, err)
+ *      a0 stream  struct http2_stream *  -> folded to a stream identity
+ *      a1 why     const char *           23 distinct literals, max 32 chars
+ *      a2 err     enum http2_error
+ *
+ * THE ONE THAT PASSES ALL FOUR TESTS. ssl__err (slot 8) fails test 2 --- its reason is
+ * already in syslog at warning level, proven by "Connection error" appearing 4 times in
+ * the shipped binary. This one's only narration is TRACES(), compiled out by
+ * #if HTTP2_DEBUG, proven by "initiates ABORT in" appearing 0 times in the same binary.
+ *
+ * A `static` function, so no endbr64 and the pad sits at offset 0 --- and so some of the
+ * 36 calls may have been inlined and never reach this entry. How many do is a
+ * measurement.
+ */
+#define LS_CTX_SLOT_H2ABORT 9   /* http2_stream_abort --- ls_ctx_h2abort_build    */
+
 /* Distinctness, checked by the compiler rather than by reading. Pairwise because
  * the set is small and an enum would not catch a duplicated explicit value. */
 _Static_assert(LS_CTX_SLOT_SHIELD != LS_CTX_SLOT_PARSE,
@@ -132,6 +151,19 @@ _Static_assert(LS_CTX_SLOT_SSLERR != LS_CTX_SLOT_PARSE,      "slot collision: ss
 /* And that it FITS. A slot number the trampoline never expanded is refused at arm time
  * by ls_arm.c, but that is a run-time discovery of a build-time mistake. */
 _Static_assert(LS_CTX_SLOT_SSLERR < 12,
+               "slot >= the 12 LS_TRAMP expansions in trampoline_x86_64.S --- expand it");
+
+/* Slot 9 against all nine predecessors. */
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_SHIELD,     "collision: h2abort/shield");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_TP,         "collision: h2abort/tp");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_RST_PRE_VA, "collision: h2abort/rst_pre_va");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_RST_PRE,    "collision: h2abort/rst_pre");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_ALPN,       "collision: h2abort/alpn");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_RST,        "collision: h2abort/rst");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_RST_VA,     "collision: h2abort/rst_va");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_PARSE,      "collision: h2abort/parse");
+_Static_assert(LS_CTX_SLOT_H2ABORT != LS_CTX_SLOT_SSLERR,     "collision: h2abort/sslerr");
+_Static_assert(LS_CTX_SLOT_H2ABORT < 12,
                "slot >= the 12 LS_TRAMP expansions in trampoline_x86_64.S --- expand it");
 
 #endif /* LS_SLOTS_H */

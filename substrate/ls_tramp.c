@@ -18,6 +18,7 @@
 #include "ls_ctx_parse.h"
 #include "ls_ctx_alpn_abi.h"
 #include "ls_ctx_rst.h"
+#include "ls_ctx_h2abort.h"
 #include "ls_ctx_sslerr.h"
 #include "ls_flow_cookie.h"
 #include "ls_ssl_cookie.h"
@@ -174,6 +175,17 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
          * stream rather than only counters. The ring is off unless LS_TP_RING
          * names a segment. */
         if (ls_tp_dispatch(slot, &rc, sizeof rc, hook) != LS_SAFE_RETURN)
+            return r;
+    } else if (slot == LS_CTX_SLOT_H2ABORT) {
+        /* http2_stream_abort(stream, why, err) --- three direct arguments, nothing
+         * derived, nothing to snapshot. The simplest hook in the set, and the only one
+         * that passes all four uniqueness tests: its reason reaches no log, no iRule
+         * event and no trace in a production build. */
+        struct ls_ctx_h2abort hc;
+
+        ls_ctx_h2abort_build(&hc, (unsigned long long)a0, (const char *)a1,
+                             (unsigned int)a2);
+        if (ls_tp_dispatch(slot, &hc, sizeof hc, LS_TP_HOOK_H2ABORT) != LS_SAFE_RETURN)
             return r;
     } else if (slot == LS_CTX_SLOT_SSLERR) {
         /* ssl__err(sc, alert, __func__, __LINE__, ...) --- the TLS twin of rst_why.

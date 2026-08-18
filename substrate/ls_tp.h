@@ -60,6 +60,11 @@
  * the connection down" from "TLS failed", which are different questions with different
  * owners. */
 #define LS_TP_HOOK_SSLERR      8u      /* ssl__err --- 475 call sites           */
+/* http2_stream_abort --- its own hook family and its own `hook` string ("h2abort"), for
+ * the reason sslerr got one: a consumer must be able to separate "an h2 STREAM was
+ * aborted" from "the CONNECTION was reset" and from "TLS failed". Three questions, three
+ * owners. */
+#define LS_TP_HOOK_H2ABORT     9u      /* http2_stream_abort --- 36 call sites   */
 
 /* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
  * the wrong stride now, so it must fail rather than decode plausible garbage. */
@@ -74,6 +79,9 @@
  * the reset record beyond the cookie, so a consumer must not be able to decode one as
  * the other. That is the whole job of this number. */
 #define LS_TP_SCHEMA_SSLERR    4u
+/* struct ls_ctx_h2abort, 48 bytes. Distinct from 3 and 4 because the layout shares
+ * nothing with either --- no file, no line, no alert, no cookie. */
+#define LS_TP_SCHEMA_H2ABORT   5u
 
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and
@@ -137,6 +145,8 @@ ls_tp_schema_for(unsigned int hook_id)
         return LS_TP_SCHEMA_HTTP;
     case LS_TP_HOOK_SSLERR:
         return LS_TP_SCHEMA_SSLERR;
+    case LS_TP_HOOK_H2ABORT:
+        return LS_TP_SCHEMA_H2ABORT;
     default:
         /* An unknown hook must NOT default to a real schema --- that is exactly how a
          * reset record came out labelled HTTP. 0 is not a valid schema, so the

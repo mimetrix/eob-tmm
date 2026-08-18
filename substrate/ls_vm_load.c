@@ -420,6 +420,36 @@ handle(int fd)
             reply(fd, "ERR arm: put the entry address in binding.hook (e.g. 0xcd4700)\n");
             break;
         }
+        /*
+         * REFUSE TO ARM A SLOT WITH NO PROGRAM. Observed 2026-08-18: a load was
+         * correctly refused (the object's section was fentry/rst_why while the request
+         * named a different hook --- finding O14 working), and the ARM that followed
+         * still reported "OK ARMED LIVE" with armed=0. Live .text on two pods was
+         * patched to call a trampoline whose slot held nothing.
+         *
+         * It is not a crash --- ls_vm_call falls through on an empty slot --- but it is
+         * a patch into a running data plane that buys nothing, reported as success. And
+         * it is the shape of a worse bug: whoever reads "ARMED LIVE" believes a program
+         * is running, so a later "why did nothing fire" hunt looks at traffic instead of
+         * at the load that failed a minute earlier.
+         *
+         * Checked here rather than in ls_arm_live because ls_arm.c knows about pads and
+         * trampolines, not about slots holding programs. Structurally it belongs where
+         * the two are joined.
+         */
+        {
+            struct ls_stats st;
+            if (!ls_vm_stats(slot, &st)) {
+                reply(fd, "ERR arm: slot %d out of range\n", slot);
+                break;
+            }
+            if (!st.armed) {
+                reply(fd, "ERR arm: slot %d holds NO PROGRAM --- refusing to patch "
+                          ".text for a hook that cannot run. Load first; if a load was "
+                          "refused, fix that rather than arming over it.\n", slot);
+                break;
+            }
+        }
         /* ls_arm_live rewrites the five pad bytes with the kernel's text_poke_bp
          * protocol, so the poll threads may be executing this function right now. */
         if (ls_arm_live((void *)(uintptr_t)addr, (void *)ls_trampoline_entry, slot) != 0)
