@@ -67,7 +67,21 @@ struct ls_rec {
     uint32_t hook_id;
     uint32_t schema_id;
     uint64_t seq;
-    uint32_t tmm_id;
+    /* THE SLOT THE PROGRAM RAN IN --- renamed from tmm_id 2026-08-18, because that is
+     * what has always been written here. The only producer passes (unsigned)slot, and
+     * the drain emitted it as "tmm", so every record claimed a TMM instance number and
+     * carried a slot. Every live record read "tmm":5 on both pods for the obvious
+     * reason: slot 5 is where rst_why was armed.
+     *
+     * Nothing detected it because both are small integers and 5 is a plausible TMM id.
+     * The BYTE layout is unchanged --- same offset, same width --- so a consumer walking
+     * records is unaffected; only the JSON key changes, and it changes because the old
+     * one was a false statement.
+     *
+     * A real TMM instance id would be worth having and is NOT available here: `tid`
+     * lives in TMM's -nostdinc include world and this file is STDINC. It would need the
+     * same kind of crossing ls_flow_cookie.c uses. Left undone rather than approximated. */
+    uint32_t slot;
     uint32_t len;                    /* payload bytes following this header         */
     uint64_t ts_ns;                  /* CLOCK_REALTIME at capture, ns since epoch   */
 };

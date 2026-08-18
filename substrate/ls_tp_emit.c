@@ -113,3 +113,40 @@ ls_tp_dispatch(int slot, const void *rec, unsigned long len, unsigned int hook_i
     }
     return (int)v;
 }
+
+/*
+ * PUBLISH ONLY --- no program run. This is what bpf_ringbuf_output() reaches.
+ *
+ * WHY IT CANNOT BE ls_tp_dispatch. That function runs the slot's program and THEN
+ * publishes. Calling it from inside a helper invoked BY that program would re-enter the
+ * VM from within itself: unbounded recursion on the data path, with each level consuming
+ * a fresh uBPF stack frame. So the two halves are separated and the helper gets the half
+ * that does not execute anything.
+ *
+ * SCHEMA IS THE PROGRAM'S, NOT OURS. The bytes are whatever the program chose, so the
+ * host cannot claim to know their shape --- it publishes them under LS_TP_HOOK_PROG /
+ * LS_TP_SCHEMA_PROG and the drain reports length and hex. Interpreting them is a contract
+ * between the program's author and their own consumer, and pretending otherwise would put
+ * a schema number on bytes nobody validated.
+ *
+ * Returns 0 on success, -1 when the ring is off or the record does not fit. -1 is
+ * ordinary: the ring is disabled unless LS_TP_RING names a segment.
+ */
+int
+ls_tp_publish_raw(int slot, const void *rec, unsigned long len)
+{
+    struct timespec ts;
+
+    ls_tp_seg_bootstrap();
+    if (g_tp_seg == NULL)
+        return -1;
+
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_PROG, LS_TP_SCHEMA_PROG,
+                              (unsigned)slot,
+                              atomic_fetch_add_explicit(&g_tp_seq, 1,
+                                                        memory_order_relaxed),
+                              (unsigned long long)ts.tv_sec * 1000000000ull
+                                  + (unsigned long long)ts.tv_nsec,
+                              rec, (unsigned int)len) == 0 ? 0 : -1;
+}

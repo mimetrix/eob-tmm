@@ -70,9 +70,30 @@ struct ls_map_def {
 };
 
 #define LS_MAP_TYPE_HASH 1u     /* BPF_MAP_TYPE_HASH */
+/*
+ * BPF_MAP_TYPE_RINGBUF, and it is NOT storage --- it is a handle on the thread's
+ * existing egress ring.
+ *
+ * WHY A MAP AT ALL. bpf_ringbuf_output(rb, data, size, flags) is helper id 130, whose
+ * first argument is a map reference, and PREVAIL already knows that signature --- so a
+ * program can emit with ZERO verifier work. Verified 2026-08-18: a program declaring a
+ * SEC("maps") entry of this type and calling id 130 passes PREVAIL unchanged. Inventing
+ * our own emit helper at a private id would have meant teaching PREVAIL about it.
+ *
+ * A ringbuf descriptor is SHAPED DIFFERENTLY from a hash one: key_size and value_size
+ * are both 0 and max_entries is a BYTE COUNT. So ls_map_check_descriptor has to admit a
+ * shape it otherwise (correctly) refuses, and ls_map_create must not allocate a table
+ * for it.
+ */
+#define LS_MAP_TYPE_RINGBUF 27u /* BPF_MAP_TYPE_RINGBUF --- the egress ring     */
 
 struct ls_map {
     uint32_t in_use;
+    /* A ringbuf slot holds NO storage: keys/vals stay zeroed and every hash operation
+     * on it must refuse. Kept in the same array as the hash maps because the program
+     * refers to both by the same index space, and splitting them would mean two
+     * relocation namespaces for no gain. */
+    uint32_t is_ring;
     uint32_t key_sz, val_sz, entries;
     uint64_t hits, misses, evictions, updates;
     uint8_t  used[LS_MAP_ENTRIES];
@@ -108,6 +129,14 @@ ls_map_hash(const uint8_t *k, uint32_t n)
 static inline int
 ls_map_check_descriptor(const struct ls_map_def *d)
 {
+    /* The ringbuf shape, checked FIRST and on its own terms. key_size and value_size
+     * are 0 by definition here, so falling through to the hash checks below would
+     * refuse it --- and refusing it is right for a hash map and wrong for this. */
+    if (d->type == LS_MAP_TYPE_RINGBUF) {
+        if (d->key_size != 0 || d->value_size != 0)  return 0;
+        if (d->max_entries == 0)                     return 0;
+        return 1;
+    }
     if (d->type != LS_MAP_TYPE_HASH)                return 0;
     if (d->key_size == 0 || d->key_size > LS_MAP_KEY_MAX)   return 0;
     if (d->value_size == 0 || d->value_size > LS_MAP_VAL_MAX) return 0;
@@ -125,6 +154,13 @@ ls_map_create(struct ls_map_set *s, const struct ls_map_def *d)
     m = &s->m[s->n];
     memset(m, 0, sizeof *m);
     m->in_use  = 1;
+    if (d->type == LS_MAP_TYPE_RINGBUF) {
+        /* No table. The slot exists only so an index resolves to "the egress ring";
+         * key_sz and val_sz stay 0, which is what every hash operation checks against
+         * before touching storage. */
+        m->is_ring = 1;
+        return (int)s->n++;
+    }
     m->key_sz  = d->key_size;
     m->val_sz  = d->value_size;
     m->entries = d->max_entries;
@@ -166,6 +202,12 @@ ls_map_slot(struct ls_map *m, const uint8_t *key, int for_insert)
 static inline void *
 ls_map_lookup(struct ls_map *m, const uint8_t *key)
 {
+    /* A RINGBUF slot has no table. Refusing here rather than relying on key_sz==0
+     * arithmetic further down: a hash operation on the ring must be an explicit
+     * no-op, not an accident of zero sizes. */
+    if (m != 0 && m->is_ring)
+        return 0;
+
     int s = ls_map_slot(m, key, 0);
     if (s < 0) { m->misses++; return 0; }
     m->hits++;
@@ -175,6 +217,12 @@ ls_map_lookup(struct ls_map *m, const uint8_t *key)
 static inline int
 ls_map_update(struct ls_map *m, const uint8_t *key, const uint8_t *val)
 {
+    /* A RINGBUF slot has no table. Refusing here rather than relying on key_sz==0
+     * arithmetic further down: a hash operation on the ring must be an explicit
+     * no-op, not an accident of zero sizes. */
+    if (m != 0 && m->is_ring)
+        return -1;
+
     int s = ls_map_slot(m, key, 1);
     if (s < 0)
         return -1;
@@ -190,6 +238,12 @@ ls_map_update(struct ls_map *m, const uint8_t *key, const uint8_t *val)
 static inline int
 ls_map_delete(struct ls_map *m, const uint8_t *key)
 {
+    /* A RINGBUF slot has no table. Refusing here rather than relying on key_sz==0
+     * arithmetic further down: a hash operation on the ring must be an explicit
+     * no-op, not an accident of zero sizes. */
+    if (m != 0 && m->is_ring)
+        return -1;
+
     int s = ls_map_slot(m, key, 0);
     if (s < 0)
         return -1;

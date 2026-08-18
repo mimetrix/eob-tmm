@@ -177,7 +177,7 @@ ls_tp_my_ring(struct ls_tp_seg *s)
  */
 static inline int
 ls_tp_ring_publish(struct ls_tp_seg *seg, uint32_t hook_id, uint32_t schema_id,
-                   uint32_t tmm_id, uint64_t seq, uint64_t ts_ns,
+                   uint32_t slot, uint64_t seq, uint64_t ts_ns,
                    const void *rec, uint32_t len)
 {
     struct ls_ring *r = ls_tp_my_ring(seg);
@@ -189,7 +189,7 @@ ls_tp_ring_publish(struct ls_tp_seg *seg, uint32_t hook_id, uint32_t schema_id,
     h.hook_id   = hook_id;
     h.schema_id = schema_id;
     h.seq       = seq;
-    h.tmm_id    = tmm_id;
+    h.slot      = slot;
     h.len       = len;
     h.ts_ns     = ts_ns;
     return ls_ring_emit(r, &h, rec, len);

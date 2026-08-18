@@ -12,12 +12,12 @@ measured output, not a design sketch.
 ## 1. What a record looks like
 
 ```json
-{"ts_ns":1787066626925893333,"seq":162,"tmm":5,"hook":"reset","fn":"rst_why","schema":3,
+{"ts_ns":1787066626925893333,"seq":162,"slot":5,"hook":"reset","fn":"rst_why","schema":3,
  "file":"http_mr_proxy.c","line":993,"err":32,"reason":0,
  "flow":"00003a0c137fafba","cause":"Closing"}
 ```
 
-Twelve fields, drained from a live pod on 2026-08-18. **This section showed a nine-field
+Twelve fields, drained from a live pod on 2026-08-18. **The fourth key was `"tmm"` until that date and always carried the SLOT number** --- the only producer passes `(unsigned)slot` into a parameter called `tmm_id`, and the drain printed it as `tmm`. Every record on every pod read `"tmm":5` for the obvious reason: slot 5 is where `rst_why` was armed. Nothing caught it because both are small integers and 5 is a plausible TMM instance id. The byte layout is unchanged; only the key was a false statement. A real TMM instance id is not available on this side of the include boundary and is left undone rather than approximated. **This section showed a nine-field
 schema-1 record until then**, which is worth flagging rather than quietly replacing: the
 record has GAINED fields, and a reader comparing a current record against the old
 example would reasonably think three had gone missing.

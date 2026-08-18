@@ -59,7 +59,7 @@ producer(void *a)
     for (uint64_t i = 0; i < N_REC; i++) {
         uint32_t len = 8 + (uint32_t)(i % 80);          /* varying, so offsets vary */
         memset(payload, (int)(i & 0xff), len);
-        struct ls_rec rec = { .hook_id = 7, .schema_id = 1, .seq = i, .tmm_id = 0, .len = len };
+        struct ls_rec rec = { .hook_id = 7, .schema_id = 1, .seq = i, .slot = 0, .len = len };
         while (!ls_ring_emit(s->r, &rec, payload, len))
             s->refusals++;          /* STREAM: retry. Each refusal IS counted as a
                                      * drop by the ring, which is correct for TMM
@@ -127,7 +127,7 @@ test_stream_full(void)
 
     uint64_t accepted = 0, refused = 0;
     for (uint64_t i = 0; i < 200; i++) {                  /* far more than fits */
-        struct ls_rec rec = { .hook_id = 1, .schema_id = 1, .seq = i, .tmm_id = 0, .len = 256 };
+        struct ls_rec rec = { .hook_id = 1, .schema_id = 1, .seq = i, .slot = 0, .len = 256 };
         if (ls_ring_emit(r, &rec, payload, 256)) accepted++; else refused++;
     }
     char d[96];
@@ -161,7 +161,7 @@ test_record_full(void)
     uint64_t accepted = 0;
     for (uint64_t i = 0; i < 200; i++) {
         memset(payload, (int)(i & 0xff), sizeof payload);
-        struct ls_rec rec = { .hook_id = 1, .schema_id = 1, .seq = i, .tmm_id = 0, .len = 256 };
+        struct ls_rec rec = { .hook_id = 1, .schema_id = 1, .seq = i, .slot = 0, .len = 256 };
         if (ls_ring_emit(r, &rec, payload, 256)) accepted++;
     }
     char d[96];
@@ -194,7 +194,7 @@ test_wrap(void)
     for (uint64_t i = 0; i < 5000; i++) {
         uint32_t len = 17 + (uint32_t)(i % 131);          /* odd sizes: hit the pad at many offsets */
         memset(payload, (int)(i & 0xff), len);
-        struct ls_rec in = { .hook_id = 3, .schema_id = 2, .seq = i, .tmm_id = 0, .len = len };
+        struct ls_rec in = { .hook_id = 3, .schema_id = 2, .seq = i, .slot = 0, .len = len };
         if (!ls_ring_emit(r, &in, payload, len)) {        /* full: drain then retry */
             while (ls_ring_consume(r, &rec, out, sizeof out) >= 0) ;
             if (!ls_ring_emit(r, &in, payload, len)) continue;

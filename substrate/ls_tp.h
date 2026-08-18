@@ -65,6 +65,14 @@
  * aborted" from "the CONNECTION was reset" and from "TLS failed". Three questions, three
  * owners. */
 #define LS_TP_HOOK_H2ABORT     9u      /* http2_stream_abort --- 36 call sites   */
+/*
+ * PROGRAM-EMITTED. Not a hook at all --- the record was published by a program calling
+ * bpf_ringbuf_output(), so no hook fired and the host does not know the byte layout.
+ *
+ * A high number on purpose: hook ids 1-9 name places in TMM, and this names the absence
+ * of one. Putting it at 10 would have implied it was the next hook.
+ */
+#define LS_TP_HOOK_PROG      100u      /* emitted by a program, not by a hook   */
 
 /* Bumped 1 -> 2 with ts_ns. A consumer built against schema 1 walks records at
  * the wrong stride now, so it must fail rather than decode plausible garbage. */
@@ -82,6 +90,9 @@
 /* struct ls_ctx_h2abort, 48 bytes. Distinct from 3 and 4 because the layout shares
  * nothing with either --- no file, no line, no alert, no cookie. */
 #define LS_TP_SCHEMA_H2ABORT   5u
+/* Program-chosen bytes. The host validated the LENGTH and nothing else, so the drain
+ * reports len and hex rather than naming fields it cannot vouch for. */
+#define LS_TP_SCHEMA_PROG    100u
 
 /*
  * Run the slot's program over `rec`, publish the same bytes to the ring, and
@@ -108,6 +119,12 @@
  */
 int ls_tp_dispatch(int slot, const void *rec, unsigned long len,
                    unsigned int hook_id);
+
+/* Publish bytes a PROGRAM chose, without running anything. Reached from the
+ * bpf_ringbuf_output helper. Separated from ls_tp_dispatch because that function runs
+ * the slot's program first, and calling it from a helper the program invoked would
+ * re-enter the VM from inside itself. Returns 0, or -1 when the ring is off. */
+int ls_tp_publish_raw(int slot, const void *rec, unsigned long len);
 
 /*
  * Slot assignment. Slot 0 is the shield --- the built-in program compiled into
@@ -147,6 +164,8 @@ ls_tp_schema_for(unsigned int hook_id)
         return LS_TP_SCHEMA_SSLERR;
     case LS_TP_HOOK_H2ABORT:
         return LS_TP_SCHEMA_H2ABORT;
+    case LS_TP_HOOK_PROG:
+        return LS_TP_SCHEMA_PROG;
     default:
         /* An unknown hook must NOT default to a real schema --- that is exactly how a
          * reset record came out labelled HTTP. 0 is not a valid schema, so the

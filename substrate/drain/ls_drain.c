@@ -33,7 +33,9 @@
  *
  * DELIVERY IS AT-LEAST-ONCE. Records are written BEFORE consumer_pos advances,
  * so a crash mid-batch re-delivers rather than loses. Consumers dedupe on
- * (tmm_id, seq); seq is atomic in the producer precisely so that pair is unique.
+ * (slot, seq); seq is atomic in the producer precisely so that pair is unique.
+ * `slot` was called `tmm` until 2026-08-18 and always carried the slot number ---
+ * the producer passes (unsigned)slot and always did. The key was a false claim.
  * The other order --- acknowledge then publish --- loses records silently on a
  * crash, which is the worse failure for an analytics feed.
  *
@@ -128,9 +130,9 @@ emit_rst(const struct ls_rec *h, const struct rst_rec *r)
     uint32_t fn = r->file_len  < sizeof r->file  ? r->file_len  : (uint32_t)sizeof r->file;
     uint32_t cn = r->cause_len < sizeof r->cause ? r->cause_len : (uint32_t)sizeof r->cause;
 
-    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"reset\","
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"reset\","
            "\"fn\":\"%s\",\"schema\":%u,\"file\":\"",
-           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
            rst_fn_name(h->hook_id), h->schema_id);
     ls_json_str(r->file, fn);
     printf("\",\"line\":%u,\"err\":%u,\"reason\":%u,",
@@ -208,9 +210,9 @@ emit_sslerr(const struct ls_rec *h, const struct sslerr_rec *r)
     /* `fn` here is __func__, so it names the FUNCTION rather than the file --- the
      * opposite way round from the reset record, which has __FILE__ and no function. Both
      * fields are emitted under the names that say which is which: "func" not "file". */
-    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"sslerr\","
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"sslerr\","
            "\"schema\":%u,\"func\":\"",
-           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
            h->schema_id);
     ls_json_str(r->func, fn);
     printf("\",\"line\":%u,\"alert\":%u,\"alert_name\":\"%s\",",
@@ -246,13 +248,13 @@ hook_name(uint32_t id)
 static void
 emit_http(const struct ls_rec *h, const struct http_rec *r)
 {
-    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"%s\",\"schema\":%u,"
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"%s\",\"schema\":%u,"
            "\"class\":\"%s\",\"parse_err\":%u,\"err\":%u,"
            "\"reject_reason\":%u,\"passthru\":%u,"
            "\"version\":\"%s\",\"method\":%u,\"header_count\":%u,"
            "\"status_code\":%u,\"invalid_flags\":%u,\"body_pos\":%u,"
            "\"hdr_bytes\":%u}\n",
-           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
            hook_name(h->hook_id), h->schema_id,
            klass(r), r->parse_err, r->err, r->reject_reason, r->passthru,
            VERSION_NAME[r->version & 3], r->method, r->header_count,
@@ -263,8 +265,8 @@ static void
 emit_raw(const struct ls_rec *h, const unsigned char *p, int n)
 {
     int i;
-    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"tmm\":%u,\"hook\":\"%s\",\"schema\":%u,\"raw\":\"",
-           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->tmm_id,
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"%s\",\"schema\":%u,\"raw\":\"",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
            hook_name(h->hook_id), h->schema_id);
     for (i = 0; i < n; i++)
         printf("%02x", p[i]);
