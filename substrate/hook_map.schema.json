@@ -4,7 +4,11 @@
   "title": "Per-build hook-point map",
   "description": "The artifact the hook-map generator emits every TMOS build (development-scope.md item 5; walkthrough build step 3): named symbol -> patchable entry + typed argument layout, signed and shipped with the image. A shield resolves its target hook by NAME against this map, and the signed binding is checked against it at load. REQUIRED here is scoped to what hook-point-map.json already carries, so that instance validates clean; the fields a real generator must add are marked '$comment: required in product'.",
   "type": "object",
-  "required": ["tmos_version", "build_id", "hook_points"],
+  "required": [
+    "tmos_version",
+    "build_id",
+    "hook_points"
+  ],
   "additionalProperties": false,
   "properties": {
     "_comment": {
@@ -38,20 +42,28 @@
     "hook_points": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/hook_point" }
+      "items": {
+        "$ref": "#/$defs/hook_point"
+      }
     }
   },
   "$defs": {
     "hook_point": {
       "type": "object",
-      "required": ["name", "symbol", "attach_mode", "path_class", "enumerated_outcomes", "arg_btf"],
+      "required": [
+        "name",
+        "symbol",
+        "attach_mode",
+        "path_class",
+        "enumerated_outcomes"
+      ],
       "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
           "minLength": 1,
           "maxLength": 63,
-          "description": "The hook's stable name — what a shield names as its target, and what the binding's `hook` field pins. Bounded by SHIELD_HOOK_NAME_MAX (64) minus the NUL."
+          "description": "The hook's stable name \u2014 what a shield names as its target, and what the binding's `hook` field pins. Bounded by SHIELD_HOOK_NAME_MAX (64) minus the NUL."
         },
         "symbol": {
           "type": "string",
@@ -59,22 +71,34 @@
           "description": "The build's symbol for this hook. Kept distinct from `name` so a catalog name can outlive a symbol rename."
         },
         "attach_mode": {
-          "enum": ["observe", "filter"],
+          "enum": [
+            "observe",
+            "filter"
+          ],
           "description": "observe = return value is telemetry only; filter = return value selects an enumerated outcome. Consumed by tmmtrace (it refuses drop() unless filter)."
         },
         "path_class": {
-          "enum": ["hot", "warm", "cold"],
-          "description": "Cost class of the site: hot = per-packet/per-flow steady state, warm = per-connection/request, cold = exceptional/error/malformed branch. The budget pass gates against the ceiling implied here."
+          "enum": [
+            "hot",
+            "warm",
+            "cold",
+            "unclassified"
+          ],
+          "description": "Cost class of the site: hot = per-packet/per-flow steady state, warm = per-connection/request, cold = exceptional/error/malformed branch. The budget pass gates against the ceiling implied here.",
+          "$comment": "'unclassified' is what phase A emits: cost classification needs call-graph and traffic analysis (phase B/C). Admitting a hook at 'unclassified' into ENFORCE is a decision to make deliberately, not a default --- the class exists to say how much a per-invocation cost matters on that path."
         },
         "enumerated_outcomes": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "The host-owned actions available AT THIS SITE. A program may only choose among these; it cannot invent control flow."
         },
         "arg_btf": {
           "$ref": "#/$defs/arg_btf",
-          "description": "The typed argument layout = the program's ctx. Emitted from the build's DWARF/BTF; also the input the PREVAIL program-type descriptor is generated from (item 6)."
+          "description": "The typed argument layout = the program's ctx. Emitted from the build's DWARF/BTF; also the input the PREVAIL program-type descriptor is generated from (item 6).",
+          "$comment": "required in product; phase A cannot emit it (needs DWARF parameter classification)"
         },
         "abort_branch": {
           "type": "string",
@@ -95,7 +119,7 @@
         "safe_return": {
           "$ref": "#/$defs/safe_return",
           "$comment": "required in product when attach_mode is filter",
-          "description": "What a skipped body hands back (item 7), gated on skippability FIRST. A hook is enforce-capable only when skippable is yes AND kind is not none — never on the return type alone."
+          "description": "What a skipped body hands back (item 7), gated on skippability FIRST. A hook is enforce-capable only when skippable is yes AND kind is not none \u2014 never on the return type alone."
         },
         "budget_cycles": {
           "type": "integer",
@@ -104,9 +128,48 @@
           "description": "Per-invocation cycle ceiling for a program at this hook. The admission budget pass compares its longest-path estimate against this and fails closed (item 8)."
         },
         "mode_ceiling": {
-          "enum": ["observe", "monitor", "enforce"],
+          "enum": [
+            "observe",
+            "monitor",
+            "enforce"
+          ],
           "$comment": "required in product",
           "description": "The highest mode a program at this hook may ever reach. Enforcing sites sit behind a stricter authorization tier than observe-only."
+        },
+        "entry": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]+$",
+          "$comment": "function entry address; the binary is non-PIE so this is also the runtime address"
+        },
+        "arm_at": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]+$",
+          "$comment": "where the 5-byte patch is written: entry+pad_offset for 'pad', entry for 'displace'"
+        },
+        "pad_offset": {
+          "type": "integer",
+          "enum": [
+            0,
+            4
+          ],
+          "$comment": "4 = pad follows endbr64 (indirect-call targets); 0 = pad at entry (direct-call-only statics and .isra/.constprop clones). Absent when arm_method is 'displace'."
+        },
+        "arm_method": {
+          "type": "string",
+          "enum": [
+            "pad",
+            "displace"
+          ],
+          "$comment": "'pad' overwrites the compiler's nops and displaces NOTHING. 'displace' has no pad: the runtime copies displace_bytes of leading instructions to the trampoline verbatim, then writes the jump over them. Only emitted when those bytes are position-independent, so the runtime never decodes an instruction."
+        },
+        "relocatable": {
+          "type": "boolean",
+          "$comment": "leading instructions are position-independent, decided OFFLINE by mk_hook_map.py. Must be true wherever arm_method is 'displace'."
+        },
+        "displace_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "$comment": "total length of the WHOLE leading instructions covering >=5 bytes. Usually more than 5, because instructions cannot be split."
         }
       }
     },
@@ -117,7 +180,10 @@
       "patternProperties": {
         "^arg[0-9]+$": {
           "type": "object",
-          "required": ["type", "fields"],
+          "required": [
+            "type",
+            "fields"
+          ],
           "additionalProperties": false,
           "properties": {
             "type": {
@@ -128,13 +194,16 @@
               "type": "integer",
               "minimum": 1,
               "$comment": "required in product",
-              "description": "sizeof the argument struct. This is the ONLY bound the verifier enforces — PREVAIL checks that an access lies in [0, size), not that it lands on a declared field. So ctx_size decides what a program can reach; the field list is documentation on top of it."
+              "description": "sizeof the argument struct. This is the ONLY bound the verifier enforces \u2014 PREVAIL checks that an access lies in [0, size), not that it lands on a declared field. So ctx_size decides what a program can reach; the field list is documentation on top of it."
             },
             "field_offsets": {
               "type": "object",
-              "additionalProperties": { "type": "integer", "minimum": 0 },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              },
               "$comment": "required in product",
-              "description": "Authoritative byte offsets, emitted from the build's debug info (DW_AT_data_member_location) — NEVER re-derived by packing the field list. Re-packing is unsound: one omitted or untypeable field shifts every later offset, silently. Verified by check-offsets against the real header."
+              "description": "Authoritative byte offsets, emitted from the build's debug info (DW_AT_data_member_location) \u2014 NEVER re-derived by packing the field list. Re-packing is unsound: one omitted or untypeable field shifts every later offset, silently. Verified by check-offsets against the real header."
             },
             "fields": {
               "type": "object",
@@ -151,16 +220,28 @@
     },
     "safe_return": {
       "type": "object",
-      "required": ["skippable", "kind"],
+      "required": [
+        "skippable",
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
         "skippable": {
-          "enum": ["unanalysed", "no", "yes"],
+          "enum": [
+            "unanalysed",
+            "no",
+            "yes"
+          ],
           "description": "GATE 1, and the one that decides enforce-capability. Does not running the body leave TMM consistent? Considers locks held across it, refcount movement, flow-state advance, input consumed, out-params the caller reads, and allocation. Default and absent-value semantics are 'unanalysed', which means observe-only: a body nobody has analysed is not safe-returnable, and 'we could not find a problem' is not 'there is none'. Mirrors enum shield_skippable in shield_abi.h.",
           "default": "unanalysed"
         },
         "kind": {
-          "enum": ["none", "void", "zero", "const"],
+          "enum": [
+            "none",
+            "void",
+            "zero",
+            "const"
+          ],
           "description": "GATE 2, reached only after skippable is yes. none = gate 2 not reached; void = no value to synthesize, which says NOTHING about gate 1 (a void function is called entirely for its side effects, so void is the HARDEST case, not the trivial one); zero = 0/NULL is the benign no-op; const = return the enumerated benign value below. Mirrors enum shield_sr_kind in shield_abi.h."
         },
         "value": {
@@ -169,18 +250,31 @@
         },
         "rationale": {
           "type": "string",
-          "description": "Why skipping this body is safe — specifically, the gate-1 evidence: which locks, refcounts, state advances, consumed buffers, out-params and allocations were checked and found absent. Also what benign work is lost while enforcing. A per-function human judgement, not a generated field, and required in product whenever skippable is yes."
+          "description": "Why skipping this body is safe \u2014 specifically, the gate-1 evidence: which locks, refcounts, state advances, consumed buffers, out-params and allocations were checked and found absent. Also what benign work is lost while enforcing. A per-function human judgement, not a generated field, and required in product whenever skippable is yes."
         }
       }
     },
     "signature": {
       "type": "object",
-      "required": ["alg", "key_id", "value"],
+      "required": [
+        "alg",
+        "key_id",
+        "value"
+      ],
       "additionalProperties": false,
       "properties": {
-        "alg": { "type": "string", "description": "e.g. 'ed25519', 'ecdsa-p384-sha384'." },
-        "key_id": { "type": "string", "description": "Which F5 signing key; the public half is baked into TMM." },
-        "value": { "type": "string", "description": "Base64 detached signature." }
+        "alg": {
+          "type": "string",
+          "description": "e.g. 'ed25519', 'ecdsa-p384-sha384'."
+        },
+        "key_id": {
+          "type": "string",
+          "description": "Which F5 signing key; the public half is baked into TMM."
+        },
+        "value": {
+          "type": "string",
+          "description": "Base64 detached signature."
+        }
       }
     }
   }

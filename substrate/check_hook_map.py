@@ -94,6 +94,16 @@ def main(argv):
         else:
             print("ok    %s  (%s)" % (rel, validator))
 
+        # Only for maps the generator produced with the relocatability pass. The
+        # checked-in example map predates it, and failing on that would punish the
+        # wrong artifact.
+        if inst.get("hook_points") and "arm_method" in inst["hook_points"][0]:
+            try:
+                check_relocatability(inst)
+            except AssertionError as e:
+                rc = 1
+                print("FAIL  %s  relocatability: %s" % (rel, e))
+
         missing_top = [k for k in PRODUCT_TOP if k not in inst]
         missing_hook = sorted({k for hp in inst.get("hook_points", [])
                                for k in PRODUCT_HOOK if k not in hp})
@@ -105,6 +115,40 @@ def main(argv):
             if missing_hook:
                 print("        per hook : %s" % ", ".join(missing_hook))
     return rc
+
+
+
+def check_relocatability(doc):
+    """The offline analysis is what lets the RUNTIME stay a memcpy and a jmp. If any of
+    these break, the data plane would need an instruction decoder --- which is the whole
+    thing this avoids."""
+    hp = doc["hook_points"]
+    n = 0
+
+    for e in hp:
+        assert e["arm_method"] in ("pad", "displace"), e["name"]; n += 1
+
+        if e["arm_method"] == "displace":
+            # No pad, so the jump is written OVER real instructions. Emitting one that
+            # is not relocatable would corrupt the function.
+            assert e["relocatable"] is True, f'{e["name"]} displaced but not relocatable'
+            # Whole instructions only, and at least the 5 a jmp rel32 needs.
+            assert e["displace_bytes"] >= 5, f'{e["name"]} displaces {e["displace_bytes"]}'
+            assert "pad_offset" not in e, f'{e["name"]} has both a pad and displacement'
+            n += 3
+        else:
+            assert e["pad_offset"] in (0, 4), e["name"]
+            assert e["patchable_pad_bytes"] == 5, e["name"]
+            n += 2
+
+    # The population that only displacement can reach --- OpenSSL and friends. If this
+    # is zero the analysis silently stopped working and reach quietly halved.
+    disp = sum(1 for e in hp if e["arm_method"] == "displace")
+    assert disp > 0, "no displaceable entries: the relocatability pass produced nothing"
+    n += 1
+
+    print(f"ok    hook map relocatability  ({n} assertions: "
+          f"{len(hp) - disp:,} pad, {disp:,} displace)")
 
 
 if __name__ == "__main__":

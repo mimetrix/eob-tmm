@@ -96,6 +96,88 @@ def functions(debuginfo):
     return fns
 
 
+# --- relocatability ---------------------------------------------------------------
+#
+# WHY THIS IS HERE AND NOT IN TMM. A function with no compiler pad can still be hooked
+# --- overwrite its first bytes with a jump and run the displaced ones from a
+# trampoline. That is what Frida does, and it needs a full instruction decoder and
+# re-encoder, which is why Frida bundles Capstone.
+#
+# We do not need any of that AT RUNTIME, because of a measurement: of TMM's 79,794
+# function entries, 94.8% have leading instructions that are POSITION-INDEPENDENT ---
+# they can be copied to a trampoline byte-for-byte with no re-encoding at all. Only
+# 5.2% start with a relative branch or a RIP-relative operand.
+#
+# So the analysis happens HERE, offline, where objdump is harmless, and the runtime is
+# left with a memcpy and a jmp. Nothing decodes instructions inside the data plane.
+#
+# FAIL CLOSED. Anything not provably copyable is marked not relocatable and refused at
+# arm time. "We could not classify it" is never "it is fine" --- the same rule as the
+# safe-return gates.
+
+# Mnemonics whose encoding depends on where the instruction sits. Copying one to a
+# different address silently changes where it goes.
+_POSDEP = re.compile(r"^(j|call|loop|xbegin)", re.I)
+
+
+def _objdump_text(binary):
+    """One pass over .text, yielding (func_addr, [(nbytes, mnemonic, operands), ...]).
+
+    One invocation, not one per function: at ~80,000 functions a per-function objdump
+    would take hours and this takes seconds."""
+    out = run(["objdump", "-d", "--section=.text", binary])
+    cur, insns = None, []
+    fn_re = re.compile(r"^([0-9a-f]+) <([^>]+)>:")
+    in_re = re.compile(r"^\s+([0-9a-f]+):\t([0-9a-f ]+)\t?(.*)$")
+    for line in out.splitlines():
+        m = fn_re.match(line)
+        if m:
+            if cur is not None:
+                yield cur, insns
+            cur, insns = int(m.group(1), 16), []
+            continue
+        if cur is None:
+            continue
+        m = in_re.match(line)
+        if m:
+            nbytes = len(m.group(2).split())
+            text = m.group(3).strip()
+            parts = text.split(None, 1)
+            insns.append((nbytes, parts[0] if parts else "", parts[1] if len(parts) > 1 else ""))
+    if cur is not None:
+        yield cur, insns
+
+
+def relocatability(binary, need=5):
+    """{addr: {"copy_bytes": n, "relocatable": bool, "why": str}}
+
+    `need` is 5 --- the width of the `jmp rel32` an unpadded hook must write. We must
+    displace WHOLE instructions, so copy_bytes is the total length of however many
+    leading instructions it takes to cover 5 bytes, which is usually more than 5."""
+    out = {}
+    for addr, insns in _objdump_text(binary):
+        total, why = 0, None
+        for nbytes, mnem, ops in insns:
+            if "(bad)" in mnem or not mnem:
+                why = "undecodable"
+                break
+            if _POSDEP.match(mnem):
+                why = f"relative branch ({mnem})"
+                break
+            if "(%rip)" in ops:
+                why = "rip-relative operand"
+                break
+            total += nbytes
+            if total >= need:
+                break
+        if why is None and total < need:
+            why = "function shorter than the patch"
+        out[addr] = {"copy_bytes": total if why is None else 0,
+                     "relocatable": why is None,
+                     "why": why}
+    return out
+
+
 def extract_debs(debs_dir, workdir):
     binp = next((os.path.join(debs_dir, f) for f in os.listdir(debs_dir)
                  if f.startswith("tmm_") and f.endswith(".deb")), None)
@@ -144,7 +226,10 @@ def main():
             f.seek(toff)
             text = f.read(tsize)
 
-        padded, unpadded, callfirst, outside = [], 0, 0, 0
+        # Offline instruction analysis, once. Everything the runtime needs to arm an
+        # UNPADDED function is decided here --- see relocatability().
+        reloc = relocatability(binary)
+        padded, unpadded, callfirst, outside, displaceable = [], 0, 0, 0, 0
         for addr, name in functions(dbg):
             if not (taddr <= addr < taddr + tsize - 9):
                 outside += 1
@@ -155,20 +240,53 @@ def main():
             elif head[:5] == PAD5:
                 pad_off = 0                      # direct-call only: pad at the entry
             else:
+                pad_off = None                   # no pad: displacement is the only route
                 unpadded += 1
                 if head[:4] == ENDBR64 and head[4] == 0xE8:
                     callfirst += 1               # first instruction is a call; not a pad
-                continue
-            padded.append({"name": name, "symbol": name,
-                           "entry": f"0x{addr:x}",
-                           "pad_offset": pad_off,
-                           "arm_at": f"0x{addr + pad_off:x}",
-                           "patchable_pad_bytes": 5,
-                           "attach_mode": "observe", "path_class": "unclassified",
-                           "enumerated_outcomes": ["LS_FALLTHROUGH", "LS_SAFE_RETURN"]})
+
+            r = reloc.get(addr, {"relocatable": False, "copy_bytes": 0,
+                                 "why": "not present in the .text disassembly"})
+
+            # A function with NO pad is still armable when its leading instructions are
+            # position-independent: copy them to the trampoline verbatim, then write the
+            # jump over them. That is what Frida's relocator does for the common case,
+            # minus the decoder --- because the decoding happened HERE.
+            #
+            # FAIL CLOSED: no pad and not copyable means the entry is not emitted at all.
+            if pad_off is None:
+                if not r["relocatable"]:
+                    continue
+                displaceable += 1
+
+            e = {"name": name, "symbol": name,
+                 "entry": f"0x{addr:x}",
+                 "attach_mode": "observe", "path_class": "unclassified",
+                 "enumerated_outcomes": ["LS_FALLTHROUGH", "LS_SAFE_RETURN"],
+                 "arm_method": "pad" if pad_off is not None else "displace",
+                 "relocatable": r["relocatable"],
+                 "displace_bytes": r["copy_bytes"]}
+            if pad_off is not None:
+                e.update({"pad_offset": pad_off,
+                          "arm_at": f"0x{addr + pad_off:x}",
+                          "patchable_pad_bytes": 5})
+            else:
+                e["arm_at"] = f"0x{addr:x}"
+            if not r["relocatable"]:
+                e["not_relocatable_why"] = r["why"]
+            padded.append(e)
 
         doc = {
-            "_comment": ("PHASE A: addresses and pad status only, read from the binary. "
+            "_comment": ("PHASE A+: addresses, pad status, and OFFLINE RELOCATABILITY. "
+                         "arm_method is 'pad' (overwrite the compiler's 5 nops --- nothing "
+                         "is displaced) or 'displace' (no pad: copy displace_bytes of "
+                         "leading instructions to the trampoline verbatim, then write the "
+                         "jump over them). The second route only appears for entries whose "
+                         "leading instructions are POSITION-INDEPENDENT, so the runtime "
+                         "copies bytes and never decodes an instruction --- measured at "
+                         "94.8% of TMM's function entries, which is why no disassembler is "
+                         "needed in the data plane. Entries that are neither padded nor "
+                         "copyable are OMITTED: fail closed. "
                          "pad_offset is 4 (endbr64 + 5 nops, indirect-call targets) or 0 "
                          "(5 nops, direct-call-only: file-scope statics and .isra/.constprop "
                          "clones, which -fcf-protection gives no landing pad). ls_arm.c "
@@ -192,9 +310,12 @@ def main():
             open(a.out, "w").write(out + "\n")
 
         print(f"  build id      : {bid_b}", file=sys.stderr)
-        e4 = sum(1 for h in padded if h["pad_offset"] == 4)
-        e0 = len(padded) - e4
-        print(f"  padded        : {len(padded):,}   <- armable by name", file=sys.stderr)
+        # .get(): displaced entries carry no pad_offset at all, which is the point.
+        e4 = sum(1 for h in padded if h.get("pad_offset") == 4)
+        e0 = sum(1 for h in padded if h.get("pad_offset") == 0)
+        print(f"  ARMABLE TOTAL : {len(padded):,}", file=sys.stderr)
+        print(f"  padded        : {e4 + e0:,}   <- armable via the compiler's nops",
+              file=sys.stderr)
         print(f"    pad after endbr64 : {e4:,}", file=sys.stderr)
         print(f"    pad at entry      : {e0:,}   (no endbr64: direct-call-only, clones)",
               file=sys.stderr)
@@ -202,8 +323,17 @@ def main():
               file=sys.stderr)
         print(f"    the other {e0:,} need ls_arm to honour pad_offset (it refuses them now).",
               file=sys.stderr)
-        print(f"  no pad        : {unpadded:,}   <- inlined, folded, or another build's",
+        print(f"  no pad        : {unpadded:,}   <- other builds (OpenSSL etc.), inlined, folded",
               file=sys.stderr)
+        print(f"    of those, DISPLACEABLE : {displaceable:,}  <- armable without a pad,",
+              file=sys.stderr)
+        print(f"      by copying their leading bytes verbatim. This is the population",
+              file=sys.stderr)
+        print(f"      pad-based arming can never reach --- OpenSSL included.", file=sys.stderr)
+        nonreloc = sum(1 for h in padded if not h["relocatable"])
+        print(f"  padded but NOT relocatable : {nonreloc:,}  (armable via the pad anyway;",
+              file=sys.stderr)
+        print(f"      recorded so a future displacement path refuses them)", file=sys.stderr)
         print(f"    of which start with a call: {callfirst}  (not armed --- a file has no armed state)",
               file=sys.stderr)
         print(f"  outside .text : {outside:,}", file=sys.stderr)
