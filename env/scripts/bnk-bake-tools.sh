@@ -54,9 +54,20 @@ echo "  symbols   : $N"
 echo
 echo "=== 3. assemble the build context"
 cp "$REPO/env/scripts/ls-load.py" "$CTX/ls-load.py"
-[ -x "$CTX/ls_drain" ] || fail "no ls_drain in $CTX.
-    Build it: gcc -O2 -Wall -Wextra -Werror -static -o $CTX/ls_drain drain/ls_drain.c
-    STATIC on purpose --- the container's libc is not ours to rely on."
+# REBUILD ls_drain FROM SOURCE, every time. Checking only that it EXISTED shipped a stale
+# one: it was compiled once and its source changed twice afterwards (the tmm->slot rename,
+# then the h2abort and prog decoders), so the image carried a reader three commits behind.
+# It printed "tmm" for a field renamed to "slot" and dumped schema-5 records as raw hex ---
+# the records were correct and the consumer was not. Same family as the missing .d files:
+# an artifact older than its source with nothing comparing the two.
+#
+# STATIC on purpose --- the container's libc is not ours to rely on.
+DRAIN_SRC="$REPO/substrate/drain/ls_drain.c"
+[ -f "$DRAIN_SRC" ] || fail "no drain source at $DRAIN_SRC"
+gcc -O2 -Wall -Wextra -Werror -static -I"$REPO/substrate" \
+    -o "$CTX/ls_drain" "$DRAIN_SRC" || fail "ls_drain failed to build --- refusing to bake
+    an image around a consumer that does not compile."
+echo "  ls_drain  : rebuilt from source ($(stat -c%s "$CTX/ls_drain") bytes, static)"
 ls "$CTX"/shields/*.bpf.o >/dev/null 2>&1 || fail "no verified programs in $CTX/shields.
     Compile with clang -O2 -target bpf and run PREVAIL over each before baking one in."
 # ALL THREE docker files, and then CHECK the Dockerfile is the one we think.
