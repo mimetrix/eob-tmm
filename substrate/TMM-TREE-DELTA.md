@@ -72,6 +72,18 @@ file:
 whitelists by the shared-slot guard in `ls_arm.c`. That brings the tree's additions to
 32.
 
+**One more, 2026-08-18: `g_ls_names`**, from making map identity the symbol name
+rather than the shape (`ls_map_glue.h`). 33. It cost a build, and the way it cost one
+is worth recording because it will happen again: the FIRST build after the change
+passed `diff-globals` cleanly and produced a binary WITHOUT the change. There are no
+`.d` files in `src/compile`, so make has no dependency edge from an object to the
+headers it includes --- a header-only edit recompiles nothing, and the gate cannot
+catch a symbol that was never compiled. The gate only fired on the build after the
+objects were forcibly removed. `env/scripts/bnk-sync-substrate.sh` now does that
+removal as a step, and verifies it by counting rather than announcing it: the objects
+are root-owned from inside the toolchain container, so a plain `rm -f` prints
+"Permission denied" and keeps going.
+
 **The list below is prose and drifted.** An audit on 2026-08-17 found the tree adds
 **30** symbols, not the 22 written here: `g_ls_shapes`, `g_ls_nshapes`, `g_tp_seg`,
 `g_tp_seg_tried`, `g_tp_seq` and `_ubpf_instruction_filter` were added to the tree
@@ -174,9 +186,16 @@ base/ls_tp_emit.c     STDINC UBPF
 ```
 
 **And whitelist entries, in *both* files.** So far: `g_tp_seg`, `g_tp_seg_tried`, `g_tp_seq` from the
-ring producer, then `g_ls_shapes`, `g_ls_nshapes` from the map glue.
+ring producer, then `g_ls_shapes`, `g_ls_nshapes` and `g_ls_names` from the map glue.
 
-This has now cost three builds. **Adding any file-scope static to this substrate costs a whitelist
+Insert in SORTED position (`sed -i '/^g_ls_nshapes$/i g_ls_names'`) rather than
+appending and re-sorting: these are F5 files and the smallest possible diff is the
+point. Then check two things --- that the file is still sorted, and that the new line
+carries **no trailing carriage return**. `script -qec` emits CRLF, and an entry with a
+`\r` does not match the symbol, so `diff-globals` fails with a diff that looks exactly
+like the one just fixed. That has happened twice.
+
+This has now cost four builds. **Adding any file-scope static to this substrate costs a whitelist
 edit in both files**, and `diff-globals` reports it as a link failure with a diff rather than a
 compile error, so it does not look like the thing it is. Check before building, not after.
 

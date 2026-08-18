@@ -58,4 +58,10 @@
 M src/compile/debug_whitelist_x86_64
 M src/compile/default_whitelist_x86_64
 M src/compile/filelist
-M src/modules/hudfilter/ssl/ssl.c
+
+# ssl.c REMOVED FROM THIS MANIFEST 2026-08-18. It was listed as MODIFIED because the
+# build tree carried a deliberate revert of the ALPN bounds check (VULNERABLE-BUILD.md).
+# The BNK demo dropped shielding entirely, so the revert was restored --- the tree is
+# clean for that file and this manifest must say so, or the both-ways check fails on an
+# entry the tree no longer has. The substrate now modifies THREE F5 files, all of them
+# build configuration: two whitelists and filelist. No F5 source file is modified.
