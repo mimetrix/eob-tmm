@@ -117,23 +117,26 @@ on state TMM does not itself correlate.
 Needs: a hook whose return value is acted on, and a safe-return policy for it
 (scope item 7). **Days, not weeks** — the machinery is all present.
 
-### 3b. Correlate a decision to the request that caused it
+### 3b. Attribute a decision to the flow that caused it — HALF LANDED
 
-The gap the whole exercise keeps rediscovering: TMM counts in aggregate and cannot
-link a counter to a request. With maps plus the ring, a program can stamp a record
-with a key derived from the flow and emit both sides of a decision.
+**Updated 2026-08-18.** An earlier version of this section said the reset feed carries no
+flow field. That is no longer true: `struct ls_ctx_rst` gained an 8-byte flow cookie
+(TMM's own `UFLOW_COOKIE`, split into two 32-bit halves to keep the record at 92 bytes),
+and records now carry `"flow":"00003b69e998637f"`.
 
-This is the *general* form of what the reset feed does specifically --- and it is NOT
-what the reset feed does today. Checked 2026-08-17: `struct ls_ctx_rst` carries no
-flow, connection or client field, so records correlate by timestamp and thread only.
-"We can attribute to a code site and a reason" is supportable now; "we can attribute
-to a request" needs the work below and should not be said before it lands.
+**What that already buys, measured:** cardinality. One sample showed
+`flow_table.c:2618` firing 3 times across **2** distinct flows while
+`http_mr_proxy.c:993` fired 12 times across **12**. That is the difference between one
+client hammering and a systemic condition, and it was previously unanswerable.
 
-`rst_why`'s first argument IS the flow handle, forwarded and currently ignored, so
-this is a host-side dereference rather than new plumbing. The constraint is the
-96-byte ctx ceiling: at 92 bytes there is room for an 8-byte flow HASH (a correlation
-key, not an identity) if `cause[]` shrinks to 32, but not for a 5-tuple. A full tuple
-needs the ring record decoupled from the program ctx --- Phase 4.
+**What is still missing:** identity. A cookie says same-flow-or-not; it does not say
+*which client*. That needs the 5-tuple, which does not fit the remaining ctx budget —
+the record is 92 of PREVAIL's 96 bytes. Either shrink `cause[]` further, or decouple the
+ring record from the program ctx (Phase 4).
+
+Worth noting the cookie is the better artifact for anything leaving F5: it answers the
+operational question while carrying nothing about *whose* traffic it was.
+
 
 ### 3c. Latency attribution inside TMM — needs exit hooks (Phase 2)
 
@@ -165,6 +168,36 @@ demo above. Functionality is shown; safety is argued from the verifier alone.
 Neither is a show-stopper. Both are things a skeptical reviewer will ask in the first
 five minutes, and "unmeasured" is a worse answer than a modest number with honest
 error bars.
+
+---
+
+## 4b. BNK demo focus — CVE work deferred to classic BIG-IP (2026-08-18)
+
+Decision: **the BNK demo does not include CVE mitigation.** The survey
+(`cve-survey-bnk.md`) showed BNK's 3,068 tracked CVEs are ~99.9% dependency CVEs in
+separate containers — Go stdlib, Python, Istio, OS packages — which a TMM-resident
+mechanism cannot reach, and mitigating a non-CVE internal finding is marginal as a
+business claim. CVE work moves to classic BIG-IP, where the OpenSSL/crypto CVEs
+actually are, once a build/deploy environment exists for it.
+
+So the BNK story is what the mechanism does that nothing else can, ranked by
+value over cost:
+
+| # | capability | state | cost |
+|---|---|---|---|
+| 1 | **Reset feed** — every reset decision, by source line and reason, live | **works** | a scripted walkthrough |
+| 2 | **Rates, not just events** — a timer hook aggregating in place | not built | small; `ls_prep` already runs on a TMM timer |
+| 3 | **Which client** — 5-tuple on top of the flow cookie | cookie landed | needs ctx budget or Phase 4 |
+| 4 | **Admission control decided in the data plane** — §3a | `rate_watch` proves the shape | days |
+| 5 | **Per-call cost** — not a demo, but gates every review | unmeasured | needs `perf_event_paranoid` <= 1 on the node |
+
+**The claim to lead with, which is provable today:**
+
+> A verified program can be loaded into a running TMM and armed at a function entry
+> with no restart — and it reports every reset decision the data plane makes, by
+> source line and reason, attributed to a flow.
+
+Nothing about that needs a CVE, and none of it is reachable from iRules or WASM.
 
 ---
 
