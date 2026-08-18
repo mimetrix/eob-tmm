@@ -42,7 +42,7 @@ ubpf_register(struct ubpf_vm *vm, unsigned int idx, const char *n, external_func
 {
     (void)vm; (void)n; (void)f;
     return bump(idx == 1 ? "h1" : idx == 2 ? "h2" : idx == 3 ? "h3"
-              : idx == 5 ? "h5" : idx == 130 ? "h130" : "h?");
+              : idx == 5 ? "h5" : idx == 25 ? "h25" : "h?");
 }
 
 /* ls_tp_publish_raw lives in ls_tp_emit.c, which this test does not link --- the point

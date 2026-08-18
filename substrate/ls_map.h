@@ -86,6 +86,20 @@ struct ls_map_def {
  * for it.
  */
 #define LS_MAP_TYPE_RINGBUF 27u /* BPF_MAP_TYPE_RINGBUF --- the egress ring     */
+/*
+ * AND THE ONE ACTUALLY USED, found the hard way. bpf_ringbuf_output is helper id 130, and
+ * uBPF's external-function table is UBPF_MAX_EXT_FUNCS entries --- 64 by default
+ * (ubpf.h:72). So ubpf_register(vm, 130, ...) returns -1, the all-or-nothing install
+ * failed, and an image shipped in which NO helper registered at all: every program load
+ * was refused and even the built-in shield never armed. Loud, which is what
+ * all-or-nothing is for.
+ *
+ * bpf_perf_event_output is id 25 --- inside the table --- and PREVAIL knows it just as
+ * well (verified: a program declaring this map type and calling id 25 passes unchanged).
+ * Its descriptor is shaped like a HASH one (key_size 4, value_size 4), so type is the only
+ * thing that separates them, which is why the check below switches on d->type.
+ */
+#define LS_MAP_TYPE_PERF_EVENT_ARRAY 4u /* BPF_MAP_TYPE_PERF_EVENT_ARRAY        */
 
 struct ls_map {
     uint32_t in_use;
@@ -137,6 +151,12 @@ ls_map_check_descriptor(const struct ls_map_def *d)
         if (d->max_entries == 0)                     return 0;
         return 1;
     }
+    /* A perf-event array is shaped like a hash map (4/4), so ONLY the type
+     * separates them. Admitted on its own terms and never given storage. */
+    if (d->type == LS_MAP_TYPE_PERF_EVENT_ARRAY) {
+        if (d->max_entries == 0)                     return 0;
+        return 1;
+    }
     if (d->type != LS_MAP_TYPE_HASH)                return 0;
     if (d->key_size == 0 || d->key_size > LS_MAP_KEY_MAX)   return 0;
     if (d->value_size == 0 || d->value_size > LS_MAP_VAL_MAX) return 0;
@@ -154,7 +174,8 @@ ls_map_create(struct ls_map_set *s, const struct ls_map_def *d)
     m = &s->m[s->n];
     memset(m, 0, sizeof *m);
     m->in_use  = 1;
-    if (d->type == LS_MAP_TYPE_RINGBUF) {
+    if (d->type == LS_MAP_TYPE_RINGBUF ||
+        d->type == LS_MAP_TYPE_PERF_EVENT_ARRAY) {
         /* No table. The slot exists only so an index resolves to "the egress ring";
          * key_sz and val_sz stay 0, which is what every hash operation checks against
          * before touching storage. */

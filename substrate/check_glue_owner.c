@@ -64,13 +64,13 @@ main(void)
      * map=0. That program loads, verifies and runs with maps always empty. */
     reset();
     assert(owner_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h130 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h25 ") == 0);
     printf("ok    install order: %s\n", calls);
 
     /* --- 3. the non-owning TU installs identically ------------------------- */
     reset();
     assert(user_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h130 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h25 ") == 0);
     printf("ok    non-owning TU installs identically (no divergence by includer)\n");
 
     /* --- 4. a NULL vm is refused before anything is registered ------------- */
@@ -186,7 +186,7 @@ main(void)
         extern int ls_tp_publish_calls;
         extern unsigned long ls_tp_publish_len;
         const uint64_t REFUSED = (uint64_t)-1;
-        struct ls_map_def rb = { LS_MAP_TYPE_RINGBUF, 0u, 0u, 4096u, 0u };
+        struct ls_map_def rb = { LS_MAP_TYPE_PERF_EVENT_ARRAY, 4u, 4u, 16u, 0u };
         struct ls_map_def hs = { LS_MAP_TYPE_HASH, 4u, 8u, 64u, 0u };
         unsigned char sec[2 * sizeof(struct ls_map_def)];
         unsigned char payload[64];
@@ -210,23 +210,22 @@ main(void)
         ls_tp_publish_calls = 0;
         g_ls_cur_slot = 5;
 
-        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 0, 0, 0) == REFUSED);
-        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload,
-                                   LS_RB_MAX_RECORD + 1, 0, 0) == REFUSED);
-        assert(ls_h_ringbuf_output(ring_idx, 0, 8, 0, 0) == REFUSED);
+        assert(ls_h_perf_event_output(0, ring_idx, 0, (uint64_t)(uintptr_t)payload, 0) == REFUSED);
+        assert(ls_h_perf_event_output(0, ring_idx, 0, (uint64_t)(uintptr_t)payload, LS_RB_MAX_RECORD + 1) == REFUSED);
+        assert(ls_h_perf_event_output(0, ring_idx, 0, 0, 8) == REFUSED);
         /* A HASH map is not a ring --- emitting through one would publish table bytes. */
-        assert(ls_h_ringbuf_output(hash_idx, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
-        assert(ls_h_ringbuf_output(LS_MAP_MAX + 5, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
+        assert(ls_h_perf_event_output(0, hash_idx, 0, (uint64_t)(uintptr_t)payload, 8) == REFUSED);
+        assert(ls_h_perf_event_output(0, LS_MAP_MAX + 5, 0, (uint64_t)(uintptr_t)payload, 8) == REFUSED);
         assert(ls_tp_publish_calls == 0);   /* not one of those reached the ring */
 
         /* No program running --- reached from anywhere else, refuse. */
         g_ls_cur_slot = -1;
-        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 8, 0, 0) == REFUSED);
+        assert(ls_h_perf_event_output(0, ring_idx, 0, (uint64_t)(uintptr_t)payload, 8) == REFUSED);
         assert(ls_tp_publish_calls == 0);
 
         /* And the one case that SHOULD publish. */
         g_ls_cur_slot = 5;
-        assert(ls_h_ringbuf_output(ring_idx, (uint64_t)(uintptr_t)payload, 32, 0, 0) == 0);
+        assert(ls_h_perf_event_output(0, ring_idx, 0, (uint64_t)(uintptr_t)payload, 32) == 0);
         assert(ls_tp_publish_calls == 1);
         assert(ls_tp_publish_len == 32);
 

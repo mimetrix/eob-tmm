@@ -35,8 +35,14 @@ typedef unsigned long long __u64;
 struct bpf_map_def {
     __u32 type, key_size, value_size, max_entries, map_flags;
 };
-#define BPF_MAP_TYPE_HASH    1
-#define BPF_MAP_TYPE_RINGBUF 27
+#define BPF_MAP_TYPE_HASH             1
+/* PERF_EVENT_ARRAY and not RINGBUF, for a reason worth knowing: bpf_ringbuf_output is
+ * helper id 130 and uBPF's external-function table holds UBPF_MAX_EXT_FUNCS entries --- 64
+ * by default. Registering 130 fails, and because the host's helper install is
+ * all-or-nothing that failed EVERY helper, so an image shipped where no program could
+ * load at all. bpf_perf_event_output is id 25, inside the table, and PREVAIL knows it
+ * equally well. */
+#define BPF_MAP_TYPE_PERF_EVENT_ARRAY 4
 
 /* The window state, one per reset site. 24 bytes, inside LS_MAP_VAL_MAX (32). */
 struct window {
@@ -52,21 +58,22 @@ struct bpf_map_def rate_window __attribute__((section("maps"), used)) = {
     .max_entries = 64,
 };
 
-/* Resolves to the thread's EXISTING egress ring, not to new storage --- see
- * LS_MAP_TYPE_RINGBUF in ls_map.h. key_size and value_size are 0 by definition and
- * max_entries is a byte count, which is why the host admits this descriptor on its own
- * terms rather than through the hash checks. */
+/* Resolves to the thread's EXISTING egress ring, not to new storage. Its descriptor is
+ * shaped exactly like a hash map's (4/4), so the host can only tell them apart by TYPE
+ * --- which is why ls_map_check_descriptor switches on d->type and not on the sizes. */
 struct bpf_map_def egress __attribute__((section("maps"), used)) = {
-    .type = BPF_MAP_TYPE_RINGBUF,
-    .key_size = 0,
-    .value_size = 0,
-    .max_entries = 4096,
+    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
+    .key_size = sizeof(__u32),
+    .value_size = sizeof(__u32),
+    .max_entries = 16,
 };
 
 static void *(*bpf_map_lookup_elem)(void *, const void *) = (void *)1;
 static long (*bpf_map_update_elem)(void *, const void *, const void *, __u64) = (void *)2;
 static __u64 (*bpf_ktime_get_ns)(void) = (void *)5;
-static long (*bpf_ringbuf_output)(void *, void *, __u64, __u64) = (void *)130;
+/* (ctx, map, flags, data, size) --- five args, which is exactly what uBPF's
+ * external_function_t carries. The map is arg 1, the payload args 3 and 4. */
+static long (*bpf_perf_event_output)(void *, void *, __u64, void *, __u64) = (void *)25;
 
 /* struct ls_ctx_rst --- substrate/ls_ctx_rst.h, 92 bytes. */
 struct ls_ctx_rst {
@@ -136,7 +143,7 @@ shield(struct ls_ctx_rst *c)
         a.lineno    = c->lineno;
         a.count     = nw.count;
         a.window_ns = now - nw.start_ns;
-        bpf_ringbuf_output(&egress, &a, sizeof a, 0);
+        bpf_perf_event_output(c, &egress, 0, &a, sizeof a);
         nw.emitted = 1;
     }
 

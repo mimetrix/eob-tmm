@@ -59,7 +59,27 @@ cp "$REPO/env/scripts/ls-load.py" "$CTX/ls-load.py"
     STATIC on purpose --- the container's libc is not ours to rely on."
 ls "$CTX"/shields/*.bpf.o >/dev/null 2>&1 || fail "no verified programs in $CTX/shields.
     Compile with clang -O2 -target bpf and run PREVAIL over each before baking one in."
+# ALL THREE docker files, and then CHECK the Dockerfile is the one we think.
+#
+# On 2026-08-18 a bake used a STALE Dockerfile: an older copy had been staged under $REPO
+# on the build box, so the layer built with the previous inline assertion instead of
+# ls-verify-layer.sh --- and the build-id check therefore never ran. The layer looked
+# fine, because the thing that would have complained was the thing that was missing.
+#
+# So: copy all three, then assert the Dockerfile actually references the verifier. A
+# Dockerfile that does not is either stale or has had its assertion removed, and both are
+# reasons to stop.
 cp "$REPO/env/docker/Dockerfile.ls-tools" "$CTX/Dockerfile"
+cp "$REPO/env/docker/ls-verify-layer.sh" "$CTX/ls-verify-layer.sh"
+cp "$REPO/env/docker/ls_buildid.py"      "$CTX/ls_buildid.py"
+grep -q "ls-verify-layer.sh" "$CTX/Dockerfile" || fail "the Dockerfile at
+    $REPO/env/docker/Dockerfile.ls-tools does not reference ls-verify-layer.sh.
+    It is stale, or its assertion was removed. Either way the build-id check would not
+    run and the layer would be unverified --- which is what happened once already."
+grep -q "ln -sf /usr/bin/tmm.default" "$CTX/Dockerfile" || fail "the Dockerfile does not
+    repoint /usr/bin/tmm at the padded binary. Dockerfile.runtime points it at tmm.debug
+    whenever a debug binary is present, and that build has NO entry pads --- nothing can
+    be armed. Four images have shipped that way." 
 echo "  context   : $CTX  ($(ls "$CTX"/shields/*.bpf.o | wc -l) programs, ls_drain $(stat -c%s "$CTX/ls_drain") B)"
 
 echo

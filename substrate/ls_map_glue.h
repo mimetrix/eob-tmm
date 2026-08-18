@@ -400,17 +400,21 @@ ls_h_ktime_get_ns(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e)
                                  * single call */
 
 static inline uint64_t
-ls_h_ringbuf_output(uint64_t map, uint64_t data, uint64_t size, uint64_t flags,
-                    uint64_t unused)
+ls_h_perf_event_output(uint64_t ctx, uint64_t map, uint64_t flags, uint64_t data,
+                       uint64_t size)
 {
     struct ls_map *m = ls_map_get(ls_map_current(), map);
 
-    (void)flags; (void)unused;
+    /* ARGUMENT ORDER IS bpf_perf_event_output(ctx, map, flags, data, size). The map is
+     * arg 1 and the payload is args 3 and 4 --- NOT bpf_ringbuf_output's
+     * (map, data, size, flags), which this used before id 130 turned out to be outside
+     * uBPF's table. Getting the order wrong would read the ctx pointer as a map index. */
+    (void)ctx; (void)flags;
 
     /* Refuse, never clamp. A silently truncated record decodes as a short one and a
      * consumer cannot tell it from a program that meant to emit that much. */
     if (m == 0 || !m->is_ring)
-        return (uint64_t)-1;          /* not a ringbuf reference */
+        return (uint64_t)-1;          /* not an event-output map */
     if (data == 0 || size == 0 || size > LS_RB_MAX_RECORD)
         return (uint64_t)-1;
     if (g_ls_cur_slot < 0)
@@ -431,7 +435,7 @@ ls_map_glue_abi_check(void)
     f = (external_function_t)ls_h_map_update; (void)f;
     f = (external_function_t)ls_h_map_delete; (void)f;
     f = (external_function_t)ls_h_ktime_get_ns; (void)f;
-    f = (external_function_t)ls_h_ringbuf_output; (void)f;
+    f = (external_function_t)ls_h_perf_event_output; (void)f;
 }
 
 /*
@@ -478,11 +482,22 @@ ls_map_glue_install(struct ubpf_vm *vm)
      * platform work. All-or-nothing with the three above: a VM that resolved a ringbuf
      * map and then had no helper to emit through would give a program that verifies,
      * runs, and silently drops everything it tried to publish. */
+    /* EVERY ID MUST BE INSIDE uBPF'S TABLE, asserted at COMPILE time. ubpf_register
+     * refuses idx >= UBPF_MAX_EXT_FUNCS (64 by default, ubpf.h:72) and returns -1, which
+     * all-or-nothing turns into a total install failure. An image shipped that way on
+     * 2026-08-18: bpf_ringbuf_output's id is 130, so NO helper registered at all, every
+     * program load was refused and even the built-in shield never armed. Loud, which is
+     * what all-or-nothing is for --- but a build failure is better than loud. */
+    _Static_assert(5  < UBPF_MAX_EXT_FUNCS, "bpf_ktime_get_ns id outside uBPF's table");
+    _Static_assert(25 < UBPF_MAX_EXT_FUNCS, "bpf_perf_event_output id outside the table");
+    _Static_assert(1  < UBPF_MAX_EXT_FUNCS && 2 < UBPF_MAX_EXT_FUNCS
+                   && 3 < UBPF_MAX_EXT_FUNCS, "map helper ids outside uBPF's table");
+
     if (ubpf_register(vm, 5, "bpf_ktime_get_ns",
                       (external_function_t)ls_h_ktime_get_ns) != 0 ||
-        ubpf_register(vm, 130, "bpf_ringbuf_output",
-                      (external_function_t)ls_h_ringbuf_output) != 0) {
-        fprintf(stderr, "ls_map: clock/ringbuf helper registration refused\n");
+        ubpf_register(vm, 25, "bpf_perf_event_output",
+                      (external_function_t)ls_h_perf_event_output) != 0) {
+        fprintf(stderr, "ls_map: clock/event-output helper registration refused\n");
         return -1;
     }
 
