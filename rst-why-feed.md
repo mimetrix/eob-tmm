@@ -140,23 +140,40 @@ invisible without this" is wrong. What is left is narrower and still real:
 That is "better instrumentation of something partially visible", not "revealing the
 invisible" — and it is worth stating that way before a reviewer does.
 
-### The reframing that follows from it: the feed is the capture TRIGGER
+### Selective packet capture keyed on a code path — PARKED, and why
 
-Duplicating tcpdump is worth nothing; TMM already has capture. The inversion is worth
-something: **tcpdump filters on wire attributes** — addresses, ports, flags — and
-cannot express
+An earlier draft of this section pitched it as a clean win: tcpdump filters on wire
+attributes and cannot express *"capture the packets around the moment
+`flow_table.c:2618` fires with cause Connection limit exceeded"*, so the feed becomes
+the trigger for a capture no existing tool can express. That framing survives; the
+cost estimate behind it did not. **Parked 2026-08-18.**
 
-> capture the packets around the moment `flow_table.c:2618` fires with cause
-> `"Connection limit exceeded"`
+**The fact that undercuts it: `rst_why` has no packet.** Its signature is
+`(uf, file, lineno, err, reason, cause)` — a flow handle. The reset hook cannot capture
+a packet because there is not one in scope. That was not checked before proposing it.
 
-because that predicate does not exist on the wire. It exists only inside the code, and
-a hook at the decision plus a ring to write to is exactly what we have. Selective
-capture keyed on an internal code path is not reproducible by any existing tool, and it
-puts `file:line` precision to work instead of competing with a string already on the
-wire.
+Three tiers, and the value sits entirely in the expensive one:
 
-Not built. It needs the ring record decoupled from the program ctx
-(`widening-plan.md` Phase 4), since a packet slice will not fit in 96 bytes.
+| tier | cost | value |
+|---|---|---|
+| Capture the RST packet itself, hooking `rst_cause_append(uf, pkt, ...)` which does have it | days | **near zero** — the RST payload already carries `BIG-IP: [id:line] cause`, so it duplicates the record |
+| Capture forward from the trigger | days, no standing cost | misses the traffic that *caused* the reset, which is the whole question |
+| **Retrospective — "the packets around the moment"** | **weeks + PERMANENT per-packet cost** | this is the useful one |
+
+Tier 3 needs a per-thread rolling packet buffer **written on every packet, forever,
+whether anything triggers or not.** That is a standing data-plane cost, and avoiding
+exactly that is why the reset hook currently costs nothing until a reset happens.
+
+**Volume, against the rings we have** (16 x 64KB, 1MB total): records at 92 bytes give
+~700 per thread; packets at 1500 bytes give ~43. A 20-packet window for ONE event is
+~30KB, half a thread's ring. So it is not a tweak to the existing ring — it needs a
+second ring type, sized and retained differently, plus Phase 4 to decouple the record
+from the 96-byte program ctx.
+
+**The cheaper thing that answers most of the same question:** capture flow-level
+metadata at trigger time rather than packets. The cookie already gives
+same-flow-or-not; adding the 5-tuple gives "which client". Bounded, small, no capture
+machinery. See the flow-identity note in §3.
 
 ### Coverage: how much of "why a RST?" this actually answers
 

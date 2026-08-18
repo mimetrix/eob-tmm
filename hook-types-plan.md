@@ -203,6 +203,32 @@ asked to serve two jobs with opposite requirements.
 
 ---
 
+## 2.6 Parked: selective packet capture keyed on a code path
+
+Recorded here because it was proposed as the sharpest idea available and the estimate
+behind it was wrong. **Parked 2026-08-18.**
+
+`rst_why` receives a flow handle, not a packet, so the reset hook cannot capture one.
+Hooking `rst_cause_append` does give a packet, but the RST payload already carries the
+cause string, so that tier duplicates the record. The tier with real value is
+retrospective capture --- "the packets around the moment" --- and it needs a rolling
+per-thread packet buffer written on EVERY packet forever, whether anything triggers or
+not. That is a permanent data-plane cost, and avoiding exactly that is why the reset
+hook currently costs nothing until a reset fires.
+
+Volume makes it a second subsystem rather than a tweak: records are 92 bytes and a ring
+is 64KB (~700 records per thread); packets are 1500 bytes (~43). One 20-packet window is
+half a thread's ring.
+
+Weeks of work plus a standing cost, for the worst value-per-cost of the near-term
+options. The cheaper thing that answers most of the same question is flow-level
+metadata at trigger time --- the cookie already gives same-flow-or-not, and the 5-tuple
+would give "which client" --- with no capture machinery at all.
+
+Full tier breakdown in `rst-why-feed.md`.
+
+---
+
 ## 3. Recommended order
 
 1. **The `(kind, slot)` dispatch refactor.** Cheap now, and it is the thing that makes

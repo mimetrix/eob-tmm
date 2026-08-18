@@ -46,18 +46,24 @@ different sites), decisions that never emit a packet at all (40 of that sample w
 graceful proxy teardowns), always-on operation where tcpdump cannot run, and metadata
 instead of customer traffic.
 
-**Coverage is 87%, counted not estimated.** 1,116 reset-decision sites across 200
-files; 966 funnel into `rst_why` and are caught by this one hook. 131 go to
+**Coverage is 87% of CODE SITES — not of resets.** 1,116 places in the source can
+decide a reset; 966 funnel into `rst_why` and are caught by this one hook. 131 go to
 `rst_why_va` (varargs — an explicit trampoline non-goal, since `rax` carries the
-vector-register count) and 19 to `rst_why_preserve` (same 6-arg shape, so one more
-address away).
+vector-register count) and 19 to `rst_why_preserve` (same 6-arg shape, one more address
+away). What fraction of *actual* resets that represents depends on which sites execute
+under real traffic and is **unmeasured**; in the demo it was complete, matching the
+driven traffic 1:1.
 
-**And the sharper story this suggests: the feed as a capture TRIGGER.** tcpdump filters
-on wire attributes and cannot express "capture the packets around the moment
-`flow_table.c:2618` fires with cause `Connection limit exceeded`" — that predicate only
-exists inside the code. Selective capture keyed on an internal code path is not
-reproducible by any existing tool. Needs Phase 4 (ring record decoupled from the
-96-byte program ctx). This anticipates the requirement people actually have.
+**Selective packet capture keyed on a code path — PARKED (2026-08-18).** An earlier
+draft called this the sharper story and it was costed wrong. `rst_why` receives a flow
+handle, not a packet, so the reset hook cannot capture one at all. Hooking
+`rst_cause_append` instead does give a packet — but the RST payload already carries the
+cause, so it duplicates the record for near-zero gain. The version with real value is
+retrospective capture, and that needs a rolling per-thread packet buffer written on
+EVERY packet forever, which is a standing data-plane cost this design avoids
+everywhere else, plus a second ring type (records are 92 bytes, packets 1500, and a
+ring is 64KB) plus Phase 4. Weeks, for the worst value-per-cost on the list. See
+`rst-why-feed.md` for the tier breakdown.
 
 Not reproducible with iRules or WASM: `RST_WHY` is an internal macro on an internal
 path, not an exposed event.
