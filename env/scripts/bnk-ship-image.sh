@@ -40,18 +40,44 @@ verify)
     }
 
     echo "=== 1. what does /usr/bin/tmm actually resolve to?"
+    # TEST WHAT tmm RESOLVES TO, not whether a debug binary exists. The earlier
+    # version of this check called mere PRESENCE fatal, which is wrong twice over: an
+    # image can legitimately carry tmm64.debug for gdb while running the padded binary
+    # (Dockerfile.ls-tools repoints the symlink and asserts it), and the message
+    # asserted "tmm points at it" without having checked. A guard that cries wolf on a
+    # correct image gets ignored, which is worse than not having it.
     docker run --rm --entrypoint sh "$TAG" -c '
-      echo "  tmm -> $(readlink -f /usr/bin/tmm)"
-      if [ -e /usr/bin/tmm.debug ]; then
-        echo "  *** FATAL FOR ARMING: tmm.debug PRESENT and tmm points at it."
+      R=$(readlink -f /usr/bin/tmm)
+      echo "  tmm -> $R"
+      case "$R" in
+      *debug*)
+        echo "  *** FATAL FOR ARMING: tmm RESOLVES to a debug binary."
         echo "      The debug build overrides CFLAGS_OPTIMIZE, which is where"
         echo "      -fpatchable-function-entry lives --- so tmm64.debug has NO pads on"
         echo "      TMM-core functions and NOTHING CAN EVER BE ARMED in it. Arming"
         echo "      fails with \"no pad\", which reads like a wrong address and is not."
-        echo "      This is not a fidelity caveat. Rebuild with 'make tmm && make container'"
-        echo "      (no INSTALL_DEBUG_TMM) before trying to arm anything."
-      else
-        echo "  ok  no debug binary (production shape)"
+        echo "      Fix the symlink: ln -sf /usr/bin/tmm.default /usr/bin/tmm"
+        echo "      (Dockerfile.ls-tools does this and asserts the result.)"
+        exit 1 ;;
+      *)
+        if [ -e /usr/bin/tmm.debug ]; then
+          echo "  ok  tmm.debug present but NOT what tmm resolves to --- fine for arming"
+        else
+          echo "  ok  no debug binary (production shape)"
+        fi ;;
+      esac
+      # And, when the image carries an index, that it describes THIS binary. A correct
+      # symlink over a stale index fails at arm time instead, which is later and less
+      # obvious.
+      if [ -f /usr/share/ls/hook-index.tsv ] && [ -f /usr/share/ls/ls_buildid.py ]; then
+        IDX=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/hook-index.tsv)
+        LIVE=$(python3 /usr/share/ls/ls_buildid.py "$R")
+        if [ "$IDX" = "$LIVE" ]; then
+          echo "  ok  hook index matches the running binary (build ${LIVE%%${LIVE#????????}}...)"
+        else
+          echo "  *** index build id $IDX != binary $LIVE --- arming by name will refuse"
+          exit 1
+        fi
       fi'
 
     echo "=== 2. is the binary it resolves to actually padded?"

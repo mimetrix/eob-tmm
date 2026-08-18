@@ -33,11 +33,27 @@ COPY --chmod=0755 ls-load.py     /usr/bin/ls-load.py
 COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
 COPY --chmod=0644 shields/       /usr/share/ls/
 
-# A build-time assertion, so a broken layer fails HERE rather than on the cluster.
-# Checks the index is non-trivial and carries a build id --- an index without one is
-# refused at arm time, and finding that out during a demo is the failure this avoids.
-RUN test -s /usr/share/ls/hook-index.tsv && \
-    grep -q '^#build_id' /usr/share/ls/hook-index.tsv && \
-    test -x /usr/bin/ls_drain && \
-    python3 -c "import sys; sys.exit(0)" && \
-    echo "ls-tools layer: $(grep -c . /usr/share/ls/hook-index.tsv) index lines, $(ls /usr/share/ls/*.bpf.o 2>/dev/null | wc -l) programs"
+# POINT /usr/bin/tmm AT THE PADDED BINARY. Dockerfile.runtime points it at tmm.debug
+# whenever a debug binary is present, and the debug build overrides CFLAGS_OPTIMIZE ---
+# which is where -fpatchable-function-entry lives. So tmm64.debug has NO entry pads and
+# nothing in it can ever be armed; arming fails with "no pad", which reads like a stale
+# address and is not. That has now shipped four times, three of them reaching the
+# cluster.
+#
+# Repointing here rather than patching an F5 build file keeps the fix with the thing
+# that depends on it: this layer exists to make arming by name work, and arming needs
+# the padded binary. tmm64.debug is LEFT IN PLACE --- once tmm does not resolve to it
+# its presence is harmless, and deleting a 76 MB debugging aid to work around a symlink
+# would be the wrong trade.
+RUN ln -sf /usr/bin/tmm.default /usr/bin/tmm
+
+COPY --chmod=0644 ls_buildid.py      /usr/share/ls/ls_buildid.py
+COPY --chmod=0755 ls-verify-layer.sh /usr/share/ls/ls-verify-layer.sh
+
+# Fail HERE, not on the cluster. The build-id comparison is the load-bearing one: it
+# proves the index describes the binary this image will actually execute.
+#
+# As its own script rather than an inline RUN, deliberately --- escaping a multi-line
+# Python program through sh inside RUN is how a verification step turns into a
+# verification step that always passes.
+RUN /usr/share/ls/ls-verify-layer.sh
