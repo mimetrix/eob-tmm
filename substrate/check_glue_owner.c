@@ -90,6 +90,77 @@ main(void)
     }
     printf("ok    install is all-or-nothing at each of the 5 registrations\n");
 
-    printf("ok    check_glue: 5 assertions\n");
+    /* --- 6. MAP IDENTITY IS THE NAME, NOT THE SHAPE -----------------------
+     * The dedup used to compare (key_size, value_size, max_entries) only. Correct
+     * within one program --- clang emits one relocation per reference --- and
+     * wrong across programs, because the shape table is process-global. Two
+     * unrelated programs each declaring a 4/8/64 map got the SAME index and so
+     * the same per-thread storage, each reading the other's counts as its own.
+     * Silent: shared state looks like a counter running high.
+     *
+     * These build a maps section by hand and call the relocation callback the way
+     * ubpf_load_elf_ex does. What is asserted is mostly REFUSAL, because every
+     * failure in this callback resolves to a plausible index rather than an
+     * error. */
+    {
+        struct ls_map_def a = { LS_MAP_TYPE_HASH, 4u, 8u, 64u, 0u };
+        struct ls_map_def b = { LS_MAP_TYPE_HASH, 8u, 8u, 64u, 0u };  /* same name,
+                                                                       * other shape */
+        unsigned char sec[3 * sizeof(struct ls_map_def)];
+        const uint64_t REFUSED = (uint64_t)LS_MAP_MAX + 1u;
+        char longname[LS_MAP_NAME_MAX + 8];
+        uint64_t i0, i1;
+
+        memcpy(sec + 0 * sizeof a, &a, sizeof a);
+        memcpy(sec + 1 * sizeof a, &a, sizeof a);
+        memcpy(sec + 2 * sizeof a, &b, sizeof b);
+
+        ls_map_reset_shapes();
+        assert(atomic_load(&g_ls_nshapes) == 0u);
+
+        /* First reference to "rate" takes an index. */
+        i0 = ls_map_reloc(NULL, sec, sizeof sec, "rate", 0, sizeof a);
+        assert(i0 < LS_MAP_MAX);
+
+        /* Second reference to the SAME name and shape resolves to the SAME index
+         * --- this is the within-program dedup, still required. */
+        assert(ls_map_reloc(NULL, sec, sizeof sec, "rate", 0, sizeof a) == i0);
+
+        /* THE FIX. An identically shaped map under a DIFFERENT name must get its
+         * own index. Before the name key this returned i0 and the two programs
+         * shared storage. */
+        i1 = ls_map_reloc(NULL, sec, sizeof sec, "resets_seen",
+                          1 * sizeof a, sizeof a);
+        assert(i1 < LS_MAP_MAX);
+        assert(i1 != i0);
+
+        /* Same name, DIFFERENT shape: refused, never shared. Two programs that
+         * disagree about a shared map's layout would both write it. */
+        assert(ls_map_reloc(NULL, sec, sizeof sec, "rate",
+                            2 * sizeof a, sizeof b) == REFUSED);
+
+        /* No name at all: identity is undecidable, so neither sharing nor
+         * privacy can be chosen correctly. Refuse rather than guess. */
+        assert(ls_map_reloc(NULL, sec, sizeof sec, NULL, 0, sizeof a) == REFUSED);
+        assert(ls_map_reloc(NULL, sec, sizeof sec, "",   0, sizeof a) == REFUSED);
+
+        /* A name that would not round-trip through the table is refused rather
+         * than truncated --- truncation turns two distinct maps into one. */
+        memset(longname, 'x', sizeof longname - 1);
+        longname[sizeof longname - 1] = '\0';
+        assert(ls_map_reloc(NULL, sec, sizeof sec, longname, 0, sizeof a) == REFUSED);
+
+        /* Reset clears NAMES too. A name surviving at an index the next load
+         * reuses would match a map it has nothing to do with --- which is the
+         * aliasing this change removes, reintroduced by the reset path. */
+        ls_map_reset_shapes();
+        for (k = 0; k < (int)LS_MAP_MAX; k++)
+            assert(g_ls_names[k][0] == '\0');
+
+        printf("ok    map identity is the NAME: same name+shape shares, "
+               "different name is private, name+other shape REFUSED\n");
+    }
+
+    printf("ok    check_glue: 12 assertions\n");
     return 0;
 }

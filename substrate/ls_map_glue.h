@@ -53,11 +53,38 @@
  * including (ls_vm_load.c). If a second file ever does, the link fails on a
  * duplicate symbol --- loudly, at build time, which is the whole reason to prefer
  * extern here over a comment asking people to be careful. */
+/*
+ * IDENTITY IS THE SYMBOL NAME, NOT THE SHAPE --- and that is a fix, not a
+ * preference. This table used to dedup on (key_size, value_size, max_entries)
+ * alone, which is correct WITHIN one program (clang emits one relocation per
+ * reference, so the same map arrives several times) and wrong ACROSS programs,
+ * because g_ls_shapes is process-global and never scoped by slot. Two unrelated
+ * programs each declaring a 4-byte-key/8-byte-value/64-entry map resolved to the
+ * SAME index and therefore the same per-thread storage: each saw the other's
+ * counts as its own. Nothing reported it --- shared state looks exactly like a
+ * program whose counters are running a little high.
+ *
+ * Keying on the name makes both behaviours explicit and separates them:
+ *
+ *   same name, same shape        -> SHARE the index. Deliberate, and it is what
+ *                                   lets a timer program read the counters an
+ *                                   entry-armed program is accumulating.
+ *   same name, different shape   -> REFUSE. Two programs disagreeing about a
+ *                                   shared map's layout is the one case where
+ *                                   sharing corrupts, so it must not resolve.
+ *   different name               -> a NEW index, i.e. private storage.
+ *
+ * uBPF already hands us symbol_name; the old code took it only to print it.
+ */
+#define LS_MAP_NAME_MAX 32u
+
 #ifdef LS_MAP_GLUE_IMPL
 struct ls_map_def  g_ls_shapes[LS_MAP_MAX];
+char               g_ls_names[LS_MAP_MAX][LS_MAP_NAME_MAX];
 _Atomic uint32_t   g_ls_nshapes;             /* published with release ordering */
 #else
 extern struct ls_map_def g_ls_shapes[LS_MAP_MAX];
+extern char              g_ls_names[LS_MAP_MAX][LS_MAP_NAME_MAX];
 extern _Atomic uint32_t  g_ls_nshapes;
 #endif
 
@@ -167,17 +194,38 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
 
     memcpy(&d, data + symbol_offset, sizeof d);
 
-    /* Already recorded? clang emits one relocation per REFERENCE, so the same map
-     * arrives several times --- three, in the experiment program. Recording one
-     * shape per reference would exhaust the table and, worse, give two references
-     * to the same declared map separate storage. */
+    /* An unnamed map cannot be identified, and identity is what decides whether
+     * storage is shared or private. Refuse rather than guess: a wrong guess in
+     * either direction is silent. */
+    if (symbol_name == 0 || symbol_name[0] == '\0')
+        return (uint64_t)LS_MAP_MAX + 1u;
+    if (strnlen(symbol_name, LS_MAP_NAME_MAX) >= LS_MAP_NAME_MAX)
+        return (uint64_t)LS_MAP_MAX + 1u;   /* would not round-trip --- refuse */
+
+    /* Already recorded under this NAME? clang emits one relocation per REFERENCE,
+     * so the same map arrives several times --- three, in the experiment program.
+     * Recording one shape per reference would exhaust the table and, worse, give
+     * two references to the same declared map separate storage.
+     *
+     * A name match with a DIFFERENT shape is refused, not shared: the two
+     * programs disagree about the layout of memory they would both write. */
     {
         uint32_t i, have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
         for (i = 0; i < have; i++) {
-            if (g_ls_shapes[i].key_size == d.key_size &&
+            if (strncmp(g_ls_names[i], symbol_name, LS_MAP_NAME_MAX) != 0)
+                continue;
+            if (g_ls_shapes[i].key_size   == d.key_size &&
                 g_ls_shapes[i].value_size == d.value_size &&
                 g_ls_shapes[i].max_entries == d.max_entries)
-                return (uint64_t)i;
+                return (uint64_t)i;         /* deliberate share */
+            fprintf(stderr, "ls_map: REFUSED %s --- shape disagrees with the "
+                            "map already registered under that name "
+                            "(have key=%u val=%u max=%u, asked key=%u val=%u max=%u)\n",
+                    symbol_name,
+                    g_ls_shapes[i].key_size, g_ls_shapes[i].value_size,
+                    g_ls_shapes[i].max_entries,
+                    d.key_size, d.value_size, d.max_entries);
+            return (uint64_t)LS_MAP_MAX + 1u;
         }
     }
 
@@ -190,8 +238,12 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
             return (uint64_t)LS_MAP_MAX + 1u;
         idx = (int)have;
         g_ls_shapes[have] = d;
-        /* Fill the shape BEFORE publishing the count: a reader that observes the
-         * count must be guaranteed to see the entry it indexes. */
+        /* Fill the shape AND THE NAME before publishing the count: a reader that
+         * observes the count must be guaranteed to see the entry it indexes, and
+         * the name is now part of that entry rather than a debug string. */
+        memset(g_ls_names[have], 0, LS_MAP_NAME_MAX);
+        memcpy(g_ls_names[have], symbol_name,
+               strnlen(symbol_name, LS_MAP_NAME_MAX - 1u));
         atomic_store_explicit(&g_ls_nshapes, have + 1u, memory_order_release);
     }
     fprintf(stderr, "ls_map: reloc %s -> idx %d (key=%u val=%u max=%u)\n",
@@ -216,6 +268,10 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
 static inline void
 ls_map_reset_shapes(void)
 {
+    /* Clear the NAMES as well. They are identity now, so a name left behind at an
+     * index the next load reuses would match a map it has nothing to do with ---
+     * reintroducing exactly the cross-program aliasing the name key removes. */
+    memset(g_ls_names, 0, sizeof g_ls_names);
     atomic_store_explicit(&g_ls_nshapes, 0, memory_order_release);
 }
 
