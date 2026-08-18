@@ -1,0 +1,43 @@
+# A thin layer over a built TMM image that bakes in the live-surface tools.
+#
+# WHY A SEPARATE LAYER AND NOT Dockerfile.runtime. The hook index is generated FROM
+# the packaged binary, and the packaged binary is produced BY `make container`. Adding
+# the index to the runtime Dockerfile would be circular: the file cannot exist until
+# the image it belongs in has been built. Layering breaks that cleanly, and it also
+# keeps every F5 build file unmodified.
+#
+# WHY BAKE AT ALL. These used to be kubectl cp'd into running pods. That works and
+# reads as a hack: no record, no survival across a restart, different per pod, and it
+# happens in front of whoever the demo is for. It also puts files into a
+# production-shaped data-plane container by hand, which is its own problem.
+#
+# WHAT GOES IN, and each is here for a reason rather than convenience:
+#
+#   hook-index.tsv   name -> entry address, plus the BUILD ID of the binary it was
+#                    generated from. ls-load.py refuses to arm when that build id does
+#                    not match the running binary. This is the file that turns a
+#                    silent mis-arm into an error.
+#   ls-load.py       the loader client, versioned. Every live result before it existed
+#                    was produced by a client typed inline and thrown away.
+#   ls_drain         reads the shared-memory ring and emits JSON records.
+#   *.bpf.o          verified shield/watch programs, so a demo loads a program that
+#                    shipped with the image rather than one carried in.
+ARG BASE=tmm:local
+FROM ${BASE}
+
+# 0755 on the directory, 0644 on data, 0755 on the two executables. Explicit because
+# a COPY inherits the build context's modes, and ls_drain arriving non-executable
+# fails at the least convenient moment.
+COPY --chmod=0644 hook-index.tsv /usr/share/ls/hook-index.tsv
+COPY --chmod=0755 ls-load.py     /usr/bin/ls-load.py
+COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
+COPY --chmod=0644 shields/       /usr/share/ls/
+
+# A build-time assertion, so a broken layer fails HERE rather than on the cluster.
+# Checks the index is non-trivial and carries a build id --- an index without one is
+# refused at arm time, and finding that out during a demo is the failure this avoids.
+RUN test -s /usr/share/ls/hook-index.tsv && \
+    grep -q '^#build_id' /usr/share/ls/hook-index.tsv && \
+    test -x /usr/bin/ls_drain && \
+    python3 -c "import sys; sys.exit(0)" && \
+    echo "ls-tools layer: $(grep -c . /usr/share/ls/hook-index.tsv) index lines, $(ls /usr/share/ls/*.bpf.o 2>/dev/null | wc -l) programs"
