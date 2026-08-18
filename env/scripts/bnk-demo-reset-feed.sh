@@ -1,11 +1,18 @@
 #!/bin/sh
-# The reset-feed demo. Run from the DATKUBE host. Five minutes, no hand-typed values.
+# The reset-feed demo. Run from the DATKUBE host. Five minutes, NO hand-typed values.
 #
-#   bnk-demo-reset-feed.sh [addr]
+#   bnk-demo-reset-feed.sh
 #
-# `addr` is rst_why's entry address. Omit it and the script refuses rather than
-# guessing: get it from `bnk-preflight.sh <image> rst_why`, which resolves it from the
-# binary in the image it just verified.
+# TAKES NO ADDRESS. It arms `rst_why` BY NAME, resolved inside the pod from the index
+# baked into the image (/usr/share/ls/hook-index.tsv), whose header carries the build id
+# of the binary it was generated from. ls-load.py compares that against the build id of
+# the binary the pod is actually running --- read from /proc/<pid>/exe --- and refuses
+# when they differ.
+#
+# That refusal is why the address argument is gone. rst_why has now sat at 0x144df40,
+# 0x144e3c0 and 0x144e484 across three builds of the same source; a hand-carried number
+# is wrong by default, and wrong SILENTLY, because a nop pad exists at plenty of other
+# addresses.
 #
 # WHY EVERY STEP LOOKS PARANOID. Each guard below stands for a specific way this
 # demo broke on 2026-08-17:
@@ -13,9 +20,10 @@
 #   - It arms EVERY TMM pod. Requests load-balance, so arming one pod and watching it
 #     shows fired=0 while the other serves every request --- indistinguishable from a
 #     hook that does not work. This cost an hour.
-#   - It refuses a hand-carried address. rst_why moved 64 bytes between two builds;
-#     the stale address armed rst_cause_match_peer, which also has a nop pad, so
-#     arming reported OK ARMED LIVE and nothing ever fired.
+#   - It no longer TAKES an address. rst_why moved 64 bytes between two builds; the
+#     stale address armed rst_cause_match_peer, which also has a nop pad, so arming
+#     reported OK ARMED LIVE and nothing ever fired across 16,000 requests. Resolution
+#     now happens in the pod, against the running binary's build id.
 #   - It drains stale records before measuring. The ring persists across arms, so old
 #     records read as fresh evidence.
 #   - It checks the VIP answers first. The Gateway reported PROGRAMMED=True with no
@@ -26,25 +34,11 @@
 # copied into a running container while an audience watches.
 set -e
 
-ADDR="$1"
+HOOK="${HOOK:-rst_why}"
 VIP="${VIP:-11.11.11.99}"
 SLOT="${SLOT:-5}"
 PROG="${PROG:-/usr/share/ls/rate_watch.bpf.o}"
 SEG="${SEG:-/tmp/ls_tp_ring}"
-
-if [ -z "$ADDR" ]; then
-    cat >&2 <<'EOT'
-usage: bnk-demo-reset-feed.sh 0x<rst_why-entry-address>
-
-  Get the address from the image you are about to demo --- never from a previous run:
-
-      bnk-preflight.sh <image-tag> rst_why 'ls_map: reloc'
-
-  It prints the address resolved from the binary it just verified. A stale address
-  arms a neighbouring function silently, because nop pads exist in many wrong places.
-EOT
-    exit 2
-fi
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$1"; }
 ctl()  { kubectl exec -i "$1" -c f5-tmm -- python3 /usr/bin/ls-load.py "$2" "$3" "$4" "$5" "$6" 2>&1; }
@@ -79,8 +73,10 @@ for P in $PODS; do printf '  %-26s %s\n' "$P" "$(ctl "$P" status "$SLOT")"; done
 # --- 2. load and arm, on EVERY pod, while traffic is flowing ----------------------
 say "2 · load a verified program and arm rst_why --- on a RUNNING TMM, no restart"
 for P in $PODS; do
-    printf '  %-26s %s\n' "$P" "$(ctl "$P" load "$SLOT" "$PROG" 2 rst_why)"
-    printf '  %-26s %s\n' ''   "$(ctl "$P" arm  "$SLOT" "$ADDR")"
+    printf '  %-26s %s\n' "$P" "$(ctl "$P" load "$SLOT" "$PROG" 2 "$HOOK")"
+    # BY NAME. ls-load.py resolves it from the baked-in index and refuses if the
+    # index's build id does not match the binary this pod is running.
+    printf '  %-26s %s\n' ''   "$(ctl "$P" arm  "$SLOT" "$HOOK")"
 done
 
 # The ring outlives an arm, so anything already in it predates this demo.
@@ -139,7 +135,9 @@ EOT
 
 # --- 6. disarm --------------------------------------------------------------------
 say "6 · disarm --- the entry bytes go back exactly as they were"
-for P in $PODS; do printf '  %-26s %s\n' "$P" "$(ctl "$P" disarm "$ADDR")"; done
+# Disarm BY NAME too. Arming by name and disarming by a hand-typed address would
+# restore nops over whatever sits at that address --- a write into live .text.
+for P in $PODS; do printf '  %-26s %s\n' "$P" "$(ctl "$P" disarm "$HOOK")"; done
 
 cat <<'EOT'
 

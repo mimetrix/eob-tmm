@@ -136,7 +136,17 @@ def running_binary():
 
 
 def read_index(path):
-    """-> (meta dict, {name: (arm_at, arm_method, pad_offset)})."""
+    """-> (meta dict, {name: [(arm_at, arm_method, pad_offset), ...]}).
+
+    A LIST PER NAME, not one entry, because names are not unique. This build's index
+    has 71,148 lines under 70,020 distinct names: 591 names carry between 2 and 21
+    entries each. They are file-scope statics that appear in several translation units,
+    .isra/.constprop clones, and assembler labels (LOne, LTwo, LThree at 21 apiece).
+
+    Storing one entry per name silently kept whichever line came last, so arming one of
+    those 591 by name would patch an arbitrary one of its homonyms and report success.
+    That is the same failure as the stale address it replaced, with a nicer interface.
+    """
     meta, syms = {}, {}
     with open(path) as f:
         for line in f:
@@ -150,7 +160,8 @@ def read_index(path):
                 continue
             p = line.split("\t")
             if len(p) >= 3:
-                syms[p[0]] = (p[1], p[2], p[3] if len(p) > 3 else "-")
+                syms.setdefault(p[0], []).append(
+                    (p[1], p[2], p[3] if len(p) > 3 else "-"))
     return meta, syms
 
 
@@ -200,13 +211,27 @@ def resolve_hook(spec):
                  % (exe, live, want))
 
     if spec not in syms:
-        sys.exit("*** %r is not in the index (%d symbols, build %s).\n"
+        sys.exit("*** %r is not in the index (%d distinct names, build %s).\n"
                  "    Either it does not exist in this build, or it is neither padded\n"
                  "    nor safely displaceable --- the generator omits those rather than\n"
                  "    emitting an entry that cannot be armed."
                  % (spec, len(syms), want[:12]))
 
-    arm_at, method, pad_off = syms[spec]
+    cands = syms[spec]
+    if len(cands) > 1:
+        # AMBIGUOUS, so refuse. 591 names in this build have more than one entry ---
+        # file-scope statics repeated across translation units, .isra/.constprop
+        # clones, assembler labels. Picking one would patch an arbitrary homonym and
+        # report success, which is exactly the failure arming-by-name exists to end.
+        lines = "\n".join("      %s  (%s, pad_offset=%s)" % c for c in cands[:8])
+        more = "" if len(cands) <= 8 else "\n      ... and %d more" % (len(cands) - 8)
+        sys.exit("*** %r is AMBIGUOUS --- %d entries in this build:\n%s%s\n\n"
+                 "    A name that resolves to several addresses cannot be armed by name.\n"
+                 "    Pick one and pass it as a 0x address, accepting that it is then\n"
+                 "    unchecked against the build id."
+                 % (spec, len(cands), lines, more))
+
+    arm_at, method, pad_off = cands[0]
     print("%s -> %s  (%s, pad_offset=%s, build %s)"
           % (spec, arm_at, method, pad_off, want[:12]), file=sys.stderr)
     return arm_at

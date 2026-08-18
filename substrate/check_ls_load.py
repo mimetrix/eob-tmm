@@ -164,7 +164,25 @@ def main():
 
     refuses("neither hex nor a symbol", "0xzzz", "not a hex address"); n += 1
 
-    print("  ok    check_ls_load: %d assertions, 6 of them refusals" % n)
+    # --- 6. AN AMBIGUOUS NAME MUST REFUSE -----------------------------------
+    # Names are not unique. This build's index holds 71,148 lines under 70,020
+    # distinct names --- 591 names have 2 to 21 entries each: file-scope statics
+    # repeated across translation units, .isra/.constprop clones, and assembler
+    # labels (LOne/LTwo/LThree, 21 apiece). Keeping one entry per name silently kept
+    # whichever came last, so arming one of those would patch an arbitrary homonym
+    # and report success --- the stale-address failure with a nicer interface.
+    dup = os.path.join(work, "idx_dup.tsv")
+    write_index(dup, bid, [("twin", "0xaaaa", "pad", 4, 0),
+                           ("twin", "0xbbbb", "pad", 0, 0),
+                           ("only_one", "0xcccc", "pad", 4, 0)])
+    m.HOOK_INDEX = dup
+    refuses("a name with two entries", "twin", "AMBIGUOUS", "0xaaaa", "0xbbbb"); n += 1
+    # ...and a unique name in the same index still resolves, so the refusal is about
+    # ambiguity rather than the index being rejected wholesale.
+    assert m.resolve_hook("only_one") == "0xcccc"; n += 1
+    print("  ok    an ambiguous name REFUSES; a unique one in the same index resolves")
+
+    print("  ok    check_ls_load: %d assertions, 7 of them refusals" % n)
     return 0
 
 
