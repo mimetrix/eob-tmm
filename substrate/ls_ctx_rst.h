@@ -27,8 +27,10 @@
  * every one of those. Only the 4 rejected records were unique. This hook inverts
  * that ratio: every record is a decision no config-level surface can observe.
  *
- * AND IT NEEDS NO F5 SOURCE EDIT. rst_why is armed at its function entry like a
- * shield, not called from a designed-in site like the HTTP tracepoint. Every field
+ * AND IT INSERTS NO CALL SITE. rst_why is armed at its function entry like a shield,
+ * not called from a designed-in site like the HTTP tracepoint --- so no existing F5
+ * function body is edited for it. (The tree still gains the substrate's own files and
+ * three build-configuration edits; "no F5 source edit" was the looser phrasing.) Every field
  * is a direct ARGUMENT --- no derivation, no snapshot timing, nothing overwritten
  * by the time we look. That is why this one is cheap where ALPN was not.
  *
