@@ -75,6 +75,7 @@ reachable, or what something costs, prefer the current documents.
 |---|---|
 | [`tmm-integration-findings.md`](tmm-integration-findings.md) | The first integration into the TMM tree |
 | [`design-review-findings.md`](design-review-findings.md) | An adversarial review of the design. Several findings are now closed; **T4 remains open** — the worked CVE example is not a real published advisory |
+| [`probe-a-function.md`](probe-a-function.md) | **CURRENT, and every command was run.** The reverse-engineering procedure as a command sequence, walked end to end on build 03c6f0e0 |
 | [`build-pipeline.md`](build-pipeline.md) | **CURRENT, and measured.** The build-time artifact pipeline: what is generated per build, the forced ordering, where each stage runs, the gates, and the defect the gates caught while it was being written (two debug binaries in one package, differing in 3,132 functions) |
 | [`load-path-scope.md`](load-path-scope.md) | The runtime load path, and why the per-call cost figure in it must not be quoted |
 | [`bnk-integration-map.md`](bnk-integration-map.md) | What BNK exposes and what it does not |
