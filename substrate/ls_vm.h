@@ -76,6 +76,8 @@ struct ls_ctx_sample {
 
 /* One armed program. TMM holds a small fixed array of these per instance ---
  * fixed because allocating on the call path is not acceptable. */
+struct ls_ctx_reg;   /* ls_ctx_reg.h --- resolved builder, see ctx_reg below */
+
 struct ls_slot {
     void        *vm;        /* struct ubpf_vm *, opaque here          */
     void        *jit_fn;    /* ubpf_jit_fn when JIT'd; NULL = interpret.
@@ -97,6 +99,15 @@ struct ls_slot {
                                  * residue from result. */
     struct ls_ctx_sample samples[LS_CTX_SAMPLES];
     uint32_t     sample_next;
+    /* THE CTX BUILDER FOR THIS SLOT'S PROGRAM, resolved once when the slot was armed from
+     * the hook the program declared in its own ELF section. The trampoline calls through
+     * this rather than switching on the slot number --- see ls_slots.h for the record that
+     * made that necessary, and ls_ctx_reg.h for how builders register themselves.
+     *
+     * NULL means no typed builder: the program gets the generic five-register context and
+     * nothing is dereferenced. A memset slot table therefore means "generic", which is the
+     * safe reading, and that is why this is a pointer and not an index. */
+    const struct ls_ctx_reg *ctx_reg;
 };
 
 /* A snapshot of one slot, for whatever eventually reports these. Copied rather

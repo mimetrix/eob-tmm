@@ -17,6 +17,7 @@
 #include "ls_vm.h"
 #include "ls_arm.h"
 #include "ls_slots.h"
+#include "ls_ctx_reg.h"
 #include "ls_ctx_parse.h"
 #include "ls_ctx_alpn_abi.h"
 #include "ls_ctx_rst.h"
@@ -99,139 +100,84 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         uint64_t arg[5];
     } ctx;
 
+    /* SIX ARGUMENTS FOR A BUILDER, assembled from the NAMED accessors and not by indexing
+     * regs. The saved block is in STACK order, which is the reverse of ABI order, so
+     * indexing it by argument position silently swaps arguments rather than failing --- which
+     * is exactly what ls_arm.h's accessors exist to prevent. Building the array here keeps
+     * every builder from having to know that, and keeps the knowledge in one place. */
+    const unsigned long long args[6] = { a0, a1, a2, a3, a4, a5 };
+
     ctx.arg[0] = a0;
     ctx.arg[1] = a1;
     ctx.arg[2] = a2;
     ctx.arg[3] = a3;
     ctx.arg[4] = a4;
 
-    /* Per-hook ctx. The generic five-register form above is what an untyped
-     * program sees and is useless for most hooks, because nearly every TMM
-     * function takes pointers and a verified program cannot chase one. So the
-     * dereferencing happens HERE, in the host, and the program receives flat
-     * scalars --- which is the canonical case PREVAIL already proves.
+    /*
+     * PER-HOOK CTX, LOOKED UP RATHER THAN SWITCHED ON.
      *
-     * Slot-selected rather than table-driven: one generated ctx, deliberately,
-     * until this shape is proven end to end. LS_CTX_SLOT_PARSE is the hook
-     * survey found to be the only one on this traffic's path
-     * (http_parse_client_headers, 1:1 with requests). */
-    if (slot == LS_CTX_SLOT_PARSE) {
-        struct ls_ctx_parse pc;
-        ls_ctx_build_parse(&pc, (const void *)a0, (const void *)a2);
-        if (ls_vm_call(slot, &pc, sizeof pc) != LS_SAFE_RETURN)
-            return r;
-    } else if (slot == LS_CTX_SLOT_RST     || slot == LS_CTX_SLOT_RST_VA ||
-               slot == LS_CTX_SLOT_RST_PRE || slot == LS_CTX_SLOT_RST_PRE_VA) {
-        /* rst_why(uf, file, lineno, err, reason, rst_cause) --- every field is a
-         * direct argument, so no derivation and nothing to snapshot before it is
-         * overwritten.
-         *
-         * a5 IS rst_cause, and it arrives now. It was dropped until Phase 3 because
-         * the trampoline forwarded five arguments; file:line identifies the site,
-         * but at flow_table.c:2618 the cause is flow_reject_cause[flow_reject_code]
-         * --- a runtime table lookup that no amount of reading the source recovers. */
-        /* a0 is `uf`, the flow. It was forwarded and ignored until now. The cookie
-         * comes from ls_flow_cookie.c because UFLOW_COOKIE() needs TMM's flow types
-         * and this file is STDINC. A NULL uf yields 0, which is a legitimate answer:
-         * flow_table.c rejects flows before one exists. */
-        struct ls_ctx_rst rc;
+     * The generic five-register form above is what an untyped program sees. It is useless for
+     * a hook whose interesting fields are behind pointers, because a verified program cannot
+     * chase one --- so the dereferencing happens HERE, in the host, and the program receives
+     * flat scalars, which is the case PREVAIL already proves.
+     *
+     * WHAT THIS REPLACED, and why it had to go. This was an if-chain on the SLOT NUMBER:
+     * slot 7 got the parse builder, slots 2/3/5/6 the reset builder, and so on. That is
+     * correct only while every armed function is one of the handful with a builder. It stops
+     * being correct the moment a probe is generated for an arbitrary function, because the
+     * generated program lands in whichever slot is free. On 2026-08-19,
+     * mrhttp_setup_new_serverside armed in slot 2 had its registers read as rst_why's
+     * arguments: the count was exact, every field was fiction, and a1 was dereferenced as a
+     * string for up to 256 bytes. mrhttp's a1 happened to be a readable pointer.
+     *
+     * The builder now comes from the slot, resolved AT ARM TIME from the hook the program
+     * declared in its own ELF section --- so a function nobody wrote a builder for gets the
+     * register block and no dereference, which is what mk_probe.py generates against. See
+     * ls_ctx_reg.h.
+     *
+     * ONE INDIRECT CALL on the data path, not a search: the pointer was resolved when the
+     * slot was armed. A string compare over the registration set per invocation would be a
+     * real cost on a hook that fires per request.
+     */
+    {
+        const struct ls_ctx_reg *reg = ls_vm_ctx_reg(slot);
 
-        /* ALL THREE reset functions land here. RST_WHY* macros expand to three
-         * different functions covering 1,090 call sites between them, and hooking
-         * only rst_why saw 966 of them:
-         *
-         *   rst_why         (uf, file, lineno, err, reason, cause)
-         *   rst_why_va      (uf, file, lineno, err, reason, cause, fmt, ...)
-         *   rst_why_preserve(uf, file, lineno, err, cause)
-         *
-         * rst_why_va's first six arguments are IDENTICAL to rst_why's --- its varargs
-         * start at the seventh, and this dispatcher only ever reads the first six ---
-         * so it shares this builder verbatim. The header confirms the cause is a
-         * static string even there; the varargs carry additional detail we do not
-         * read, which is why nothing here has to understand them.
-         *
-         * rst_why_preserve has NO `reason`, so everything after `err` shifts down one:
-         * the cause is a4 (r8), not a5 (r9). Reading a5 there would hand the record
-         * whatever the caller happened to leave in r9 --- a plausible-looking pointer
-         * dereferenced as a string, which is the worst shape of wrong. */
-        /* TWO SHAPES, FOUR SLOTS. The preserve pair has no `reason`, so everything
-         * after `err` shifts down one and the cause is a4 rather than a5. The other
-         * pair takes the full six. Each function has its OWN slot so the record can
-         * name which fired --- possible only since the trampoline became per-slot. */
-        unsigned int hook;
-
-        if (slot == LS_CTX_SLOT_RST_PRE || slot == LS_CTX_SLOT_RST_PRE_VA) {
-            ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
-                             (unsigned int)a3, 0u, (const char *)a4,
-                             (unsigned long long)ls_uflow_cookie((void *)a0));
-            hook = (slot == LS_CTX_SLOT_RST_PRE) ? LS_TP_HOOK_RST_PRE
-                                                 : LS_TP_HOOK_RST_PRE_VA;
+        if (reg == 0) {
+            /* No typed builder. The generic ctx, and nothing is dereferenced. */
+            if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN)
+                return r;
         } else {
-            ls_ctx_rst_build(&rc, (const char *)a1, (unsigned int)a2,
-                             (unsigned int)a3, (unsigned int)a4, (const char *)a5,
-                             (unsigned long long)ls_uflow_cookie((void *)a0));
-            hook = (slot == LS_CTX_SLOT_RST) ? LS_TP_HOOK_RST : LS_TP_HOOK_RST_VA;
+            /* One buffer for every builder, bounded by LS_CTX_OUT_MAX. Sized from the
+             * registration rather than from a per-hook struct so this file does not need to
+             * know any hook's layout --- it did, and that coupling is what made the if-chain
+             * grow a branch per hook. */
+            unsigned char out[LS_CTX_OUT_MAX];
+            unsigned long n;
+
+            /* A builder may write at most LS_CTX_OUT_MAX. The registration asserts its own
+             * size at compile time, so this is a belt-and-braces bound against a builder
+             * whose struct grew without its _Static_assert being updated. Refusing is right:
+             * a truncated record is a record with wrong fields. */
+            if (reg->size > sizeof out)
+                return r;
+
+            n = reg->build(out, args);
+            if (n == 0)
+                return r;              /* the builder declined --- see ls_ctx_reg_alpn.c */
+
+            if (reg->hook_id == 0u) {
+                /* No ring identity, so run the program without publishing. ALPN is the case:
+                 * its record is a verdict input, not telemetry. Publishing under a zero
+                 * hook id would give the consumer a record it cannot decode. */
+                if (ls_vm_call(slot, out, n) != LS_SAFE_RETURN)
+                    return r;
+            } else if (ls_tp_dispatch(slot, out, n, reg->hook_id) != LS_SAFE_RETURN) {
+                /* ls_tp_dispatch runs the program AND publishes to the shared-memory ring,
+                 * so an entry-armed hook produces a stream and not only counters. The ring
+                 * is off unless LS_TP_RING names a segment. */
+                return r;
+            }
         }
-        /* ls_tp_dispatch, not ls_vm_call: it runs the program AND publishes the
-         * record to the shared-memory ring, so an entry-armed hook produces a
-         * stream rather than only counters. The ring is off unless LS_TP_RING
-         * names a segment. */
-        if (ls_tp_dispatch(slot, &rc, sizeof rc, hook) != LS_SAFE_RETURN)
-            return r;
-    } else if (slot == LS_CTX_SLOT_H2ABORT) {
-        /* http2_stream_abort(stream, why, err) --- three direct arguments, nothing
-         * derived, nothing to snapshot. The simplest hook in the set, and the only one
-         * that passes all four uniqueness tests: its reason reaches no log, no iRule
-         * event and no trace in a production build. */
-        struct ls_ctx_h2abort hc;
-
-        ls_ctx_h2abort_build(&hc, (unsigned long long)a0, (const char *)a1,
-                             (unsigned int)a2);
-        if (ls_tp_dispatch(slot, &hc, sizeof hc, LS_TP_HOOK_H2ABORT) != LS_SAFE_RETURN)
-            return r;
-    } else if (slot == LS_CTX_SLOT_SSLERR) {
-        /* ssl__err(sc, alert, __func__, __LINE__, ...) --- the TLS twin of rst_why.
-         *
-         *   a0 sc     struct ssl_ctx *   -> the cookie, via the ssl-world crossing
-         *   a1 alert  enum ssl_alert
-         *   a2 func   __func__           NOT __FILE__, which ssl_err does not pass
-         *   a3 line   __LINE__
-         *   a4 msg    the FIRST VARARG
-         *
-         * The message is a vararg, so it lands in r8 --- within the six registers the
-         * trampoline already forwards, which is the only reason this hook needs no asm
-         * change. 462 of the 475 sites pass a plain literal, so for those the captured
-         * string is the whole message; the 3 that pass a real format give us the format,
-         * and ls_ctx_sslerr.h says so rather than implying otherwise.
-         *
-         * NO SNAPSHOT TIMING PROBLEM, unlike ALPN: every field is a direct argument read
-         * before the function's body runs, so nothing is derived and nothing has been
-         * overwritten by the time we look. The one derivation is the cookie, and a NULL
-         * sc or NULL sc->cf yields 0 --- legitimate, since ssl__err fires on paths where
-         * no connflow is attached yet. */
-        struct ls_ctx_sslerr ec;
-
-        ls_ctx_sslerr_build(&ec, (unsigned int)a1, (const char *)a2,
-                            (unsigned int)a3, (const char *)a4,
-                            (unsigned long long)ls_ssl_cookie((void *)a0));
-        if (ls_tp_dispatch(slot, &ec, sizeof ec, LS_TP_HOOK_SSLERR) != LS_SAFE_RETURN)
-            return r;
-    } else if (slot == LS_CTX_SLOT_ALPN) {
-        /* ssl_alpn_match(sc, skip_ext, skip_ext_len): the ALPN bytes are NOT an
-         * argument --- the function derives them from `sc` in its first ten
-         * lines. The builder repeats that derivation one step earlier, in the
-         * ssl module's include world (ls_ctx_alpn.c), and hands back flat bytes.
-         *
-         * A zero return means there is no ALPN list to judge. Fall through
-         * WITHOUT running the program: judging bytes that do not exist would
-         * make the verdict noise rather than a finding. */
-        unsigned char ac[LS_CTX_ALPN_SZ];
-        if (ls_ctx_alpn_build_v(ac, (void *)a0) == 0)
-            return r;
-        if (ls_vm_call(slot, ac, sizeof ac) != LS_SAFE_RETURN)
-            return r;
-    } else if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN) {
-        return r;
     }
 
     /*

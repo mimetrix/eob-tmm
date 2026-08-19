@@ -62,6 +62,7 @@
 #include "vm_stack_policy.h"
 #include "ls_map.h"
 #include "ls_map_glue.h"
+#include "ls_ctx_reg.h"   /* the hook name decides the ctx builder, not the slot */
 
 #include <elf.h>
 #include <stdio.h>
@@ -552,6 +553,14 @@ ls_vm_arm(const void *elf, size_t elf_len,
 
     g_slots[slot].vm    = vm;
     g_slots[slot].mode  = m;
+    /* THE BUILDER COMES FROM THE DECLARED HOOK, not from the slot number. `section` is
+     * "fentry/<hook>" and ls_symbol_is_in_section just checked that identity against the
+     * program's own symbol, so it is the strongest statement available about what this
+     * program expects to be handed. NULL --- no registered builder --- means the generic
+     * five registers and no dereference. ls_slots.h records what went wrong when the slot
+     * number decided this. */
+    g_slots[slot].ctx_reg =
+        ls_ctx_reg_lookup(strncmp(section, "fentry/", 7) == 0 ? section + 7 : section);
     g_slots[slot].armed = true;
 
     if (g_cfg.verbose)
@@ -676,6 +685,24 @@ ls_vm_arm_configured(const void *blob, size_t blob_len,
     g_filebuf = NULL;
     return slot;
 }
+
+/*
+ * The ctx builder a slot's program declared, or NULL for "generic, dereference nothing".
+ *
+ * NULL for an out-of-range slot, an unarmed one, and an unregistered hook alike --- all three
+ * mean the same thing to the caller, which is why one return value covers them.
+ *
+ * Acquire-loaded to pair with the release in ls_vm_reload: a core already inside the
+ * trampoline must not see the new builder with the old program or the reverse.
+ */
+const struct ls_ctx_reg *
+ls_vm_ctx_reg(int slot)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS)
+        return 0;
+    return __atomic_load_n(&g_slots[slot].ctx_reg, __ATOMIC_ACQUIRE);
+}
+
 
 enum ls_verdict
 ls_vm_call(int slot, void *ctx, size_t ctx_len)
@@ -823,6 +850,13 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->vm, new->vm, __ATOMIC_RELEASE);   /* old VM leaked */
     __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
+    /* CARRY THE BUILDER ACROSS THE SWAP. ls_vm_arm resolved it for the staging slot; the
+     * live slot keeps its OLD builder unless this is copied, so reloading a slot with a
+     * program for a different function would run the new program under the previous
+     * function's ctx --- the same wrong-meaning-right-length failure, reintroduced by a
+     * reload. Same class as the jit_fn/vm pairing above: two fields that are one fact.
+     * Published before `armed`, for the same reason the pointers are. */
+    __atomic_store_n(&live->ctx_reg, new->ctx_reg, __ATOMIC_RELEASE);
     live->armed = true;
     live->gen++;              /* so STATUS can distinguish residue from result */
 

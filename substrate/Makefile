@@ -12,7 +12,7 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
@@ -325,3 +325,19 @@ gate: check
 clean:
 	@rm -f .guard.c .guard.out .gates.out tmp*.c
 	@rm -rf __pycache__
+
+# THE CTX BUILDER REGISTRATION SET. Each builder registers itself against the function name
+# it serves (ls_ctx_reg.h); the trampoline no longer switches on the slot number, which is
+# what let an arbitrary function's registers be read as rst_why's arguments.
+#
+# Links the real registration TUs, so this fails if the linker drops the ls_ctx_regs section
+# --- the failure mode that would otherwise be silent, safe, and cost a day: every typed hook
+# degrades to the generic ctx and the record feeds just stop.
+#
+# The stubs supply the TMM-side cookie and ALPN functions and register nothing, because the
+# check compares the linked count against the number of LS_CTX_REGISTER uses in the sources.
+check-ctx-reg:
+	@$(CC) -O2 -Wall -Wextra -Werror -o .ctxreg.out \
+	    check_ctx_reg.c ls_ctx_reg.c ls_ctx_reg_rst.c ls_ctx_reg_sslerr.c \
+	    ls_ctx_reg_h2abort.c ls_ctx_reg_parse.c ls_ctx_reg_alpn.c check_ctx_reg_stubs.c \
+	    && ./.ctxreg.out . && rm -f .ctxreg.out

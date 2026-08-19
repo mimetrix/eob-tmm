@@ -102,6 +102,34 @@
  */
 #define LS_CTX_SLOT_H2ABORT 9   /* http2_stream_abort --- ls_ctx_h2abort_build    */
 
+/*
+ * WHY THIS FILE NO LONGER DECIDES WHICH CTX A HOOK GETS.
+ *
+ * The slot numbers below still exist --- the built-in shield is slot 0 by convention and the
+ * demos name slots. What they no longer do is select a ctx BUILDER. They used to, and that is
+ * correct only while every armed function is one this repo prepared a builder for. It stops
+ * being correct the moment a probe is generated for an arbitrary function, because the
+ * generated program lands in whichever slot is free --- and if that is slot 2, the trampoline
+ * built a struct ls_ctx_rst out of the new function's registers.
+ *
+ * MEASURED, 2026-08-19: mrhttp_setup_new_serverside armed in slot 2 produced records reading
+ * fn:"rst_why_preserve_va" file:"" line:26 err:3266788480. The count was exact and every
+ * field was fiction. Worse than fiction --- ls_ctx_rst_build takes a1 as `const char *file`
+ * and walks it for up to 256 bytes, so arming a function whose second argument is not a
+ * readable pointer is a wild read on TMM's data path. mrhttp's a1 happened to be a valid
+ * uflow *.
+ *
+ * That is the fault this file was created to fix --- "bytes of the right length and the wrong
+ * meaning" --- one level out. The _Static_asserts below prove the slots are DISTINCT; nothing
+ * proved a slot's builder matched the function armed into it, because the two facts lived in
+ * different places again.
+ *
+ * The mapping now lives in ls_ctx_reg.h, where each builder REGISTERS ITSELF against the
+ * function name it serves. There is no list to keep in step: adding a builder is adding a
+ * file, and a function with no registered builder gets the five-register context, which is
+ * what substrate/mk_probe.py generates against anyway.
+ */
+
 /* Distinctness, checked by the compiler rather than by reading. Pairwise because
  * the set is small and an enum would not catch a duplicated explicit value. */
 _Static_assert(LS_CTX_SLOT_SHIELD != LS_CTX_SLOT_PARSE,

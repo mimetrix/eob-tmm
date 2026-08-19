@@ -9,7 +9,7 @@ a live TMM on BNK/datkube: a shield is loaded over a socket into an already-runn
 a function entry while traffic flows, and disarmed again — no rebuild, no restart. A hook armed on
 `http_parse_client_headers` fired exactly once per request across 16,000 requests through the proxy.
 The substrate splices **nothing into TMM's own logic** (startup registers through `INIT_FUNC`), but the
-tree does change: 39 files and ~7,200 lines added, three build-configuration files edited, and one
+tree does change: 46 files and ~7,800 lines added, three build-configuration files edited, and one
 compiler flag.
 
 That is not licence to claim more than was shown. Three lines still hold:

@@ -5,7 +5,7 @@ build tree. That split is the reason someone can read every file here and still 
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
 **The headline property — and read the scope carefully, because it changed.** The **shield**
-adds 39 files and ~7,200 lines into `src/base/` and `src/modules/hudfilter/ssl/`, edits three
+adds 46 files and ~7,800 lines into `src/base/` and `src/modules/hudfilter/ssl/`, edits three
 build-configuration files (`filelist` and the two globals whitelists), and adds a
 `Makefile.overrides`. **No existing F5 function BODY is edited** --- that is the accurate form of
 the claim, and it is smaller than "modifies no F5 source file", which this file used to say: nothing
@@ -31,6 +31,13 @@ Copy from this directory into `src/base/`:
 | `substrate/ls_vm.c`, `ls_vm.h` | `base/` |
 | `substrate/ls_vm_load.c` | `base/` |
 | `substrate/ls_vm_config.c`, `ls_vm_config.h` | `base/` |
+| `substrate/ls_ctx_reg.h` | `base/` — the registration type and the linker-set macro; no hook names |
+| `substrate/ls_ctx_reg.c` | `base/` — the lookup over the set, and the count that proves it linked |
+| `substrate/ls_ctx_reg_rst.c` | `base/` — the four reset functions register their two builders |
+| `substrate/ls_ctx_reg_sslerr.c` | `base/` — `ssl__err` |
+| `substrate/ls_ctx_reg_h2abort.c` | `base/` — `http2_stream_abort` |
+| `substrate/ls_ctx_reg_parse.c` | `base/` — `http_parse_client_headers` |
+| `substrate/ls_ctx_reg_alpn.c` | `base/` — `ssl_alpn_match`, the one builder that can decline |
 | `substrate/ls_tramp.c` | `base/` |
 | `substrate/trampoline_x86_64.S` | `base/ls_tramp_asm.c` (assembled via the `.c` entry — see filelist) |
 | `substrate/ls_swap.c` | `base/` |
@@ -214,6 +221,12 @@ paths (`http1x_psm_method`, `http1x_psm_header_count`, `http1x_psm_header_crnl`)
 `filelist` gains one line:
 
 ```
+base/ls_ctx_reg.c     STDINC UBPF
+base/ls_ctx_reg_rst.c STDINC UBPF
+base/ls_ctx_reg_sslerr.c STDINC UBPF
+base/ls_ctx_reg_h2abort.c STDINC UBPF
+base/ls_ctx_reg_parse.c STDINC UBPF
+base/ls_ctx_reg_alpn.c STDINC UBPF
 base/ls_tp_emit.c     STDINC UBPF
 ```
 

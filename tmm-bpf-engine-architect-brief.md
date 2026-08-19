@@ -72,7 +72,7 @@ the integration, so the actual delta is set out below.
 
 | change | scale |
 |---|---|
-| **New files added into `src/base/` and `src/modules/hudfilter/ssl/`** | **39 files, 7,174 lines**, compiled into `tmm` |
+| **New files added into `src/base/` and `src/modules/hudfilter/ssl/`** | **46 files, 7,780 lines**, compiled into `tmm` — counted as the untracked files under those two directories, which is one `git status` |
 | `src/compile/filelist` | +13 lines — those translation units, plus a `UBPF` cflags variable |
 | `src/compile/default_whitelist_x86_64` | +33 lines — the mutable globals introduced |
 | `src/compile/debug_whitelist_x86_64` | +33 lines — the same set |

@@ -7,7 +7,7 @@ out-of-line body, reached by rewriting its patchable-entry pad into a call to an
 run time. Programs either **observe** internal state (a tracepoint) or **act** on a verdict the host
 applies (a datapath control) — each one **statically proven safe before it loads**.
 
-**What it costs the TMM tree, stated plainly:** 39 new files and ~7,200 lines under `src/base/`
+**What it costs the TMM tree, stated plainly:** 46 new files and ~7,800 lines under `src/base/`
 and `src/modules/hudfilter/ssl/`, three build-configuration files edited (`filelist` and the two
 globals whitelists), and a new `Makefile.overrides` that adds uBPF's include path and static library
 and appends `CFLAGS_OPTIMIZE += -fpatchable-function-entry=5,0`, leaving the tree's own
