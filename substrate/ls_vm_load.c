@@ -100,15 +100,56 @@ extern void ls_trampoline_entry(void);
  * hanging the way this code used to. */
 #define LS_PREP_WAIT_MS  5000
 
+/*
+ * WHICH PIECE OF WORK THE TMM THREAD IS BEING ASKED TO DO.
+ *
+ * ONE request struct and ONE state machine for both, rather than a second copy of the
+ * handoff. The socket is serial, so "one outstanding at a time" is already the model, and
+ * the subtle parts here --- the IDLE/PENDING/DONE transitions, the timeout that deliberately
+ * leaves a late request PENDING, the refusal when one is already outstanding --- are exactly
+ * what a parallel implementation would get subtly wrong.
+ */
+#define LS_PREP_OP_RELOAD 0
+#define LS_PREP_OP_BENCH  1
+
+/*
+ * BENCH RUNS N ITERATIONS INSIDE A POLL ITERATION, which RELOAD does not, so it needs its own
+ * bound. ls_vm_bench_program creates a VM, JITs, executes `iters` times and destroys it, all
+ * on the TMM thread that picks the request up --- because that is the only thread where
+ * umalloc works. Every one of those iterations is time that thread is not polling.
+ *
+ * At a plausible tens-of-nanoseconds per call, 10,000 iterations is well under a millisecond;
+ * the prepare timer's own period is 10 ms. But "plausible" is doing the work in that sentence
+ * --- the per-call cost is the number this op exists to establish, so the stall cannot be
+ * computed in advance from anything but a guess. The cap is therefore set where a pessimistic
+ * 1 us per call would still stall one thread for 20 ms rather than seconds.
+ *
+ * This is a DEVELOPMENT op. It briefly stalls one TMM thread on purpose, and it must not
+ * appear in a control plane. The header above this switch says the same about all the 0x100x
+ * ops; this one now has a reason beyond taste.
+ */
+#define LS_PREP_BENCH_MAX_ITERS 20000u
+
 struct ls_prep {
     volatile int state;          /* LS_PREP_* --- the only cross-thread word    */
+    int          op;             /* LS_PREP_OP_*                                */
     int          slot;
     const void  *prog;           /* into the loader's mmap scratch; alive until DONE */
     unsigned int prog_len;
     unsigned char mode;
     char         section[80];
     char         function[64];
+    unsigned int iters;          /* bench only                                  */
+    uint64_t     bmin, bmean, bmax;   /* bench results                          */
     int          rc;             /* slot on success, negative on refusal        */
+};
+
+/* What the loader reads back. COPIED OUT before the slot returns to IDLE, so a caller can
+ * never read results that a subsequent request has begun overwriting. The socket is serial
+ * today and this costs three words. */
+struct ls_prep_result {
+    int      rc;
+    uint64_t bmin, bmean, bmax;
 };
 
 static struct ls_prep g_prep;
@@ -136,9 +177,21 @@ ls_prep_run_pending(void)
         return;
 
     /* Everything below allocates. That is the entire point of being here. */
-    g_prep.rc = ls_vm_reload(g_prep.slot, g_prep.prog, g_prep.prog_len,
-                             g_prep.section, g_prep.function,
-                             (enum ls_mode)g_prep.mode);
+    if (g_prep.op == LS_PREP_OP_BENCH) {
+        /* THE FIX THIS STRUCTURE EXISTED FOR ALREADY. ls_vm_bench_program used to be called
+         * straight from the loader thread, which hits the identical allocator freeze that
+         * this handoff was built to avoid for loads --- the dev ops were simply never
+         * converted. Running it wedged the loader (tid RUNNING, on-CPU) while the proxy kept
+         * serving, and it is why no per-call shield cost has been quotable from a live TMM:
+         * the counter mean measures the scheduler, and the clean number is this op's min. */
+        g_prep.rc = ls_vm_bench_program(g_prep.prog, g_prep.prog_len,
+                                        g_prep.section, g_prep.function, g_prep.iters,
+                                        &g_prep.bmin, &g_prep.bmean, &g_prep.bmax);
+    } else {
+        g_prep.rc = ls_vm_reload(g_prep.slot, g_prep.prog, g_prep.prog_len,
+                                 g_prep.section, g_prep.function,
+                                 (enum ls_mode)g_prep.mode);
+    }
 
     __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
 }
@@ -147,9 +200,9 @@ ls_prep_run_pending(void)
  * slot or negative. Allocates nothing --- nanosleep is a syscall, which is the
  * one thing this thread can safely do. */
 static int
-ls_prep_submit(int slot, const void *prog, unsigned int prog_len,
+ls_prep_submit(int op, int slot, const void *prog, unsigned int prog_len,
                const char *section, const char *function, unsigned char mode,
-               const char **why)
+               unsigned int iters, struct ls_prep_result *out, const char **why)
 {
     if (!ls_prep_timer_on) {
         *why = "prepare handoff not armed (no TMM thread owns the timer)";
@@ -166,10 +219,13 @@ ls_prep_submit(int slot, const void *prog, unsigned int prog_len,
         return -1;
     }
 
+    g_prep.op       = op;
     g_prep.slot     = slot;
     g_prep.prog     = prog;
     g_prep.prog_len = prog_len;
     g_prep.mode     = mode;
+    g_prep.iters    = iters;
+    g_prep.bmin = g_prep.bmean = g_prep.bmax = 0;
     /* snprintf, not strlcpy: this file is STDINC and strlcpy is not in the
      * standard C library it gets. Both truncate safely and NUL-terminate. */
     snprintf(g_prep.section,  sizeof g_prep.section,  "%s", section);
@@ -181,6 +237,15 @@ ls_prep_submit(int slot, const void *prog, unsigned int prog_len,
     for (int waited = 0; waited < LS_PREP_WAIT_MS; waited++) {
         if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) == LS_PREP_DONE) {
             int rc = g_prep.rc;
+            /* COPY BEFORE RELEASING. Once state is IDLE the struct belongs to whoever
+             * submits next, so reading g_prep afterwards is a race that the serial socket
+             * happens to hide today. Three words is not a price worth paying for that. */
+            if (out != NULL) {
+                out->rc    = rc;
+                out->bmin  = g_prep.bmin;
+                out->bmean = g_prep.bmean;
+                out->bmax  = g_prep.bmax;
+            }
             __atomic_store_n(&g_prep.state, LS_PREP_IDLE, __ATOMIC_RELEASE);
             if (rc < 0)
                 *why = "identity mismatch, malformed ELF, or uBPF rejected it";
@@ -349,8 +414,9 @@ handle(int fd)
          * ran --- the call site emits to its own slot, which stayed empty. The
          * comment under STATUS below already claimed LOAD did this; it did not.
          * Same reasoning for SET_MODE and REVOKE. */
-        int slot = ls_prep_submit((int)m->epoch, m->prog, m->prog_len, section, "shield",
-                                  m->mode, &why);
+        int slot = ls_prep_submit(LS_PREP_OP_RELOAD, (int)m->epoch, m->prog, m->prog_len,
+                                  section, "shield",
+                                  m->mode, 0u, NULL, &why);
         if (slot < 0)
             reply(fd, "ERR load refused (%s)\n", why);
         else
@@ -382,17 +448,37 @@ handle(int fd)
      * proposed additions to the protocol. A real control plane would not expose
      * "benchmark this" or "show me recent inputs" on the load path. */
     case 0x1001: {   /* BENCH: load, measure, discard --- never touches a live slot */
-        uint64_t mn = 0, me = 0, mx = 0;
+        /* HANDED TO A TMM THREAD, like a load. This called ls_vm_bench_program() directly
+         * until 2026-08-19, on the loader thread, where TMM's allocator freezes --- the same
+         * failure ls_prep exists to avoid, in the one op that was never converted. It wedged
+         * the loader on-CPU, and because the clean per-call figure is this op's MIN, that
+         * left the shield's per-invocation cost unquotable from a live TMM: the armed-hook
+         * counter mean is dominated by rdtsc pairs spanning context switches (a single call
+         * reading 1.09M then 3.14M cycles), so it measures the scheduler and not the hook. */
+        struct ls_prep_result r = { -1, 0, 0, 0 };
+        const char *why = "?";
         char section[96];
+        uint32_t iters;
+
         snprintf(section, sizeof section, "fentry/%.63s", m->binding.hook);
-        uint32_t iters = m->epoch ? m->epoch : 10000;   /* epoch reused as count */
-        if (ls_vm_bench_program(m->prog, m->prog_len, section, "shield",
-                                iters, &mn, &me, &mx) != 0) {
-            reply(fd, "ERR bench failed (identity mismatch, bad ELF, or exec fault)\n");
+        iters = m->epoch ? m->epoch : 10000;            /* epoch reused as count */
+        if (iters > LS_PREP_BENCH_MAX_ITERS) {
+            /* REFUSE rather than clamp. A clamped run reports a smaller sample than was
+             * asked for under the same "OK" line, and whoever reads the number will not
+             * know. Every other ceiling in this file refuses for the same reason. */
+            reply(fd, "ERR bench iters=%u exceeds the ceiling of %u.\n"
+                      "    This runs on a TMM thread inside a poll iteration, so the "
+                      "iteration count is a stall budget, not a preference.\n",
+                  iters, LS_PREP_BENCH_MAX_ITERS);
+            break;
+        }
+        if (ls_prep_submit(LS_PREP_OP_BENCH, -1, m->prog, m->prog_len,
+                           section, "shield", 0, iters, &r, &why) != 0) {
+            reply(fd, "ERR bench refused (%s)\n", why);
         } else {
             reply(fd, "OK bench iters=%u min=%llu mean=%llu max=%llu cycles bytes=%u\n",
-                  iters, (unsigned long long)mn, (unsigned long long)me,
-                  (unsigned long long)mx, m->prog_len);
+                  iters, (unsigned long long)r.bmin, (unsigned long long)r.bmean,
+                  (unsigned long long)r.bmax, m->prog_len);
         }
         break;
     }

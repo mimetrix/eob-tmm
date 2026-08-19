@@ -90,7 +90,15 @@ else
     # .git, so packaging cannot work this out for itself --- it recorded "unknown" on its
     # first real run. Writing it here, from the machine that actually has the repo, is the
     # only place the answer exists.
+    # -dirty WHEN THE TREE IS NOT CLEAN, which is the usual case here: the substrate is
+    # normally synced and built BEFORE the change is committed, so a bare HEAD sha names a
+    # commit that does not contain what was just copied. Recording it without the suffix
+    # would put a precise and wrong provenance string into the pipeline receipt --- worse
+    # than "unstamped", because it looks authoritative.
     C=$(cd "$REPO" && git rev-parse --short HEAD 2>/dev/null || echo unstamped)
+    if [ -n "$(cd "$REPO" && git status --porcelain -- substrate 2>/dev/null)" ]; then
+        C="$C-dirty"
+    fi
     echo "$C" | ssh "$BUILD_BOX" "cat > $TREE/../.substrate-commit" 2>/dev/null || true
     echo "  stamped commit $C"
 fi
