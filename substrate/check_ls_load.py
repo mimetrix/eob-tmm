@@ -336,6 +336,41 @@ def main():
         print("  ok    %-38s old parse: %-42s now: full 40 hex"
               % (label, "%s (%d hex)" % (bad, len(bad or ""))))
 
+    # --- 9. THE HOOK NAME COMES FROM THE OBJECT ----------------------------------------
+    # `load` used to default the hook to b"" when the argument was omitted. That is not a
+    # hook and cannot become one: TMM looks for 'shield' in section 'fentry/' and refuses,
+    # logging "the verified program and the loaded one may differ" --- which reads like a bad
+    # object, not a missing argument. Every load in a fresh deployment failed that way until
+    # the argument was noticed. A default that can only fail is worse than a required one.
+    # A real relocatable BPF object is not built here (no clang guaranteed), so synthesise
+    # the section table: name lookup is all this function does.
+    def synth_obj(secname):
+        import struct as _s
+        names = b"\x00" + secname + b"\x00" + b".shstrtab\x00"
+        shentsize, shnum = 64, 2
+        shoff = 64
+        strtab_off = shoff + shnum * shentsize
+        eh = bytearray(64)
+        eh[0:4] = b"\x7fELF"; eh[4], eh[5], eh[6] = 2, 1, 1
+        _s.pack_into("<HH", eh, 0x10, 1, 247)          # ET_REL, EM_BPF
+        _s.pack_into("<Q", eh, 0x28, shoff)
+        _s.pack_into("<HHH", eh, 0x3a, shentsize, shnum, 1)
+        shs = bytearray(shnum * shentsize)
+        _s.pack_into("<I", shs, 0, 1)                  # sec 0 name -> secname
+        _s.pack_into("<I", shs, shentsize, 1 + len(secname) + 1)   # sec 1 -> .shstrtab
+        _s.pack_into("<Q", shs, shentsize + 0x18, strtab_off)
+        _s.pack_into("<Q", shs, shentsize + 0x20, len(names))
+        return bytes(eh) + bytes(shs) + names
+
+    assert m.elf_fentry_hook(synth_obj(b"fentry/rst_why")) == b"rst_why"; n += 1
+    assert m.elf_fentry_hook(synth_obj(b"fentry/ssl__err")) == b"ssl__err"; n += 1
+    # NO SECTION, NO GUESS. Returning something plausible here would put a hook name on a
+    # program that never declared one.
+    assert m.elf_fentry_hook(synth_obj(b".text")) == b""; n += 1
+    assert m.elf_fentry_hook(b"not an elf at all") == b""; n += 1
+    assert m.elf_fentry_hook(b"") == b""; n += 1
+    print("  ok    the hook name is READ FROM the object's fentry/ section, not defaulted")
+
     print("  ok    check_ls_load: %d assertions, 7 of them refusals" % n)
     return 0
 

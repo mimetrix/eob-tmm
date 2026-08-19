@@ -177,6 +177,36 @@ def _note_build_id(note):
     return None
 
 
+def elf_fentry_hook(blob):
+    """b"<hook>" from the object's fentry/<hook> section name, or b"" if it has none.
+
+    Section headers only --- a relocatable object has no program headers to speak of. Kept
+    here rather than imported so this file stays runnable standalone inside a container with
+    no readelf, no objdump and no llvm tools; the same reason elf_build_id is here.
+    """
+    try:
+        if blob[:4] != b"\x7fELF" or blob[4] != 2:
+            return b""
+        shoff, = struct.unpack_from("<Q", blob, 0x28)
+        shentsize, shnum = struct.unpack_from("<HH", blob, 0x3a)
+        shstrndx, = struct.unpack_from("<H", blob, 0x3e)
+        if not shoff or not shnum or shstrndx >= shnum:
+            return b""
+        base = shoff + shstrndx * shentsize
+        stroff, = struct.unpack_from("<Q", blob, base + 0x18)
+        strsz, = struct.unpack_from("<Q", blob, base + 0x20)
+        strs = blob[stroff:stroff + strsz]
+        for i in range(shnum):
+            nmoff, = struct.unpack_from("<I", blob, shoff + i * shentsize)
+            end = strs.find(b"\x00", nmoff)
+            name = strs[nmoff:end]
+            if name.startswith(b"fentry/"):
+                return name[len(b"fentry/"):]
+    except (struct.error, IndexError):
+        return b""
+    return b""
+
+
 def running_binary():
     """The binary this container is ACTUALLY executing.
 
@@ -399,10 +429,25 @@ def main():
         mode = int(a[3]) if len(a) > 3 else 2
         with open(path, "rb") as f:
             prog = f.read()
-        # The hook name becomes "fentry/<hook>", the section uBPF selects by. It
-        # must match what the program was compiled with or the load is refused
-        # (finding O14 --- section and function are two separate identities).
-        hook = a[4].encode() if len(a) > 4 else b""
+        # The hook name becomes "fentry/<hook>", the section uBPF selects by. It must match
+        # what the program was compiled with or the load is refused (finding O14 --- section
+        # and function are two separate identities).
+        #
+        # DERIVED FROM THE OBJECT when not given, instead of defaulting to empty. It used to
+        # default to b"", which is not a hook and cannot be one: TMM then looks for 'shield'
+        # in section 'fentry/' and refuses every load with "the verified program and the
+        # loaded one may differ". A default that can only fail is worse than a required
+        # argument, and it fails in a way that reads like a bad object rather than a missing
+        # argument --- which is exactly how it was read.
+        #
+        # The object's own section header is the right source: it is what the program was
+        # compiled with and what PREVAIL verified. bnk-deliver-program.py already derives it
+        # this way, so the two tools now agree instead of one of them needing to be told.
+        hook = a[4].encode() if len(a) > 4 else elf_fentry_hook(prog)
+        if not hook:
+            sys.exit("*** %s carries no fentry/<hook> section, so nothing in it says which\n"
+                     "    function it attaches to. Name the hook explicitly as the 5th\n"
+                     "    argument if you are certain: load <slot> <file> <mode> <hook>" % path)
         print(send(msg(OP_LOAD, slot=slot, mode=mode, hook=hook, prog=prog)))
     elif cmd == "status":
         print(send(msg(OP_STATUS, slot=int(a[1]))))

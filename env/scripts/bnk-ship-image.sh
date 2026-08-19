@@ -142,15 +142,74 @@ deploy)
     fi
 
     echo "=== 2. point the deployment at it and roll"
-    kubectl set image deploy/f5-tmm "f5-tmm=docker.io/library/$TAG"
+    WANT="docker.io/library/$TAG"
+    HAVE=$(kubectl get deploy f5-tmm -o jsonpath='{.spec.template.spec.containers[0].image}')
+    kubectl set image deploy/f5-tmm "f5-tmm=$WANT" >/dev/null
     kubectl patch deploy f5-tmm --type=json \
-        -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}]'
+        -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}]' >/dev/null
+
+    # A REBAKE REUSES THE TAG, AND THEN NOTHING ROLLS.
+    #
+    # The deployment already names docker.io/library/tmm:ls, so `set image` to the same
+    # string changes no field, the pull policy is already Never, and the pod template is
+    # byte-identical. Kubernetes correctly does nothing. `rollout status` then reports
+    # "successfully rolled out" IMMEDIATELY --- about the pods that were already there,
+    # running the PREVIOUS contents of that tag. A clean success message for a deploy that
+    # did not happen, which is the worst shape a failure can take.
+    #
+    # Importing into containerd replaces what the tag resolves to, so the new bits are on
+    # the node; only the pods are stale. `rollout restart` is what picks them up.
+    if [ "$HAVE" = "$WANT" ]; then
+        echo "  image string unchanged ($WANT) --- forcing a restart, because"
+        echo "  set image alone would change nothing and report success anyway."
+        kubectl rollout restart deploy/f5-tmm >/dev/null
+    fi
     kubectl rollout status deploy/f5-tmm --timeout=180s 2>&1 | tail -2 | sed 's/^/  /'
     kubectl get pods -l app=f5-tmm -o wide --no-headers 2>/dev/null \
         | awk '{print "  "$1"  "$2"  "$3"  restarts="$4"  node="$7}'
     echo
     echo "  restarts must be 0. A pod that restarts once and comes back looks healthy in"
     echo "  'kubectl get pods' and is usually the VM failing at INIT_LATE --- read the logs."
+
+    echo
+    echo "=== 3. VERIFY BY CONTENT, from inside the new pods"
+    # Not by rollout status, and not by tag. The only question that matters is whether the
+    # artifacts in the running pod describe the binary the running pod executes --- which is
+    # what ls-load.py will refuse on. Ask each pod, not the deployment.
+    # SKIP PODS THAT ARE GOING AWAY. The first run of this check flagged a pod BAD that was
+    # merely Terminating: `rollout status` returns as soon as the new replicas are Ready,
+    # while the old pod is still shutting down and still listed. It carries the previous
+    # layer, so of course its artifacts do not match --- reporting that as a deploy failure
+    # sends you looking at the wrong node. A pod with a deletionTimestamp is not evidence
+    # about anything.
+    bad=0
+    # kubectl's jsonpath has no negation operator, so the timestamp is printed and filtered
+    # here. A pod being deleted prints a second field; a live one prints nothing after its name.
+    for p in $(kubectl get pods -l app=f5-tmm \
+                 -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.deletionTimestamp}{"\n"}{end}' \
+               | awk 'NF==1 {print $1}'); do
+        printf "  %-26s " "$p"
+        out=$(kubectl exec -c f5-tmm "$p" -- sh -c '
+            R=$(readlink -f /usr/bin/tmm)
+            L=$(python3 /usr/share/ls/ls_buildid.py "$R")
+            H=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/hook-index.tsv 2>/dev/null)
+            S=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/signatures.tsv 2>/dev/null)
+            N=$(grep -vc "^#" /usr/share/ls/signatures.tsv 2>/dev/null || echo 0)
+            if [ "$L" = "$H" ] && [ "$L" = "$S" ]; then
+                echo "OK $L hook+sig match, $N signatures"
+            else
+                echo "BAD binary=$L hook=${H:-none} sig=${S:-none}"
+            fi' 2>&1 | tr -d '\r')
+        echo "$out"
+        case "$out" in OK*) ;; *) bad=$((bad + 1)) ;; esac
+    done
+    [ "$bad" -eq 0 ] || {
+        echo
+        echo "*** $bad pod(s) carry artifacts that do not describe their own binary."
+        echo "    Arming by name will refuse there --- correct, and useless. Either the"
+        echo "    import did not reach that node's containerd, or the pod did not restart."
+        exit 1
+    }
     ;;
 
 *)
