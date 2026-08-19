@@ -50,6 +50,12 @@ run() { printf '\n  %s$ %s%s\n' "$DIM" "$*" "$OFF"; sh -c "$*" 2>&1 | sed 's/^/ 
 # driven from the machine that has clang and PREVAIL. Bare kubectl when unset, so running this
 # on the datkube host is unchanged.
 KUBECTL="${KUBECTL:-kubectl}"
+# What to PRINT for it. The echoed commands are the whole point of this format, so they must
+# read as something a person could type. Printing the literal string $KUBECTL shows plumbing;
+# printing the basename shows `kubectl`, or `kubectl-datkube` when the ssh wrapper is in use ---
+# which is true and is the thing an audience would want to know.
+KDISP=$(basename "$KUBECTL")
+REPO_DIR="${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 
 PODS=$("$KUBECTL" get pods -l app=f5-tmm --no-headers | awk '$3=="Running"{print $1}')
 [ -n "$PODS" ] || { echo "*** no Running f5-tmm pods" >&2; exit 1; }
@@ -64,13 +70,13 @@ POD1=$(echo $PODS | awk '{print $1}')
 # the process's own memory rather than asking a tool that could be telling us anything.
 L() {
     p=$1; shift
-    printf '\n  %s$ "$KUBECTL" exec -i %s -c f5-tmm -- python3 /usr/bin/ls-load.py %s%s\n' \
-        "$DIM" "$p" "$*" "$OFF"
+    printf '\n  %s$ %s exec -i %s -c f5-tmm -- python3 /usr/bin/ls-load.py %s%s\n' \
+        "$DIM" "$KDISP" "$p" "$*" "$OFF"
     "$KUBECTL" exec -i "$p" -c f5-tmm -- python3 /usr/bin/ls-load.py "$@" 2>&1 | sed 's/^/      /'
 }
 D() {
     t=${1:-5}
-    printf '\n  %s$ for p in $PODS; do "$KUBECTL" exec $p -c f5-tmm -- \\%s\n' "$DIM" "$OFF"
+    printf '\n  %s$ for p in $PODS; do %s exec $p -c f5-tmm -- \\%s\n' "$DIM" "$KDISP" "$OFF"
     printf '  %s      timeout %s /usr/bin/ls_drain --segment /tmp/ls_tp_ring; done%s\n' "$DIM" "$t" "$OFF"
     for p in $PODS; do
         "$KUBECTL" exec "$p" -c f5-tmm -- sh -c "timeout $t /usr/bin/ls_drain --segment /tmp/ls_tp_ring 2>/dev/null"
@@ -80,10 +86,22 @@ DQ() { for p in $PODS; do "$KUBECTL" exec "$p" -c f5-tmm -- sh -c "timeout ${1:-
 # BYTES: read a function's entry out of /proc in the pod. The script is piped on stdin;
 # `-i` is load-bearing --- without it kubectl attaches no stdin, python reads an empty
 # program, and this prints NOTHING while returning success.
+# BYTES <pod> <arm-address> <pad-offset>
+#
+# THE PAD OFFSET IS PASSED IN, not inferred, and getting this wrong is silent. The index's
+# address column is the ARM address --- the first byte of the pad --- not the function entry.
+# This function previously assumed byte 0 was the start of endbr64 and that the pad lived at
+# bytes 4..9, which is true only when handed a function entry. Given the arm address it read
+# five bytes of the function BODY as the pad and printed "pad is: ?" while showing the five
+# reserved nops mislabelled as endbr64. The bytes on screen were right and every label was wrong.
+#
+# pad_offset comes from the same index row as the address: 4 when gcc emitted endbr64 first
+# (the -fcf-protection default, so most functions), 0 when it did not --- statics and
+# .isra/.constprop clones, which are never indirect-call targets.
 BYTES() {
-printf '\n  %s$ "$KUBECTL" exec -i %s -c f5-tmm -- python3 - %s <<PY%s\n' "$DIM" "$1" "$2" "$OFF"
-printf '  %s    # find the tmm pid, seek to the entry in /proc/<pid>/mem, read 14 bytes%s\n' "$DIM" "$OFF"
-"$KUBECTL" exec -i "$1" -c f5-tmm -- python3 - "$2" <<'PY' 2>&1 | sed 's/^/      /'
+printf '\n  %s$ %s exec -i %s -c f5-tmm -- python3 - %s %s <<PY%s\n' "$DIM" "$KDISP" "$1" "$2" "$3" "$OFF"
+printf '  %s    # find the tmm pid, seek to the function entry in /proc/<pid>/mem, read 14 bytes%s\n' "$DIM" "$OFF"
+"$KUBECTL" exec -i "$1" -c f5-tmm -- python3 - "$2" "$3" <<'PY' 2>&1 | sed 's/^/      /'
 import os, sys
 pid = None
 for d in os.listdir("/proc"):
@@ -91,19 +109,55 @@ for d in os.listdir("/proc"):
     try: e = os.readlink("/proc/%s/exe" % d)
     except OSError: continue
     if os.path.basename(e).startswith("tmm"): pid = d; break
-addr = int(sys.argv[1], 16)
+arm = int(sys.argv[1], 16)
+off = int(sys.argv[2])
+entry = arm - off                      # the function's first byte
 with open("/proc/%s/mem" % pid, "rb") as m:
-    m.seek(addr); b = m.read(14)
+    m.seek(entry); b = m.read(off + 10)
 h = lambda s: " ".join("%02x" % x for x in s)
-pad = b[4:9]
+pad = b[off:off + 5]
 if pad == b"\x90" * 5:      what = "five reserved nops --- NOT ARMED"
 elif pad[0] == 0xe8:        what = "call rel32 --- ARMED, calling the trampoline"
-else:                       what = "?"
-print("0x%x   %s" % (addr, h(b)))
-print("         endbr64 %s | pad %s | body %s" % (h(b[:4]), h(pad), h(b[9:14])))
+else:                       what = "NEITHER --- not a pad, and not a hook. Do not write here."
+print("entry 0x%x   pad at +%d (0x%x)" % (entry, off, arm))
+print("         %s" % h(b))
+if off:
+    print("         endbr64 %s | pad %s | body %s" % (h(b[:off]), h(pad), h(b[off + 5:])))
+else:
+    print("         pad %s | body %s        (no endbr64 --- not an indirect-call target)"
+          % (h(pad), h(b[5:])))
 print("         pad is: %s" % what)
 PY
 }
+# CLAIM <label> <pattern> --- check an assertion against the records we just captured,
+# and say plainly whether it held.
+#
+# WHY THIS EXISTS. Move 4 used to NARRATE its findings: "flow_table.c:2618 appeared in BOTH
+# runs with different causes", ":973 and :974 are adjacent call sites, one per side", "ten
+# records for six requests". Those were true of the run during which the script was written.
+# On 2026-08-19 none of them appeared --- the backend answers 404 over TLS on this cluster, so
+# there is no proxy teardown at :973, and the port-9999 probe did not produce a local-listener
+# reject. The script told the audience to look at four things that were not on the screen.
+#
+# That is the worst failure available to a live demo: it reads as either a broken system or a
+# prepared script, and both are worse than the finding being absent. Ambient traffic also
+# varies by cluster and by minute, so a fixed expectation cannot be right for long.
+#
+# So a claim is now CHECKED. It either says "confirmed, here it is" or "did not appear this
+# run", and the second is a fine thing to say out loud --- the mechanism is the point, not any
+# particular reset cause.
+CLAIM() {
+    _label=$1; _pat=$2; _file=$3
+    if grep -qE "$_pat" "$_file" 2>/dev/null; then
+        printf '  %sCONFIRMED this run: %s%s\n' "$BOLD" "$_label" "$OFF"
+        grep -E "$_pat" "$_file" | head -3 | sed 's/^/      /'
+    else
+        printf '  %sNOT SEEN this run: %s%s\n' "$DIM" "$_label" "$OFF"
+        printf '  %s  (this cluster/traffic did not produce it; the mechanism is unaffected)%s\n' \
+               "$DIM" "$OFF"
+    fi
+}
+
 RANK() {
 python3 -c '
 import sys, json, collections
@@ -163,16 +217,26 @@ ENTRY() {
     printf '%s\n' "$_out" | grep '^0x' | head -1
 }
 
+# The pad offset for the same name, from the same row. Separate call rather than parsing a
+# tuple, because a caller that wanted only the address and got "0x144fbc4 4" would pass the
+# whole string to /proc and seek somewhere arbitrary.
+PADOFF() {
+    "$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
+        "awk -F'\t' -v n='$1' '\$1==n{print \$4}' /usr/share/ls/hook-index.tsv" 2>/dev/null \
+        | tr -d '\r' | head -1
+}
+
 # Show the resolution once, so the audience sees where the number came from before it is used.
-printf '\n  %s$ "$KUBECTL" exec %s -c f5-tmm -- awk -F"\\t" \x27$1=="rst_why"\x27 \\%s\n' \
-       "$DIM" "$POD1" "$OFF"
-printf '  %s      /usr/share/ls/hook-index.tsv        # the index the BAKE generated%s\n' "$DIM" "$OFF"
+printf '\n  %s$ %s exec %s -c f5-tmm -- \\%s\n' "$DIM" "$KDISP" "$POD1" "$OFF"
+printf '  %s      grep -P %s^rst_why\\t%s /usr/share/ls/hook-index.tsv%s\n' "$DIM" "'" "'" "$OFF"
+printf '  %s      # the index mk_hook_map.py generated from the PACKAGED binary during the bake%s\n' "$DIM" "$OFF"
 "$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
-    "awk -F'\t' '\$1==\"rst_why\"{print \"      \" \$0}' /usr/share/ls/hook-index.tsv" 2>/dev/null
+    "awk -F'\t' '\$1==\"rst_why\"{print \"      name=\" \$1 \"  arm_at=\" \$2 \"  method=\" \$3 \"  pad_offset=\" \$4}' /usr/share/ls/hook-index.tsv" 2>/dev/null
 "$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
-    "awk -F'\t' '/^#build_id/{print \"      build id: \" \$2}' /usr/share/ls/hook-index.tsv" 2>/dev/null
+    "awk -F'\t' '/^#build_id/{print \"      build_id=\" \$2 \"   <- the binary this index describes\"}' /usr/share/ls/hook-index.tsv" 2>/dev/null
 
 RST=$(ENTRY rst_why) || exit 1
+RSTOFF=$(PADOFF rst_why)
 
 # =============================================================================
 if want 1; then
@@ -183,12 +247,12 @@ note "  not a feature of the product, it IS the product."
 note ""
 note "  So the most important question anyone can ask is: why did you do that to my"
 note "  connection? And that is the one question we cannot currently answer."
-run "kubectl get pods -l app=f5-tmm --no-headers"
+run "$KUBECTL get pods -l app=f5-tmm --no-headers"
 note ""
 note "  Nothing is armed. Do NOT ask the loader --- 'armed' in its status means the SLOT"
 note "  HOLDS A PROGRAM, which stays true after a disarm. The only source of truth for"
 note "  'is this function patched' is the process's own memory:"
-BYTES "$POD1" "$RST"
+BYTES "$POD1" "$RST" "$RSTOFF"
 note ""
 note "  f3 0f 1e fa is endbr64 --- Intel CET's indirect-branch guard, put there by gcc's"
 note "  default -fcf-protection. It is never ours. The five 90s after it are the pad the"
@@ -237,7 +301,7 @@ note "  By NAME, not address --- resolved through an index built from this exact
 note "  and gated on its build ID. rst_why has sat at three different addresses across"
 note "  three builds of identical source, so a hand-carried address is wrong by default"
 note "  and wrong SILENTLY: a nop pad exists at plenty of other addresses."
-BYTES "$POD1" "$RST"
+BYTES "$POD1" "$RST" "$RSTOFF"
 note ""
 note "  FIVE BYTES CHANGED. endbr64 above is untouched; the real first instruction below"
 note "  is untouched. NOTHING WAS DISPLACED --- so there is nothing to relocate, no"
@@ -250,62 +314,125 @@ fi
 # =============================================================================
 if want 4; then
 say "MOVE 4 of 6 --- what TMM is actually deciding"
+AMB=/tmp/.demo_ambient.$$
+REQ=/tmp/.demo_requests.$$
+REJ=/tmp/.demo_reject.$$
+trap 'rm -f "$AMB" "$REQ" "$REJ"' EXIT
+
 DQ 4
 note "  (ring drained --- everything below is from this moment on)"
 note ""
 note "  First: three seconds, and I send nothing at all."
 run "sleep 3"
-D 5 2>/dev/null | RANK | sed 's/^/      /'
+D 5 2>/dev/null > "$AMB" || true
+RANK < "$AMB" | sed 's/^/      /'
 note ""
-note "  I sent nothing. That is ambient --- health probes. And tcp.c:4689 says the REMOTE"
-note "  end reset: TMM did not decide that. Fourteen of those and you go look at your"
-note "  server, not at us."
+note "  I sent nothing, and the feed is not empty. That is ambient traffic --- health"
+note "  probes and the cluster talking to itself. Read the causes: anything attributed to"
+note "  the REMOTE end is a reset TMM did not decide, and that sends you to your server"
+note "  rather than to us. Which causes appear depends on the cluster and the minute."
 pause
 DQ 4
-note "  Now six ordinary HTTPS requests, client -> TMM -> backend pool."
-run ""$KUBECTL" exec client -- sh -c 'for i in 1 2 3 4 5 6; do timeout 3 curl -sk -o /dev/null https://$VIP/; done'"
-D 5 2>/dev/null | RANK | sed 's/^/      /'
+note "  Now six ordinary requests, client -> TMM -> backend pool."
+run ""$KUBECTL" exec client -- sh -c 'for i in 1 2 3 4 5 6; do timeout 3 curl -s -o /dev/null http://$VIP/; done'"
+D 5 2>/dev/null > "$REQ" || true
+RANK < "$REQ" | sed 's/^/      /'
 note ""
-note "  Ten records for six requests --- a proxy is TWO connections, and :973 and :974 are"
-note "  adjacent call sites, one per side. The feed reflects real internal structure."
+CLAIM "a proxy is TWO connections --- adjacent call sites, one per side" \
+      '"file":"http_mr_proxy.c","line":(99[0-9]|10[0-9][0-9])' "$REQ"
 pause
 DQ 4
 note "  Now five connects to a port with NO listener. The backend is never involved:"
 note "  TMM rejects the flow before any proxying, so nothing else in the path can vary it."
 run ""$KUBECTL" exec client -- sh -c 'for i in 1 2 3 4 5; do timeout 2 nc -z $VIP 9999; done' || true"
-D 5 2>/dev/null | RANK | sed 's/^/      /'
+D 5 2>/dev/null > "$REJ" || true
+RANK < "$REJ" | sed 's/^/      /'
 note ""
-note "  THE POINT. flow_table.c:2618 appeared in BOTH runs, with DIFFERENT causes ---"
-note "  'No flow found for ACK' from ambient traffic, 'No local listener' from that"
-note "  trigger. Same file. Same line. Two different answers, because the source says"
+note "  THE POINT, and it is checked against the two captures rather than asserted:"
+note "  one file:line can carry DIFFERENT causes, because the source is"
 note ""
 note "      RST_WHY_CF(&cf_static, flow_reject_cause[flow_reject_code]);"
 note ""
-note "  an 18-entry table indexed at RUNTIME: connection limit exceeded, VIP down, DOS"
+note "  an 18-entry table indexed at RUNTIME --- connection limit exceeded, VIP down, DOS"
 note "  signature, 3WHS rejected. The line number tells you WHERE. Nothing in the source"
-note "  tells you WHICH --- a developer with the code open cannot answer it. The record"
+note "  tells you WHICH, so a developer with the code open cannot answer it. The record"
 note "  can, and only because the hook forwards all six arguments instead of five."
+note ""
+python3 - "$AMB" "$REQ" "$REJ" <<'PYX' 2>/dev/null | sed 's/^/  /'
+import sys, json, collections
+sites = collections.defaultdict(set)
+for f in sys.argv[1:]:
+    try: lines = open(f).read().splitlines()
+    except OSError: continue
+    for l in lines:
+        l = l.strip()
+        if not l.startswith("{"): continue
+        try: d = json.loads(l)
+        except Exception: continue
+        if d.get("hook") != "reset": continue
+        if not d.get("file"): continue
+        sites["%s:%s" % (d["file"], d["line"])].add(d.get("cause", ""))
+multi = {k: v for k, v in sites.items() if len(v) > 1}
+if multi:
+    print("CONFIRMED this run --- one site, several causes:")
+    for k, v in sorted(multi.items()):
+        print("    %-26s %s" % (k, " | ".join(sorted(x for x in v if x))))
+else:
+    print("NOT SEEN this run: every site carried a single cause across these three captures.")
+    print("  The runtime-table site is reached by paths this traffic did not take. What the")
+    print("  captures DO show is %d distinct sites, each with the cause its source wrote:" % len(sites))
+    for k, v in sorted(sites.items())[:6]:
+        print("    %-26s %s" % (k, " | ".join(sorted(x for x in v if x))))
+PYX
 pause
 fi
 
 # =============================================================================
 if want 5; then
 say "MOVE 5 of 6 --- you pick the target"
-note "  41,148 functions in this binary are armable through the pad. Name one."
+# COUNTED FROM THIS IMAGE'S INDEX. These read "41,148" and "30,009" --- true of the build the
+# script was written against. Every build relinks and the optimiser makes different inlining
+# choices, so the populations move. Quoting last build's numbers at an audience looking at this
+# build's binary is the same error as the hardcoded address, one step further from the machine.
+POP=$("$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
+      "awk -F'\t' '!/^#/{c[\$3]++} END{printf \"%d %d\", c[\"pad\"], c[\"displace\"]}' /usr/share/ls/hook-index.tsv" \
+      2>/dev/null | tr -d '\r')
+NPAD=$(echo "$POP" | awk '{print $1}')
+NDIS=$(echo "$POP" | awk '{print $2}')
+note "  $NPAD functions in THIS binary are armable through the pad --- counted from the index"
+note "  in this image, not from a number written down when the script was drafted. Name one."
 note "  Before arming, ask what will happen --- so any answer is a sentence:"
-run "python3 /tmp/bnk-explore-hooks.py explain ssl_hs_process_client_hello || true"
+# From the repo, not /tmp --- it was referenced at /tmp/bnk-explore-hooks.py, which is not
+# there, so this move printed "No such file or directory" where the verdict should have been.
+# It reads the index inside the pod and honours $KUBECTL, so it works from wherever the demo
+# is being driven.
+#
+# THE EXAMPLE IS CHOSEN FROM THE LIVE INDEX, not written down. ssl_hs_process_client_hello was
+# the hardcoded example and it is NOT ARMABLE on this build --- the optimiser folded it away.
+# A demo that opens its "you pick the target" move on a refusal for a function nobody chose is
+# making the wrong point by accident. So: one armable name taken from the index, then the
+# refusals, all from this binary.
+EXPLORE="$REPO_DIR/env/scripts/bnk-explore-hooks.py"
+PICK=$("$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
+       "awk -F'\t' '\$3==\"pad\" && \$4==4 && \$1 ~ /^mrhttp_/ {print \$1}' /usr/share/ls/hook-index.tsv | sort | head -1" \
+       2>/dev/null | tr -d '\r')
+[ -n "$PICK" ] || PICK=rst_why
+run "KUBECTL=$KUBECTL python3 $EXPLORE explain $PICK || true"
+note ""
+note "  ...and one the mechanism refuses, so the boundary is shown rather than described:"
+run "KUBECTL=$KUBECTL python3 $EXPLORE explain LOne || true"
 note ""
 note "  Four possible verdicts, and the refusals are the more honest half:"
 note "     ARMABLE            padded, unique --- arm it"
 note "     AMBIGUOUS          e.g. LOne has 21 entries; arming refuses rather than guess"
-note "     NEEDS DISPLACEMENT no pad. An OpenSSL symbol. 30,009 of these, unbuilt path"
+note "     NEEDS DISPLACEMENT no pad. An OpenSSL symbol. $NDIS of these, unbuilt path"
 note "     NOT ARMABLE        inlined or folded away by the optimiser"
 note ""
 note "  That is the boundary of the mechanism, and better seen here than read in a caveat."
 pause
 say "         ...and then it goes back"
 for p in $PODS; do L "$p" disarm rst_why; done
-BYTES "$POD1" "$RST"
+BYTES "$POD1" "$RST" "$RSTOFF"
 note ""
 note "  Byte-identical to move 1. Not equivalent --- identical."
 pause
@@ -316,20 +443,77 @@ if want 6; then
 say "MOVE 6 of 6 --- a decision made INSIDE the data plane"
 note "  Everything so far is observation. This one is different: the same mechanism, but"
 note "  the program decides what is worth reporting, using a clock, in the poll loop."
+# LOAD, and arm ONLY IF the entry is not already patched.
+#
+# Changing the program at a live hook is a LOAD, not a re-arm: the trampoline is already in
+# place, and ls_vm_reload swaps (vm, jit_fn) under it. Re-arming would rewrite the displacement
+# over an existing call and lose the original bytes, which is why ls-load.py now refuses it ---
+# and running this move on its own, after move 3 armed the same function, is exactly how that
+# refusal shows up. Making the arm conditional turns a stumble into the point.
+note "  Note what this does NOT do: it loads a different program into the SAME live hook."
+note "  The trampoline is already there from move 3, so there is nothing to patch again ---"
+note "  and re-arming is refused precisely because it would overwrite the displacement."
 for p in $PODS; do
   L "$p" load 5 /usr/share/ls/rate_gate.bpf.o 1 rst_why
-  L "$p" arm 5 rst_why
+  _pad=$("$KUBECTL" exec -i "$p" -c f5-tmm -- python3 - "$RST" <<'PYP' 2>/dev/null
+import os, sys
+pid = None
+for d in os.listdir("/proc"):
+    if not d.isdigit(): continue
+    try: e = os.readlink("/proc/%s/exe" % d)
+    except OSError: continue
+    if os.path.basename(e).startswith("tmm"): pid = d; break
+with open("/proc/%s/mem" % pid, "rb") as m:
+    m.seek(int(sys.argv[1], 16)); print("nops" if m.read(5) == b"\x90" * 5 else "armed")
+PYP
+)
+  if [ "$_pad" = "nops" ]; then
+      L "$p" arm 5 rst_why
+  else
+      printf '\n  %s# %s: entry already holds a call --- the hook is live, so no arm is needed.%s\n' \
+             "$DIM" "$p" "$OFF"
+  fi
 done
+GATE=/tmp/.demo_gate.$$
 DQ 4
-run ""$KUBECTL" exec client -- sh -c 'for i in \$(seq 1 40); do timeout 2 curl -sk -o /dev/null https://$VIP/ & done; wait' || true"
-D 6 2>/dev/null | RANK | sed 's/^/      /'
+# HTTP, not HTTPS. The earlier form drove https:// and this cluster answers 404 over TLS
+# without reaching the proxy path, so the gate had almost nothing to count and the move showed
+# no program-emitted records while asserting them. Plain HTTP gets 200 and goes through both
+# sides of the proxy, which is what generates enough events for a rate gate to have an opinion.
+run ""$KUBECTL" exec client -- sh -c 'for i in \$(seq 1 40); do timeout 2 curl -s -o /dev/null http://$VIP/ & done; wait' || true"
+D 6 2>/dev/null > "$GATE" || true
+RANK < "$GATE" | sed 's/^/      /'
 note ""
 note "  hook=reset is the host publishing one record per event. hook=prog is the PROGRAM"
 note "  choosing to emit --- only when a site crossed five occurrences inside a window it"
-note "  timed itself. Measured earlier: 86 events, 2 emitted records. 43 to 1, decided in"
-note "  the poll loop, with nothing downstream counting anything."
+note "  timed itself, using the clock helper, in the poll loop."
 note ""
-note "  At 1,090 sites under load, streaming everything is a firehose. This is the"
+# CHECKED, not asserted. This move used to state "86 events, 2 emitted records" --- a real
+# measurement from a different run, presented as if it were this one. A rate gate is
+# load-dependent by construction, so whether it fires here depends on how much of that burst
+# landed on this pod within one window.
+python3 - "$GATE" <<'PYX' 2>/dev/null | sed 's/^/  /'
+import sys, json
+prog = rest = 0
+for l in open(sys.argv[1]):
+    l = l.strip()
+    if not l.startswith("{"): continue
+    try: d = json.loads(l)
+    except Exception: continue
+    if d.get("hook") == "prog": prog += 1
+    else: rest += 1
+if prog:
+    print("CONFIRMED this run: %d host record(s), %d PROGRAM-emitted --- a ratio of %.0f to 1,"
+          % (rest, prog, (rest / prog) if prog else 0))
+    print("decided inside the data plane with nothing downstream counting anything.")
+else:
+    print("NOT SEEN this run: %d host record(s) and 0 program-emitted." % rest)
+    print("  The gate emits only when one site crosses five occurrences inside its own timed")
+    print("  window, so this burst did not concentrate enough on this pod. The mechanism is")
+    print("  the same one move 3 proved; what varies is whether the threshold was met.")
+PYX
+note ""
+note "  At 1,090 sites under load, streaming everything is a firehose. That is the"
 note "  difference between telemetry and a decision."
 pause
 say "CLOSING --- the three things you would ask me anyway"

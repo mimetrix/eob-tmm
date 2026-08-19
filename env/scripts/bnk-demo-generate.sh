@@ -138,11 +138,27 @@ for p in $("$KUBECTL" get pods -l app=f5-tmm \
     printf '      %-26s ' "$p"
     "$KUBECTL" exec -c f5-tmm "$p" -- python3 /usr/bin/ls-load.py status "$SLOT" 2>&1 | tail -1
 done
-printf '\n  %s12 requests, and one pod counts 12 --- the requests land on one of the two. errors=0.\n' "$DIM"
-printf '  A counter is all this move claims. The RECORD is not trustworthy yet on this build:\n'
-printf '  the record header takes its hook name and schema from a hardwired slot table, not\n'
-printf '  from the function that was armed, so these bytes get decoded as a reset record and\n'
-printf '  print nonsense. That needs a rebuild, and so does capturing anything but scalars.%s\n' "$OFF"
+printf '\n  %sThe requests land on one of the two pods, so one counter moves. errors=0.%s\n' "$DIM" "$OFF"
+
+say "7b. And the record. This is what the probe actually reported."
+printf '  %sUntil 2026-08-19 this move stopped at the counter, because the record could not be\n' "$DIM"
+printf '  trusted: the trampoline chose its ctx builder from the SLOT NUMBER, so a probe in a\n'
+printf '  slot belonging to one of the reset functions had its arguments read as rst_why'"'"'s and\n'
+printf '  published fiction under that name. Builders now register against the function they\n'
+printf '  serve, and a function with no registered builder gets the raw registers and no\n'
+printf '  dereference --- which is what this generated program is compiled against.%s\n' "$OFF"
+show "ls_drain --segment /tmp/ls_tp_ring   | records this probe published"
+for p in $("$KUBECTL" get pods -l app=f5-tmm \
+             -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.deletionTimestamp}{"\n"}{end}' \
+           | awk 'NF==1 {print $1}'); do
+    "$KUBECTL" exec -c f5-tmm "$p" -- sh -c \
+        "timeout 4 /usr/bin/ls_drain --segment /tmp/ls_tp_ring 2>/dev/null" 2>/dev/null \
+      | grep '"hook":"prog"' | head -2 | sed 's/^/      /'
+done
+printf '\n  %shook "prog", schema 100 --- labelled as program-emitted, not decoded as something\n' "$DIM"
+printf '  else. The host validated the LENGTH and nothing more, which is why ls_drain prints\n'
+printf '  bytes rather than naming fields: the layout is in the .bpf.c from move 3, and a\n'
+printf '  consumer would have to be handed it. That is the honest remaining gap here.%s\n' "$OFF"
 
 say "8. Disarm. The entry goes back to five nops."
 show "ls-load.py disarm $FN"
