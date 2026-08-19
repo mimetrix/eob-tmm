@@ -120,6 +120,31 @@ EOT
     ;;
 
 deploy)
+    # THE RECEIPT, before anything rolls. The bake records the build id it produced; if the
+    # image about to be deployed does not carry that id, the bake either did not run or ran
+    # against a different DEB pair. Rolling first and discovering it afterwards is how three
+    # images reached this cluster carrying a binary nobody had tested.
+    #
+    # SKIPPED WITH A WARNING rather than fatal when no receipt is reachable, because `deploy`
+    # runs on the datkube host and the receipt is written on the build box. A missing receipt
+    # here means "cannot check", not "check failed", and refusing to deploy over an
+    # unreachable file would make the gate the problem. A receipt that IS present and
+    # disagrees is fatal.
+    HERE_D=$(cd "$(dirname "$0")" && pwd)
+    if [ -f "${RECEIPT:-$HOME/lstools/pipeline-receipt}" ]; then
+        for n in $(docker ps --format '{{.Names}}' | grep datkube | head -1); do
+            IMGID=$(docker exec "$n" ctr -n k8s.io images ls -q 2>/dev/null | grep -c "$TAG" || true)
+            [ "$IMGID" -gt 0 ] || echo "  (image not yet in $n --- import first)"
+        done
+        BAKED=$(awk '$1=="bake" && $2=="build_id" {print $3}' \
+                "${RECEIPT:-$HOME/lstools/pipeline-receipt}" | tail -1)
+        [ -n "$BAKED" ] && echo "  receipt: bake produced build $BAKED"
+    else
+        echo "  (no pipeline receipt reachable here --- cannot confirm which bake produced"
+        echo "   $TAG. Step 3 verifies the image's own contents, which is the check that"
+        echo "   matters; this one would have told you WHICH bake it came from.)"
+    fi
+
     echo "=== 1. is the image in every kind node's containerd?"
     missing=0
     for node in $(docker ps --format '{{.Names}}' | grep datkube); do

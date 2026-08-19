@@ -41,6 +41,23 @@ echo "  runtime   : ${BIN_DEB##*/}"
 echo "  debuginfo : ${DBG_DEB##*/}"
 
 echo
+echo "=== 1b. the receipt --- did packaging actually run for THESE DEBs?"
+# WHY THIS COMES BEFORE ANYTHING IS GENERATED. Every check downstream compares artifacts
+# against each other, and a stale DEB agrees with itself perfectly: same binary, same build
+# id, every gate green, and the image ships without the change. That is what happened on
+# 2026-08-19. Agreement is not freshness, so the question "did the packaging stage run and
+# produce THIS pair" has to be asked separately --- and the only thing that can answer it is
+# a record left by that stage.
+RT=$(mktemp -d); trap 'rm -rf "$RT"' EXIT
+dpkg-deb -x "$BIN_DEB" "$RT"
+LIVEID=$(python3 "$REPO/substrate/ls_buildid.py" "$(readlink -f "$RT/usr/bin/tmm.default")")
+sh "$REPO/env/scripts/bnk-receipt.sh" require package build_id "$LIVEID" || fail "the DEB pair
+    in $DEBS was not produced by a verified packaging run. Run:
+        env/scripts/bnk-package.sh
+    It clears the version-stamped chain, builds, verifies the result contains the substrate
+    that was compiled, and records the build id this stage just refused to accept."
+
+echo
 echo "=== 2. generate the index (mk_hook_map.py checks the pair's build ids agree)"
 mkdir -p "$CTX/shields"
 python3 "$REPO/substrate/mk_hook_map.py" --debs "$DEBS" \
@@ -171,6 +188,11 @@ PY
   echo "  signatures      : $(grep -vc "^#" /usr/share/ls/signatures.tsv) functions, build id matches"
   echo "  programs        : $(ls /usr/share/ls/*.bpf.o 2>/dev/null | wc -l)"
 '
+
+echo
+echo "=== 6. record what this stage produced"
+sh "$REPO/env/scripts/bnk-receipt.sh" write bake "build_id=$BID" "tag=$OUT" \
+                                      "programs=$(ls "$CTX"/shields/*.bpf.o | wc -l)"
 
 echo
 echo "  Next: bnk-ship-image.sh verify $OUT 'shape disagrees with the'"

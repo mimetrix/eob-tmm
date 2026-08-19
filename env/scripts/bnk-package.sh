@@ -74,4 +74,18 @@ echo "=== 3. VERIFY FRESHNESS --- does the packaged binary contain what was just
 sh "$HERE/bnk-check-deb-contains-substrate.sh" "$TMM/docker_build/DEBS/amd64" "$SRC"
 
 echo
+echo "=== 4. record what this stage produced"
+# THE RECEIPT. The next stage refuses unless the DEBs it reads carry this build id, so
+# skipping this stage --- or baking from a different one --- is a hard error rather than an
+# omission nobody mentions. bnk-preflight.sh's header is the reason this exists: four correct
+# guards sat beside the path on 2026-08-17 and every error happened anyway.
+RDEB=$(ls "$TMM"/docker_build/DEBS/amd64/tmm_*.deb 2>/dev/null | head -1)
+RT=$(mktemp -d); trap 'rm -rf "$RT"' EXIT
+dpkg-deb -x "$RDEB" "$RT"
+PKGID=$(python3 "$SRC/ls_buildid.py" "$(readlink -f "$RT/usr/bin/tmm.default")")
+COMMIT=$(cd "$SRC/.." 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo unknown)
+sh "$HERE/bnk-receipt.sh" write package "build_id=$PKGID" "commit=$COMMIT" \
+                                       "deb=$(basename "$RDEB")"
+
+echo
 echo "  Next: bnk-bake-tools.sh   (it regenerates both indexes from these DEBs)"

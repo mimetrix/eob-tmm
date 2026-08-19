@@ -18,14 +18,30 @@
 # version-stamped packaging chain: the build succeeds, the artifact is stale, and every
 # downstream measurement is taken against the wrong binary.
 #
-# HOW IT CHECKS, without naming a single symbol. Every non-static function defined in the
-# substrate's .c files must appear in the packaged DEBUGINFO binary's symbol table. The list
-# comes from reading the sources, so adding a file needs no edit here; a file that was added
-# and never packaged fails, and so does a whole packaging chain that did not run.
+# TWO CHECKS, because they catch different faults and neither subsumes the other.
 #
-# The debuginfo package is what carries symbols --- the runtime binary is stripped, which is
-# why `nm` on it returns nothing and why an earlier attempt to check this with `strings` inside
-# the container was worthless (strings is absent there and silently returns nothing).
+#   A. THE DEB IS NEWER THAN THE SOURCES. Cheap, and it catches the stale chain directly: if
+#      the newest substrate source is younger than the DEB, packaging did not see it.
+#
+#      NOT a build-id comparison against the linked binary, and this is worth stating because
+#      it was the first design and it was wrong. TMM's build id IS content-derived (verified:
+#      74ed5caf -> aef8cac4 across a substrate change), so comparing the DEB against
+#      obj_x86_64.no_pgo/tmm.no_pgo looks exact. It is not: `make container` runs rpmbuild,
+#      which recompiles from a source tarball inside the toolchain container, so a legitimate
+#      package carries a DIFFERENT id from the one make linked --- measured, aef8cac4 linked
+#      versus 03c6f0e0 packaged, both containing the change. A check requiring equality would
+#      reject every correct package. The ids are printed, because seeing both is useful, but
+#      difference is not a failure.
+#
+#   B. EVERY NON-STATIC SUBSTRATE FUNCTION IS PRESENT. The real gate, and the one that would
+#      have caught 2026-08-19 on its own: the stale DEB had no ls_ctx_reg_lookup. It also
+#      catches a fault A cannot see --- a source file added without a filelist entry is never
+#      compiled, so the DEB is newer than the sources and the feature is simply absent.
+#      The function names are read from the sources, so adding a file needs no edit here.
+#
+# The debuginfo package is where symbols live --- the runtime binary is stripped, which is why
+# `nm` on it returns nothing, and why an earlier attempt to check this with `strings` inside the
+# container proved nothing at all: strings is absent there and silently returns nothing.
 set -e
 
 DEBS="${1:-$HOME/code/tmm/docker_build/DEBS/amd64}"
@@ -55,6 +71,33 @@ for f in $(find "$TMP" -type f -size +10M 2>/dev/null); do
 done
 [ -n "$DB" ] || fail "no debug binary in the debuginfo package matches the shipped build id $WANT"
 echo "  debuginfo : $(basename "$DB")  (build $WANT)"
+
+# --- CHECK A: is the DEB newer than the newest substrate source? ---------------------------
+NEWEST=$(ls -t "$SRC"/ls_*.c "$SRC"/ls_*.h 2>/dev/null | head -1)
+if [ -n "$NEWEST" ]; then
+    echo "  newest source : $(basename "$NEWEST")  $(stat -c%y "$NEWEST" | cut -c1-19)"
+    echo "  runtime DEB   : $(stat -c%y "$RDEB" | cut -c1-19)"
+    if [ "$NEWEST" -nt "$RDEB" ]; then
+        fail "A SUBSTRATE SOURCE IS NEWER THAN THE PACKAGE.
+
+    $NEWEST
+    is younger than
+    $RDEB
+
+    Packaging did not see it. The version-stamped chain went stale --- see the header of
+    bnk-package.sh --- so make container repackaged a previous binary and exited 0.
+    Run bnk-package.sh, which clears the chain first."
+    fi
+    echo "  ok --- the package is newer than every substrate source"
+fi
+
+# The linked binary's id, for information only. It DIFFERS from the packaged one on a normal
+# build, because rpmbuild recompiles inside the toolchain container. See the header.
+LINKED="${LINKED:-$HOME/code/tmm/src/compile/obj_x86_64.no_pgo/tmm.no_pgo}"
+if [ -f "$LINKED" ]; then
+    echo "  linked id     : $(python3 "$SRC/ls_buildid.py" "$LINKED")  (informational)"
+    echo "  packaged id   : $WANT"
+fi
 
 # Non-static function definitions in the substrate's .c files: a line starting at column 1
 # with an identifier followed by '(' , where the PREVIOUS line is the return type on its own
@@ -104,3 +147,6 @@ if [ "$NMISS" -ne 0 ]; then
     nothing. That has happened here before."
 fi
 echo "  MATCH --- the packaged binary contains every non-static substrate function"
+echo
+echo "  Both checks passed: the package is newer than every substrate source (A), and it"
+echo "  contains every substrate function the sources define (B)."
