@@ -73,6 +73,9 @@ OFF_CTX_ABI = 16 + 105
 CTX_ABI_VERSION = 3
 
 OP_LOAD, OP_SET_MODE, OP_STATUS, OP_REVOKE = 1, 2, 3, 4
+# DEVELOPMENT ops, deliberately far from the real ones. A control plane would not expose
+# "benchmark this program" on the load path, and the numbering says so.
+OP_BENCH = 0x1001
 OP_ARM, OP_DISARM = 0x1003, 0x1004
 
 HOOK_INDEX = os.environ.get("LS_HOOK_INDEX", "/usr/share/ls/hook-index.tsv")
@@ -175,6 +178,27 @@ def _note_build_id(note):
         if i >= 0 and i + 16 + dsz <= len(note):
             return note[i + 16: i + 16 + dsz].hex()
     return None
+
+
+def read_program(path):
+    """The bytes of a .bpf.o, or a clear refusal.
+
+    open(path, "rb") unguarded gave a Python traceback for a path typo --- which reads as "the
+    tool is broken" rather than "you named a file that is not there". Same reasoning as the
+    argument checks above; a traceback is never the right answer to a user error.
+    """
+    try:
+        with open(path, "rb") as f:
+            blob = f.read()
+    except OSError as exc:
+        sys.exit("*** cannot read %r: %s\n"
+                 "    This wants a compiled and verified object --- clang -O2 -target bpf, then\n"
+                 "    PREVAIL. The image carries some at /usr/share/ls/*.bpf.o." % (path, exc.strerror))
+    if not blob:
+        sys.exit("*** %r is empty." % path)
+    if blob[:4] != b"\x7fELF":
+        sys.exit("*** %r is not an ELF object (no \\x7fELF magic). Did you pass the .bpf.c?" % path)
+    return blob
 
 
 def elf_fentry_hook(blob):
@@ -400,12 +424,18 @@ def sock():
     return _SOCK
 
 
-def msg(op, slot=0, mode=0, hook=b"", prog=b""):
+def msg(op, slot=0, mode=0, hook=b"", prog=b"", epoch=None):
     """Build one shield_msg. Zero-filled: every field this op does not use must
-    read as zero, not as residue from whatever was in the buffer before."""
+    read as zero, not as residue from whatever was in the buffer before.
+
+    `epoch` OVERRIDES the slot in that field, and the field is genuinely overloaded: the
+    struct calls it the replay guard, the load and status ops carry the SLOT in it, and the
+    bench op carries an ITERATION COUNT. Passing an iteration count as `slot=` would work and
+    would read as a lie at the call site, so the alternative name is spelled out here rather
+    than left to a comment beside each caller."""
     b = bytearray(HDR)
     struct.pack_into("<I", b, OFF_OP, op)
-    struct.pack_into("<I", b, OFF_EPOCH, slot)
+    struct.pack_into("<I", b, OFF_EPOCH, slot if epoch is None else epoch)
     struct.pack_into("<I", b, OFF_MODE, mode)
     struct.pack_into("<I", b, OFF_PROGLEN, len(prog))
     b[OFF_CTX_ABI] = CTX_ABI_VERSION
@@ -463,6 +493,8 @@ _ARGS = {
     "status":  (1, 1, "status <slot>"),
     "mode":    (2, 2, "mode <slot> <1|2>"),
     "revoke":  (1, 1, "revoke <slot>"),
+    "bench":   (1, 3, "bench <file.bpf.o> [iters] [hook]   # measure, discard, touch no slot;\n"
+                      "                                     min is the number to quote"),
 }
 
 
@@ -491,7 +523,7 @@ def _check_args(cmd, rest):
                  "    whatever is at that address instead." % (rest[0], usage))
     # A slot where a slot is expected. int() on a symbol name raises ValueError, which is a
     # traceback again.
-    if cmd in ("arm", "load", "status", "mode", "revoke"):
+    if cmd in ("arm", "load", "status", "mode", "revoke"):    # not bench: file comes first
         try:
             int(rest[0])
         except ValueError:
@@ -552,8 +584,7 @@ def main():
     elif cmd == "load":
         slot, path = int(a[1]), a[2]
         mode = int(a[3]) if len(a) > 3 else 2
-        with open(path, "rb") as f:
-            prog = f.read()
+        prog = read_program(path)
         # The hook name becomes "fentry/<hook>", the section uBPF selects by. It must match
         # what the program was compiled with or the load is refused (finding O14 --- section
         # and function are two separate identities).
@@ -580,6 +611,28 @@ def main():
         print(send(msg(OP_SET_MODE, slot=int(a[1]), mode=int(a[2]))))
     elif cmd == "revoke":
         print(send(msg(OP_REVOKE, slot=int(a[1]))))
+    elif cmd == "bench":
+        # THE OP EXISTED IN TMM AND HAD NO CLIENT. Every previous bench run was driven by a
+        # loader typed inline and thrown away --- the exact practice this file exists to
+        # replace, and the reason its results were never reproducible.
+        #
+        # `epoch` carries the iteration count. That is a reuse of a protocol field rather than
+        # a new one on purpose: these 0x100x ops are DEVELOPMENT ops and must not grow the
+        # wire format a real control plane would have to implement.
+        #
+        # QUOTE THE MIN. The mean is 2-3x it even on an idle box with no traffic, because a
+        # single rdtsc pair spanning a context switch dominates the total --- the same effect
+        # that makes the armed-hook counter mean unusable. TMM refuses an iteration count above
+        # its ceiling rather than clamping, since bench runs on a TMM thread inside a poll
+        # iteration and the count is a stall budget.
+        path = a[1]
+        iters = int(a[2]) if len(a) > 2 else 10000
+        prog = read_program(path)
+        hook = a[3].encode() if len(a) > 3 else elf_fentry_hook(prog)
+        if not hook:
+            sys.exit("*** %s carries no fentry/<hook> section, so there is nothing to identify\n"
+                     "    the program against. Name the hook as the 3rd argument." % path)
+        print(send(msg(OP_BENCH, slot=0, mode=0, hook=hook, prog=prog, epoch=iters)))
     else:
         sys.exit("unknown command %r" % cmd)
 
