@@ -499,8 +499,23 @@ readelf -S "$B" | grep -c '\.debug_'               # DWARF present?
 **The toolchain container has no clang.** Compile shield programs on the *host*, which
 has clang 18 with `bpf`/`bpfel`/`bpfeb` targets:
 
+**Do not run this by hand.** `env/scripts/bnk-build-programs.sh` is the stage:
+
 ```bash
-clang -O2 -g -target bpf -c shield.bpf.c -o shield.bpf.o
+env/scripts/bnk-build-programs.sh $HOME/lstools/shields
+```
+
+It compiles every `substrate/shields/*.bpf.c`, verifies each with PREVAIL, emits **only** what
+verifies, and asserts the expected verdict in both directions — programs named `reject_*` must
+be refused, and a build where one of them passes fails the stage, because that means the
+verifier stopped catching what the program was written to trip. It also reads each object's own
+`fentry/<hook>` section rather than a table beside it, so a program cannot be baked against a
+different function than the one it was compiled for. Current set: 16 verified, 2 refused.
+
+The single-file invocation, for reference when debugging one program:
+
+```bash
+clang -O2 -g -target bpf -I substrate -c shield.bpf.c -o shield.bpf.o
 ```
 
 Compile them **on this box, against `ctx` headers from `~/code/tmm`** — a shield must

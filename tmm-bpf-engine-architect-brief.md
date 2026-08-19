@@ -85,19 +85,34 @@ linker-set mechanism `urlcat`, `pem_lib` and `license_pgo_gen` use — rather th
 from a line inserted into TMM's own logic. That keeps the diff reviewable and confines merge
 exposure to the four configuration files above. It does **not** mean the tree is untouched.
 
-**One line in `Makefile.overrides` warrants review:**
+**The one line in `Makefile.overrides`, and the defect it used to carry:**
 
 ```make
-CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0
+CFLAGS_OPTIMIZE += -fpatchable-function-entry=5,0
 ```
 
-The assignment is `:=`, which replaces rather than appends. `Makefile.inc:96-100` selects
-`-Os` when `VADC_TRIAL=yes` and `-O2` otherwise, so this override silently forces a VADC
-trial build from `-Os` to `-O2`. That is a change in build behaviour beyond adding a flag.
-The correct form is `+=`, with the optimisation level left as the tree selected it.
+It was written `:=  -O2 -fpatchable-function-entry=5,0`. That assignment replaces rather than
+appends, and `Makefile.inc:96-100` selects `-Os` when `VADC_TRIAL=yes` and `-O2` otherwise —
+so the override silently forced a VADC trial build from `-Os` to `-O2`, a change in build
+behaviour beyond adding a flag. **Corrected to `+=` on 2026-08-18** and verified by expanding
+both configurations: the default build's flags are unchanged, and `VADC_TRIAL=yes` now keeps
+`-Os`. The optimisation level is left as the tree selected it, which is the property that
+matters — this file adds a flag and decides nothing else.
 
 **Size cost of the padding: 0.182%** of the binary — 74,048 functions at five bytes. A pad
 costs nothing at run time until it is armed.
+
+**What the build gains beyond that flag: three generated files and one container layer.**
+Arming by name needs to know where a function is, whether its entry can be patched, and what
+it takes as arguments — none of which can be worked out at arming time on a stripped binary.
+So the build emits a hook index, a full hook map, and a signature index, each keyed to the
+binary's build id and each refused against any other. They are generated from the **packaged**
+binary rather than the build tree's, because packaging re-links and every address moves;
+since the packaged binary only exists after `make container`, they cannot be part of the
+runtime image build and are layered on top of it. That is also why no F5 build stage is
+replaced or reordered. It costs 2m9s of build time and nothing at run time.
+[`build-pipeline.md`](build-pipeline.md) is the whole of it — stages, gates, costs, and the
+six things it still does not do.
 
 **One earlier integration did edit F5 source, and was rolled back.** A designed-in HTTP
 tracepoint added call sites to `http.c` and `http1x.c`. It worked and was removed: every

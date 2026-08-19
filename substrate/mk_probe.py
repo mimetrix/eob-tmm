@@ -251,12 +251,107 @@ def generate(fn, params, fields, dropped, used):
     return "\n".join(L) + "\n"
 
 
+SIG_VERSION = 1
+
+
+# THE CANONICAL BUILD-ID READER, not a local copy. There were six independent copies of this
+# parse in the repo and the one written here read a TRUNCATED id --- see substrate/ls_buildid.py
+# for why (the note straddles two PT_NOTE segments in the PGO debug build). Importing beats
+# copying for exactly the reason six copies demonstrate.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ls_buildid import build_id                                     # noqa: E402
+
+
+def build_index(dbg, out):
+    """ONE DWARF walk, every function's signature, written to a flat file.
+
+    WHY THIS IS A BUILD STEP RATHER THAN A LOOKUP. Finding one function costs a walk of every
+    compilation unit in a 97 MB debuginfo --- measured at 1m34s. That is fine once and useless
+    interactively, and the walk is the same whether you want one signature or all of them. So
+    it happens at build time, alongside the hook index, and every later lookup is a dictionary
+    hit.
+
+    Keyed to the build id, because a signature index from another build describes different
+    parameter layouts for the same names --- the same failure mode the hook index's build-id
+    gate exists to prevent, one level up.
+    """
+    bid = build_id(dbg)
+    n_fn = n_par = 0
+    seen = {}
+    with open(dbg, "rb") as f:
+        elf = ELFFile(f)
+        if not elf.has_dwarf_info():
+            sys.exit("*** no DWARF in %s" % dbg)
+        dw = elf.get_dwarf_info()
+        for cu in dw.iter_CUs():
+            for die in cu.iter_DIEs():
+                if die.tag != "DW_TAG_subprogram":
+                    continue
+                nm = die_name(die)
+                if not nm:
+                    continue
+                params = []
+                for child in die.iter_children():
+                    if child.tag != "DW_TAG_formal_parameter":
+                        continue
+                    ref = child.attributes.get("DW_AT_type")
+                    t = cu.get_DIE_from_refaddr(ref.value + cu.cu_offset) if ref else None
+                    kind, detail = resolve(cu, t)
+                    params.append((die_name(child) or "", kind, detail))
+                if not params:
+                    continue
+                # PREFER THE DEFINITION. A declaration has the types but no parameter names;
+                # both DIEs exist for an external function, and taking whichever came first
+                # would give arg0..argN for half the tree.
+                score = (1 if "DW_AT_low_pc" in die.attributes else 0,
+                         sum(1 for q in params if q[0]))
+                if nm not in seen or score > seen[nm][0]:
+                    seen[nm] = (score, params)
+    with open(out, "w") as fh:
+        fh.write("#ls-sig-index\t%d\n" % SIG_VERSION)
+        fh.write("#build_id\t%s\n" % bid)
+        fh.write("#name\tnparams\tname:kind:detail|...\n")
+        for nm in sorted(seen):
+            params = seen[nm][1]
+            n_fn += 1
+            n_par += len(params)
+            enc = "|".join("%s:%s:%s" % (a.replace(":", "_"), b, c.replace(":", "_").replace("|", "_"))
+                           for a, b, c in params)
+            fh.write("%s\t%d\t%s\n" % (nm, len(params), enc))
+    print("  build id  : %s" % bid)
+    print("  functions : %d with at least one parameter" % n_fn)
+    print("  parameters: %d" % n_par)
+    print("  written   : %s (%d bytes)" % (out, os.path.getsize(out)))
+
+
+def load_index(path, want):
+    """-> [(name, kind, detail), ...] for `want`, or None. A dictionary hit, not a walk."""
+    with open(path) as f:
+        for line in f:
+            if line.startswith("#"):
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if len(parts) < 3 or parts[0] != want:
+                continue
+            out = []
+            for tok in parts[2].split("|"):
+                bits = tok.split(":", 2)
+                if len(bits) == 3:
+                    out.append((bits[0] or None, bits[1], bits[2]))
+            return out
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--debuginfo")
     ap.add_argument("--debs")
-    ap.add_argument("--function", required=True)
+    ap.add_argument("--function")
     ap.add_argument("--describe", action="store_true")
+    ap.add_argument("--build-index", metavar="OUT",
+                    help="walk DWARF once and write a signature index for EVERY function")
+    ap.add_argument("--index", metavar="FILE",
+                    help="use a prebuilt signature index instead of walking DWARF")
     ap.add_argument("-o", "--out")
     a = ap.parse_args()
 
@@ -269,15 +364,80 @@ def main():
         if not deb:
             sys.exit("*** no tmm-debuginfo_*.deb under %s" % a.debs)
         subprocess.run(["dpkg-deb", "-x", deb[0], tmp], check=True)
-        cands = [os.path.join(r, f) for r, _, fs in os.walk(tmp) for f in fs
-                 if os.path.getsize(os.path.join(r, f)) > 10 * 1024 * 1024]
-        if not cands:
-            sys.exit("*** no large file in the debuginfo package")
-        dbg = cands[0]
-    if not dbg:
-        sys.exit("*** need --debuginfo or --debs")
 
-    params = signature(dbg, a.function)
+        # PICK THE DEBUG FILE BY BUILD ID, NOT BY SIZE. This package ships TWO debug
+        # binaries with DIFFERENT build ids:
+        #
+        #   usr/lib/debug/usr/bin/tmm64.debug          97 MB   PGO build
+        #   usr/lib/debug/usr/bin/tmm64.no_pgo.debug  146 MB   what /usr/bin/tmm resolves to
+        #
+        # The first version of this code took the first file over 10 MB in os.walk order and
+        # got tmm64.debug --- the one TMM does not run. Both are builds of the same source, so
+        # the generated probes verified clean and read plausible fields; PGO changes inlining,
+        # so which functions have parameter DIEs at all differs between them. A signature index
+        # from the wrong build is the same class of fault as a stale address: correct-looking
+        # and wrong, with nothing in the output to say so.
+        #
+        # The runtime DEB names the binary that ships, so its build id is the selector. Nothing
+        # is inferred from a filename, because `no_pgo` being the shipped one is a property of
+        # this build's configuration, not a rule.
+        rdeb = glob.glob(os.path.join(a.debs, "**", "tmm_*.deb"), recursive=True)
+        if not rdeb:
+            sys.exit("*** no tmm_*.deb under %s. Without the runtime package there is nothing\n"
+                     "    to identify WHICH of the debuginfo package's debug binaries ships."
+                     % a.debs)
+        rtmp = tempfile.mkdtemp(prefix="mkprobe.rt.")
+        subprocess.run(["dpkg-deb", "-x", rdeb[0], rtmp], check=True)
+        rbin = os.path.join(rtmp, "usr/bin/tmm.default")
+        if not os.path.exists(rbin):
+            sys.exit("*** no usr/bin/tmm.default in %s" % os.path.basename(rdeb[0]))
+        want = build_id(os.path.realpath(rbin))
+
+        cands = []
+        for r, _, fs in os.walk(tmp):
+            for f in fs:
+                q = os.path.join(r, f)
+                # islink FIRST: the package carries .build-id/ symlinks whose targets are
+                # relative to the install root, so they dangle under an extraction dir and
+                # getsize raises FileNotFoundError. That is what it did.
+                if os.path.islink(q) or os.path.getsize(q) < 10 * 1024 * 1024:
+                    continue
+                try:
+                    cands.append((build_id(q), q))
+                except (OSError, ValueError):
+                    continue
+        match = [q for b, q in cands if b == want]
+        if not match:
+            sys.exit("*** no debug binary in %s matches the shipped binary's build id %s.\n"
+                     "    Found: %s\n"
+                     "    The DEB pair is mismatched --- do not generate an index from it."
+                     % (os.path.basename(deb[0]), want,
+                        ", ".join("%s=%s" % (os.path.basename(q), b[:12]) for b, q in cands)
+                        or "none"))
+        if len(match) > 1:
+            sys.exit("*** %d debug binaries share build id %s; refusing to guess." % (len(match), want))
+        dbg = match[0]
+        if len(cands) > 1:
+            print("  debuginfo : %s  (of %d candidates, selected by build id %s)"
+                  % (os.path.basename(dbg), len(cands), want[:12]))
+    if not dbg and not a.index:
+        sys.exit("*** need --debuginfo, --debs, or a prebuilt --index")
+
+    if a.build_index:
+        build_index(dbg, a.build_index)
+        return
+    if not a.function:
+        sys.exit("*** need --function (or --build-index)")
+
+    params = None
+    if a.index:
+        params = load_index(a.index, a.function)
+        if params is None:
+            sys.exit("*** %r is not in %s. Either it has no parameters, or the index is from\n"
+                     "    a different build --- check its #build_id header."
+                     % (a.function, a.index))
+    if params is None:
+        params = signature(dbg, a.function)
     print("  %s(" % a.function)
     for i, (nm, kind, detail) in enumerate(params):
         note = ""

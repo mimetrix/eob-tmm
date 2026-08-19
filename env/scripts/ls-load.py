@@ -92,8 +92,48 @@ def elf_build_id(path):
             return None
         if e[4] != 2:                              # ELFCLASS64 only
             return None
+
+        # SECTION FIRST, SEGMENT AS FALLBACK, and the order is the whole point.
+        #
+        # This used to walk PT_NOTE program headers only. On the binary that ships it gives
+        # the right answer; on the PGO debug build in the same DEB pair it silently returns a
+        # 16-BYTE id where readelf reports 20, because that binary declares two adjacent
+        # PT_NOTE segments and the build-id note STRADDLES them --- the first segment's
+        # p_filesz cuts the descriptor after 16 bytes and the last 4 live in the next segment.
+        #
+        # `.note.gnu.build-id` as a SECTION covers the whole note regardless of where a
+        # segment boundary fell. substrate/ls_buildid.py is the canonical implementation and
+        # substrate/check_ls_load.py asserts this copy agrees with it on real binaries --- the
+        # copy exists because this file must run standalone inside a container with no readelf,
+        # not because two implementations are wanted.
+        shoff, = struct.unpack_from("<Q", e, 0x28)
+        shentsize, shnum = struct.unpack_from("<HH", e, 0x3a)
+        shstrndx, = struct.unpack_from("<H", e, 0x3e)
+        if shoff and shnum and shstrndx < shnum:
+            f.seek(shoff + shstrndx * shentsize)
+            sh = f.read(shentsize)
+            stroff, = struct.unpack_from("<Q", sh, 0x18)
+            strsz, = struct.unpack_from("<Q", sh, 0x20)
+            f.seek(stroff)
+            strs = f.read(strsz)
+            for i in range(shnum):
+                f.seek(shoff + i * shentsize)
+                sh = f.read(shentsize)
+                nmoff, = struct.unpack_from("<I", sh, 0)
+                if strs[nmoff:strs.find(b"\x00", nmoff)] != b".note.gnu.build-id":
+                    continue
+                off, = struct.unpack_from("<Q", sh, 0x18)
+                sz, = struct.unpack_from("<Q", sh, 0x20)
+                f.seek(off)
+                got = _note_build_id(f.read(sz))
+                if got:
+                    return got
+
+        # No section headers (fully stripped). Coalesce ADJACENT PT_NOTE segments so a
+        # straddling note is whole before it is looked for.
         phoff, = struct.unpack_from("<Q", e, 0x20)
         phentsize, phnum = struct.unpack_from("<HH", e, 0x36)
+        spans = []
         for i in range(phnum):
             f.seek(phoff + i * phentsize)
             ph = f.read(phentsize)
@@ -102,16 +142,38 @@ def elf_build_id(path):
                 continue
             off, = struct.unpack_from("<Q", ph, 0x08)
             sz,  = struct.unpack_from("<Q", ph, 0x20)
+            spans.append((off, sz))
+        spans.sort()
+        merged = []
+        for off, sz in spans:
+            if merged and merged[-1][0] + merged[-1][1] == off:
+                merged[-1] = (merged[-1][0], merged[-1][1] + sz)
+            else:
+                merged.append((off, sz))
+        for off, sz in merged:
             f.seek(off)
-            note = f.read(sz)
-            j = 0
-            while j + 12 <= len(note):
-                nsz, dsz, ntype = struct.unpack_from("<III", note, j)
-                name = note[j + 12: j + 12 + nsz].rstrip(b"\x00")
-                doff = j + 12 + ((nsz + 3) & ~3)
-                if ntype == 3 and name == b"GNU":  # NT_GNU_BUILD_ID
-                    return note[doff: doff + dsz].hex()
-                j = doff + ((dsz + 3) & ~3)
+            got = _note_build_id(f.read(sz))
+            if got:
+                return got
+    return None
+
+
+def _note_build_id(note):
+    """First NT_GNU_BUILD_ID in a note blob as hex, or None.
+
+    A PATTERN SCAN rather than a note walk, because ALIGNMENT IS PER-NOTE:
+    .note.gnu.property pads its name to 8 bytes on 64-bit ELF and .note.gnu.build-id pads to
+    4, in the same PT_NOTE. Any single stride desynchronises --- 4 skips past the build-id
+    header, 8 mis-locates its descriptor by 4 bytes. A build-id note header is 16 determined
+    bytes (namesz=4, descsz, type=3, "GNU\\0"), so searching for it needs no assumption about
+    what came before. Kept byte-identical in behaviour to substrate/ls_buildid.py, which
+    substrate/check_ls_load.py asserts.
+    """
+    for dsz in (20, 16, 8):
+        pat = struct.pack("<III", 4, dsz, 3) + b"GNU\x00"
+        i = note.find(pat)
+        if i >= 0 and i + 16 + dsz <= len(note):
+            return note[i + 16: i + 16 + dsz].hex()
     return None
 
 

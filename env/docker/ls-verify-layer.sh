@@ -14,9 +14,12 @@
 set -e
 
 IDX_FILE=/usr/share/ls/hook-index.tsv
+SIG_FILE=/usr/share/ls/signatures.tsv
 
 test -s "$IDX_FILE"       || { echo "*** $IDX_FILE missing or empty"; exit 1; }
 grep -q '^#build_id' "$IDX_FILE" || { echo "*** index carries no #build_id header"; exit 1; }
+test -s "$SIG_FILE"       || { echo "*** $SIG_FILE missing or empty"; exit 1; }
+grep -q '^#build_id' "$SIG_FILE" || { echo "*** signature index carries no #build_id header"; exit 1; }
 test -x /usr/bin/ls_drain || { echo "*** /usr/bin/ls_drain missing or not executable"; exit 1; }
 test -f /usr/bin/ls-load.py || { echo "*** /usr/bin/ls-load.py missing"; exit 1; }
 ls /usr/share/ls/*.bpf.o >/dev/null 2>&1 || { echo "*** no verified programs baked in"; exit 1; }
@@ -29,11 +32,24 @@ case "$R" in
 esac
 
 IDX=$(awk -F'\t' '/^#build_id/{print $2}' "$IDX_FILE")
+SIG=$(awk -F'\t' '/^#build_id/{print $2}' "$SIG_FILE")
 LIVE=$(python3 /usr/share/ls/ls_buildid.py "$R")
 
 echo "  tmm resolves to : $R"
 echo "  index build id  : $IDX"
+echo "  sig index bid   : $SIG"
 echo "  binary build id : $LIVE"
+
+# BOTH indexes, separately. They are produced by two different tools from the same DEB
+# pair, so checking one and assuming the other is how a stale file survives. A signature
+# index from another build gives the right parameter NAMES with the wrong TYPES for
+# anything whose struct changed --- a probe that verifies clean and reads the wrong bytes.
+if [ "$SIG" != "$LIVE" ]; then
+    echo "*** SIGNATURE INDEX MISMATCH. $SIG describes a different binary than this"
+    echo "    image runs. Generated probes would read the wrong offsets and still pass"
+    echo "    verification, because PREVAIL checks bounds, not meaning."
+    exit 1
+fi
 
 if [ "$IDX" != "$LIVE" ]; then
     echo "*** BUILD ID MISMATCH. The index describes a different binary than this"

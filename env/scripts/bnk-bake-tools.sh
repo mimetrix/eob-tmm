@@ -52,6 +52,35 @@ echo "  build id  : $BID"
 echo "  symbols   : $N"
 
 echo
+echo "=== 2b. generate the SIGNATURE index --- one DWARF walk for every function"
+# WHY THIS IS A BUILD STEP. mk_probe.py needs one function's parameter names and types to
+# generate a probe. Finding them means walking every compilation unit of a 97 MB debuginfo,
+# measured at 1m54s --- and the walk costs the same whether you want one signature or all
+# 66,905 of them. So it happens once, here, and every later lookup is 0.10s.
+#
+# That is the difference between "name a function, get a running probe" and "name a
+# function, wait two minutes". The second one cannot be demonstrated and would not be used.
+#
+# SEPARATE FROM hook-index.tsv on purpose. They answer different questions about the same
+# binary and either can be useful without the other:
+#   hook-index.tsv  CAN this name be armed?   -> address, pad shape, relocatability
+#   signatures.tsv  WHAT does it take?        -> parameter names, types, kinds
+# A function can be in one and not the other: a parameterless function has no signature
+# entry, and an inlined-away function has a signature but no address.
+python3 "$REPO/substrate/mk_probe.py" --debs "$DEBS" \
+        --build-index "$CTX/signatures.tsv" | sed 's/^/  /'
+SBID=$(awk -F'\t' '/^#build_id/{print $2}' "$CTX/signatures.tsv")
+[ -n "$SBID" ] || fail "the signature index carries no build id"
+# BOTH indexes must describe the SAME binary. They are generated from the same DEB pair by
+# two different tools, so a mismatch means one of them read a stale file --- exactly the
+# failure the runtime build-id gate catches one step too late.
+[ "$SBID" = "$BID" ] || fail "index build ids disagree:
+    hook-index.tsv  $BID
+    signatures.tsv  $SBID
+    Two tools read what should be one binary and got different answers. Do not bake this."
+echo "  build id  : $SBID (matches the hook index)"
+
+echo
 echo "=== 3. assemble the build context"
 cp "$REPO/env/scripts/ls-load.py" "$CTX/ls-load.py"
 # REBUILD ls_drain FROM SOURCE, every time. Checking only that it EXISTED shipped a stale
@@ -82,7 +111,10 @@ ls "$CTX"/shields/*.bpf.o >/dev/null 2>&1 || fail "no verified programs in $CTX/
 # reasons to stop.
 cp "$REPO/env/docker/Dockerfile.ls-tools" "$CTX/Dockerfile"
 cp "$REPO/env/docker/ls-verify-layer.sh" "$CTX/ls-verify-layer.sh"
-cp "$REPO/env/docker/ls_buildid.py"      "$CTX/ls_buildid.py"
+# FROM substrate/, not env/docker/. There was a second copy of the build-id reader under
+# env/docker/ and it carried the segment-only parse that truncates a 20-byte id to 16 on the
+# PGO debug build. One file, copied here, is the fix --- see substrate/ls_buildid.py.
+cp "$REPO/substrate/ls_buildid.py"       "$CTX/ls_buildid.py"
 grep -q "ls-verify-layer.sh" "$CTX/Dockerfile" || fail "the Dockerfile at
     $REPO/env/docker/Dockerfile.ls-tools does not reference ls-verify-layer.sh.
     It is stale, or its assertion was removed. Either way the build-id check would not
@@ -131,6 +163,12 @@ PY
     echo "      The index describes a different binary than the one this image runs."
     exit 1
   fi
+  SIG=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/signatures.tsv)
+  if [ "$SIG" != "$LIVE" ]; then
+    echo "  *** signatures.tsv build id $SIG describes a different binary."
+    exit 1
+  fi
+  echo "  signatures      : $(grep -vc "^#" /usr/share/ls/signatures.tsv) functions, build id matches"
   echo "  programs        : $(ls /usr/share/ls/*.bpf.o 2>/dev/null | wc -l)"
 '
 

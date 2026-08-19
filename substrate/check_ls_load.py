@@ -24,6 +24,7 @@ hand-written in the first place.
 """
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -181,6 +182,159 @@ def main():
     # ambiguity rather than the index being rejected wholesale.
     assert m.resolve_hook("only_one") == "0xcccc"; n += 1
     print("  ok    an ambiguous name REFUSES; a unique one in the same index resolves")
+
+    # --- 7. THE BUILD-ID READER: TWO COPIES MUST AGREE, AND BOTH WITH readelf -------
+    # ls-load.py carries its own ELF note parser because it runs inside a container with no
+    # readelf, no objdump and no nm. That copy is forced; two DIFFERENT answers are not.
+    #
+    # The copy it replaced walked PT_NOTE segments only, and on TMM's PGO debug build that
+    # returns 16 bytes where readelf reports 20 --- two adjacent PT_NOTE segments with the
+    # build-id note straddling the boundary. Nothing complained, because the only thing it
+    # was ever compared against was another copy of itself.
+    #
+    # So: compare against substrate/ls_buildid.py AND against readelf, on whatever real
+    # binaries this machine has. readelf is the referee; without it the two copies could
+    # agree on the same wrong answer, which is the situation this replaces.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import ls_buildid
+    import shutil
+    import subprocess
+
+    readelf = shutil.which("readelf")
+    cands = [q for q in ("/bin/ls", "/usr/bin/python3", "/bin/sh", "/usr/bin/env",
+                         os.path.realpath(sys.executable))
+             if os.path.isfile(q)]
+    seen = set()
+    checked = 0
+    for q in cands:
+        q = os.path.realpath(q)
+        if q in seen:
+            continue
+        seen.add(q)
+        a = m.elf_build_id(q)
+        b = ls_buildid.build_id(q)
+        assert a == b, ("the two build-id readers disagree on %s:\n"
+                        "    ls-load.py     %s\n"
+                        "    ls_buildid.py  %s" % (q, a, b))
+        n += 1
+        if readelf:
+            out = subprocess.run([readelf, "-n", q], capture_output=True, text=True).stdout
+            ref = re.search(r"Build ID:\s*([0-9a-f]+)", out)
+            if ref:
+                assert a == ref.group(1), ("both readers disagree with readelf on %s:\n"
+                                           "    readers  %s\n"
+                                           "    readelf  %s" % (q, a, ref.group(1)))
+                n += 1
+                checked += 1
+    assert seen, "no ELF binary to check the build-id readers against"
+    print("  ok    build-id readers agree on %d binaries%s"
+          % (len(seen), ", %d cross-checked against readelf" % checked if checked
+             else " (readelf absent --- NOT cross-checked)"))
+
+    # --- 8. THE TWO FAULTS, SYNTHESISED ------------------------------------------------
+    # Assertion 7 compares the readers on this machine's binaries and they all agree, which
+    # is exactly why the bug survived review: /bin/ls has one PT_NOTE and no property note,
+    # so it exercises neither fault. Both need a binary shaped like TMM's, so build two.
+    #
+    #   (a) THE STRADDLE --- what tmm64.debug actually does. Two ADJACENT PT_NOTE segments
+    #       with the build-id note crossing the boundary: segment one's p_filesz ends 16
+    #       bytes into a 20-byte descriptor. A per-segment reader returns those 16 bytes and
+    #       calls them the build id --- a 32-hex-character answer where readelf says 40. It
+    #       still discriminated builds, so nothing ever disagreed with it.
+    #
+    #   (b) PER-NOTE ALIGNMENT --- a .note.gnu.property note whose name IS padded to 8 bytes,
+    #       followed by a build-id note padded to 4, in one segment. No single stride walks
+    #       both: 4 skips past the build-id header, 8 mis-locates its descriptor by 4 bytes.
+    #       The first fix for (a) walked with one alignment and lost the id entirely, which
+    #       is why this case is here and not just (a).
+    #
+    # Neither file has section headers, so the section path cannot rescue either and it is
+    # the fallback under test.
+    import struct as _st
+
+    def synth(path, idhex, prop_pad, cut_back):
+        """A 2-PT_NOTE ELF. prop_pad: bytes of name padding in the property note (0 mirrors
+        the real binary, 4 makes it 8-aligned). cut_back: how many bytes of the build-id
+        descriptor land in the SECOND segment (0 = no straddle)."""
+        idb = bytes.fromhex(idhex)
+        prop = (_st.pack("<III", 4, 16, 5) + b"GNU\x00" + b"\x00" * prop_pad + b"\xaa" * 16)
+        bid = _st.pack("<III", 4, len(idb), 3) + b"GNU\x00" + idb
+        notes = prop + bid
+        cut = len(notes) - cut_back if cut_back else len(notes)
+        base, ehsize, pes = 0x1000, 64, 56
+        eh = bytearray(64)
+        eh[0:4] = b"\x7fELF"
+        eh[4], eh[5], eh[6] = 2, 1, 1                     # 64-bit, LSB, EV_CURRENT
+        _st.pack_into("<HH", eh, 0x10, 2, 0x3e)           # ET_EXEC, EM_X86_64
+        _st.pack_into("<I", eh, 0x14, 1)
+        _st.pack_into("<Q", eh, 0x20, ehsize)             # e_phoff
+        _st.pack_into("<Q", eh, 0x28, 0)                  # e_shoff --- NO section headers
+        _st.pack_into("<HH", eh, 0x36, pes, 2)
+        _st.pack_into("<HH", eh, 0x3a, 0, 0)
+        _st.pack_into("<H", eh, 0x3e, 0)
+        segs = [(base, cut, 8), (base + cut, len(notes) - cut, 4)]
+        phs = b""
+        for off, sz, align in segs:
+            ph = bytearray(pes)
+            _st.pack_into("<I", ph, 0x00, 4)              # PT_NOTE
+            _st.pack_into("<I", ph, 0x04, 4)              # PF_R
+            for o in (0x08, 0x10, 0x18):
+                _st.pack_into("<Q", ph, o, off)
+            _st.pack_into("<Q", ph, 0x20, sz)             # p_filesz --- where (a) truncates
+            _st.pack_into("<Q", ph, 0x28, sz)
+            _st.pack_into("<Q", ph, 0x30, align)
+            phs += bytes(ph)
+        with open(path, "wb") as fh:
+            fh.write(bytes(eh) + phs + b"\x00" * (base - ehsize - len(phs)) + notes)
+
+    def naive(path):
+        """The parse that shipped before this fix: per-segment, one 4-byte stride."""
+        with open(path, "rb") as fh:
+            e = fh.read(64)
+            phoff, = _st.unpack_from("<Q", e, 0x20)
+            pes_, pn = _st.unpack_from("<HH", e, 0x36)
+            for i in range(pn):
+                fh.seek(phoff + i * pes_)
+                ph = fh.read(pes_)
+                if _st.unpack_from("<I", ph, 0)[0] != 4:
+                    continue
+                off, = _st.unpack_from("<Q", ph, 0x08)
+                sz, = _st.unpack_from("<Q", ph, 0x20)
+                fh.seek(off)
+                nt = fh.read(sz)
+                j = 0
+                while j + 12 <= len(nt):
+                    ns, ds, t = _st.unpack_from("<III", nt, j)
+                    nm = nt[j + 12:j + 12 + ns].rstrip(b"\x00")
+                    d = j + 12 + ((ns + 3) & ~3)
+                    if t == 3 and nm == b"GNU":
+                        return nt[d:d + ds].hex()
+                    j = d + ((ds + 3) & ~3)
+        return None
+
+    want = "47a10fc43398caa9af9dddbd8bed82cec2cde196"
+    cases = (("(a) straddle, mirroring tmm64.debug", 0, 4),
+             ("(b) 8-aligned property note",         4, 0))
+    for label, prop_pad, cut_back in cases:
+        f = os.path.join(work, "synth_%d_%d.elf" % (prop_pad, cut_back))
+        synth(f, want, prop_pad, cut_back)
+        bad = naive(f)
+        # THE FILE MUST REPRODUCE THE FAULT. Without this the two asserts below would pass
+        # against a reader that is still broken, which is the whole failure mode being fixed.
+        assert bad != want, ("%s does not reproduce a fault --- the old parse got the right "
+                             "answer, so this case proves nothing" % label); n += 1
+        got_l = m.elf_build_id(f)
+        got_c = ls_buildid.build_id(f)
+        assert got_l == want, "%s: ls-load.py got %r, want %s" % (label, got_l, want); n += 1
+        assert got_c == want, "%s: ls_buildid.py got %r, want %s" % (label, got_c, want); n += 1
+        if readelf:
+            out = subprocess.run([readelf, "-n", f], capture_output=True, text=True).stdout
+            ref = re.search(r"Build ID:\s*([0-9a-f]+)", out)
+            if ref:
+                assert ref.group(1) == want, "%s: readelf disagrees" % label
+                n += 1
+        print("  ok    %-38s old parse: %-42s now: full 40 hex"
+              % (label, "%s (%d hex)" % (bad, len(bad or ""))))
 
     print("  ok    check_ls_load: %d assertions, 7 of them refusals" % n)
     return 0

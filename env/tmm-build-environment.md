@@ -498,10 +498,13 @@ sets `TOPDIR := ../..`, so the file belongs at the repo root:
 
 ```make
 # Makefile.overrides
-CFLAGS_OPTIMIZE := -O2 -fpatchable-function-entry=5,0
+CFLAGS_OPTIMIZE += -fpatchable-function-entry=5,0
 ```
 
-That is the whole change. It matters that a supported hook exists, because the proposal
+That is the whole change. **Append, do not assign.** This was first written
+`:=  -O2 -fpatchable-function-entry=5,0`, which replaces the value `Makefile.inc:96-100` just
+selected — and that line picks `-Os` when `VADC_TRIAL=yes`. Assigning therefore forced a
+trial build to `-O2` as a side effect of adding a flag. Corrected 2026-08-18. It matters that a supported hook exists, because the proposal
 claims the mechanism needs no source modification, and here the *experiment* needs none
 either.
 
