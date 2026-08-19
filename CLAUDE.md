@@ -21,8 +21,12 @@ That is not licence to claim more than was shown. Three lines still hold:
   is not even reachable there (`prot_transfer_log_profile` has no Kubernetes CRD, and the caller
   guards the null), so "it stops the crash" has never been demonstrated end to end.
 - **Per-call hook cost is unmeasured.** The counter mean is dominated by preemption artifacts and the
-  bench op that would give a clean minimum currently wedges the loader thread. Quote no per-call
-  number until that is fixed — see `load-path-scope.md` §7.
+  bench op is FIXED as of 2026-08-19 — handed to a TMM thread like a load, and now timing the
+  JIT rather than the interpreter it used to measure. So a FLOOR exists: a simple program executes in ≤ 11 ns on the JIT path (min 26–28 cycles at 2.60 GHz, build e8e854ad), bounded by the rdtsc pair that measures it rather than by the program.
+  What an armed hook costs ON THE DATA PATH is still unmeasured: the floor excludes the
+  trampoline's register save and restore, the call and return, and cache effects under real
+  traffic. Quote the floor as a floor, and nothing as a per-packet cost — see
+  `load-path-scope.md` §7.
 
 The earlier convention read "there is deliberately no prototype; nothing in this repo executes a
 shield." That was true when written and is now superseded. **Replace such claims when they are

@@ -149,7 +149,7 @@ Until that is run, **"it stops the crash" is unproven end to end.**
 
 **Per-call cost is unmeasured.** The counter mean is dominated by preemption artifacts (`cycles_max`
 of 1.09M against a mean of 1,134), and the bench op that would give a clean minimum still runs on
-the loader thread and wedges it. Quote no per-call number until that is fixed.
+the loader thread and wedged it. FIXED 2026-08-19: handed to a TMM thread like a load, and now timing the JIT instead of the interpreter. A floor is established — a simple program executes in ≤ 11 ns on the JIT path (min 26–28 cycles at 2.60 GHz, build e8e854ad), bounded by the rdtsc pair that measures it rather than by the program — while the armed-hook cost on the data path remains unmeasured. See load-path-scope.md §7.
 
 Bench figures that *do* hold, with their caveats: **~10 ns JIT / ~48 ns interpreter**, for a
 9-instruction program, warm cache, no contention, the VM entry **only** — no `ctx` build, no

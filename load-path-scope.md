@@ -445,3 +445,53 @@ loader (`tid RUNNING`, on-CPU); the proxy kept serving throughout, 0 restarts.
 
 Tracked as its own item. **Until it is fixed, no per-call shield cost should be quoted from a live
 TMM.**
+
+### RESOLVED 2026-08-19 --- and the number is bounded by the ruler, not the program
+
+The bench op now hands its work to a TMM thread through the same `ls_prep` handoff loads use, so
+it returns instead of wedging the loader. It also **compiles and times the JIT**, which it never
+did: its loop called `ubpf_exec_ex` while every armed hook prefers `jit_fn`, so the figure it
+used to produce described a path nothing executes. The reply now carries `path=jit` or
+`path=interp` first, because neither number means anything without it.
+
+Measured on build `e8e854ad`, Xeon Gold 6348 at 2.60 GHz, 10,000 iterations, both pods
+`restarts=0` throughout:
+
+| program | min (jit) | ≈ ns | min (interp) | reading |
+|---|---|---|---|---|
+| `demo_pass` --- returns immediately | 28 | 10.8 | 74 | **at the measurement floor** |
+| `rst_watch` | 26 | 10.0 | 108–132 | at the floor |
+| `parse_watch` | 28 | 10.8 | 134 | at the floor |
+| `alpn_guard` | 26 | 10.0 | 168 | at the floor |
+| `generic_probe` --- uses `bpf_probe_read` | 68 | 26.2 | 262 | above the floor |
+| `rate_gate` --- maps, clock, program emit | 272 | 104.6 | 1508 | clearly above |
+
+**THE FOUR SMALL NUMBERS ARE NOT DISTINGUISHABLE FROM EACH OTHER, and the tell is that
+`rst_watch` came in BELOW `demo_pass`.** `demo_pass` does nothing but return; a program that
+builds a record and emits it cannot be faster. Both are sitting on the cost of the `rdtsc` pair
+that measures them, which on this part is around 26 cycles by itself. So for a small program the
+instrument is the dominant term and the honest statement is an upper bound:
+
+> **A simple shield program executes in ≲11 ns on the JIT path.** That is bounded by the
+> measurement, not by the program, and the differences among the small programs are noise.
+
+`generic_probe` at 68 and `rate_gate` at 272 are far enough above the floor to be real: a
+`bpf_probe_read` and a maps-plus-clock-plus-emit path cost something measurable.
+
+**The min is now stable where it was not.** Five runs of one program: 26, 26, 28, 28, 28 --- ±7%,
+against 114–132 on the interpreter. The mean and max remain unusable, and more visibly so: the
+same five runs gave means of 34 to 105 and maxima from 224 to 589,912. A single `rdtsc` pair
+spanning a context switch still dominates any average, which is why the reply tells the reader
+to quote the min.
+
+**INDEPENDENT CORROBORATION.** `tmm-integration-findings.md` recorded 10 ns JIT and 48 ns
+interpreter from an off-TMM harness. This is a different method, inside a live TMM, through the
+loader socket, and it gives ~10–11 ns JIT and ~42–51 ns interpreter. Two unrelated measurements
+agreeing that closely is stronger evidence than either had alone.
+
+### Still NOT established: what an armed hook costs on the data path
+
+This is program execution in a tight loop with a warm cache and no contention. A live hook also
+pays the trampoline's register save and restore, the call and the return, and cache effects from
+real traffic --- none of which this op measures. **It is a floor.** Quoting it as a per-packet
+cost would be the same category error as quoting the counter mean, in the opposite direction.
