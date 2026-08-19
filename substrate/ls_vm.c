@@ -348,7 +348,8 @@ int
 ls_vm_bench_program(const void *elf, size_t elf_len,
                     const char *section, const char *function,
                     uint32_t iters,
-                    uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out)
+                    uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out,
+                    int *jitted_out)
 {
     char *err = NULL;
     struct ubpf_vm *vm = NULL;
@@ -381,14 +382,63 @@ ls_vm_bench_program(const void *elf, size_t elf_len,
     if (stack == NULL)
         goto out;
 
+    /*
+     * MEASURE THE PATH AN ARMED HOOK ACTUALLY TAKES.
+     *
+     * This loop called ubpf_exec_ex --- the INTERPRETER --- while ls_vm_call prefers jit_fn
+     * whenever it is non-NULL, and this build runs with jit=1. So the figure it produced
+     * described an execution path no armed hook uses. It was not wrong by a little: an
+     * earlier off-TMM measurement in this repo put the interpreter at 48 ns against the JIT's
+     * 10 ns, and the whole reason this op exists is to answer "what does a hook cost per
+     * call". Reporting the interpreter under that question invites exactly one misreading and
+     * it is the pessimistic one.
+     *
+     * So: compile when the configuration says to, call through the same ubpf_jit_ex_fn cast
+     * ls_vm_call uses, with the same stack argument, and report WHICH path was measured so
+     * the number cannot be read as the other one.
+     *
+     * EXTENDED mode, matching ls_vm_arm. Basic mode's prologue allocates its own stack ---
+     * ubpf.h: "automatically allocates a stack" --- which is the unprobed 4 KB frame finding
+     * O7 is about, and it would also make this measure a different prologue than the live one.
+     *
+     * A JIT FAILURE FALLS BACK rather than aborting: an unbenchmarkable program is less useful
+     * than an interpreter figure that says so. The caller is told which it got.
+     */
+    ubpf_jit_ex_fn jf = NULL;
+
+    if (g_cfg.jit) {
+        char *jerr = NULL;
+        jf = ubpf_compile_ex(vm, &jerr, ExtendedJitMode);
+        if (jf == NULL) {
+            fprintf(stderr, "ls_vm: bench: JIT failed (%s) --- measuring the interpreter "
+                            "instead; the number is NOT the armed-hook path\n",
+                    jerr ? jerr : "?");
+        }
+        free(jerr);
+    }
+    if (jitted_out)
+        *jitted_out = (jf != NULL);
+
     memset(ctx, 0, sizeof ctx);
-    for (uint32_t i = 0; i < 100 && i < iters; i++)
-        (void)ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE);
+    /* Warm the caches and, on the JIT path, fault in the generated code. Measuring the first
+     * call would measure the page fault. */
+    for (uint32_t i = 0; i < 100 && i < iters; i++) {
+        if (jf != NULL)
+            (void)jf(ctx, sizeof ctx, stack, LS_PROG_STACK_SIZE);
+        else
+            (void)ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE);
+    }
 
     for (uint32_t i = 0; i < iters; i++) {
         uint64_t t0 = ls_cycles();
-        if (ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE) != 0)
+        if (jf != NULL) {
+            /* No error channel, exactly as on the data path: ls_vm_call cannot tell a faulting
+             * compiled program from a returning one either. That asymmetry with the
+             * interpreter branch below is a real property of the JIT, not an omission here. */
+            (void)jf(ctx, sizeof ctx, stack, LS_PROG_STACK_SIZE);
+        } else if (ubpf_exec_ex(vm, ctx, sizeof ctx, &ret, stack, LS_PROG_STACK_SIZE) != 0) {
             goto out;
+        }
         uint64_t d = ls_cycles() - t0;
         total += d;
         if (d < best)  best = d;

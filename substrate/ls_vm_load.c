@@ -141,6 +141,10 @@ struct ls_prep {
     char         function[64];
     unsigned int iters;          /* bench only                                  */
     uint64_t     bmin, bmean, bmax;   /* bench results                          */
+    int          bjitted;        /* 1 = the JIT was measured, 0 = the interpreter.
+                                  * Reported to the client, because a number from
+                                  * the interpreter is not a hook cost and nothing
+                                  * else in the reply would say so. */
     int          rc;             /* slot on success, negative on refusal        */
 };
 
@@ -150,6 +154,7 @@ struct ls_prep {
 struct ls_prep_result {
     int      rc;
     uint64_t bmin, bmean, bmax;
+    int      jitted;
 };
 
 static struct ls_prep g_prep;
@@ -186,7 +191,8 @@ ls_prep_run_pending(void)
          * the counter mean measures the scheduler, and the clean number is this op's min. */
         g_prep.rc = ls_vm_bench_program(g_prep.prog, g_prep.prog_len,
                                         g_prep.section, g_prep.function, g_prep.iters,
-                                        &g_prep.bmin, &g_prep.bmean, &g_prep.bmax);
+                                        &g_prep.bmin, &g_prep.bmean, &g_prep.bmax,
+                                        &g_prep.bjitted);
     } else {
         g_prep.rc = ls_vm_reload(g_prep.slot, g_prep.prog, g_prep.prog_len,
                                  g_prep.section, g_prep.function,
@@ -242,9 +248,10 @@ ls_prep_submit(int op, int slot, const void *prog, unsigned int prog_len,
              * happens to hide today. Three words is not a price worth paying for that. */
             if (out != NULL) {
                 out->rc    = rc;
-                out->bmin  = g_prep.bmin;
-                out->bmean = g_prep.bmean;
-                out->bmax  = g_prep.bmax;
+                out->bmin   = g_prep.bmin;
+                out->bmean  = g_prep.bmean;
+                out->bmax   = g_prep.bmax;
+                out->jitted = g_prep.bjitted;
             }
             __atomic_store_n(&g_prep.state, LS_PREP_IDLE, __ATOMIC_RELEASE);
             if (rc < 0)
@@ -455,7 +462,7 @@ handle(int fd)
          * left the shield's per-invocation cost unquotable from a live TMM: the armed-hook
          * counter mean is dominated by rdtsc pairs spanning context switches (a single call
          * reading 1.09M then 3.14M cycles), so it measures the scheduler and not the hook. */
-        struct ls_prep_result r = { -1, 0, 0, 0 };
+        struct ls_prep_result r = { -1, 0, 0, 0, 0 };
         const char *why = "?";
         char section[96];
         uint32_t iters;
@@ -476,7 +483,11 @@ handle(int fd)
                            section, "shield", 0, iters, &r, &why) != 0) {
             reply(fd, "ERR bench refused (%s)\n", why);
         } else {
-            reply(fd, "OK bench iters=%u min=%llu mean=%llu max=%llu cycles bytes=%u\n",
+            /* `path` in the reply, first, because it changes what the number MEANS. A reader
+             * who sees only cycles will read an interpreter figure as a hook cost. */
+            reply(fd, "OK bench path=%s iters=%u min=%llu mean=%llu max=%llu cycles bytes=%u\n"
+                      "   quote the MIN; the mean is 2-3x it and measures the scheduler\n",
+                  r.jitted ? "jit" : "interp",
                   iters, (unsigned long long)r.bmin, (unsigned long long)r.bmean,
                   (unsigned long long)r.bmax, m->prog_len);
         }

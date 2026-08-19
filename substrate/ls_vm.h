@@ -146,11 +146,30 @@ unsigned ls_vm_samples(int slot, struct ls_ctx_sample *out, unsigned max);
 /* Benchmark an ARBITRARY program without arming it onto a hook --- move-3
  * instrument. Loading a program, benching it and discarding it is what turns
  * budget-pass calibration from one restart per data point into one message per
- * data point. Returns 0 on success and fills min/mean/max. */
+ * data point. Returns 0 on success and fills min/mean/max.
+ *
+ * QUOTE THE MIN. The mean is 2-3x it and swings run to run --- 194 to 538 for one program on
+ * an idle box --- because a single rdtsc pair spanning a context switch dominates the total.
+ * That is the same effect that makes the armed-hook counter mean unusable, and it is why the
+ * max is reported: seeing 130,720 next to a min of 132 is what tells a reader the mean is
+ * measuring the scheduler.
+ *
+ * `jitted_out` says WHICH EXECUTION PATH was measured, and it is not optional information.
+ * This function used to time the interpreter unconditionally while every armed hook runs
+ * jit_fn, so the figure described a path nothing uses. It now compiles when the configuration
+ * does, falls back to the interpreter if the JIT fails, and reports which happened --- a
+ * caller that ignores this can publish an interpreter number as a hook cost, which is the
+ * mistake the flag exists to prevent. Pass NULL only if you genuinely do not care.
+ *
+ * IT IS STILL A FLOOR, not the cost of an armed hook. It measures program execution in a
+ * tight loop with a warm cache and no contention. A live hook additionally pays the
+ * trampoline's register save and restore, the call and return, and cache effects from real
+ * traffic. */
 int ls_vm_bench_program(const void *elf, size_t elf_len,
                         const char *section, const char *function,
                         uint32_t iters,
-                        uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out);
+                        uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out,
+                        int *jitted_out);
 
 /* Log the current counters for every armed slot. Called at fini, every
  * LS_VM_REPORT_EVERY invocations, and on demand. */
