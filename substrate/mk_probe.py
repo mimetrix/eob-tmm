@@ -461,6 +461,28 @@ def main():
 
     dbg = a.debuginfo
     tmp = None
+    rtmp = None
+    # REMOVE THE EXTRACTED PACKAGES ON EVERY EXIT PATH, including sys.exit and a traceback.
+    #
+    # This function created two temp dirs and removed neither. Each holds a full extraction of
+    # a TMM package --- roughly 145 MB for the debuginfo one --- so every --debs run left that
+    # behind, and half of the ways out of this block are sys.exit() calls that skip any cleanup
+    # written after them. Found 2026-08-19: 10 leaked directories totalling 1,415 MB on the
+    # build box, and I had DOUBLED the per-run cost that morning by adding the second dir for
+    # the build-id selection below.
+    #
+    # atexit rather than try/finally because the exits are scattered through the block and a
+    # finally would have to wrap all of it; registering once here covers sys.exit, an exception,
+    # and the normal return with one line and no indentation change.
+    import atexit
+    import shutil
+
+    def _cleanup():
+        for d in (tmp, rtmp):
+            if d:
+                shutil.rmtree(d, ignore_errors=True)
+    atexit.register(_cleanup)
+
     if a.debs:
         import glob
         tmp = tempfile.mkdtemp(prefix="mkprobe.")
@@ -490,7 +512,7 @@ def main():
             sys.exit("*** no tmm_*.deb under %s. Without the runtime package there is nothing\n"
                      "    to identify WHICH of the debuginfo package's debug binaries ships."
                      % a.debs)
-        rtmp = tempfile.mkdtemp(prefix="mkprobe.rt.")
+        rtmp = tempfile.mkdtemp(prefix="mkprobe.rt.")   # removed by _cleanup above
         subprocess.run(["dpkg-deb", "-x", rdeb[0], rtmp], check=True)
         rbin = os.path.join(rtmp, "usr/bin/tmm.default")
         if not os.path.exists(rbin):
