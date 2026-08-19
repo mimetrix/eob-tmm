@@ -1,0 +1,39 @@
+#!/bin/sh
+# kubectl against the datkube cluster, from a machine that has no route to its API server.
+#
+# WHY A WRAPPER AND NOT A KUBECONFIG. The demo's generation half needs clang and PREVAIL; the
+# delivery half needs kubectl. They are on different machines and that split is deliberate ---
+# it is the trust boundary the design asks for (compile and verify in dev or CI, load on the
+# target). Copying datkube's credentials onto the dev box to collapse the split would work and
+# would also be the wrong direction: it puts cluster admin where the compiler is.
+#
+# So kubectl runs where it belongs, over ssh, and everything that shells out to `kubectl`
+# --- including bnk-deliver-program.py, which honours $KUBECTL --- works unchanged:
+#
+#     export KUBECTL=env/scripts/bin/kubectl-datkube
+#
+# EVERY ARGUMENT IS QUOTED. ssh joins its arguments into one shell command, so an unquoted
+# argument containing a space is re-split at the far end. That is not hypothetical here: the
+# jsonpath this repo uses to skip terminating pods contains `{" "}`, and without quoting it
+# arrives as several arguments and kubectl reports a parse error.
+#
+# stdin passes through, which is what bnk-deliver-program.py needs --- it pipes a loader
+# program into `kubectl exec -i ... python3 -` and writes nothing to the pod's disk.
+set -e
+
+HOST="${DATKUBE_HOST:-starin@10.145.35.70}"
+KEY="${DATKUBE_KEY:-$HOME/.ssh/id_ed25519}"
+
+# POSIX single-quote quoting: wrap in '...' and replace each embedded ' with '\''
+q() {
+    printf "'"
+    printf '%s' "$1" | sed "s/'/'\\\\''/g"
+    printf "'"
+}
+
+CMD="kubectl"
+for a in "$@"; do
+    CMD="$CMD $(q "$a")"
+done
+
+exec ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -i "$KEY" "$HOST" "$CMD"

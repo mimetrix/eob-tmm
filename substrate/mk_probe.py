@@ -38,10 +38,23 @@ import subprocess
 import sys
 import tempfile
 
-try:
-    from elftools.elf.elffile import ELFFile
-except ImportError:
-    sys.exit("*** needs pyelftools (python3 -m pip install pyelftools)")
+def _elffile():
+    """pyelftools, imported ON DEMAND.
+
+    It was imported at module scope and the script exited without it. But the whole reason
+    --index exists is that a lookup needs no DWARF: it reads a text file. Requiring the DWARF
+    library to read that file put the 146 MB dependency back on every machine that only wanted
+    to generate a probe --- including, on the first try, the one running the demo.
+
+    The index path now needs nothing but python3. Only --build-index and an uncached
+    --debuginfo/--debs lookup touch this.
+    """
+    try:
+        from elftools.elf.elffile import ELFFile
+    except ImportError:
+        sys.exit("*** reading DWARF needs pyelftools (python3 -m pip install pyelftools).\n"
+                 "    A prebuilt --index needs none of it --- see build-pipeline.md.")
+    return ELFFile
 
 STR_BYTES = 24          # bytes captured per char* argument
 BLOB_BYTES = 16         # bytes captured from the head of a struct pointer
@@ -109,7 +122,7 @@ def signature(path, want):
     """
     best = None
     with open(path, "rb") as f:
-        elf = ELFFile(f)
+        elf = _elffile()(f)
         if not elf.has_dwarf_info():
             sys.exit("*** no DWARF in %s" % path)
         dw = elf.get_dwarf_info()
@@ -141,12 +154,21 @@ def signature(path, want):
     return best[1]
 
 
-def layout(params):
+def layout(params, no_probe_read=False):
     """Assign each reachable parameter a record field, inside the 96-byte ceiling.
 
     Returns (fields, dropped). A field is (argindex, name, kind, detail, bytes).
     Scalars first, then strings, then struct heads --- so a wide signature loses its
     least-informative fields rather than its line numbers.
+
+    no_probe_read DROPS EVERY FIELD THAT NEEDS A DEREFERENCE, because a scalar argument
+    arrives in a register and a pointer does not. TMM registers bpf_probe_read as helper 4,
+    but a given BUILD only has the helpers it was compiled with: the binary on the cluster
+    today has the clock (5) and the emit helper (25) and NOT probe_read, so a program using it
+    is refused at load with no indication of which helper was the problem. Generating a probe
+    the target cannot run is worse than generating a smaller one that works, so this makes the
+    trade explicit and records it in the generated file rather than leaving it to be discovered
+    at load time.
     """
     reach = [(i, n or ("arg%d" % i), k, d) for i, (n, k, d) in enumerate(params)][:5]
     dropped = [(i, n or ("arg%d" % i), k, d) for i, (n, k, d) in enumerate(params)][5:]
@@ -154,6 +176,8 @@ def layout(params):
     reach.sort(key=lambda f: order.get(f[2], 3))
     fields, used = [], 4          # 4 bytes of header: which args made it in
     for i, nm, kind, detail in reach:
+        if no_probe_read and kind in ("string", "blob"):
+            dropped.append((i, nm, kind, detail)); continue
         want = {"scalar": 8, "opaque": 8, "string": STR_BYTES, "blob": BLOB_BYTES}.get(kind)
         if want is None:
             dropped.append((i, nm, kind, detail)); continue
@@ -164,7 +188,7 @@ def layout(params):
     return fields, dropped, used
 
 
-def generate(fn, params, fields, dropped, used):
+def generate(fn, params, fields, dropped, used, no_probe_read=False):
     """Emit a .bpf.c that reads the generic register context and probe_reads the pointers."""
     L = []
     A = L.append
@@ -172,8 +196,17 @@ def generate(fn, params, fields, dropped, used):
     A(" *")
     A(" * A probe for %s(), derived entirely from the build's own DWARF. No host-side ctx" % fn)
     A(" * builder exists for this function and none is needed: the program is handed the")
-    A(" * GENERIC five-register context and does its own dereferencing through")
-    A(" * bpf_probe_read, so this costs a program rather than a rebuild of TMM.")
+    if no_probe_read:
+        A(" * GENERIC five-register context and reads SCALAR ARGUMENTS ONLY.")
+        A(" *")
+        A(" * GENERATED WITH --no-probe-read. Every pointer argument is dropped, because a")
+        A(" * pointer has to be dereferenced and that needs bpf_probe_read (helper 4), which")
+        A(" * the target build does not register. A program using an unregistered helper is")
+        A(" * refused at load without saying which helper, so the choice is made here instead.")
+        A(" * Regenerate without the flag once the target has helper 4 to capture the rest.")
+    else:
+        A(" * GENERIC five-register context and does its own dereferencing through")
+        A(" * bpf_probe_read, so this costs a program rather than a rebuild of TMM.")
     A(" *")
     A(" * Signature as DWARF describes it:")
     for i, (nm, kind, detail) in enumerate(params):
@@ -203,7 +236,13 @@ def generate(fn, params, fields, dropped, used):
     A("    .key_size = sizeof(__u32), .value_size = sizeof(__u32), .max_entries = 16,")
     A("};")
     A("")
-    A("static long (*bpf_probe_read)(void *, __u32, const void *) = (void *)4;")
+    # DECLARE ONLY WHAT IS CALLED. An unused function pointer initialised to a helper id is
+    # harmless in principle --- no call means no relocation for uBPF to resolve --- but it puts
+    # the id of a helper the target does not register into a program that claims not to need
+    # it. Nothing should have to reason about that: if the probe does not dereference, the
+    # declaration does not appear.
+    if any(k in ("string", "blob") for _, _, k, _, _ in fields):
+        A("static long (*bpf_probe_read)(void *, __u32, const void *) = (void *)4;")
     A("static long (*bpf_perf_event_output)(void *, void *, __u64, void *, __u64) = (void *)25;")
     A("")
     A("struct ls_ctx_generic { __u64 arg[5]; };")
@@ -279,7 +318,7 @@ def build_index(dbg, out):
     n_fn = n_par = 0
     seen = {}
     with open(dbg, "rb") as f:
-        elf = ELFFile(f)
+        elf = _elffile()(f)
         if not elf.has_dwarf_info():
             sys.exit("*** no DWARF in %s" % dbg)
         dw = elf.get_dwarf_info()
@@ -352,6 +391,10 @@ def main():
                     help="walk DWARF once and write a signature index for EVERY function")
     ap.add_argument("--index", metavar="FILE",
                     help="use a prebuilt signature index instead of walking DWARF")
+    ap.add_argument("--no-probe-read", action="store_true",
+                    help="capture SCALAR arguments only --- for a target build that does not "
+                         "register bpf_probe_read (helper 4). Pointer arguments are dropped "
+                         "and the generated file says so.")
     ap.add_argument("-o", "--out")
     a = ap.parse_args()
 
@@ -451,8 +494,16 @@ def main():
     if a.describe:
         return
 
-    fields, dropped, used = layout(params)
-    src = generate(a.function, params, fields, dropped, used)
+    fields, dropped, used = layout(params, a.no_probe_read)
+    if not fields:
+        sys.exit("*** nothing capturable in %s under these constraints.\n"
+                 "    %s"
+                 % (a.function,
+                    "Every argument is a pointer and --no-probe-read drops those. Either the\n"
+                    "    target needs helper 4, or this is the wrong function to probe."
+                    if a.no_probe_read else
+                    "No argument mapped to a field --- check the signature above."))
+    src = generate(a.function, params, fields, dropped, used, a.no_probe_read)
     out = a.out or ("probe_%s.bpf.c" % a.function)
     with open(out, "w") as f:
         f.write(src)

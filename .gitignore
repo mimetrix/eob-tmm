@@ -57,3 +57,5 @@ substrate/ls_shield_blob.h
 
 # personal Claude Code permission rules --- not shared
 .claude/settings.local.json
+signatures.tsv
+hook-index.tsv

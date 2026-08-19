@@ -207,6 +207,21 @@ def elf_fentry_hook(blob):
     return b""
 
 
+def tmm_pid():
+    """The pid of the running tmm, or None. Same scan as running_binary, which needs the
+    path; this needs the pid. Split so neither has to return a tuple nobody wants."""
+    for d in os.listdir("/proc"):
+        if not d.isdigit():
+            continue
+        try:
+            exe = os.readlink("/proc/%s/exe" % d)
+        except OSError:
+            continue
+        if os.path.basename(exe).startswith("tmm"):
+            return d
+    return None
+
+
 def running_binary():
     """The binary this container is ACTUALLY executing.
 
@@ -255,6 +270,26 @@ def read_index(path):
                 syms.setdefault(p[0], []).append(
                     (p[1], p[2], p[3] if len(p) > 3 else "-"))
     return meta, syms
+
+
+def entry_bytes(addr, n=5):
+    """The n bytes at `addr` in the running tmm, or None if they cannot be read.
+
+    None means "could not check", NOT "fine" --- every caller treats it as unknown and
+    proceeds, because refusing to arm because /proc was unreadable would be worse than the
+    thing being guarded against. It is readable in practice: the loader already reads
+    /proc/<pid>/exe to gate on the build id.
+    """
+    try:
+        pid = tmm_pid()
+        if pid is None:
+            return None
+        with open("/proc/%s/mem" % pid, "rb") as m:
+            m.seek(int(addr, 16) if isinstance(addr, str) else addr)
+            b = m.read(n)
+        return b if len(b) == n else None
+    except (OSError, ValueError):
+        return None
 
 
 def resolve_hook(spec):
@@ -418,6 +453,37 @@ def main():
         # The address goes in binding.hook AS TEXT --- the loader strtoull()s it.
         # resolve_hook turns a symbol name into that text, or exits.
         slot, addr = int(a[1]), resolve_hook(a[2])
+        # LOOK AT THE ENTRY BEFORE WRITING TO IT.
+        #
+        # Arming an already-armed entry fails, correctly --- the pad no longer holds nops. But
+        # the failure came back as "no pad, out of rel32 range, or swap refused", a catch-all
+        # naming three unrelated causes, and the first of them is wrong in a way that reads
+        # like a stale address. It cost a diagnosis: I went looking at the bytecode.
+        #
+        # More importantly this catches the case that actually hurt this project. On
+        # 2026-08-17 a stale address armed a nop pad 64 bytes past rst_why: the patch
+        # succeeded, OK ARMED LIVE printed, and nothing fired across 16,000 requests. The
+        # index's build-id gate closes that for named lookups. This closes it for a raw
+        # 0x address, which the gate cannot check --- if the five bytes are not a pad and not
+        # an existing hook, do not write to them.
+        pre = entry_bytes(addr)
+        if pre is not None:
+            if pre == b"\x90" * 5:
+                pass                                   # a clean pad, as expected
+            elif pre[0] == 0xe8:
+                sys.exit("*** %s is ALREADY ARMED --- its entry holds %s, a call, not a pad.\n"
+                         "    Disarm it first. Arming over an armed entry would overwrite the\n"
+                         "    displacement to the current trampoline with another one, and the\n"
+                         "    original instruction bytes would be lost."
+                         % (a[2], " ".join("%02x" % x for x in pre)))
+            else:
+                sys.exit("*** %s (%s) does not hold a five-byte nop pad. It holds %s.\n"
+                         "    REFUSING to write. This is the check that was missing when a\n"
+                         "    stale address armed a pad 64 bytes past rst_why, printed OK, and\n"
+                         "    fired zero times across 16,000 requests.\n"
+                         "    If you are certain, disarm whatever is there rather than\n"
+                         "    overwriting it."
+                         % (a[2], addr, " ".join("%02x" % x for x in pre)))
         print(send(msg(OP_ARM, slot=slot, hook=addr.encode())))
     elif cmd == "disarm":
         # Disarm resolves the same way. It MUST, or the demo arms by name and
