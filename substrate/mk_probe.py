@@ -198,6 +198,26 @@ def layout(params, no_probe_read=False):
 # slot 2 fired 29 times, and the ring stayed empty. The counter said the probe worked.
 LS_MAP_NAME_MAX = 32
 
+# EACH GENERATED PROBE CONSUMES ONE OF FOUR MAP REGISTRATIONS, and they are per PROCESS, not
+# per program: ls_map.h sets LS_MAP_MAX to 4 and ls_map_glue.h keys the table by symbol name,
+# so four distinct emitting programs fill it. `revoke` disables a slot's program but does NOT
+# reclaim its map registration (item 0c --- reclaiming needs the quiescence pass), so the
+# ceiling is four distinct map names for the LIFE OF THE PROCESS.
+#
+# OBSERVED 2026-08-19: five generated probes were loaded in one session --- flow_reject,
+# flow_input_drop, flow_reject_dos, ip4_reject, mrhttp_proxy_route_message, each with its own
+# uniquely named output map. flow_reject then counted fired=20 and published nothing. After
+# revoking the others and reloading it, records appeared. LS_MAP_MAX=4 is the documented limit
+# and the most plausible cause; it was not isolated further than that, so this is stated as an
+# observation rather than a mechanism.
+#
+# WHAT IT COSTS THE PROCEDURE. Screening several candidates for reachability is exactly the
+# right thing to do, and it burns registrations. Screen with the COUNTER --- fired is exact
+# whether or not the map registered --- and only keep the probes whose records you intend to
+# read. A probe past the fourth counts correctly and reports nothing, which is the most
+# misleading shape available: the counter says it works.
+LS_MAP_SLOTS = 4
+
 
 def map_name(fn):
     """A map name for `fn` that always fits the host's table, and is unique per function.
