@@ -220,6 +220,24 @@ ENTRY() {
 # The pad offset for the same name, from the same row. Separate call rather than parsing a
 # tuple, because a caller that wanted only the address and got "0x144fbc4 4" would pass the
 # whole string to /proc and seek somewhere arbitrary.
+# PADSTATE <pod> <arm-address> -> "nops" or "armed"
+#
+# A FUNCTION, because a here-document nested inside $( ) hangs. Written inline as
+#   _pad=$("$KUBECTL" exec -i "$p" ... <<'PY' ... PY )
+# it stalled the demo indefinitely at move 6 --- the process sat there with the run at a
+# standstill and no output, which in front of an audience is indistinguishable from TMM having
+# locked up. In a function the here-document is attached to the command, and only the
+# function's output is captured, which is what BYTES has always done correctly.
+PADSTATE() {
+    "$KUBECTL" exec -i "$1" -c f5-tmm -- python3 - "$2" <<'PYQ' 2>/dev/null
+import os, sys
+pid = next((d for d in os.listdir("/proc") if d.isdigit()
+            and os.path.basename(os.readlink("/proc/%s/exe" % d)).startswith("tmm")), None)
+with open("/proc/%s/mem" % pid, "rb") as m:
+    m.seek(int(sys.argv[1], 16)); print("nops" if m.read(5) == b"\x90" * 5 else "armed")
+PYQ
+}
+
 PADOFF() {
     "$KUBECTL" exec -c f5-tmm "$POD1" -- sh -c \
         "awk -F'\t' -v n='$1' '\$1==n{print \$4}' /usr/share/ls/hook-index.tsv" 2>/dev/null \
@@ -249,9 +267,31 @@ note "  So the most important question anyone can ask is: why did you do that to
 note "  connection? And that is the one question we cannot currently answer."
 run "$KUBECTL get pods -l app=f5-tmm --no-headers"
 note ""
-note "  Nothing is armed. Do NOT ask the loader --- 'armed' in its status means the SLOT"
-note "  HOLDS A PROGRAM, which stays true after a disarm. The only source of truth for"
-note "  'is this function patched' is the process's own memory:"
+# ESTABLISH THE PRECONDITION, do not assert it.
+#
+# This move used to state "Nothing is armed" and then read the entry bytes. On 2026-08-19 a
+# previous run had left rst_why armed, so the narration said nothing was armed and the byte
+# dump immediately below it said "ARMED, calling the trampoline". The script contradicted
+# itself on screen, in front of the audience, in the first thirty seconds --- and it is the
+# same fault that was fixed in moves 4 and 6 the same day: narrating a state instead of
+# reading it.
+#
+# A demo needs a KNOWN starting state, and the only honest way to get one is to make it and
+# say so. Disarming visibly also demonstrates the mechanism a move early, which costs nothing.
+for p in $PODS; do
+    _b=$(PADSTATE "$p" "$RST")
+    if [ "$_b" = "armed" ]; then
+        printf '  %s# %s still has rst_why armed from an earlier run --- disarming so this
+' "$DIM" "$p"
+        printf '  # move starts from the state it describes.%s
+' "$OFF"
+        L "$p" disarm rst_why
+    fi
+done
+note "  Nothing is armed --- and that was checked, not assumed. Do NOT ask the loader:"
+note "  'armed' in its status means the SLOT HOLDS A PROGRAM, which stays true after a"
+note "  successful disarm. The only source of truth for 'is this function patched' is the"
+note "  process's own memory:"
 BYTES "$POD1" "$RST" "$RSTOFF"
 note ""
 note "  f3 0f 1e fa is endbr64 --- Intel CET's indirect-branch guard, put there by gcc's"
@@ -455,18 +495,7 @@ note "  The trampoline is already there from move 3, so there is nothing to patc
 note "  and re-arming is refused precisely because it would overwrite the displacement."
 for p in $PODS; do
   L "$p" load 5 /usr/share/ls/rate_gate.bpf.o 1 rst_why
-  _pad=$("$KUBECTL" exec -i "$p" -c f5-tmm -- python3 - "$RST" <<'PYP' 2>/dev/null
-import os, sys
-pid = None
-for d in os.listdir("/proc"):
-    if not d.isdigit(): continue
-    try: e = os.readlink("/proc/%s/exe" % d)
-    except OSError: continue
-    if os.path.basename(e).startswith("tmm"): pid = d; break
-with open("/proc/%s/mem" % pid, "rb") as m:
-    m.seek(int(sys.argv[1], 16)); print("nops" if m.read(5) == b"\x90" * 5 else "armed")
-PYP
-)
+  _pad=$(PADSTATE "$p" "$RST")
   if [ "$_pad" = "nops" ]; then
       L "$p" arm 5 rst_why
   else
