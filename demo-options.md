@@ -65,7 +65,7 @@ everywhere else, plus a second ring type (records are 92 bytes, packets 1500, an
 ring is 64KB) plus Phase 4. Weeks, for the worst value-per-cost on the list. See
 `rst-why-feed.md` for the tier breakdown.
 
-Not reproducible with iRules or WASM: `RST_WHY` is an internal macro on an internal
+Not reproducible with iRules: `RST_WHY` is an internal macro on an internal
 path, not an exposed event.
 
 **Status: working. Needs a scripted 5-minute walkthrough, not more engineering.**
@@ -251,7 +251,7 @@ so the event source stays cheap to add later.
 > with no restart --- and it reports every reset decision the data plane makes, by
 > source line and reason, attributed to a flow.
 
-Nothing about that needs a CVE, and none of it is reachable from iRules or WASM.
+Nothing about that needs a CVE, and none of it is reachable from iRules.
 
 ### 4b.1 What blocks part 1 right now, and it is not the mechanism
 

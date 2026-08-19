@@ -128,7 +128,7 @@ cat <<'EOT'
   "TCP 3WHS rejected", ...). No amount of reading the source recovers which one
   applied. It arrives only because the trampoline forwards all six arguments.
 
-  None of this is reachable from iRules or WASM: RST_WHY is an internal macro on an
+  None of this is reachable from iRules: RST_WHY is an internal macro on an
   internal path, not an event F5 exposed. The hook was chosen AFTER the binary
   shipped and armed into a live process with no restart.
 EOT

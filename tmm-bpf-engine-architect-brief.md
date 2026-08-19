@@ -152,9 +152,18 @@ than packets: `rst_why` electing to tear down a connection, `http2_stream_abort`
 kill a stream, `ssl__err` electing an alert. None of these is a kernel event in any
 configuration.
 
-The same decisions are equally unavailable to iRules and to WASM, which are built on the
-parsed request model. A reset following a failed parse raises no HTTP event, because no
-request object exists to raise it against.
+The same decisions are unavailable to **iRules**, and that is checkable rather than
+asserted: `tclrule.c` defines the event set, and a reset following a failed parse raises no
+HTTP event at all because no request object exists to raise one against. Where an event does
+exist it need not carry the reason — `CLIENTSSL_HANDSHAKE_FAILED` is raised as
+`tclrule_execute(hn, uflow, …)` with the node and the flow and nothing else, so an iRule
+learns *that* a handshake failed and never *why*.
+
+**No claim is made here about WASM.** It is absent from TMM's source tree, its `filelist`,
+its build configuration and its component manifest, and from every image in the lab cluster.
+If a WASM tier exists elsewhere in the product it is in a component not examined here, which
+would put it in a different process — but that is an inference and it is not this document's
+to make.
 
 **Interception of a call before a vulnerable body executes.** A program inspects the
 arguments and selects `SAFE_RETURN`; the function does not run. The mitigation ships as an

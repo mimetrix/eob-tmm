@@ -8,9 +8,14 @@
  * Eighty call sites on the HTTP path alone, each passing the file and line of the
  * decision plus a human-written cause. A client observes a bare TCP reset. An
  * iRule observes nothing at all when the reset follows a failed parse, because no
- * HTTP event ever fired --- there is no request object to hand it. WASM has the
- * same gap for the same reason: both surfaces are built on the parsed model, and
- * this is precisely the traffic that never reached it.
+ * HTTP event ever fired --- there is no request object to hand it. That is checkable:
+ * tclrule.c defines the event set, and even where an event exists it need not carry a
+ * reason (CLIENTSSL_HANDSHAKE_FAILED is raised with the node and flow and nothing else).
+ *
+ * NO CLAIM IS MADE ABOUT WASM. It appears nowhere in TMM's source tree, filelist, build
+ * configuration or component manifest --- the only WASM mention in the tree used to be
+ * this comment. Asserting what a surface cannot see, when the surface is not there, is
+ * not an argument.
  *
  * TMM does keep these internally, in a small rst_info_buf ring that overwrites and
  * is not correlated to the request that caused it. What this adds is a per-event

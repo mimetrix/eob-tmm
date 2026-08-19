@@ -111,7 +111,9 @@ That is the gap this fills, and it is worth stating as the primary claim:
 
 > `rst_why` and its three siblings decide, at **1,116 call sites**, to tear a connection
 > down — with a source line and a human-written reason. None of that crosses the kernel
-> boundary a Falcon-style agent watches, and none of it is reachable from iRules or WASM.
+> boundary a Falcon-style agent watches, and none of it is reachable from iRules. (No claim
+> is made about WASM: it is absent from TMM's source tree and from this deployment, so
+> there is nothing here to compare against.)
 
 What a record carries today, drained live:
 

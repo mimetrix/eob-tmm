@@ -228,7 +228,8 @@ One file, `tcp_common.c`, sends a RST without calling `RST_WHY` — but that is 
 emitter (it holds `rst_cause_append` and the send path), not a decision site. Worth
 confirming rather than assuming.
 
-Not reachable from iRules or WASM either way: `RST_WHY` is an internal macro on an
+Not reachable from iRules either way --- and no claim is made about WASM, which is absent
+from TMM's source tree: `RST_WHY` is an internal macro on an
 internal path, not an event F5 exposed. Nothing had to be designed in — the hook was
 chosen after the binary shipped and armed into a running process with no restart.
 
