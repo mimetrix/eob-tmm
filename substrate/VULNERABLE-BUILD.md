@@ -12,6 +12,21 @@
 > This page stays as the record of what was done and why, and as the handling rules
 > if the defect is ever reintroduced. **Do not reintroduce it without re-reading the
 > handling rules below.**
+>
+> **Images retired 2026-08-19.** Every image built while the revert was in the tree is now
+> deleted from both the build box and both `kind` node containerd stores: `tmm:hookid`,
+> `tmm:hookid2`, `tmm:multi`, `tmm:fix`, `tmm:diag`, `tmm:all3`, `tmm:fc`, `tmm:p5`,
+> `tmm:rstdemo`, `tmm:maps2`, `tmm:demo`, `tmm:frida`. Only `tmm:ls` remains, built from
+> restored source.
+>
+> **A note on how NOT to check whether a build carries the hole.** The obvious test —
+> grepping the binary for the fix's trace string `"malformed ALPN extension entry"` — is
+> worthless. That string is emitted through `ssl_tracef`, which `ssl.h:3777` defines as
+> `/* Nothing. */`, so it is compiled out of every build whether patched or not. A check
+> built on it reports *every* image as vulnerable, including pristine upstream. Verify from
+> the SOURCE the build used (`git status` on `ssl.c`, and the presence of the
+> `extend past the extension buffer` comment), or by disassembling `ssl_alpn_match` — not
+> from a trace string.
 
 **This image contains a known security defect on purpose. It exists to validate a
 mitigation and must never be deployed anywhere but the lab cluster.**
