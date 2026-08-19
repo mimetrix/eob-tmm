@@ -78,7 +78,7 @@ hook with a non-trivial return type is an admission-time error nobody currently 
 |---|---|
 | armable today (pad) | **41,143** |
 | armable only by displacement (**unbuilt**) | 30,009 |
-| total in the index | 71,157 |
+| total in the index | 71,157 *(per build; count it from the image rather than quoting this)* |
 
 Anything in a linked component — OpenSSL included — is in the second row. The displacement
 path is designed and not built.

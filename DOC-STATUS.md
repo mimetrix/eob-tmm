@@ -63,7 +63,7 @@ reachable, or what something costs, prefer the current documents.
 | [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) | The egress ring is built and running; the design's contract sketch predates it |
 | [`data-plane-intelligence.md`](data-plane-intelligence.md) | Unchanged by the build — it is a product argument, not a mechanism claim |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | The catalogue stands. The designed-in HTTP tracepoint it proposes **was built and rolled back** — iRules already saw every field it captured |
-| [`hook-point-catalog.md`](hook-point-catalog.md) | Superseded in practice by the generated index: 71,157 entries produced per build, rather than a hand-maintained list |
+| [`hook-point-catalog.md`](hook-point-catalog.md) | Superseded in practice by the generated index: ~71k entries produced per build (71,157 then 71,169 across two builds of identical source), rather than a hand-maintained list |
 | [`safe-swap-plan.md`](safe-swap-plan.md) | Built. Live arm and disarm with byte-identical restore is now routine |
 | [`cve-mitigation-plan.md`](cve-mitigation-plan.md) | **Substantially superseded.** See `cve-survey-bnk.md`: a shield does not change a package version, so it does not clear a scan. CVE work moved off BNK |
 | [`widening-plan.md`](widening-plan.md) | Its assertion that a third-party inline hooker could not work inside TMM was **tested and disproved**. The library was declined on provenance, not capability |

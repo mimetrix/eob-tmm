@@ -145,7 +145,7 @@ All of the following have been observed on a running TMM on the BNK lab cluster.
 |---|---|
 | functions armable via the compiler pad | **41,143** |
 | functions armable only by displacement (unimplemented) | 30,009 |
-| total entries in the generated index | 71,157 |
+| total entries in the generated index | 71,157 *(per build --- 71,169 on the 2026-08-19 rebuild)* |
 | distinct symbol names | 70,029 |
 
 ---

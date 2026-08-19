@@ -184,7 +184,7 @@ both.
 
 ## 5 · Costs, measured
 
-On the build box, for build `74ed5caf`:
+On the build box, for build `74ed5caf`. **These move every build** --- relinking and different inlining choices shift the populations, and 2026-08-19's rebuild gave 71,169 / 63,785 / 41,160 for the same three lines. Quote them from the image in front of you (`env/bnk-dev-runbook.md` §12f has the commands), not from this table:
 
 | stage | wall clock | output |
 |---|---|---|
