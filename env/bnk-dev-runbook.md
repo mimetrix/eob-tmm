@@ -472,6 +472,25 @@ INSTALL_DEBUG_TMM=TRUE container`. Before any `make container`, delete stale art
 **your changes are silently absent from the new image** — it builds, deploys and runs the
 old code:
 
+**Do not do this by hand --- use `env/scripts/bnk-package.sh`.** It performs the removal,
+verifies it by COUNTING what survived (the files are root-owned and `rm -f` keeps going after
+Permission denied, so a script can report success having removed nothing), runs `make
+container`, and then checks that the packaged binary actually contains the substrate that was
+built. That last check is not redundant with the build-id gate: a stale DEB agrees with
+itself, so the ids match and the image ships without the change.
+
+This paragraph existed before the script did, and on 2026-08-19 it was not read --- two `make
+container` runs were wasted, one packaging a byte-identical copy of the deployed binary and
+one dying with `gcc: fatal error: no input files` from a stale `BUILD_x86_64`. Both are the
+sentence above. A step that has to be remembered at the right moment is not a control.
+
+```bash
+env/scripts/bnk-package.sh          # clear + build + verify freshness
+env/scripts/bnk-package.sh --check  # verify an existing DEB pair only
+```
+
+What it removes, for the record:
+
 ```bash
 sudo rm -rf RPMS SRPMS docker_build/DEBS BUILD_* docker_build/tmm-runtime.*
 ```
