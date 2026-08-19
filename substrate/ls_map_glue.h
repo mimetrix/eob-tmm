@@ -33,7 +33,10 @@
 #include <sys/mman.h>
 #include "ls_tp.h"
 #include "ubpf.h"
+#include <fcntl.h>
+#include <stdlib.h>   /* strtoull, for the /proc/self/maps parse */
 #include <time.h>
+#include <unistd.h>
 
 /*
  * SHAPE IS GLOBAL, STORAGE IS PER THREAD, and the split is forced rather than
@@ -346,6 +349,153 @@ ls_h_map_delete(uint64_t map, uint64_t key, uint64_t a, uint64_t b, uint64_t c)
     return (uint64_t)ls_map_delete(m, (const uint8_t *)(uintptr_t)key);
 }
 
+/* --- readable-range cache, for bpf_probe_read ----------------------------
+ *
+ * WHY A RANGE CHECK AND NOT A FAULT HANDLER. bpf_probe_read must return an ERROR for a bad
+ * address, never crash. The kernel gets that from its page-fault handler plus a fixup
+ * table. Userspace has three options and only one of them is affordable on a poll loop:
+ *
+ *   range-check against cached mappings   two compares. Catches NULL, wild pointers and
+ *                                         unmapped addresses --- the whole common case.
+ *   process_vm_readv on self              a syscall per read. Catches everything, and is
+ *                                         far too slow per invocation.
+ *   SIGSEGV handler + siglongjmp          catches everything, but async-signal-safety
+ *                                         inside run-to-completion, and the handler is
+ *                                         PROCESS-WIDE so it collides with TMM's own crash
+ *                                         handling. Not a trade to make quietly.
+ *
+ * So: range check. STATE THE LIMIT PLAINLY --- it does not catch a pointer that is mapped
+ * but wrong. Neither does a hand-written ctx builder, which dereferences on trust today, so
+ * this is not a regression; it is a bound where there was none.
+ *
+ * PER THREAD, like the map storage, for the same reason: no locking on the hot path. Built
+ * on first use from /proc/self/maps, and REFRESHED ONCE on a miss before refusing, because
+ * TMM mmaps after init (the per-thread map tables are themselves an example) and a stale
+ * snapshot would refuse a legitimate read forever.
+ */
+#define LS_RANGES_MAX 64u
+
+struct ls_range { uint64_t lo, hi; };
+
+struct ls_ranges {
+    struct ls_range r[LS_RANGES_MAX];
+    uint32_t n;
+};
+
+#ifdef LS_MAP_GLUE_IMPL
+__thread struct ls_ranges *g_ls_ranges;
+__thread int               g_ls_ranges_failed;
+#else
+extern __thread struct ls_ranges *g_ls_ranges;
+extern __thread int               g_ls_ranges_failed;
+#endif
+
+/* Parse /proc/self/maps into the readable ranges.
+ *
+ * Deliberately ignores any mapping without 'r' --- a write-only or guard mapping is not
+ * somewhere a program may read from. Uses stdio because this runs ONCE PER THREAD at first
+ * use, off the hot path; the per-invocation cost is the two compares in ls_addr_readable.
+ */
+static inline int
+ls_ranges_load(struct ls_ranges *rs)
+{
+    FILE *f;
+    char line[512];
+
+    rs->n = 0;
+    f = fopen("/proc/self/maps", "r");
+    if (f == 0)
+        return -1;
+    while (rs->n < LS_RANGES_MAX && fgets(line, (int)sizeof line, f) != 0) {
+        char *p = line, *q;
+        uint64_t lo, hi;
+
+        lo = strtoull(p, &q, 16);
+        if (q == p || *q != '-')
+            continue;
+        p = q + 1;
+        hi = strtoull(p, &q, 16);
+        if (q == p || hi <= lo)
+            continue;
+        while (*q == ' ')
+            q++;
+        if (*q != 'r')                 /* not readable --- not our business */
+            continue;
+        /* Merge with the previous range when they abut. /proc/self/maps splits on permission
+         * and backing changes, so a heap can appear as several adjacent readable entries and
+         * a 64-slot table would otherwise fill on a large process. */
+        if (rs->n > 0 && rs->r[rs->n - 1].hi == lo) {
+            rs->r[rs->n - 1].hi = hi;
+        } else {
+            rs->r[rs->n].lo = lo;
+            rs->r[rs->n].hi = hi;
+            rs->n++;
+        }
+    }
+    fclose(f);
+    return rs->n ? 0 : -1;
+}
+
+/* This thread's ranges, built on first use. Returns 0 on failure, and remembers the
+ * failure so a broken /proc is not retried on every invocation. */
+static inline struct ls_ranges *
+ls_ranges_current(int refresh)
+{
+    if (g_ls_ranges_failed && !refresh)
+        return 0;
+    if (g_ls_ranges == 0) {
+        void *m = mmap(0, sizeof(struct ls_ranges), PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (m == MAP_FAILED) {
+            g_ls_ranges_failed = 1;
+            return 0;
+        }
+        g_ls_ranges = (struct ls_ranges *)m;
+        refresh = 1;
+    }
+    if (refresh) {
+        if (ls_ranges_load(g_ls_ranges) != 0) {
+            g_ls_ranges_failed = 1;
+            return 0;
+        }
+        g_ls_ranges_failed = 0;
+    }
+    return g_ls_ranges;
+}
+
+/* Is [addr, addr+size) entirely inside ONE readable mapping?
+ *
+ * One mapping, not several: a read spanning two adjacent mappings is legal in principle and
+ * is far more likely to be a pointer that walked off the end of something. Refusing it costs
+ * a caller nothing real and removes a whole class of accident.
+ *
+ * On a miss the snapshot is REFRESHED ONCE and retried, because TMM mmaps after init --- the
+ * per-thread map tables are themselves an example --- and a stale snapshot would refuse a
+ * legitimate read forever.
+ */
+static inline int
+ls_addr_readable(uint64_t addr, uint64_t size)
+{
+    int attempt;
+
+    if (size == 0 || addr == 0)
+        return 0;
+    if (addr + size < addr)                 /* wrap --- refuse before doing arithmetic */
+        return 0;
+
+    for (attempt = 0; attempt < 2; attempt++) {
+        struct ls_ranges *rs = ls_ranges_current(attempt);   /* 2nd pass refreshes */
+        uint32_t i;
+        if (rs == 0)
+            return 0;
+        for (i = 0; i < rs->n; i++) {
+            if (addr >= rs->r[i].lo && addr + size <= rs->r[i].hi)
+                return 1;
+        }
+    }
+    return 0;
+}
+
 /* --- bpf_ktime_get_ns, helper id 5 ---------------------------------------
  *
  * WHY A CLOCK IS THE SINGLE MOST USEFUL ADDITION. Without one a program cannot know what
@@ -425,6 +575,56 @@ ls_h_perf_event_output(uint64_t ctx, uint64_t map, uint64_t flags, uint64_t data
                                                 (unsigned long)size);
 }
 
+/* --- bpf_probe_read, helper id 4 -----------------------------------------
+ *
+ * WHY THIS IS THE MOST STRUCTURALLY IMPORTANT HELPER IN THE SET. A verified program cannot
+ * chase a pointer --- PREVAIL refuses it --- so until now the HOST had to dereference and
+ * hand the program flat scalars. That host code is a per-hook ctx builder written in C and
+ * COMPILED INTO TMM, which means a hook with a new argument shape costs a rebuild.
+ *
+ * With this helper the program chases pointers itself, and the generic five-register ctx
+ * covers arbitrary hooks. A new hook shape becomes a NEW PROGRAM rather than a new build:
+ * minutes instead of a build cycle. That is the difference between "we can instrument
+ * anything, given a rebuild" and "we can instrument anything, now".
+ *
+ * PREVAIL admits id 4 with every gate on --- verified before this was written, not after.
+ *
+ * WHAT IS AND IS NOT GUARANTEED, stated because the whole value depends on it:
+ *
+ *   src   RANGE-CHECKED against this thread's readable mappings. NULL, unmapped and wild
+ *         pointers are refused with -1 rather than faulting. A pointer that is mapped but
+ *         semantically wrong is NOT caught --- and neither is it by a hand-written ctx
+ *         builder, which dereferences on trust today. This is a bound where there was none.
+ *   size  capped. A program cannot ask for an unbounded copy.
+ *   dst   TRUSTED, because PREVAIL proved the program owns it. Same trust the event-output
+ *         helper takes, and the same reason it is the signing gate (scope item 4) that
+ *         really underwrites this rather than any check here.
+ *
+ * The kernel's version of this helper is backed by the page-fault handler and a fixup table.
+ * Ours is a range check, because the userspace alternatives are a syscall per read (far too
+ * slow on a poll loop) or a process-wide SIGSEGV handler with siglongjmp (async-signal-safety
+ * inside run-to-completion, colliding with TMM's own crash handling). The range check is the
+ * affordable 95%, and saying which 5% it misses is the point of this comment.
+ */
+#define LS_PROBE_READ_MAX 256u
+
+static inline uint64_t
+ls_h_probe_read(uint64_t dst, uint64_t size, uint64_t src, uint64_t d, uint64_t e)
+{
+    (void)d; (void)e;
+
+    if (dst == 0 || src == 0 || size == 0)
+        return (uint64_t)-1;
+    if (size > LS_PROBE_READ_MAX)
+        return (uint64_t)-1;          /* refuse, never clamp --- a short read is
+                                       * indistinguishable from a program that meant it */
+    if (!ls_addr_readable(src, size))
+        return (uint64_t)-1;
+
+    memcpy((void *)(uintptr_t)dst, (const void *)(uintptr_t)src, (size_t)size);
+    return 0;
+}
+
 /* Assert the helper signatures really match uBPF's, so a future edit that adds a
  * parameter fails the build rather than corrupting arguments at run time. */
 static inline void
@@ -436,6 +636,7 @@ ls_map_glue_abi_check(void)
     f = (external_function_t)ls_h_map_delete; (void)f;
     f = (external_function_t)ls_h_ktime_get_ns; (void)f;
     f = (external_function_t)ls_h_perf_event_output; (void)f;
+    f = (external_function_t)ls_h_probe_read; (void)f;
 }
 
 /*
@@ -488,16 +689,19 @@ ls_map_glue_install(struct ubpf_vm *vm)
      * 2026-08-18: bpf_ringbuf_output's id is 130, so NO helper registered at all, every
      * program load was refused and even the built-in shield never armed. Loud, which is
      * what all-or-nothing is for --- but a build failure is better than loud. */
+    _Static_assert(4  < UBPF_MAX_EXT_FUNCS, "bpf_probe_read id outside uBPF's table");
     _Static_assert(5  < UBPF_MAX_EXT_FUNCS, "bpf_ktime_get_ns id outside uBPF's table");
     _Static_assert(25 < UBPF_MAX_EXT_FUNCS, "bpf_perf_event_output id outside the table");
     _Static_assert(1  < UBPF_MAX_EXT_FUNCS && 2 < UBPF_MAX_EXT_FUNCS
                    && 3 < UBPF_MAX_EXT_FUNCS, "map helper ids outside uBPF's table");
 
-    if (ubpf_register(vm, 5, "bpf_ktime_get_ns",
+    if (ubpf_register(vm, 4, "bpf_probe_read",
+                      (external_function_t)ls_h_probe_read) != 0 ||
+        ubpf_register(vm, 5, "bpf_ktime_get_ns",
                       (external_function_t)ls_h_ktime_get_ns) != 0 ||
         ubpf_register(vm, 25, "bpf_perf_event_output",
                       (external_function_t)ls_h_perf_event_output) != 0) {
-        fprintf(stderr, "ls_map: clock/event-output helper registration refused\n");
+        fprintf(stderr, "ls_map: probe-read/clock/event-output registration refused\n");
         return -1;
     }
 

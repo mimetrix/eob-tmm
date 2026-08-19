@@ -34,7 +34,7 @@
                                  * 7, not 0: 0 is the shield. This was the bug.  */
 /*
  * THE OTHER TWO RESET FUNCTIONS. RST_WHY* macros expand to three different
- * functions, and hooking only rst_why covers 966 of 1,116 call sites:
+ * functions, and hooking only rst_why covers 966 of 1,090 call sites:
  *
  *   rst_why         (uf, file, lineno, err, reason, cause)            966 sites
  *   rst_why_va      (uf, file, lineno, err, reason, cause, fmt, ...)  131 sites

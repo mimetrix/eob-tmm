@@ -191,14 +191,53 @@ reset functions fell through and printed as raw hex.
 
 ## 10. Ranked: the extensions worth making
 
-| # | extension | why | size |
-|---|---|---|---|
-| 1 | **`bpf_ktime_get_ns`** | no clock at all today; every threshold is "ever", not "recently" | one helper |
-| 2 | **program-controlled emit** | the host emits per event; the program cannot filter. Together with 1, retires the timer hook | one helper + a ring API |
-| 3 | **array maps** | right shape for the dense small key spaces both new programs want | small |
-| 4 | **`.data`/`.rodata` relocation** | makes a threshold a load-time parameter instead of a recompile; the relocation callback already exists | small |
-| 5 | **map iteration** | a program can accumulate but never summarise | medium |
-| 6 | **exit probes** | return values: latency inside TMM, and what a function DECIDED rather than what it was asked | medium-high, and the first that can corrupt control flow |
-| 7 | **PMU as a helper** | the direct answer to the per-call cost that gates every review; `rdtsc` is preemption-polluted, instructions-retired is not | low, and it is measurement not mechanism |
+**Re-ranked 2026-08-19.** `bpf_probe_read` moved to the top after testing showed PREVAIL
+admits it unchanged. It outranks everything below because it is the only item that removes a
+**rebuild** from the critical path rather than adding expressiveness within one.
 
-Items 1–4 are all small, and 1+2 together are worth more than the timer hook they replace.
+| # | extension | why | size | state |
+|---|---|---|---|---|
+| 1 | **`bpf_probe_read`** | **Removes the per-hook ctx builder, and therefore the rebuild.** A verified program cannot chase a pointer, so today the host dereferences in C compiled into TMM — which is why a hook with a new argument shape costs a build cycle. With this the program chases pointers itself and the generic five-register context covers arbitrary hooks: a new hook shape becomes a new *program* | one helper + a range check | **BUILT 2026-08-19** |
+| 2 | **`bpf_ktime_get_ns`** | there was no clock at all, so every threshold meant "ever" rather than "recently" | one helper | **BUILT** |
+| 3 | **program-controlled emit** | the host published per event; a program could not decide what was worth reporting. With 2, retires the timer hook | one helper | **BUILT** (`bpf_perf_event_output`) |
+| 4 | **array maps** | the right shape for dense small key spaces — alert codes, error enums | small | open |
+| 5 | **`.data`/`.rodata` relocation** | a threshold becomes a load-time parameter rather than a recompile; the relocation callback already exists | small | open |
+| 6 | **PMU as a helper** | the direct answer to the per-call cost that gates every review. `rdtsc` is preemption-polluted; instructions-retired is not | low — measurement, not mechanism | open |
+| 7 | **ctx-builder generation from DWARF** | now a convenience rather than a necessity. Tiers 1–2 (scalars, `const char *`) are fully mechanical; tier 3 (which fields of a struct matter) is semantic; tier 4 (`UFLOW_COOKIE`) cannot be derived at all | medium | open (scope item 6) |
+| 8 | **map iteration** | a program can accumulate but never summarise its own state | medium | open |
+| 9 | **exit probes** | return values: latency inside TMM, and what a function *decided* rather than what it was asked | medium-high — the first item that can corrupt control flow | open |
+
+### Why `bpf_probe_read` outranks the rest
+
+Before it, the cost model had two tiers:
+
+> a new question on an **existing** hook shape — minutes, live, no restart
+> a new hook **shape** — a rebuild
+
+The second tier existed only because the dereferencing had to happen in host C. `probe_read`
+collapses it: `substrate/shields/generic_probe.bpf.c` takes the generic register context,
+dereferences TMM's `__FILE__` pointer itself, and recovers the same filename the typed reset
+record carries — with **no host-side code for that hook**.
+
+**What it does not do, so the claim stays bounded.** The generic context carries five
+registers; `rst_why`'s sixth argument is the cause string, which only a typed builder sees.
+And derivations like `UFLOW_COOKIE` — a macro hashing three fields into a flow identity — are
+judgement, not type information, and no generator or helper produces them. So `probe_read`
+removes the rebuild, not every reason to write a builder.
+
+**Fault safety is the whole of the engineering.** The helper must return an error for a bad
+address, never fault. The kernel uses its page-fault handler and a fixup table. Userspace has
+three options and only one is affordable in a poll loop:
+
+| approach | per-call cost | catches |
+|---|---|---|
+| **range-check against mappings cached per thread** | two compares | NULL, unmapped, wild, wrapping, straddling — the common case |
+| `process_vm_readv` on self | a syscall per read | everything; far too slow |
+| `SIGSEGV` handler + `siglongjmp` | async-signal-safety inside run-to-completion, and the handler is **process-wide**, colliding with TMM's own crash handling | everything |
+
+The range check is what shipped. It does **not** catch a pointer that is mapped but
+semantically wrong — and neither does a hand-written ctx builder, which dereferences on trust
+today, so this is a bound where there was none rather than a regression. The snapshot is
+per-thread, built from `/proc/self/maps` on first use, and refreshed once on a miss before
+refusing, because TMM `mmap`s after init and a stale snapshot would refuse a legitimate read
+forever.

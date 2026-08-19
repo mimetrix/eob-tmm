@@ -109,7 +109,7 @@ host, the process, the packets on the wire — and not one decision TMM makes ab
 
 That is the gap this fills, and it is worth stating as the primary claim:
 
-> `rst_why` and its three siblings decide, at **1,116 call sites**, to tear a connection
+> `rst_why` and its three siblings decide, at **1,090 call sites**, to tear a connection
 > down — with a source line and a human-written reason. None of that crosses the kernel
 > boundary a Falcon-style agent watches, and none of it is reachable from iRules. (No claim
 > is made about WASM: it is absent from TMM's source tree and from this deployment, so
@@ -144,7 +144,7 @@ Applied to real candidates, from the shipped binary rather than from reading sou
 
 | site | logged? | verdict |
 |---|---|---|
-| `rst_why` (1,116 sites) | **no** — `net/rstcause.c` has zero log macros; the cause goes only into an overwriting in-memory ring | **unique to a hook** |
+| `rst_why` (1,090 sites) | **no** — `net/rstcause.c` has zero log macros; the cause goes only into an overwriting in-memory ring | **unique to a hook** |
 | `http2_stream_abort` (36 sites) | **no** — its only narration is `TRACES()` inside `#if HTTP2_DEBUG`, undefined in the build. `"initiates ABORT in"` occurs **0 times** in `tmm.no_pgo` | **unique to a hook** |
 | `ssl__err` (475 sites) | **yes** — `LOG_WARNING` with function, line, alert and the *interpolated* message. `"Connection error"` occurs **4 times** in the same binary | **duplicates syslog** |
 

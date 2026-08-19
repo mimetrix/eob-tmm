@@ -114,7 +114,7 @@ All of the following have been observed on a running TMM on the BNK lab cluster.
 | A verified program is loaded into a running TMM and armed at a function entry with no rebuild and no restart | `OK ARMED LIVE entry=0x144f604 slot=5 (no restart)` |
 | The hook is disarmed and the entry bytes are byte-identical to their original state | bytes read from `/proc/<pid>/mem` before, during and after; equality asserted programmatically |
 | The hook fires exactly once per event | a hook on `http_parse_client_headers` fired once per request across 16,000 requests through the proxy |
-| TMM's own connection-teardown decisions are reported | `rst_why` and three sibling functions, 1,116 call sites; records carry file, line, error code, reason code, cause string and a flow cookie |
+| TMM's own connection-teardown decisions are reported | `rst_why` and three sibling functions, 1,090 call sites; records carry file, line, error code, reason code, cause string and a flow cookie |
 | The reported cause and line agree with an independent code path | packet capture showed TMM's own RST payload carrying the same cause string and line number as the record, produced by code sharing nothing with the hook |
 | HTTP/2 stream-abort decisions are reported | `http2_stream_abort` armed and fired; records carry the source literals `malformed content-length` and `Content-Length Exceeded` |
 | Two independent hooks corroborate a single decision | `http2_stream_abort` reported `malformed content-length` six times while `rst_why` at `http2.c:1773` reported the same reason six times |

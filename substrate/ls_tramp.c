@@ -137,7 +137,7 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         struct ls_ctx_rst rc;
 
         /* ALL THREE reset functions land here. RST_WHY* macros expand to three
-         * different functions covering 1,116 call sites between them, and hooking
+         * different functions covering 1,090 call sites between them, and hooking
          * only rst_why saw 966 of them:
          *
          *   rst_why         (uf, file, lineno, err, reason, cause)

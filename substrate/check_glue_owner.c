@@ -64,13 +64,13 @@ main(void)
      * map=0. That program loads, verifies and runs with maps always empty. */
     reset();
     assert(owner_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h25 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
     printf("ok    install order: %s\n", calls);
 
     /* --- 3. the non-owning TU installs identically ------------------------- */
     reset();
     assert(user_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h5 h25 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
     printf("ok    non-owning TU installs identically (no divergence by includer)\n");
 
     /* --- 4. a NULL vm is refused before anything is registered ------------- */
@@ -83,16 +83,16 @@ main(void)
      * refuses every read of a value; one with helpers but no relocation hands
      * every helper map=0. Both look like a working feature. So any single
      * refusal must fail the whole install. */
-    /* SEVEN registrations now: reloc, bounds, and helpers 1/2/3/5/130. The clock and the
+    /* EIGHT registrations now: reloc, bounds, and helpers 1/2/3/4/5/25. The clock and the
      * ringbuf helper are part of the same all-or-nothing set on purpose --- a VM that
      * resolved a ringbuf map and then had no helper to emit through would give a program
      * that verifies, runs, and silently drops everything it tried to publish. */
-    for (k = 0; k < 7; k++) {
+    for (k = 0; k < 8; k++) {
         reset();
         fail_at = k;
         assert(owner_install(&fake_vm) == -1);
     }
-    printf("ok    install is all-or-nothing at each of the 7 registrations\n");
+    printf("ok    install is all-or-nothing at each of the 8 registrations\n");
 
     /* --- 6. MAP IDENTITY IS THE NAME, NOT THE SHAPE -----------------------
      * The dedup used to compare (key_size, value_size, max_entries) only. Correct
@@ -243,6 +243,53 @@ main(void)
                "bad index, no program), 1 publish, hash ops on a ring refuse\n");
     }
 
-    printf("ok    check_glue: 24 assertions\n");
+    /* --- 9. bpf_probe_read, and it is almost entirely refusals ---------------
+     * This is the helper that lets a program chase pointers itself, which is what removes
+     * the per-hook ctx builder --- and therefore the rebuild --- from the critical path. Its
+     * value rests entirely on refusing a bad address instead of faulting, so that is what
+     * gets tested. A crash here would take the data plane with it. */
+    {
+        const uint64_t REFUSED = (uint64_t)-1;
+        unsigned char dst[64];
+        uint64_t src_ok = (uint64_t)(uintptr_t)&dst[32];   /* our own stack: mapped */
+
+        memset(dst, 0, sizeof dst);
+        dst[32] = 0xAB; dst[33] = 0xCD;
+
+        /* the reading-works case, first, so a blanket-refuse implementation fails here */
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 2, src_ok, 0, 0) == 0);
+        assert(dst[0] == 0xAB && dst[1] == 0xCD);
+
+        /* NULL either side */
+        assert(ls_h_probe_read(0, 8, src_ok, 0, 0) == REFUSED);
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 8, 0, 0, 0) == REFUSED);
+        /* zero and over-cap sizes: refused, never clamped */
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 0, src_ok, 0, 0) == REFUSED);
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, LS_PROBE_READ_MAX + 1,
+                               src_ok, 0, 0) == REFUSED);
+        /* THE ONE THAT MATTERS: a wild pointer must be refused, not dereferenced. If the
+         * range check is wrong this test does not fail, it segfaults --- which is itself
+         * the signal. */
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 8,
+                               0x0000dead0000beefULL, 0, 0) == REFUSED);
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 8, 0x1000ULL, 0, 0) == REFUSED);
+        /* address arithmetic that wraps */
+        assert(ls_h_probe_read((uint64_t)(uintptr_t)dst, 64,
+                               0xffffffffffffffe0ULL, 0, 0) == REFUSED);
+
+        /* A read must sit inside ONE mapping. Straddling the end of the highest range is
+         * the accident this catches --- a pointer that walked off the end of something. */
+        {
+            struct ls_ranges *rs = ls_ranges_current(1);
+            assert(rs != 0 && rs->n > 0);
+            assert(ls_addr_readable(rs->r[rs->n - 1].hi - 4, 64) == 0);
+            assert(ls_addr_readable(rs->r[0].lo, 1) == 1);
+            printf("ok    /proc/self/maps parsed: %u readable range(s)\n", rs->n);
+        }
+        printf("ok    bpf_probe_read: reads what is mapped, REFUSES null, zero, over-cap, "
+               "wild, low, wrapping, and straddling\n");
+    }
+
+    printf("ok    check_glue: 36 assertions\n");
     return 0;
 }

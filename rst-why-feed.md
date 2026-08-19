@@ -9,6 +9,33 @@ measured output, not a design sketch.
 
 ---
 
+
+## 0. Where the call-site count comes from
+
+**1,090 call sites**, counted 2026-08-19 from the tree, and the derivation matters because
+this number is quoted in several documents and an earlier figure of 1,116 was wrong.
+
+`net/rstcause.h` defines **14 macros** that expand to four underlying functions. Counting
+per macro, rolling up to the function each expands to, and excluding `#define` lines and
+comments:
+
+| function | call sites | reached through |
+|---|---|---|
+| `rst_why` | **935** | `RST_WHY_CF` 558, `RST_WHY` 233, `RST_WHY_ERR` 79, `RST_WHY_EXPIRE` 49, plus `_RSN` variants and 6 direct calls |
+| `rst_why_va` | **131** | `RST_WHY2`, `RST_WHY2_ERR`, `RST_WHY_EXPIRE2`, `RST_WHY_EXPIRE2_RSN` |
+| `rst_why_preserve` | **22** | `RST_WHY_PRESERVE`, `RST_WHY_PRESERVE_CF`, `RST_WHY_ERR_PRESERVE` |
+| `rst_why_preserve_va` | **2** | direct calls |
+| | **1,090** | |
+
+**Two ways to get this wrong, both of which happened.** Counting `RST_WHY` with a regex that
+stops at `[A-Z_]` misses `RST_WHY2` and its variants, losing the entire 131-site varargs
+family. And counting without stripping `#define` lines and comments inflates the total by
+about 26 --- which is precisely the gap between 1,090 and the 1,116 previously quoted.
+
+Arming `rst_why` alone therefore reaches 935 of the 1,090. All four are armable, each in its
+own slot, because the two `_preserve` forms take five arguments rather than six and the cause
+moves register.
+
 ## 1. What a record looks like
 
 ```json
@@ -194,7 +221,7 @@ machinery. See the flow-identity note in §3.
 
 ### Coverage: how much of "why a RST?" this actually answers
 
-Counted in the tree, not estimated. **1,116 reset-decision call sites across 200
+Counted in the tree, not estimated. **1,090 reset-decision call sites across 200
 files**, funnelling into three different functions:
 
 | funnels into | sites | armed by this hook |
@@ -207,7 +234,7 @@ files**, funnelling into three different functions:
 decide a reset, not resets that happen. One hook sees *every* reset flowing through
 `rst_why` and *none* flowing through the other two functions.
 
-What fraction of ACTUAL resets that is depends on which of the 1,116 sites execute
+What fraction of ACTUAL resets that is depends on which of the 1,090 sites execute
 under real traffic, and **that is unmeasured**. In the demo it was complete: every
 reset produced by the traffic driven came through `rst_why`, and the counts matched
 1:1 (15 requests, 15 pairs; 5 closed-port connects, 5 rejects). The 131 varargs sites

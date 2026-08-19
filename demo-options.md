@@ -46,7 +46,7 @@ different sites), decisions that never emit a packet at all (40 of that sample w
 graceful proxy teardowns), always-on operation where tcpdump cannot run, and metadata
 instead of customer traffic.
 
-**Coverage is 87% of CODE SITES — not of resets.** 1,116 places in the source can
+**Coverage is 87% of CODE SITES — not of resets.** 1,090 places in the source can
 decide a reset; 966 funnel into `rst_why` and are caught by this one hook. 131 go to
 `rst_why_va` (varargs — an explicit trampoline non-goal, since `rax` carries the
 vector-register count) and 19 to `rst_why_preserve` (same 6-arg shape, one more address

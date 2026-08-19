@@ -51,6 +51,14 @@ CASES = [
      "to know this is the sixth. Declares a standard SEC(\"maps\") hash and calls "
      "helpers 1/2/3; PREVAIL verifies it UNCHANGED, which is why maps needed no "
      "verifier work at all."),
+    ("generic_probe.bpf.c", "fentry/rst_why", True,
+     "PROOF THAT A HOOK NEEDS NO ctx BUILDER. Takes the GENERIC five-register context and "
+     "dereferences TMM's __FILE__ pointer itself, through bpf_probe_read (helper 4), which "
+     "PREVAIL admits with every gate on. Every other program here is handed a typed record "
+     "assembled by host C compiled INTO TMM --- so a new argument shape costs a rebuild. "
+     "This one costs a new program. It does not see rst_why's sixth argument, because the "
+     "generic context carries five, so probe_read removes the REBUILD rather than every "
+     "reason to write a builder."),
     ("sslerr_watch.bpf.c", "fentry/ssl__err", True,
      "tmm:ssl:err. Verifies and works --- and is DISQUALIFIED as a headline by test 2 of "
      "the uniqueness screen: ssl__err already logs its reason at LOG_WARNING with "
