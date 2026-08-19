@@ -86,6 +86,13 @@ else
         scp -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
     done
     echo "  copied (base/ + 3 ssl-module files)"
+    # STAMP THE COMMIT THE STAGED COPY CAME FROM. The staged tree is a tar extract with no
+    # .git, so packaging cannot work this out for itself --- it recorded "unknown" on its
+    # first real run. Writing it here, from the machine that actually has the repo, is the
+    # only place the answer exists.
+    C=$(cd "$REPO" && git rev-parse --short HEAD 2>/dev/null || echo unstamped)
+    echo "$C" | ssh "$BUILD_BOX" "cat > $TREE/../.substrate-commit" 2>/dev/null || true
+    echo "  stamped commit $C"
 fi
 
 echo

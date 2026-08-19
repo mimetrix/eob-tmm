@@ -83,7 +83,20 @@ RDEB=$(ls "$TMM"/docker_build/DEBS/amd64/tmm_*.deb 2>/dev/null | head -1)
 RT=$(mktemp -d); trap 'rm -rf "$RT"' EXIT
 dpkg-deb -x "$RDEB" "$RT"
 PKGID=$(python3 "$SRC/ls_buildid.py" "$(readlink -f "$RT/usr/bin/tmm.default")")
-COMMIT=$(cd "$SRC/.." 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || echo unknown)
+# The repo commit, so a bake from a different commit than the package is visible. It recorded
+# "unknown" on the first real run: $SRC is the STAGED copy on the build box, which is a tar
+# extract and not a git repo. The commit therefore has to be passed in by whoever staged it ---
+# and a field that silently reads "unknown" is worse than no field, so say which it is.
+COMMIT="${REPO_COMMIT:-}"
+if [ -z "$COMMIT" ]; then
+    COMMIT=$(cd "$SRC/.." 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || true)
+fi
+if [ -z "$COMMIT" ]; then
+    COMMIT="unstamped"
+    echo "  note: no repo commit recorded. \$SRC is a staged extract, not a git checkout, so"
+    echo "        pass REPO_COMMIT=\$(git rev-parse --short HEAD) from the machine that staged"
+    echo "        it if you want the bake tied to a commit as well as a build id."
+fi
 sh "$HERE/bnk-receipt.sh" write package "build_id=$PKGID" "commit=$COMMIT" \
                                        "deb=$(basename "$RDEB")"
 

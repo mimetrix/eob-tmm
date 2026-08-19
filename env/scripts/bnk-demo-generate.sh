@@ -30,11 +30,19 @@
 # the message-routing path and not the classic HTTP filter. This one fires exactly once per
 # proxied request: 12 requests gave fired=12, 17 gave fired=17.
 #
-# WHAT THIS MOVE DOES NOT SHOW, and do not let it look like it does: the FIELD VALUES. The
-# counter is exact, but the record a generated probe publishes is mislabelled on this build ---
-# the record's hook name and schema come from a hardwired slot table rather than from the armed
-# function, so a probe in slot 2 has its bytes decoded as a 92-byte reset record and prints
-# garbage. Both that and the scalars-only limit need a TMM rebuild. See the end of this script.
+# WHAT IT SHOWS AS OF 2026-08-19, both fixed by a rebuild that day and both verified live in
+# slot 2 --- the slot that used to impose the reset record's shape on whatever was armed there:
+#
+#   hook "prog", schema 100    the record is labelled program-emitted, not decoded as a reset
+#                              record. Before, a probe in slot 2 printed fn "rst_why_preserve_va"
+#                              with fictional fields, and rst_why's builder walked its second
+#                              argument as a string for up to 256 bytes.
+#   real dereferenced bytes    ...ffff0b0b0b64 in the peer_uf blob is ::ffff:11.11.11.100, the
+#                              client address, read out of struct uflow by the program itself.
+#
+# STILL NOT SHOWN: the host cannot name the fields of a generated record, so ls_drain prints
+# len and hex rather than decoding. The layout is in the generated .bpf.c, which is the file
+# move 3 puts on screen --- but a consumer would have to be given it.
 set -e
 
 FN="${1:-mrhttp_proxy_route_message}"
@@ -68,13 +76,14 @@ head -2 "$SIG" | sed 's/^/      /'
 pause
 
 say "2. Generate the record layout AND the program from it. No TMM source is read."
-# --no-probe-read: SCALARS ONLY, because the build on the cluster does not register
-# bpf_probe_read (helper 4). A program using an unregistered helper is refused at load with no
-# indication of which helper --- so the constraint is applied here, where it can be explained,
-# and the generated file records what was dropped and why.
-show "time python3 substrate/mk_probe.py --index signatures.tsv --function $FN --no-probe-read -o probe.bpf.c"
+# POINTERS INCLUDED. The build on the cluster now registers bpf_probe_read (helper 4), so a
+# generated probe dereferences its own pointer arguments and the host needs no per-hook C. Before
+# 2026-08-19 this move needed --no-probe-read (scalars only) because that helper was absent, and
+# a program using an unregistered helper is refused at load with no indication of which one.
+# Pass --no-probe-read if you are ever pointed at a build without it.
+show "time python3 substrate/mk_probe.py --index signatures.tsv --function $FN -o probe.bpf.c"
 python3 "$REPO/substrate/mk_probe.py" --index "$SIG" --function "$FN" \
-        --no-probe-read -o "$WORK/probe.bpf.c" 2>&1 | sed 's/^/      /'
+        -o "$WORK/probe.bpf.c" 2>&1 | sed 's/^/      /'
 printf '\n  %sThat took a tenth of a second. The same lookup against the raw debug information\n' "$DIM"
 printf '  takes 1m54s, because it walks every compilation unit of a 146 MB file.%s\n' "$OFF"
 pause

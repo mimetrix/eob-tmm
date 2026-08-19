@@ -188,6 +188,39 @@ def layout(params, no_probe_read=False):
     return fields, dropped, used
 
 
+# The host records a map by its SYMBOL NAME in a fixed 32-byte table and REFUSES any name that
+# would not round-trip (ls_map_glue.h: LS_MAP_NAME_MAX). A refused map is silent from the
+# program's side --- bpf_perf_event_output gets a null map, returns -1, and the generated
+# program does not read the return value --- so the probe fires, the counter is exact, and no
+# record ever appears.
+#
+# MEASURED, 2026-08-19: probe_mrhttp_proxy_route_message_out is 36 characters. It was refused,
+# slot 2 fired 29 times, and the ring stayed empty. The counter said the probe worked.
+LS_MAP_NAME_MAX = 32
+
+
+def map_name(fn):
+    """A map name for `fn` that always fits the host's table, and is unique per function.
+
+    NOT the function name with a prefix and suffix: TMM has functions whose names alone exceed
+    the budget. NOT a truncation either --- two functions sharing a 20-character prefix would
+    collide, and a name collision with a DIFFERENT record shape is refused by the host, so one
+    probe would break another that happened to be loaded.
+
+    A short digest of the full name is unique in practice, deterministic across runs (so the
+    same function regenerates byte-identically, which is what makes the index-vs-DWARF
+    comparison meaningful), and fixed at 18 characters regardless of input.
+    """
+    import hashlib
+    h = hashlib.sha256(fn.encode()).hexdigest()[:8]
+    name = "probe_%s_out" % h
+    # An assertion rather than a comment: if the format above is ever edited to something
+    # longer, this fails at generation time instead of producing a probe that counts and
+    # never reports.
+    assert len(name) < LS_MAP_NAME_MAX, name
+    return name
+
+
 def generate(fn, params, fields, dropped, used, no_probe_read=False):
     """Emit a .bpf.c that reads the generic register context and probe_reads the pointers."""
     L = []
@@ -231,7 +264,15 @@ def generate(fn, params, fields, dropped, used, no_probe_read=False):
     A("#define BPF_MAP_TYPE_HASH             1")
     A("#define BPF_MAP_TYPE_PERF_EVENT_ARRAY 4")
     A("")
-    A('struct bpf_map_def probe_%s_out __attribute__((section("maps"), used)) = {' % fn)
+    MAP = map_name(fn)
+    A("/* Output map: %s  <-  %s" % (MAP, fn))
+    A(" *")
+    A(" * Named from a DIGEST of the function name, not from the name itself. The host records")
+    A(" * a map by symbol name in a 32-byte table and refuses anything longer, and a refused")
+    A(" * map is silent: the helper gets a null map, returns -1, this program does not read the")
+    A(" * return value, so the probe fires and the counter is exact and no record ever appears.")
+    A(" * A 36-character name did exactly that on 2026-08-19. */")
+    A('struct bpf_map_def %s __attribute__((section("maps"), used)) = {' % MAP)
     A("    .type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,")
     A("    .key_size = sizeof(__u32), .value_size = sizeof(__u32), .max_entries = 16,")
     A("};")
@@ -284,7 +325,7 @@ def generate(fn, params, fields, dropped, used, no_probe_read=False):
               % (nm, nm, i))
             A("        r.present |= 1u << %d;" % i)
         A("")
-    A("    bpf_perf_event_output(c, &probe_%s_out, 0, &r, sizeof r);" % fn)
+    A("    bpf_perf_event_output(c, &%s, 0, &r, sizeof r);" % MAP)
     A("    return 0ull;                          /* observation only --- always fall through */")
     A("}")
     return "\n".join(L) + "\n"
