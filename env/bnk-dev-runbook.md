@@ -929,6 +929,60 @@ inside `kubectl exec` dies when the exec ends; `setsid` it. And controllers here
 informers at startup — `spk-f5ingress` kept logging `Failed to find lister` for a CRD created
 after it started, and only a `kubectl rollout restart` fixed it.
 
+## 12f · What builds am I holding, and where
+
+Ask this rather than remember it. Image sprawl has been a real complaint here twice, and a
+frozen list in a document is wrong the day after it is written --- so this section is the
+commands, not an inventory.
+
+**A TMM build is identified by its GNU build id, not by a tag.** Four docker tags routinely point
+at two images, and `tmm:ls` is rebaked in place, so tags tell you nothing about how many distinct
+binaries exist.
+
+```bash
+# BUILD BOX --- every TMM image, and the build id inside each one
+ssh starin@10.145.42.119 'docker images --format "{{.ID}}  {{.Repository}}:{{.Tag}}  {{.Size}}" | sort'
+for T in tmm:ls tmm:local tmm:local_img; do
+  printf "%-16s " "$T"
+  ssh starin@10.145.42.119 "docker run --rm --entrypoint sh $T -c \
+    'R=\$(readlink -f /usr/bin/tmm); python3 /usr/share/ls/ls_buildid.py \$R 2>/dev/null || echo no-ls-tools'"
+done
+
+# BUILD BOX --- the linked binary, and the one that actually shipped
+ssh starin@10.145.42.119 'cd code/tmm
+  python3 ~/eob-tmm-staged/substrate/ls_buildid.py src/compile/obj_x86_64.no_pgo/tmm.no_pgo
+  T=$(mktemp -d); dpkg-deb -x docker_build/DEBS/amd64/tmm_10*.deb $T
+  python3 ~/eob-tmm-staged/substrate/ls_buildid.py $T/usr/bin/tmm64.no_pgo; rm -rf $T'
+
+# DATKUBE --- kind keeps images per NODE, in containerd, not in the host's docker
+ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 starin@10.145.35.70 '
+  for n in $(docker ps --format "{{.Names}}" | grep datkube); do
+    echo "--- $n"; docker exec $n ctr -n k8s.io images ls -q | grep -i tmm
+  done'
+```
+
+**THE LINKED BINARY AND THE SHIPPED ONE ALWAYS DIFFER, and that is not staleness.** `make
+container` runs `rpmbuild`, which recompiles from a source tarball inside the toolchain
+container, so `obj_x86_64.no_pgo/tmm.no_pgo` carries a different build id from the DEB every
+time. Measured 2026-08-19: `aef8cac4` linked, `03c6f0e0` packaged, both containing the same
+change. Do not "fix" that difference --- an earlier freshness check required them to be equal
+and would have rejected every correct package. Freshness is
+`bnk-check-deb-contains-substrate.sh`, which compares the DEB against the SOURCES.
+
+**The debuginfo package ships TWO debug binaries with different build ids** ---
+`tmm64.no_pgo.debug` and the PGO `tmm64.debug`. That is F5's packaging. Select by build id
+against the runtime DEB, never by size or name; picking the larger one gave a signature index
+for a build TMM does not run, differing in 3,132 functions.
+
+**What is safe to delete, and what it costs:**
+
+| artifact | safe? | cost of deleting |
+|---|---|---|
+| `tmm:ls`, and any tag not currently deployed | yes | one bake (~4 min) |
+| `docker_build/DEBS`, `RPMS`, `tmm-runtime.*.tgz`, `BUILD_*` | yes, and `bnk-package.sh` does it | one `make container` |
+| `src/compile/obj_x86_64.*` | yes | a FULL rebuild, ~20 min --- this is the incremental state |
+| `tmm-img:v10.204.15` in the kind nodes | **no** | the cluster's baseline image, not ours |
+
 ## 13 · Teardown
 
 ```bash
