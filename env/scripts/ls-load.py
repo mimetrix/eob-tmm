@@ -443,11 +443,70 @@ def send(payload):
     return out.decode("utf-8", "replace").rstrip()
 
 
+# WHAT EACH COMMAND TAKES. Checked before dispatch, so a wrong argument list produces a usage
+# line naming the command rather than a Python traceback.
+#
+# WHY THIS IS HERE. On 2026-08-19 five invocations of these tools were wrong in a row ---
+# `status` without a slot (IndexError traceback), `disarm 5` when disarm takes a NAME (it tried
+# to resolve "5" as a symbol and reported "nor safely displaceable", which reads like a fact
+# about the binary), and `load` without a hook. Each cost a diagnosis of the wrong thing. A
+# traceback tells the reader the tool broke; a usage line tells them what they typed wrong, and
+# these two are not close to the same message when someone is mid-demo.
+#
+# (min, max, "usage") --- max None means unbounded.
+_ARGS = {
+    "arm":     (2, 2, "arm <slot> <symbol-or-0xADDR>"),
+    "disarm":  (1, 1, "disarm <symbol-or-0xADDR>          # a NAME, not a slot"),
+    "load":    (2, 4, "load <slot> <file.bpf.o> [mode] [hook]   # mode 1=MONITOR 2=ENFORCE;\n"
+                      "                                          hook defaults to the object's"
+                      " own fentry/ section"),
+    "status":  (1, 1, "status <slot>"),
+    "mode":    (2, 2, "mode <slot> <1|2>"),
+    "revoke":  (1, 1, "revoke <slot>"),
+}
+
+
+def _check_args(cmd, rest):
+    """Exit with a usage line naming the command, rather than letting an index fail."""
+    if cmd not in _ARGS:
+        sys.exit("*** unknown command %r. Commands: %s"
+                 % (cmd, " ".join(sorted(_ARGS))))
+    lo, hi, usage = _ARGS[cmd]
+    n = len(rest)
+    if n < lo or (hi is not None and n > hi):
+        sys.exit("*** %s takes %s argument%s, got %d.\n    usage: %s"
+                 % (cmd,
+                    ("%d" % lo) if lo == hi else ("%d to %d" % (lo, hi)),
+                    "" if lo == 1 and hi == 1 else "s", n, usage))
+    # A SLOT WHERE A NAME BELONGS. `disarm 5` has the right argument COUNT, so arity cannot
+    # catch it --- and it then reached resolve_hook, which reported that '5' is "not padded nor
+    # safely displaceable". That reads as a fact about the binary rather than a typo, and it
+    # cost a diagnosis. A C identifier cannot begin with a digit, so a bare decimal here is
+    # never a symbol and the check is exact rather than a guess.
+    if cmd == "disarm" and rest[0].isdigit():
+        sys.exit("*** disarm takes the FUNCTION NAME, not the slot: you passed %r.\n"
+                 "    usage: %s\n"
+                 "    Disarm resolves the name the same way arm does, on purpose --- arming by\n"
+                 "    name and disarming by a hand-typed address would restore nops over\n"
+                 "    whatever is at that address instead." % (rest[0], usage))
+    # A slot where a slot is expected. int() on a symbol name raises ValueError, which is a
+    # traceback again.
+    if cmd in ("arm", "load", "status", "mode", "revoke"):
+        try:
+            int(rest[0])
+        except ValueError:
+            sys.exit("*** %s expects a SLOT NUMBER first, got %r.\n    usage: %s%s"
+                     % (cmd, rest[0], usage,
+                        "\n    (disarm is the one that takes a name, not a slot.)"
+                        if cmd != "disarm" else ""))
+
+
 def main():
     a = sys.argv[1:]
     if not a:
         sys.exit(__doc__)
     cmd = a[0]
+    _check_args(cmd, a[1:])
 
     if cmd == "arm":
         # The address goes in binding.hook AS TEXT --- the loader strtoull()s it.
