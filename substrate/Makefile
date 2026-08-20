@@ -12,7 +12,7 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-sig shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
@@ -348,3 +348,35 @@ check-ctx-reg:
 # because nothing compares it to anything.
 check-vendor-pin:
 	@sh check_vendor_pin.sh
+
+# SIGNATURE VERIFICATION, attacked before it is believed. 02-RESEARCH-PARAMETERS.md P6
+# pre-registered five ways this could be worthless; check_sig.c is those five, executable.
+#
+# BOTH CONFIGURATIONS ARE RUN. A keyed build must admit a good program and refuse every tampered
+# one; a KEYLESS build must refuse even a good one, because that is the correct default for a
+# tree nobody configured. Testing only the keyed case would leave the fail-closed default
+# unverified, which is the half that matters if someone forgets to generate a key.
+#
+# -I$$T PRECEDES -I. and the order is load-bearing: the generated key header must win over the
+# one committed in this directory. With -I. first, the test signed with a fresh key and verified
+# against the checked-in one --- and reported a failure of its own construction, which is the
+# most confusing possible way for a security test to fail.
+check-sig:
+	@set -e; T=$$(mktemp -d); trap 'rm -rf $$T' EXIT; \
+	  openssl genpkey -algorithm ed25519 -out $$T/sk.pem 2>/dev/null; \
+	  openssl genpkey -algorithm ed25519 -out $$T/other.pem 2>/dev/null; \
+	  openssl pkey -in $$T/sk.pem -pubout -out $$T/pk.pem 2>/dev/null; \
+	  clang -O2 -g -target bpf -I. -c shields/rst_watch.bpf.c -o $$T/prog.o 2>/dev/null \
+	    || cp shields/rst_watch.bpf.c $$T/prog.o; \
+	  clang -O2 -g -target bpf -I. -c shields/demo_pass.bpf.c -o $$T/other.o 2>/dev/null \
+	    || cp shields/demo_pass.bpf.c $$T/other.o; \
+	  python3 sign_shield.py --key $$T/sk.pem --prog $$T/prog.o --hook rst_why \
+	      -o $$T/signed.bin >/dev/null; \
+	  python3 sign_shield.py --key $$T/other.pem --prog $$T/prog.o --hook rst_why \
+	      -o $$T/wrong.bin >/dev/null; \
+	  python3 gen_sig_pubkey.py $$T/pk.pem -o $$T/ls_sig_pubkey.h >/dev/null; \
+	  $(CC) -O2 -Wall -Wextra -Werror -I$$T -I. -o $$T/keyed check_sig.c ls_sig.c -lcrypto; \
+	  $$T/keyed $$T/signed.bin $$T/prog.o $$T/other.o $$T/wrong.bin; \
+	  python3 gen_sig_pubkey.py --none -o $$T/ls_sig_pubkey.h >/dev/null; \
+	  $(CC) -O2 -Wall -Wextra -Werror -I$$T -I. -o $$T/nokey check_sig.c ls_sig.c -lcrypto; \
+	  LS_SIG_EXPECT_NOKEY=1 $$T/nokey $$T/signed.bin $$T/prog.o $$T/other.o

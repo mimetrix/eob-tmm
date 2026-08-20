@@ -72,7 +72,10 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 | claim | tier | witness | anchor |
 |---|---|---|---|
-| Programs are signature-verified before loading | **FALSIFIED / not built** | — | the loader accepts anything and prints `unverified=yes` on every load. This is the principal gap to anything customer-facing |
+| Ed25519 signature verification refuses tampered, unsigned and wrong-key programs | MEASURED | KERNEL | `make -C substrate check-sig` — 16 assertions from freshly generated keys, covering every falsifier pre-registered in `02-RESEARCH-PARAMETERS.md` P6 (F6a–F6d) |
+| A build with no key refuses **every** load, including valid ones | MEASURED | KERNEL | same check, second configuration. Fail-closed is asserted, not inferred from a failing test |
+| Signature verification runs in the deployed loader without hanging it | **SHIPPED-UNVALIDATED → not yet shipped** | — | **F6e is untested.** The code is written and compiles; it has not been built into TMM or exercised on the cluster. The claim that OpenSSL's allocator is safe on the loader thread — where TMM's own allocator freezes — is reasoning, not measurement |
+| A signed program is accepted end to end on a live TMM | **NOT DEMONSTRATED** | — | requires a build, a bake and a ship. Until then this is verified logic, not a working gate |
 | Arming is audited | ROADMAP | — | nothing durably records who armed what, when, against which build |
 | A CVE is mitigated on live traffic | **NOT DEMONSTRATED** | — | the mechanism is proven; no advisory has been mitigated end to end. The BNK target is not reachable on this cluster |
 | `alpn_guard` expresses a real fix | SHIPPED-UNVALIDATED | INDEPENDENT | reinstates the bounds check from commit `c806f1b2e8`; PREVAIL admits it. Never exercised against a live exploit |

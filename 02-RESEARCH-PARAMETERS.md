@@ -66,6 +66,40 @@ stream, which is the current situation — the host validates only the length an
 
 **Status:** currently **failing**. Recorded as a limitation rather than a plan.
 
+### P6 · Can a program be refused unless it carries a valid signature?
+
+**Registered before the work, 2026-08-20.** The gap this closes is the largest one on
+`GROUND_TRUTH.md`: the loader accepts anything and prints `unverified=yes` on every load.
+
+**Claim to be tested:** an Ed25519 signature over the 112-byte `struct shield_binding`, verified
+in TMM against a baked-in public key, refuses every program that is not signed by the holder of
+the private key — while still admitting the ones that are.
+
+**Falsified if any of these:**
+
+- **F6a** — a program with a corrupted signature, a corrupted body, a signature from a different
+  key, or no signature at all is *admitted*. One admission and the mechanism is worthless.
+- **F6b** — a validly signed program is *refused*. A gate that blocks legitimate work gets
+  disabled, which is worse than not having it.
+- **F6c** — a signature valid for one program can be replayed onto a different program. The
+  binding commits to the body via `prog_sha256`, so this fails if that hash is not also checked.
+- **F6d** — a signature valid at one hook can be moved to another hook, or past its build range,
+  mode ceiling or expiry. Those fields are inside the signed binding precisely so they cannot be.
+- **F6e** — verification cannot run where the load runs. TMM's allocator freezes on the loader
+  thread, so if OpenSSL allocates during verify it must happen on the handoff thread; if that
+  turns out impossible, the design is wrong rather than merely awkward.
+
+**A deliberate deviation from the ABI comment, recorded rather than silently taken.**
+`shield_abi.h` says the signature is "over op, epoch, mode, prog_len, binding, prog". This work
+signs **the binding only**, and lets the binding commit to the body by hash. Reason: `epoch` is
+reused by the current implementation to carry the *slot number*, so signing it would bind a
+signed program to one slot for no security benefit. `mode` is likewise bounded by the signed
+`mode_ceiling`, which is the field that exists for it. If that reasoning is wrong the ABI
+comment is right and this must change — which is why it is written down here.
+
+**Will not claim MEASURED until:** every F6 case above has a test that fails before the fix and
+passes after.
+
 ---
 
 ## Retired

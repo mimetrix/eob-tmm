@@ -39,6 +39,7 @@
  */
 
 #include "ls_vm.h"
+#include "ls_sig.h"
 #include "ls_ctx_reg.h"
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
@@ -408,9 +409,45 @@ handle(int fd)
 
     switch (m->op) {
     case SHIELD_OP_LOAD: {
+        /* SIGNATURE FIRST, before anything looks at the program.
+         *
+         * Everything else in this file constrains what a program may DO --- PREVAIL, the
+         * section/symbol identity gate, the build-id refusal. None of it constrained WHO may
+         * send one, and this line used to say so on every load. That was honest and it was the
+         * largest gap between this and anything customer-facing.
+         *
+         * What is verified is the 112-byte binding, which commits to the body by SHA-256. So one
+         * signature says: this key asserts the program with THIS hash may be armed at THIS hook,
+         * on builds in THIS range, at no more than THIS mode, until THIS expiry. See ls_sig.h for
+         * why that rather than the whole wire message, and 02-RESEARCH-PARAMETERS.md P6 for the
+         * five ways it was attacked before being believed.
+         *
+         * A BUILD WITH NO KEY REFUSES EVERY LOAD. That is the correct default for a tree nobody
+         * configured, and it is why gen_sig_pubkey.py has an explicit --none rather than letting
+         * a missing header mean "accept anything".
+         *
+         * VERIFIED HERE, ON THE LOADER THREAD, and that needs justifying because the prepare work
+         * below is deliberately handed to a TMM thread: EVP allocates, and TMM's allocator
+         * freezes on this thread. It is safe because ls_sig_verify calls into OpenSSL's own
+         * allocator, not TMM's --- the loader thread is an ordinary pthread and libcrypto's
+         * malloc is glibc's. The freeze is specific to TMM's per-core umalloc, which nothing here
+         * touches. Falsifier F6e is exactly this claim, and it is checked live rather than
+         * argued: if verification hangs the loader, the design moves behind ls_prep. */
+        {
+            enum ls_sig_result sr = ls_sig_verify(&m->binding, sizeof m->binding,
+                                                  m->sig, sizeof m->sig,
+                                                  m->prog, m->prog_len);
+            if (sr != LS_SIG_OK) {
+                fprintf(stderr, "ls_vm: LOAD REFUSED on %s --- %s; hook=%.63s bytes=%u\n",
+                        g_sock_path, ls_sig_strerror(sr), m->binding.hook, m->prog_len);
+                /* The reason goes to the log, not to the caller. A remote caller that can
+                 * distinguish "bad key" from "bad hash" learns which half of its forgery to fix. */
+                reply(fd, "ERR load refused (signature verification failed)\n");
+                break;
+            }
+        }
         fprintf(stderr,
-                "ls_vm: LOAD accepted on %s --- NOT SIGNATURE VERIFIED "
-                "(scope item 4 deferred); hook=%.63s bytes=%u\n",
+                "ls_vm: LOAD accepted on %s --- signature verified; hook=%.63s bytes=%u\n",
                 g_sock_path, m->binding.hook, m->prog_len);
         /* Handed to a TMM thread: preparing here would hang this thread in
          * TMM's allocator. See ls_prep above. */
@@ -612,6 +649,15 @@ ls_vm_bootstrap(void)
      * anyone reading a startup log will see it. substrate/check_ctx_reg.c is what fails the
      * build; this is what explains a running system. */
     ls_ctx_reg_report();
+
+    /* SAY WHETHER THIS BUILD CAN VERIFY, at startup, before anything tries to load.
+     * A keyless build refuses every load --- correct, and confusing to meet for the first time
+     * as a refusal. An operator should learn it from the boot log. */
+    if (ls_sig_have_pubkey())
+        fprintf(stderr, "ls_vm: signature verification ARMED --- unsigned programs are refused\n");
+    else
+        fprintf(stderr, "ls_vm: NO SIGNING KEY in this build --- EVERY load will be refused. "
+                        "Generate one with substrate/gen_sig_pubkey.py and rebuild.\n");
 
     /* Both identities: PREVAIL proved the SECTION, uBPF runs the SYMBOL, and
      * ls_vm_arm refuses unless they are the same program (O14). The _configured
