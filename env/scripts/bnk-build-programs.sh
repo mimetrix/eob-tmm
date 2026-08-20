@@ -31,6 +31,10 @@ set -e
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OUT="${1:-$HOME/lstools/shields}"
 PREVAIL="${PREVAIL:-$REPO/ebpf-verifier/bin/prevail}"
+# The signing key, outside the repo by default. SIGN_CEILING is the MOST a signed program may be
+# run at --- monitor unless asked otherwise, because enforce should be requested rather than
+# defaulted into.
+SIGN_KEY="${SIGN_KEY:-$HOME/.ls-signing/shield_sk.pem}"
 CLANG="${CLANG:-clang}"
 
 fail() { echo "*** $*" >&2; exit 1; }
@@ -97,7 +101,32 @@ for f in "$SRC"/*.bpf.c; do
     est=$(python3 "$REPO/substrate/budget_pass.py" --section "$sec" "$o" 2>/dev/null \
           | grep -oE '[0-9]+ (cycles|insns)' | head -1)
     cp "$o" "$OUT/$b.bpf.o"
-    echo "  verified $b  ($sec)${est:+  budget ~$est}"
+
+    # SIGN IT HERE, in the same step that verified it.
+    #
+    # This is the natural place and not a convenience: the signature asserts "this key vouches
+    # for this exact program at this exact hook", and the only moment both facts are established
+    # is immediately after PREVAIL accepted the object and its fentry/ section was read from it.
+    # Signing earlier would vouch for something unverified; signing later would need the hook
+    # rediscovered, and a rediscovered hook is a second answer to a question already answered.
+    #
+    # The private key stays OUTSIDE the repository --- $SIGN_KEY, default ~/.ls-signing. A build
+    # with no key produces unsigned programs and says so per program, rather than failing: a tree
+    # someone has just cloned should still compile and verify, and only fail at the point where
+    # the missing key actually matters, which is load.
+    if [ -n "$SIGN_KEY" ] && [ -f "$SIGN_KEY" ]; then
+        if python3 "$REPO/substrate/sign_shield.py" --key "$SIGN_KEY" --prog "$o" \
+               --hook "${sec#fentry/}" --mode-ceiling "${SIGN_CEILING:-monitor}" \
+               -o "$OUT/$b.bpf.sig" >/dev/null 2>&1; then
+            echo "  verified $b  ($sec)${est:+  budget ~$est}  SIGNED"
+        else
+            rm -f "$OUT/$b.bpf.sig"
+            echo "  *** $b verified but COULD NOT BE SIGNED --- it will be refused at load"
+            nbad=$((nbad + 1)); continue
+        fi
+    else
+        echo "  verified $b  ($sec)${est:+  budget ~$est}  UNSIGNED (no \$SIGN_KEY)"
+    fi
     npass=$((npass + 1))
 done
 

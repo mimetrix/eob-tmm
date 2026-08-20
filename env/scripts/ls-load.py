@@ -424,7 +424,37 @@ def sock():
     return _SOCK
 
 
-def msg(op, slot=0, mode=0, hook=b"", prog=b"", epoch=None):
+OFF_BINDING, OFF_SIG, BINDING_LEN, SIG_LEN = 16, 128, 112, 64
+
+
+def read_signature(prog_path):
+    """The signed blob beside a program: <name>.bpf.o -> <name>.bpf.sig.
+
+    REFUSES rather than sending an unsigned request. TMM will reject it anyway now, but the
+    round trip is confusing --- the reply says "signature verification failed" and the reader
+    looks for a corrupted signature rather than a missing one. Say it here, where the file is.
+    """
+    base = prog_path[:-2] if prog_path.endswith(".o") else prog_path
+    for cand in (base + ".sig", prog_path + ".sig"):
+        try:
+            with open(cand, "rb") as f:
+                blob = f.read()
+        except OSError:
+            continue
+        if len(blob) != BINDING_LEN + SIG_LEN:
+            sys.exit("*** %s is %d bytes; a signed blob is %d (%d binding + %d signature).\n"
+                     "    Regenerate it with substrate/sign_shield.py."
+                     % (cand, len(blob), BINDING_LEN + SIG_LEN, BINDING_LEN, SIG_LEN))
+        return blob[:BINDING_LEN], blob[BINDING_LEN:]
+    sys.exit("*** no signature found for %s (looked for %s.sig).\n"
+             "    Every load is signature-verified now; an unsigned program is refused by TMM,\n"
+             "    so this refuses here where the reason is visible. Sign it:\n"
+             "      python3 substrate/sign_shield.py --key <sk.pem> --prog %s \\\n"
+             "          --hook <function> -o %s.sig"
+             % (prog_path, base, prog_path, base))
+
+
+def msg(op, slot=0, mode=0, hook=b"", prog=b"", epoch=None, binding=None, sig=None):
     """Build one shield_msg. Zero-filled: every field this op does not use must
     read as zero, not as residue from whatever was in the buffer before.
 
@@ -439,7 +469,17 @@ def msg(op, slot=0, mode=0, hook=b"", prog=b"", epoch=None):
     struct.pack_into("<I", b, OFF_MODE, mode)
     struct.pack_into("<I", b, OFF_PROGLEN, len(prog))
     b[OFF_CTX_ABI] = CTX_ABI_VERSION
-    if hook:
+    if binding is not None:
+        # THE SIGNED BINDING REPLACES THE HOOK FIELD, because the hook lives INSIDE it (at
+        # binding+32, which is why OFF_HOOK is 48). Writing both would let a caller name one
+        # hook in the signed bytes and another beside them; there is exactly one hook name on
+        # the wire and it is the signed one.
+        if len(binding) != BINDING_LEN or not sig or len(sig) != SIG_LEN:
+            sys.exit("*** malformed signed blob: %d-byte binding, %d-byte signature"
+                     % (len(binding), len(sig) if sig else 0))
+        b[OFF_BINDING:OFF_BINDING + BINDING_LEN] = binding
+        b[OFF_SIG:OFF_SIG + SIG_LEN] = sig
+    elif hook:
         if len(hook) > 64:
             sys.exit("hook name/address longer than the 64-byte field")
         b[OFF_HOOK:OFF_HOOK + len(hook)] = hook
@@ -487,9 +527,9 @@ def send(payload):
 _ARGS = {
     "arm":     (2, 2, "arm <slot> <symbol-or-0xADDR>"),
     "disarm":  (1, 1, "disarm <symbol-or-0xADDR>          # a NAME, not a slot"),
-    "load":    (2, 4, "load <slot> <file.bpf.o> [mode] [hook]   # mode 1=MONITOR 2=ENFORCE;\n"
-                      "                                          hook defaults to the object's"
-                      " own fentry/ section"),
+    "load":    (2, 4, "load <slot> <file.bpf.o> [mode]   # mode 1=MONITOR 2=ENFORCE.\n"
+                      "               Needs <file>.sig beside it --- the hook comes from the\n"
+                      "               signed binding, not from an argument"),
     "status":  (1, 1, "status <slot>"),
     "mode":    (2, 2, "mode <slot> <1|2>"),
     "revoke":  (1, 1, "revoke <slot>"),
@@ -599,12 +639,17 @@ def main():
         # The object's own section header is the right source: it is what the program was
         # compiled with and what PREVAIL verified. bnk-deliver-program.py already derives it
         # this way, so the two tools now agree instead of one of them needing to be told.
-        hook = a[4].encode() if len(a) > 4 else elf_fentry_hook(prog)
-        if not hook:
-            sys.exit("*** %s carries no fentry/<hook> section, so nothing in it says which\n"
-                     "    function it attaches to. Name the hook explicitly as the 5th\n"
-                     "    argument if you are certain: load <slot> <file> <mode> <hook>" % path)
-        print(send(msg(OP_LOAD, slot=slot, mode=mode, hook=hook, prog=prog)))
+        # THE HOOK NOW COMES FROM THE SIGNED BINDING, not from the object's section and not
+        # from an argument. Both of those are things a caller controls; the binding is what a
+        # key asserted. The ELF section is still checked by TMM against the program symbol --- a
+        # separate gate on a separate identity --- but it no longer decides where this may arm.
+        binding, sig = read_signature(path)
+        if len(a) > 4:
+            print("*** ignoring the hook argument: the signed binding names the hook, and a "
+                  "second name on the wire would be a second answer to one question.",
+                  file=sys.stderr)
+        print(send(msg(OP_LOAD, slot=slot, mode=mode, prog=prog,
+                       binding=binding, sig=sig)))
     elif cmd == "status":
         print(send(msg(OP_STATUS, slot=int(a[1]))))
     elif cmd == "mode":

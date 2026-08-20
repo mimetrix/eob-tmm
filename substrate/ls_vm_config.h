@@ -75,6 +75,11 @@ struct ls_vm_config {
                              * stamp, and the first invocation. Without this the
                              * only observable state is failure, which is
                              * backwards for a demonstration.                   */
+    /* Signature enforcement. TRUE unless LS_SIG_ENFORCE is exactly
+     * "i-am-debugging" --- every other value, including a typo, an empty string
+     * or "0", enforces. See ls_vm_config.c for why this is deliberately not
+     * env_bool: a toggle on a security gate must not be reachable by accident. */
+    bool     sig_enforce;
 };
 
 /* Read once, at init. Never called on the data path. */

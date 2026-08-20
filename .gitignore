@@ -59,3 +59,7 @@ substrate/ls_shield_blob.h
 .claude/settings.local.json
 signatures.tsv
 hook-index.tsv
+
+# never commit a signing key --- it lives in ~/.ls-signing, outside the repo
+*_sk.pem
+*.sig

@@ -79,4 +79,28 @@ ls_vm_config_load(struct ls_vm_config *c)
     c->samples      = env_bool("LS_VM_SAMPLES", false);
     c->selftest     = env_u32 ("LS_VM_SELFTEST", 0);
     c->verbose      = env_bool("LS_VM_VERBOSE", false);
+    /*
+     * SIGNATURE ENFORCEMENT, AND WHY THIS ONE IS NOT env_bool.
+     *
+     * A toggle on a security gate is the thing that ends up left off, so this one is
+     * deliberately awkward in three ways that the other options are not:
+     *
+     *   1. It DEFAULTS ON. Absent, empty, misspelled, or set to anything this does not
+     *      recognise all mean ENFORCE. env_bool would treat a typo as false for some inputs;
+     *      here every value that is not the exact opt-out string enforces. A fat-fingered pod
+     *      spec must not disable verification.
+     *   2. The opt-out is a WORD, not "0" or "false". "LS_SIG_ENFORCE=i-am-debugging" cannot be
+     *      arrived at by accident and cannot be mistaken for a tidy production setting when
+     *      someone reads the manifest six months from now.
+     *   3. It is read at STARTUP ONLY, never over the loader socket. An op that disables
+     *      verification would hand the gate's own key to anyone who can reach the socket ---
+     *      which is precisely the population the gate exists to constrain.
+     *
+     * ls_vm_load.c shouts on every load when this is off, for the same reason the pre-signature
+     * loader shouted `unverified=yes`: a debugging session must not quietly become a demo.
+     */
+    {
+        const char *v = getenv("LS_SIG_ENFORCE");
+        c->sig_enforce = !(v != NULL && !strcmp(v, "i-am-debugging"));
+    }
 }

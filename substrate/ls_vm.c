@@ -745,6 +745,20 @@ ls_vm_arm_configured(const void *blob, size_t blob_len,
  * Acquire-loaded to pair with the release in ls_vm_reload: a core already inside the
  * trampoline must not see the new builder with the old program or the reverse.
  */
+/*
+ * Is signature enforcement on?
+ *
+ * An accessor rather than exporting g_cfg, and rather than letting ls_vm_load.c read the
+ * environment itself. One place parses configuration; two would eventually disagree, and the one
+ * place they must not disagree is whether a security gate is armed.
+ */
+int
+ls_vm_sig_enforce(void)
+{
+    return g_cfg.sig_enforce ? 1 : 0;
+}
+
+
 const struct ls_ctx_reg *
 ls_vm_ctx_reg(int slot)
 {

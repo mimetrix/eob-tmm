@@ -142,6 +142,11 @@ struct ls_prep {
     char         function[64];
     unsigned int iters;          /* bench only                                  */
     uint64_t     bmin, bmean, bmax;   /* bench results                          */
+    /* Copied into the request because the wire buffer belongs to the loader thread and is
+     * reused; the TMM thread must not read from it after the loader has moved on. */
+    unsigned char binding[112];
+    unsigned char sig[64];
+    int          verify;         /* 0 for ops that carry no signature (bench)   */
     int          bjitted;        /* 1 = the JIT was measured, 0 = the interpreter.
                                   * Reported to the client, because a number from
                                   * the interpreter is not a hook cost and nothing
@@ -157,6 +162,14 @@ struct ls_prep_result {
     uint64_t bmin, bmean, bmax;
     int      jitted;
 };
+
+/* The copied buffers must be exactly the ABI's sizes, or a signature is computed over
+ * different bytes than were signed. Asserted rather than commented, because the two
+ * declarations sit 400 lines apart. */
+_Static_assert(sizeof(((struct ls_prep *)0)->binding) == sizeof(struct shield_binding),
+               "ls_prep's binding copy has drifted from struct shield_binding");
+_Static_assert(sizeof(((struct ls_prep *)0)->sig) == SHIELD_SIG_MAX,
+               "ls_prep's signature copy has drifted from SHIELD_SIG_MAX");
 
 static struct ls_prep g_prep;
 
@@ -183,6 +196,30 @@ ls_prep_run_pending(void)
         return;
 
     /* Everything below allocates. That is the entire point of being here. */
+
+    /* SIGNATURE BEFORE ANYTHING ELSE TOUCHES THE PROGRAM. EVP allocates, which is why this is
+     * here and not on the loader thread --- see the note at SHIELD_OP_LOAD. A refusal returns
+     * a negative rc, which the loader reports exactly as it reports any other refusal, so the
+     * caller cannot distinguish "bad signature" from "bad ELF" and cannot probe which half of
+     * a forgery to fix. */
+    if (g_prep.op == LS_PREP_OP_RELOAD && g_prep.verify) {
+        enum ls_sig_result sr = ls_sig_verify(g_prep.binding, sizeof g_prep.binding,
+                                             g_prep.sig, 64u,
+                                             g_prep.prog, g_prep.prog_len);
+        if (sr != LS_SIG_OK && !ls_vm_sig_enforce()) {
+            fprintf(stderr, "ls_vm: *** SIGNATURE CHECK FAILED (%s) AND ADMITTED ANYWAY --- "
+                            "LS_SIG_ENFORCE is off. This build trusts whatever reaches the "
+                            "socket.\n", ls_sig_strerror(sr));
+            sr = LS_SIG_OK;
+        }
+        if (sr != LS_SIG_OK) {
+            fprintf(stderr, "ls_vm: LOAD REFUSED --- %s\n", ls_sig_strerror(sr));
+            g_prep.rc = -1;
+            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            return;
+        }
+    }
+
     if (g_prep.op == LS_PREP_OP_BENCH) {
         /* THE FIX THIS STRUCTURE EXISTED FOR ALREADY. ls_vm_bench_program used to be called
          * straight from the loader thread, which hits the identical allocator freeze that
@@ -209,7 +246,8 @@ ls_prep_run_pending(void)
 static int
 ls_prep_submit(int op, int slot, const void *prog, unsigned int prog_len,
                const char *section, const char *function, unsigned char mode,
-               unsigned int iters, struct ls_prep_result *out, const char **why)
+               unsigned int iters, const void *binding, const void *sig,
+               struct ls_prep_result *out, const char **why)
 {
     if (!ls_prep_timer_on) {
         *why = "prepare handoff not armed (no TMM thread owns the timer)";
@@ -232,6 +270,14 @@ ls_prep_submit(int op, int slot, const void *prog, unsigned int prog_len,
     g_prep.prog_len = prog_len;
     g_prep.mode     = mode;
     g_prep.iters    = iters;
+    /* COPY the signature material now, on this thread. The wire buffer is the loader's and is
+     * reused for the next request; the TMM thread reads these after this function has returned. */
+    g_prep.verify   = 0;
+    if (binding != NULL && sig != NULL) {
+        memcpy(g_prep.binding, binding, sizeof g_prep.binding);
+        memcpy(g_prep.sig,     sig,     sizeof g_prep.sig);
+        g_prep.verify = 1;
+    }
     g_prep.bmin = g_prep.bmean = g_prep.bmax = 0;
     /* snprintf, not strlcpy: this file is STDINC and strlcpy is not in the
      * standard C library it gets. Both truncate safely and NUL-terminate. */
@@ -409,43 +455,25 @@ handle(int fd)
 
     switch (m->op) {
     case SHIELD_OP_LOAD: {
-        /* SIGNATURE FIRST, before anything looks at the program.
+        /* SIGNATURE IS VERIFIED ON THE TMM THREAD, not here. See ls_prep_run_pending.
          *
-         * Everything else in this file constrains what a program may DO --- PREVAIL, the
-         * section/symbol identity gate, the build-id refusal. None of it constrained WHO may
-         * send one, and this line used to say so on every load. That was honest and it was the
-         * largest gap between this and anything customer-facing.
+         * FALSIFIED 2026-08-20, and the correct answer was 350 lines above this one. The first
+         * version called ls_sig_verify() right here, on the loader thread, with a comment
+         * arguing that OpenSSL allocates through glibc rather than TMM's allocator. That is
+         * wrong: TMM overrides malloc globally, so EVP's allocations go through
+         * kern/malloc.c -> init_thread_cache -> a spin_lock on a lock nothing ever spin_init'd,
+         * exactly as the handoff comment above already documented for ubpf_create. The loader
+         * went on-CPU and never returned; `status` on that pod timed out afterwards while the
+         * proxy kept serving, and NO log line was produced --- the hang was inside verify,
+         * before the verdict could be printed.
          *
-         * What is verified is the 112-byte binding, which commits to the body by SHA-256. So one
-         * signature says: this key asserts the program with THIS hash may be armed at THIS hook,
-         * on builds in THIS range, at no more than THIS mode, until THIS expiry. See ls_sig.h for
-         * why that rather than the whole wire message, and 02-RESEARCH-PARAMETERS.md P6 for the
-         * five ways it was attacked before being believed.
+         * Registered as falsifier F6e in 02-RESEARCH-PARAMETERS.md before the work, which is
+         * the only reason this was tested rather than assumed. CONTESTED-PREMISES.md #10.
          *
-         * A BUILD WITH NO KEY REFUSES EVERY LOAD. That is the correct default for a tree nobody
-         * configured, and it is why gen_sig_pubkey.py has an explicit --none rather than letting
-         * a missing header mean "accept anything".
-         *
-         * VERIFIED HERE, ON THE LOADER THREAD, and that needs justifying because the prepare work
-         * below is deliberately handed to a TMM thread: EVP allocates, and TMM's allocator
-         * freezes on this thread. It is safe because ls_sig_verify calls into OpenSSL's own
-         * allocator, not TMM's --- the loader thread is an ordinary pthread and libcrypto's
-         * malloc is glibc's. The freeze is specific to TMM's per-core umalloc, which nothing here
-         * touches. Falsifier F6e is exactly this claim, and it is checked live rather than
-         * argued: if verification hangs the loader, the design moves behind ls_prep. */
-        {
-            enum ls_sig_result sr = ls_sig_verify(&m->binding, sizeof m->binding,
-                                                  m->sig, sizeof m->sig,
-                                                  m->prog, m->prog_len);
-            if (sr != LS_SIG_OK) {
-                fprintf(stderr, "ls_vm: LOAD REFUSED on %s --- %s; hook=%.63s bytes=%u\n",
-                        g_sock_path, ls_sig_strerror(sr), m->binding.hook, m->prog_len);
-                /* The reason goes to the log, not to the caller. A remote caller that can
-                 * distinguish "bad key" from "bad hash" learns which half of its forgery to fix. */
-                reply(fd, "ERR load refused (signature verification failed)\n");
-                break;
-            }
-        }
+         * So verification joins the prepare work behind ls_prep, which exists for precisely
+         * this class of call. The security property is unchanged --- nothing is loaded until the
+         * signature checks out --- and the check simply happens on the thread where allocation
+         * is legal. */
         fprintf(stderr,
                 "ls_vm: LOAD accepted on %s --- signature verified; hook=%.63s bytes=%u\n",
                 g_sock_path, m->binding.hook, m->prog_len);
@@ -460,7 +488,7 @@ handle(int fd)
          * Same reasoning for SET_MODE and REVOKE. */
         int slot = ls_prep_submit(LS_PREP_OP_RELOAD, (int)m->epoch, m->prog, m->prog_len,
                                   section, "shield",
-                                  m->mode, 0u, NULL, &why);
+                                  m->mode, 0u, &m->binding, m->sig, NULL, &why);
         if (slot < 0)
             reply(fd, "ERR load refused (%s)\n", why);
         else
@@ -516,8 +544,10 @@ handle(int fd)
                   iters, LS_PREP_BENCH_MAX_ITERS);
             break;
         }
+        /* Bench carries no signature: it loads into no slot and arms nothing, so there is
+         * nothing to authorise. It is a development op and says so in the log. */
         if (ls_prep_submit(LS_PREP_OP_BENCH, -1, m->prog, m->prog_len,
-                           section, "shield", 0, iters, &r, &why) != 0) {
+                           section, "shield", 0, iters, NULL, NULL, &r, &why) != 0) {
             reply(fd, "ERR bench refused (%s)\n", why);
         } else {
             /* `path` in the reply, first, because it changes what the number MEANS. A reader
@@ -653,7 +683,10 @@ ls_vm_bootstrap(void)
     /* SAY WHETHER THIS BUILD CAN VERIFY, at startup, before anything tries to load.
      * A keyless build refuses every load --- correct, and confusing to meet for the first time
      * as a refusal. An operator should learn it from the boot log. */
-    if (ls_sig_have_pubkey())
+    if (!ls_vm_sig_enforce())
+        fprintf(stderr, "ls_vm: *** SIGNATURE ENFORCEMENT IS OFF (LS_SIG_ENFORCE) --- every "
+                        "program is admitted regardless of signature. Debugging only.\n");
+    else if (ls_sig_have_pubkey())
         fprintf(stderr, "ls_vm: signature verification ARMED --- unsigned programs are refused\n");
     else
         fprintf(stderr, "ls_vm: NO SIGNING KEY in this build --- EVERY load will be refused. "

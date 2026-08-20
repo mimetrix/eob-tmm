@@ -114,6 +114,19 @@ gcc -O2 -Wall -Wextra -Werror -static -I"$REPO/substrate" \
     -o "$CTX/ls_drain" "$DRAIN_SRC" || fail "ls_drain failed to build --- refusing to bake
     an image around a consumer that does not compile."
 echo "  ls_drain  : rebuilt from source ($(stat -c%s "$CTX/ls_drain") bytes, static)"
+# EVERY BAKED PROGRAM MUST HAVE ITS SIGNATURE. A program without one is refused at load, so
+# baking it produces an image whose own programs do not work --- which looks like a broken
+# signature check rather than a missing file.
+_no_sig=0
+for _o in "$CTX"/shields/*.bpf.o; do
+    [ -f "$_o" ] || continue
+    [ -f "${_o%.o}.sig" ] || { echo "  *** ${_o##*/} has no signature"; _no_sig=$((_no_sig + 1)); }
+done
+[ "$_no_sig" -eq 0 ] || fail "$_no_sig baked program(s) have no signature. Every load is
+    signature-verified now, so an unsigned program in the image is refused by the TMM that
+    ships with it. Re-run bnk-build-programs.sh with SIGN_KEY set."
+echo "  programs  : $(ls "$CTX"/shields/*.bpf.o | wc -l) objects, $(ls "$CTX"/shields/*.bpf.sig 2>/dev/null | wc -l) signatures"
+
 ls "$CTX"/shields/*.bpf.o >/dev/null 2>&1 || fail "no verified programs in $CTX/shields.
     Compile with clang -O2 -target bpf and run PREVAIL over each before baking one in."
 # ALL THREE docker files, and then CHECK the Dockerfile is the one we think.

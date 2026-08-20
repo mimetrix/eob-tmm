@@ -8,6 +8,44 @@ Ordered newest first.
 
 ---
 
+## 10 · "OpenSSL can verify on the loader thread" — FALSIFIED, by the falsifier that
+predicted it
+
+**Claimed**, in a comment I wrote in `ls_vm_load.c` while adding signature verification: safe to
+call `ls_sig_verify` on the loader thread, because "EVP allocates, and TMM's allocator freezes on
+this thread. It is safe because ls_sig_verify calls into OpenSSL's own allocator, not TMM's ---
+the loader thread is an ordinary pthread and libcrypto's malloc is glibc's."
+
+**Killed by:** shipping it (2026-08-20). The first signed load never returned. `status` on that
+pod timed out afterwards; the untouched second pod answered instantly. The proxy kept serving
+throughout — this wedged the loader, not the data plane.
+
+**The sharpest part of the evidence:** *no log line was produced at all.* The code prints either
+`LOAD REFUSED` or `LOAD accepted --- signature verified` immediately after the verify call
+returns. Neither appeared, which places the hang inside verification rather than anywhere after
+it.
+
+**Why the claim was wrong, and where the answer already was.** TMM overrides `malloc` globally,
+so libcrypto's allocations go through `kern/malloc.c → init_thread_cache → spin_lock` on a lock
+nothing ever `spin_init`'d. That is not a new discovery: it is written out in full **350 lines
+above my change, in the same file**, as the reason `ubpf_create` is handed to a TMM thread —
+ending "Measured, not inferred: the loader goes on-CPU and never returns." I read that file to
+add the call and reasoned past its own explanation.
+
+**What it became:** verification moved behind `ls_prep`, the handoff that exists for exactly this
+class of call. The security property is unchanged — nothing loads until the signature checks out
+— and the check now happens on the thread where allocation is legal. The binding and signature
+are *copied* into the request on the loader thread, because the wire buffer is reused and the TMM
+thread reads them later.
+
+**Why this one is worth keeping rather than quietly fixing.** F6e was registered in
+`02-RESEARCH-PARAMETERS.md` *before the work began*, in these words: "verification cannot run
+where the load runs … if that turns out impossible, the design is wrong rather than merely
+awkward." It is the only reason this was tested on a live TMM at all rather than reasoned about
+and shipped. Pre-registration earned its keep here in a single instance.
+
+---
+
 ## 1 · "The slot number identifies the hook" — CONCEDED, and it was a memory-safety bug
 
 **Claimed:** the trampoline could select a per-hook context builder from the slot a program

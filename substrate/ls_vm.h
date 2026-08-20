@@ -171,6 +171,12 @@ int ls_vm_bench_program(const void *elf, size_t elf_len,
                         uint64_t *min_out, uint64_t *mean_out, uint64_t *max_out,
                         int *jitted_out);
 
+/* Whether signature enforcement is on --- see ls_vm_config.c for why the opt-out is a word
+ * rather than a boolean. Exported so the loader does not become a second reader of the
+ * environment; the one thing two config readers must never disagree about is whether a
+ * security gate is armed. */
+int ls_vm_sig_enforce(void);
+
 /* Log the current counters for every armed slot. Called at fini, every
  * LS_VM_REPORT_EVERY invocations, and on demand. */
 void ls_vm_report(void);

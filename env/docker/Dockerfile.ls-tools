@@ -44,6 +44,8 @@ COPY --chmod=0644 hook-index.tsv /usr/share/ls/hook-index.tsv
 COPY --chmod=0644 signatures.tsv /usr/share/ls/signatures.tsv
 COPY --chmod=0755 ls-load.py     /usr/bin/ls-load.py
 COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
+# shields/ carries BOTH the objects and their .bpf.sig signatures. A program without its
+# signature beside it is refused at load, so they travel together or not at all.
 COPY --chmod=0644 shields/       /usr/share/ls/
 
 # POINT /usr/bin/tmm AT THE PADDED BINARY. Dockerfile.runtime points it at tmm.debug

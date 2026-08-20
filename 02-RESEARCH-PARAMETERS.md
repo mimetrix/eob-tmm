@@ -100,6 +100,12 @@ comment is right and this must change — which is why it is written down here.
 **Will not claim MEASURED until:** every F6 case above has a test that fails before the fix and
 passes after.
 
+**F6e FIRED, 2026-08-20.** Verification on the loader thread wedged it — TMM overrides `malloc`
+globally, so OpenSSL's allocations hit the same allocator freeze the prepare handoff was built to
+avoid. No log line was produced, placing the hang inside verify. Fixed by moving verification
+behind `ls_prep`; see `CONTESTED-PREMISES.md` #10. **F6a–F6d remain proven off-TMM; the live path
+is unproven again until the next ship.**
+
 ---
 
 ## Retired
