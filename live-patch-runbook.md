@@ -17,7 +17,7 @@ Two outcomes the program can select, applied by the host:
 
 | Tag | Meaning |
 |---|---|
-| **[reuse]** | reused open source as-is — uBPF (`c900ed9`), PREVAIL (`v0.2.5`), clang |
+| **[reuse]** | reused open source — uBPF (`c900ed9f`, plus one recorded patch applied at build time), PREVAIL (`v0.2.5` / `06769f7b`, unmodified), clang. Verified by `substrate/check_vendor_pin.sh` |
 | **[built]** | built and proven (bench and/or pod) this program of work |
 | **[dev-stub]** | present but simplified in the dev environment; production needs the fuller form |
 | **[not-yet]** | remaining work, scoped but not built |

@@ -9,14 +9,22 @@
 >
 > **Three recording gaps would stop a reproducer even inside F5:**
 >
-> 1. **The vendored uBPF revision is not recorded, and the copy has no version-control
->    history.** `design-review-findings.md` cites `c900ed9…`, `live-patch-runbook.md` cites
->    `c900ed9` with PREVAIL `v0.2.5`. The tree's copy matches neither, nor the `508d5e4b`
->    checkout on the build box. Cloning "the pinned revision" therefore yields different code.
-> 2. **uBPF is patched.** `vm/ubpf_jit_support.c` carries
->    `substrate/ubpf-patches/0001-jit-scratch-rightsize.patch`. The patch is preserved and
->    documented; several summaries elsewhere describe the vendoring as unmodified, which it
->    is not. PREVAIL is unmodified, and the binary in use reports **v0.2.6**.
+> 1. **RESOLVED 2026-08-20 — the pin is recorded and enforced.** This item claimed the
+>    vendored revision could not be stated. It could: the copies in this repo carry git
+>    history. uBPF is `c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d` from `iovisor/ubpf`; PREVAIL
+>    is `06769f7b508214e63b97905d275920f7e90182fa`, tag **`v0.2.5`**, and the binary reports
+>    `v0.2.5` — the earlier `v0.2.6` claim was wrong. `substrate/check_vendor_pin.sh` compares
+>    both revisions against the recorded pins on every `make -C substrate check`.
+>
+>    What *was* true is that the build box's `~/code/tmm/.ubpf` is a git-less extract, so its
+>    provenance cannot be read from itself. That is a property of that copy, not of the pin,
+>    and generalising it was the error. See `CONTESTED-PREMISES.md` #6.
+> 2. **uBPF carries one patch, and the tree is deliberately unpatched.**
+>    `substrate/ubpf-patches/0001-jit-scratch-rightsize.patch` is applied when the library TMM
+>    links is built, not to the checkout — so the source tree and the linked artifact are not
+>    the same thing, on purpose. The check requires the patch to apply cleanly to the pinned
+>    revision, which is what makes "base plus this diff" reproducible rather than asserted.
+>    PREVAIL is unmodified, and that is now checked rather than promised.
 > 3. **The current workflow is undocumented here.** `bnk-sync-substrate.sh`,
 >    `bnk-bake-tools.sh`, `bnk-preflight.sh`, arming by name and the build-ID gate are all
 >    load-bearing now and appear nowhere below.

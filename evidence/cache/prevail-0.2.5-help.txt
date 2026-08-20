@@ -1,0 +1,54 @@
+PREVAIL is a new eBPF verifier based on abstract interpretation. 
+
+
+/home/claude/eob-tmm/ebpf-verifier/bin/prevail [OPTIONS] path [section] [function]
+
+
+POSITIONALS:
+  path TEXT:FILE REQUIRED     Elf file to analyze 
+  section SECTION             Section to analyze 
+  function FUNCTION           Function to analyze 
+
+OPTIONS:
+  -h,     --help              Print this help message and exit 
+          --version           Display program version information and exit 
+          --section SECTION   Section to analyze 
+          --function FUNCTION Function to analyze 
+  -l                          List programs 
+  -q,     --quiet             No stdout output, exit code only 
+          --cfg               Print control-flow graph and exit 
+
+Features:
+          --termination, --no-verify-termination{false} 
+                              Verify termination. Default: ignore 
+          --allow-division-by-zero, --no-division-by-zero{false} 
+                              Handling potential division by zero. Default: allow 
+  -s,     --strict            Apply additional checks that would cause runtime failures 
+          --stack-size INT:INT in [1 - 1048576] 
+                              Per-subprogram stack frame size in bytes (default: 512) 
+          --max-call-stack-frames INT:INT in [1 - 128] 
+                              Maximum number of nested function calls (default: 8) 
+          --max-packet-size INT:INT in [1 - 1073741824] 
+                              Maximum packet size in bytes (default: 65535) 
+          --include_groups GROUPS:{atomic32,atomic64,base32,base64,callx,divmul32,divmul64,packet} 
+                              Include conformance groups 
+          --exclude_groups GROUPS:{atomic32,atomic64,base32,base64,callx,divmul32,divmul64,packet} 
+                              Exclude conformance groups 
+
+Verbosity:
+          --simplify, --no-simplify{false} 
+                              Simplify the display of the CFG by merging chains of instructions 
+                              into a single basic block. Default: enabled (disabled with 
+                              --failure-slice) 
+          --line-info         Print line information 
+          --print-btf-types   Print BTF types 
+  -v                          Print invariants and first failure 
+  -f                          Print first failure 
+          --failure-slice     Print minimal failure slices showing only instructions that 
+                              contributed to errors 
+          --failure-slice-depth UINT 
+                              Maximum backward steps for failure slicing (default: 200) 
+
+CFG output:
+          --asm FILE          Print disassembly to FILE 
+          --dot FILE          Export control-flow graph to dot FILE 

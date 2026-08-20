@@ -5,7 +5,7 @@ Prepared for architecture review · 2026-08-18
 
 Every capability described as working has been exercised on a live TMM, and the supporting
 observation is cited. Every limit is stated with its consequence. Unmeasured quantities are
-identified as unmeasured rather than estimated.
+identified as unmeasured rather than estimated — and where a bound is all the measurement supports, it is given as a bound.
 
 ---
 
@@ -58,7 +58,7 @@ belong in a review of this component rather than in a footnote:
   derives from cannot be stated. Two documents cite pins that do not match it. This is a
   reproducibility defect, not a licensing one, and it is tracked in `REPRODUCING.md`.
 
-PREVAIL is used unmodified. The binary in use reports **v0.2.6**. For a component entering a Threat Model
+PREVAIL is used unmodified, and that is now checked rather than asserted — no tracked file in the vendored checkout differs. The binary in use reports **v0.2.5**, matching its own revision `06769f7b`; an earlier claim of v0.2.6 was wrong. For a component entering a Threat Model
 Analysis, the reviewable surface is a few thousand auditable lines rather than a compiler
 toolchain, and that was the governing consideration.
 
@@ -126,7 +126,7 @@ All of the following have been observed on a running TMM on the BNK lab cluster.
 
 | result | supporting observation |
 |---|---|
-| A verified program is loaded into a running TMM and armed at a function entry with no rebuild and no restart | `OK ARMED LIVE entry=0x144f604 slot=5 (no restart)` |
+| A verified program is loaded into a running TMM and armed at a function entry with no rebuild and no restart | `OK ARMED LIVE entry=0x144ff04 slot=5 (no restart)`. The address is quoted from the build in front of you, not carried between builds — see the build-identity row below |
 | The hook is disarmed and the entry bytes are byte-identical to their original state | bytes read from `/proc/<pid>/mem` before, during and after; equality asserted programmatically |
 | The hook fires exactly once per event | a hook on `http_parse_client_headers` fired once per request across 16,000 requests through the proxy |
 | TMM's own connection-teardown decisions are reported | `rst_why` and three sibling functions, 1,090 call sites; records carry file, line, error code, reason code, cause string and a flow cookie |
@@ -138,6 +138,11 @@ All of the following have been observed on a running TMM on the BNK lab cluster.
 | A program performs rate limiting inside the data plane | 86 qualifying events produced 2 emitted records; the program measured its own windows at 16.0 ms and 10.8 ms |
 | Hooks are armed by symbol name, gated on build identity | `rst_why` has occupied three different addresses across three builds of identical source; the index carries the build ID of the binary it describes and a mismatch is refused |
 | A shield expresses a real security fix | `alpn_guard` reinstates the bounds check added by commit `c806f1b2e8` to `ssl_alpn_match`; PREVAIL admits it |
+| **A probe is generated for a function nobody prepared anything for, and armed, in one sitting** | Name a function; the build's signature index gives its parameters; `mk_probe.py` emits the record layout and the program; clang and PREVAIL accept it; the bytes travel over the loader socket with no file placed in the container. **0.04 s** to generate, against **1 m 54 s** for the same lookup against raw debug information. `mrhttp_proxy_route_message` fired 36 times for 36 requests |
+| **A program dereferences its own pointer arguments** | `bpf_probe_read` is registered, so a generated probe reads a `char *` or a struct head itself rather than needing host C compiled into TMM. Observed: `…ffff0b0b0b64` in a `struct uflow` blob, which is `::ffff:11.11.11.100` — the client address |
+| **A record identifies the function that produced it** | Previously the trampoline chose its context builder from the SLOT NUMBER, so a generated probe landing in a reset function's slot had its registers read as `rst_why`'s arguments and published fiction under that name — and `ls_ctx_rst_build` walks argument two as a string for up to 256 bytes, making it a wild read on the data path. Builders now register against the function they serve; an unregistered function gets the raw registers and no dereference |
+| **A per-call cost floor is measured** | ≤ **11 ns** of program execution on the JIT path (26–28 cycles at 2.60 GHz). Bounded by the `rdtsc` pair that measures it, so the four smallest programs are indistinguishable from each other; `bpf_probe_read` at 26 ns and a maps-plus-clock-plus-emit program at 105 ns are resolvable. Corroborated by an off-TMM harness that recorded 10 ns |
+| **The walkthrough runs end to end** | Seven moves, every command echoed, on the live cluster: nops → armed → decisions reported → target chosen from the index → disarmed byte-identical → an in-plane rate decision at 30:1 → a generated probe armed and reporting. `env/scripts/bnk-demo.sh` and `bnk-demo-generate.sh` |
 
 **Addressable surface**, measured against the shipped binary:
 
@@ -201,7 +206,7 @@ to emit only on that condition.
 | **A single event source** | Function entry only, on padded functions. Kernel eBPF offers approximately ten attach types |
 | **No exit or return probes** | A program observes a function's inputs. Return values, and therefore in-TMM latency, are structurally unavailable |
 | **Padded functions only** | 30,009 index entries require displacement, which is designed and unimplemented. OpenSSL and every separately built component fall in this set |
-| **Per-invocation cost is unmeasured** | `rdtsc` is polluted by preemption, so its mean is not meaningful; `perf_event_paranoid=4` on the node blocks hardware counters. No per-call figure should be quoted |
+| **Per-invocation cost: a floor, not the data-path cost** | Program execution is ≤ 11 ns on the JIT path, and that figure is bounded by the measurement rather than the program. What an armed hook costs *on the data path* — the trampoline's register save and restore, the call and return, cache effects under real traffic — is **not** in it. `rdtsc` means remain meaningless (one pair spanning a context switch gave 130,720 cycles against a minimum of 132) and `perf_event_paranoid=4` still blocks hardware counters. Quote the floor as a floor |
 | **The safe return value is a fixed `0`** | Per-function safe values are unimplemented. An incorrect safe value converts a crash into silent misbehaviour. The mechanism is correct only for return types that fit in `rax` |
 | **No program signature verification** | The loader accepts any program and reports this on every load. This is the principal gap between the current state and anything customer-facing |
 | **No audit trail** | Arming events — who, what, when, which mode, what outcome — are not durably recorded |
@@ -231,7 +236,7 @@ Ordered by value against cost.
 |---|---|---|---|
 | 1 | Array maps | The appropriate structure for dense, small key spaces such as alert codes and error enums | none |
 | 2 | `.data` / `.rodata` relocation | A threshold becomes a load-time parameter rather than a recompilation; the relocation callback already exists | none |
-| 3 | PMU counters as a helper | Resolves the unmeasured per-invocation cost. Instructions-retired is not subject to the preemption artefact that makes `rdtsc` unusable | none — measurement rather than mechanism |
+| 3 | PMU counters as a helper | The remaining half of the per-invocation question. A floor is now measured; instructions-retired would give the *data-path* figure, and it is not subject to the preemption artefact that makes `rdtsc` means unusable | none — measurement rather than mechanism. Note `perf_event_paranoid=4` blocks it today, and the watchpoint prototype found `CAP_PERFMON` insufficient at that setting |
 | 4 | Map iteration | A program can summarise its own accumulated state rather than only adding to it | low |
 
 ### Medium term
@@ -247,7 +252,7 @@ Ordered by value against cost.
 | # | extension | effect | risk |
 |---|---|---|---|
 | 8 | Displacement (inline hooking) | The 30,009 unpadded entries, OpenSSL included. Leading bytes are copied verbatim and a `jmp rel32` written over them; relocatability is determined offline by the index generator, so the runtime remains a memory copy and a jump with no decoder in the data path | Medium — a check on executing threads' program counters is required before patching |
-| 9 | Hardware watchpoints | Any address, with no pad required. The only route to code F5 does not compile | **High.** Requires privilege, is limited to four debug registers, and delivers via SIGTRAP into a run-to-completion poll loop |
+| 9 | Hardware watchpoints | Any address, with no pad required. The only route to code F5 does not compile — the 1,781 linked OpenSSL symbols included | **Prototyped 2026-08-20, outside TMM — [`prototype/watchpoint/`](prototype/watchpoint/). Three corrections.** Delivery does **not** require a signal: `perf_event_open` breakpoints sample into a ring another thread drains, so nothing runs in the watched thread. The privilege ask is **`CAP_SYS_ADMIN`**, not the narrow `CAP_PERFMON`, which is refused at `perf_event_paranoid=4` — that may settle the question on its own. Four is exact (`ENOSPC` on the fifth). And the per-hit cost is **501 ns on aarch64, 4,755 ns on the x86 KVM guest**, against ≤ 11 ns for a pad hook: 45× at best. So it is the reach mechanism for rare events, and unusable per-request — 16,000 requests would cost 8–88 ms of pure trap |
 | 10 | Timer or periodic hook | **Deprioritised.** The clock and event-output helpers already provide in-place aggregation, which was this extension's purpose | Low, and now largely redundant |
 
 ### Considered and declined
@@ -267,10 +272,27 @@ Ordered by value against cost.
 
 ## 7. Anticipated questions
 
-**What is the per-invocation cost?** Unmeasured, and no figure should be offered.
-Preemption pollutes `rdtsc`, and the node's `perf_event_paranoid` setting blocks hardware
-counters. Extension 3 resolves it. The known cost is the 0.182% size increase from the
-padding, which has no run-time component until a hook is armed.
+**What is the per-invocation cost?** A **floor** of ≤ 11 ns for program execution on the JIT
+path, and I would rather give you the floor with its boundary than a confident number. It is
+26–28 cycles at 2.60 GHz, and the `rdtsc` pair doing the measuring costs about that much on its
+own — the tell is that a program which builds and emits a record came in *below* one that returns
+immediately, which is impossible. So the four smallest programs are indistinguishable and the
+honest form of the answer is an upper bound. Two that clear the instrument: `bpf_probe_read` at
+26 ns, and a maps-plus-clock-plus-emit program at 105 ns. An off-TMM harness independently
+recorded 10 ns.
+
+What is **not** in that figure: the trampoline's register save and restore, the call and the
+return, and cache effects under real traffic. So it is not a per-packet cost, and extension 3
+(instructions-retired via the PMU) is what would give one — `rdtsc` means remain useless, one
+pair spanning a context switch having produced 130,720 cycles against a minimum of 132.
+
+Getting this far required fixing the instrument: the benchmark op locked the loader thread
+because it allocated on a thread where TMM's allocator freezes, and it timed the *interpreter*
+while every armed hook runs JIT-compiled code — so the figure it used to produce was several
+times too pessimistic and described a path nothing executes.
+
+The other known cost is the 0.182% size increase from the padding, which has no run-time
+component until a hook is armed.
 
 **What happens when a program is wrong?** Admission fails closed; invocation fails open. A
 program faulting at run time falls through and the fault is counted, on the principle that a

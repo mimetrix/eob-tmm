@@ -12,7 +12,7 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
@@ -341,3 +341,10 @@ check-ctx-reg:
 	    check_ctx_reg.c ls_ctx_reg.c ls_ctx_reg_rst.c ls_ctx_reg_sslerr.c \
 	    ls_ctx_reg_h2abort.c ls_ctx_reg_parse.c ls_ctx_reg_alpn.c check_ctx_reg_stubs.c \
 	    && ./.ctxreg.out . && rm -f .ctxreg.out
+
+# THE BORROWED CODE IS WHAT WE SAY IT IS. Four documents recorded the uBPF and PREVAIL
+# provenance and disagreed with each other and with the tree --- one claiming the revision
+# "cannot be stated" while the checkout carried git history all along. A prose pin drifts
+# because nothing compares it to anything.
+check-vendor-pin:
+	@sh check_vendor_pin.sh

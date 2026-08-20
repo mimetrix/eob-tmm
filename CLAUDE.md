@@ -33,6 +33,23 @@ shield." That was true when written and is now superseded. **Replace such claims
 falsified rather than letting them stand — and add the new limit in the same edit**, which is why the
 three bullets above exist.
 
+**How claims are governed here — four rules, binding.** They exist so the output can be
+*argued with*, and so my own errors stay visible rather than being smoothed out of the record.
+
+1. **No cached file, no claim.** Any statement about something external cites a row in
+   [`SOURCES.md`](SOURCES.md) naming a file in `evidence/cache/` with a SHA-256. A source that
+   cannot be retrieved is recorded `NOT_RETRIEVED` with the reason — never paraphrased.
+2. **Claims about our own system carry an evidence tier** — MEASURED, SHIPPED-UNVALIDATED,
+   ROADMAP, IDEA, FALSIFIED — anchored in [`GROUND_TRUTH.md`](GROUND_TRUTH.md). **Who witnessed
+   it is tracked separately and matters as much:** a counter our own code incremented is weaker
+   evidence than something the kernel or an independent tool observed.
+3. **Falsifier-first.** Open questions are pre-registered with what would kill them, in
+   [`02-RESEARCH-PARAMETERS.md`](02-RESEARCH-PARAMETERS.md). A claim with no stated falsifier is
+   not a claim yet.
+4. **Being wrong is recorded, not tidied away.** [`CONTESTED-PREMISES.md`](CONTESTED-PREMISES.md)
+   keeps attacks on our own premises, including a fix that measurement overturned within the same
+   session. Retracting quietly destroys the audit trail that makes the rest worth anything.
+
 **Reading order across a repo that spans both eras: see [`DOC-STATUS.md`](DOC-STATUS.md).** It
 classifies every document as current, design (pre-build), record, or procedure, and lists the
 specific claims the build falsified. Older documents are kept rather than rewritten — the design
