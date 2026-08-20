@@ -72,6 +72,26 @@ directions, the VM-geometry finding, the Ed25519 signature gate against freshly 
 audit trail's 21 assertions, and compilation of the actual in-TMM sources against the real uBPF
 API.
 
+### Measured, from nothing, on 2026-08-20
+
+Clone into an empty directory, `./bootstrap.sh`, `make -C substrate check`:
+
+```
+bootstrap exit 0    uBPF c900ed9f cloned, configured, libubpf.a built; PREVAIL 06769f7b cloned
+make check exit 0   59 ok, 0 failures, 3 loud skips
+```
+
+**Read the skips, because exit 0 is not "everything ran".** On that host:
+
+| skipped | why | what you lose |
+|---|---|---|
+| `check_shields` | `ebpf-verifier/bin/prevail` not built — PREVAIL needs `libboost-dev` and `libyaml-cpp-dev`, and `bootstrap.sh` reports the failure and continues | **The verifier's verdict on every candidate program, in both directions.** This is the biggest one: a skipped verifier is not a passing verifier |
+| `trampoline_x86_64.S`, `ls_arm.c`, `check_swap`, `check_selfpatch` | the host was **aarch64** | The load-bearing proofs — a process patching its own `r-xp` `.text`, arming a live function and reversing it, the naive swap racing under stress. They *run* only on x86-64 |
+
+So a clean `make check` on aarch64 without PREVAIL is a weaker statement than the same command on
+x86-64 with it, and the output says which one you got rather than printing the same summary either
+way. If you want the full set: an x86-64 host, plus those two packages before `bootstrap.sh`.
+
 On x86-64 it additionally **runs** the mechanism's load-bearing proofs: `check_selfpatch` (a
 process patching its own `r-xp` `.text` so execution sees it), `check_arm` (arming a live function
 and reversing it), and `check_swap` (the naive swap racing under stress while `text_poke_bp` stays

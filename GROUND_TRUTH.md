@@ -95,6 +95,17 @@ weaker evidence than something an independent tool observed, and conflating the 
 | A CVE is mitigated on live traffic | **NOT DEMONSTRATED** | — | the mechanism is proven; no advisory has been mitigated end to end. The BNK target is not reachable on this cluster |
 | `alpn_guard` expresses a real fix | SHIPPED-UNVALIDATED | INDEPENDENT | reinstates the bounds check from commit `c806f1b2e8`; PREVAIL admits it. Never exercised against a live exploit |
 
+## Reproducibility
+
+| claim | tier | witness | anchor |
+|---|---|---|---|
+| A fresh clone reaches a clean check | MEASURED | SELF | 2026-08-20: clone into an empty directory, `./bootstrap.sh`, `make -C substrate check` → exit 0, **59 ok, 0 failures, 3 loud skips**. `REPRODUCING.md` |
+| …and it did **not** before that date | **FALSIFIED** | SELF | the same command failed 4 targets on `fatal error: ubpf.h`, and `REPRODUCING.md` claimed it ran "on any Linux host with a C compiler, Python 3 and clang". uBPF and PREVAIL are vendored and gitignored — present on every machine this was developed on, absent on every machine it would be reproduced on |
+| The uBPF include path was correct | **FALSIFIED** | SELF | `-I../ubpf/vm` for the *generated* `ubpf_config.h` worked only because this tree had once been configured in-source, leaving a second copy there. A fresh `cmake -S . -B build` writes only `build/vm`, so on a clean clone the path was wrong and the error read as a missing dependency |
+| Exit 0 from `make check` means every check ran | **NO** | — | on aarch64 the load-bearing self-patch and live-arm proofs **skip**, and without PREVAIL built `check_shields` skips. Both say so in the output. A skipped verifier is not a passing verifier |
+| The vendored revisions are what the docs say | MEASURED | INDEPENDENT | `substrate/check_vendor_pin.sh`, 6 assertions, reading the pins from `substrate/vendor.pins` — one definition, which `bootstrap.sh` also uses to create the trees the check verifies |
+| This repo can reproduce the live results | **NO** | — | it builds bench harnesses. The live arm needs F5's TMM tree, the toolchain container, a build box and a cluster — `env/bnk-dev-runbook.md` |
+
 ## Borrowed code
 
 | claim | tier | witness | anchor |
