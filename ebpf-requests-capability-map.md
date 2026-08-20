@@ -261,7 +261,7 @@ same answer today: not built, or not measured.
 | 1 | **Peer authentication and key lifecycle** | signature verification **built and measured** (2026-08-20); these two are not | The program is now authenticated; the *requester* is not. Anything that can reach the socket may ask, and the verifying key is compiled in with no revocation path |
 | 2 | **Audit trail** | unbuilt (item 12) | (c)'s "customer made aware" needs a durable record |
 | 3 | **Per-function safe values** | hardcoded `0` | A wrong safe value turns a crash into silent misbehaviour |
-| 4 | **Per-invocation cost** | **unmeasured** | `rdtsc` is preemption-polluted, so the mean is meaningless; `perf_event_paranoid=4` on the node blocks hardware counters. Quote no per-call number |
+| 4 | **Per-invocation cost on the data path** | **a floor only** | ≤ 11 ns of program execution on the compiled path, and that figure is bounded by the `rdtsc` pair measuring it rather than by the program — a record-building program timed *below* one that returns immediately, which is impossible. It excludes the trampoline's register save and restore, the call and return, and cache effects under traffic. `perf_event_paranoid=4` still blocks hardware counters. Quote the floor as a floor and no per-packet number |
 | 5 | **JIT skips the bounds callback** | by design in uBPF | The interpreter and the JIT do not agree on memory safety, and the lab runs the JIT (`LS_VM_JIT=1`) |
 | 6 | **Reachability must be measured** | per-site | Five CVE candidates were compiled into the binary and never executed on BNK's path. `fired > 0` under traffic is the only proof |
 

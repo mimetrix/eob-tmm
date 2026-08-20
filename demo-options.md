@@ -156,10 +156,22 @@ it. Same blocker as 3c.
 
 ## 4. The gating unmeasured thing
 
-**Per-invocation cost.** Every option above is blocked for review, not for
-engineering, until there is a defensible number. The slot counters are dominated by
-preemption artifacts and the bench op that would give a clean floor wedges the loader
-thread.
+**Per-invocation cost — updated 2026-08-20, and the update is smaller than it looks.**
+The bench op no longer wedges the loader (it runs on a TMM thread through `ls_prep`) and
+it now times the compiled program rather than the interpreter it was accidentally
+measuring. So there **is** a number: **≤ 11 ns** for a small program on the JIT path.
+
+It is a **floor, and it is the instrument's floor rather than the program's**: a program
+that builds a record timed *faster* than one that returns immediately, which cannot
+happen, so the `rdtsc` pair dominates what it is trying to measure. What an armed hook
+costs **on the data path** — the trampoline's register save and restore, the call and
+return, cache effects under real traffic — is still not established, and the slot
+counters remain dominated by preemption artefacts. `perf_event_paranoid=4` on the node
+blocks the hardware counters that would settle it.
+
+So the honest position for a review is: a floor exists and is quotable **as a floor**;
+the per-packet cost does not exist yet. That is a better answer than "unmeasured" and a
+worse one than the reviewer wants.
 
 Also, `LS_VM_JIT=1` in the current deployment and uBPF's compiled path does not
 consult the bounds callback — so the memory-safety property is *not* exercised by any
@@ -277,7 +289,10 @@ silent mis-arm into a hard error.
 
 1. **Ship the debug/RCA demo now.** It works, it answers a real question, and it is
    not reproducible by any existing scripting surface. Fold the probe story into it.
-2. **Measure per-call cost next.** Unglamorous, and everything else waits on it.
+2. **Measure per-call cost next — the DATA-PATH cost.** A floor now exists (§4) and it
+   is at the limit of the `rdtsc` rig, so more `rdtsc` will not help. The next step is
+   instructions-retired via PMU counters, which needs `perf_event_paranoid` lowered on the
+   node. Unglamorous, and everything else still waits on it.
 3. **Then Phase 2 (exit hooks)** — the largest remaining jump in what a program can
    express, and the enabler for 3c and 3d.
 4. **Re-frame CVE mitigation** as mechanism-proven / target-blocked, with the

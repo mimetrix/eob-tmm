@@ -18,7 +18,16 @@ rule, not a substitute for it.
 | **What the engine does, has done, and could do** — the current state, with evidence | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) |
 | Every axis in flat form: hook types, maps, helpers, ceilings | [`vm-capability-inventory.md`](vm-capability-inventory.md) |
 | The three customer requests, answered — including where the answer is no | [`ebpf-requests-capability-map.md`](ebpf-requests-capability-map.md) |
+| Whether "CVE mitigation" is even the right frame for BNK | [`cve-survey-bnk.md`](cve-survey-bnk.md) — the Bugzilla survey, and it says no |
+| What can actually be demonstrated, and the gating unknown | [`demo-options.md`](demo-options.md) |
 | How to reproduce any of it | [`REPRODUCING.md`](REPRODUCING.md), [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) |
+
+**These six were written for the architecture review of 2026-08-18** and are the set to hand
+someone cold, in that order. They are kept current rather than frozen: everything above was
+re-checked against the build on 2026-08-20, which moved three claims — signature verification
+from *unbuilt* to *measured*, per-call cost from *unmeasured* to *a floor, stated as a floor*, and
+hardware watchpoints from *absent, needs signal delivery* to *prototyped, and the signal-delivery
+objection falsified*.
 
 **One thing to know before reading anything older than 2026-08-13.** The repository's
 earlier convention was *"there is deliberately no prototype; nothing in this repo executes a

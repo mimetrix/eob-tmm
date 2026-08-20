@@ -21,8 +21,9 @@ is unmeasured it says so.
 | Designed-in call site | **retired** | the HTTP tracepoint; rolled back because iRules already saw every field |
 | Exit / return probes | **absent** | needs per-thread per-depth return-address storage, a depth cap, and a give-up path for `longjmp`/unwind/`noreturn` |
 | Timer / periodic | **absent, and see §5** | `ls_prep` already runs on a TMM timer, so the event source is nearly free |
-| Hardware watchpoint | absent | removes the pad requirement; needs privilege and signal-context delivery |
-| PMU counters | absent | a *helper*, not a hook type — and the direct answer to the unmeasured per-call cost |
+| Hardware watchpoint | **prototyped outside TMM**, 2026-08-20 | removes the pad requirement entirely, so it reaches code F5 does not compile. Measured: `CAP_SYS_ADMIN` required (`CAP_PERFMON` is refused at `perf_event_paranoid=4`), exactly four concurrent, 501 ns/hit aarch64 and 4,755 ns/hit in an x86 KVM guest — viable for rare high-reach events, not per-request. `prototype/watchpoint/` |
+| …delivered by a signal | **FALSIFIED** | this row previously said watchpoints "need signal-context delivery", which was the objection to them. They do not: samples land in a ring buffer that another thread drains, with nothing installed to catch a signal. `CONTESTED-PREMISES.md` #7 |
+| PMU counters | absent | a *helper*, not a hook type — and the direct answer to the per-call cost, of which only a **floor** is measured (≤ 11 ns, bounded by the timer rather than the program). Instructions-retired would give the data-path figure and is not subject to the preemption artefact; `perf_event_paranoid=4` blocks it today |
 | XDP / tc / socket / LSM / cgroup | **not applicable** | kernel-plane program types; TMM has its own userspace data path |
 
 **The honest headline stays:** kernel eBPF attaches to roughly ten kinds of event. We
