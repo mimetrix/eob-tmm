@@ -79,6 +79,32 @@ def sign(key, message):
     return sig
 
 
+def current_ctx_abi():
+    """SHIELD_CTX_ABI_VERSION, read from shield_abi.h.
+
+    NOT a constant here. It was hardcoded to 1, and this build declares 3 --- so every signed
+    program was refused with "ctx abi mismatch: program built for 1, this TMM builds 3". The
+    refusal was correct; the signer was wrong. Reading it from the header means a bump to the
+    ABI cannot leave the signing tool behind, which is exactly the drift the version exists to
+    catch.
+
+    Refuses rather than guessing a default: signing against an assumed ABI produces artifacts
+    that fail at load with a message pointing at the program rather than at this tool.
+    """
+    import re
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "shield_abi.h")
+    try:
+        text = open(path).read()
+    except OSError as exc:
+        sys.exit("*** cannot read %s (%s), so the context ABI version is unknown.\n"
+                 "    Pass --ctx-abi explicitly if you know it." % (path, exc.strerror))
+    m = re.search(r"#define\s+SHIELD_CTX_ABI_VERSION\s+(\d+)", text)
+    if not m:
+        sys.exit("*** no SHIELD_CTX_ABI_VERSION in %s. Pass --ctx-abi explicitly." % path)
+    return int(m.group(1))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--key", required=True, help="Ed25519 private key (PEM). A file is the "
@@ -90,7 +116,9 @@ def main():
     ap.add_argument("--mode-ceiling", choices=sorted(MODES), default="monitor",
                     help="the MOST this program may be run at. Default monitor, deliberately: "
                          "enforce should be asked for, not defaulted into")
-    ap.add_argument("--ctx-abi", type=int, default=1)
+    ap.add_argument("--ctx-abi", type=int, default=None,
+                    help="context ABI version. Defaults to whatever shield_abi.h declares, "
+                         "because a hardcoded 1 signs programs this TMM refuses")
     ap.add_argument("--expires-with", type=lambda x: int(x, 0), default=0xffffffff)
     ap.add_argument("-o", "--out", required=True)
     a = ap.parse_args()
@@ -99,8 +127,9 @@ def main():
     if prog[:4] != b"\x7fELF":
         sys.exit("*** %r is not an ELF object. Sign the .bpf.o, not the .bpf.c" % a.prog)
 
+    ctx_abi = a.ctx_abi if a.ctx_abi is not None else current_ctx_abi()
     binding = build_binding(prog, a.hook, a.build_min, a.build_max,
-                            MODES[a.mode_ceiling], a.ctx_abi, a.expires_with)
+                            MODES[a.mode_ceiling], ctx_abi, a.expires_with)
     sig = sign(a.key, binding)
 
     with open(a.out, "wb") as fh:
@@ -110,6 +139,8 @@ def main():
     print("    hook          : %s" % a.hook)
     print("    prog sha256   : %s" % hashlib.sha256(prog).hexdigest())
     print("    mode ceiling  : %s" % a.mode_ceiling)
+    print("    ctx abi       : %d%s" % (ctx_abi, "" if a.ctx_abi is not None
+                                          else "  (from shield_abi.h)"))
     print("    builds        : 0x%x .. 0x%x" % (a.build_min, a.build_max))
     print("    out           : %s  (%d-byte binding + 64-byte signature)" % (a.out, BINDING_LEN))
 
