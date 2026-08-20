@@ -1,0 +1,22 @@
+# The vendored dependencies, pinned. ONE definition, read by everything that needs it.
+#
+# WHY A FILE RATHER THAN A CONSTANT IN EACH SCRIPT. These revisions were previously written down
+# in four documents and one script, and they disagreed with each other and with the tree --- two
+# said the uBPF revision "cannot be stated", one said PREVAIL reported v0.2.6 when its checkout is
+# v0.2.5. check_vendor_pin.sh was written to end that by comparing the pin to the tree, and then
+# bootstrap.sh needed the same numbers to CREATE the tree. Two copies of a pin is how the first
+# disagreement started, so there is one copy and both read it.
+#
+# Shell-sourceable and grep-able on purpose: no parser, no format, nothing to get wrong.
+
+UBPF_ORIGIN=https://github.com/iovisor/ubpf.git
+UBPF_PIN=c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d
+UBPF_DIR=ubpf
+
+# UNMODIFIED, and that is the claim the patch check protects: the vendored tree is base, and the
+# one patch is applied when the library TMM links is built. "Base plus this diff" is reproducible;
+# "a binary we built once" is not.
+PREVAIL_ORIGIN=https://github.com/vbpf/ebpf-verifier.git
+PREVAIL_PIN=06769f7b508214e63b97905d275920f7e90182fa
+PREVAIL_TAG=v0.2.5
+PREVAIL_DIR=ebpf-verifier

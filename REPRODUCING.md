@@ -43,14 +43,34 @@ where **this repo is not sufficient** and what you need besides it.
 
 ## What this repo can do on its own
 
+**Step one, and it is not optional:**
+
 ```sh
+./bootstrap.sh
 make -C substrate check
 ```
 
-22 checks on any Linux host with a C compiler, Python 3 and clang: the ABI header's wire-layout
-assertions, the safe-return gate cases, the hook-map schema, the budget pass, PREVAIL's verdict on
-each candidate shield in **both** directions, the VM-geometry finding, and compilation of the
-actual in-TMM sources against the real uBPF API.
+**Why there is a step one.** This section used to say the checks run "on any Linux host with a C
+compiler, Python 3 and clang". Measured on a fresh clone on 2026-08-20, that was **false**: four
+targets — `check-skeletons`, `check-vm`, `check-map`, `check-glue` — failed on `fatal error:
+ubpf.h: No such file or directory`, three screens below forty passing lines. uBPF and PREVAIL are
+vendored and **gitignored**, so they are present on every machine this work was done on and absent
+from every machine it would be reproduced on, and nothing in the repository could notice because
+everything that would notice was running where they existed. That is recorded here rather than
+quietly fixed, because it was wrong in the one document whose whole job is reproduction.
+
+`bootstrap.sh` clones both at the revisions [`substrate/vendor.pins`](substrate/vendor.pins) names
+— **from source, from the upstream origins, never a prebuilt artifact** — verifies them with
+`check_vendor_pin.sh`, and runs uBPF's cmake configure, because `ubpf_config.h` is *generated* and
+four checks include it. `./bootstrap.sh --check` reports what is missing and changes nothing.
+`make check` now begins with `check-prereqs`, which names the missing header and the one command
+that fixes it instead of failing as a compiler error at the bottom of a long log.
+
+Once bootstrapped: the ABI header's wire-layout assertions, the safe-return gate cases, the
+hook-map schema, the budget pass, PREVAIL's verdict on each candidate shield in **both**
+directions, the VM-geometry finding, the Ed25519 signature gate against freshly generated keys, the
+audit trail's 21 assertions, and compilation of the actual in-TMM sources against the real uBPF
+API.
 
 On x86-64 it additionally **runs** the mechanism's load-bearing proofs: `check_selfpatch` (a
 process patching its own `r-xp` `.text` so execution sees it), `check_arm` (arming a live function

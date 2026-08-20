@@ -27,12 +27,17 @@ set -e
 
 ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 
-UBPF_PIN=c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d
-UBPF_ORIGIN=https://github.com/iovisor/ubpf.git
-PREVAIL_PIN=06769f7b508214e63b97905d275920f7e90182fa
-PREVAIL_TAG=v0.2.5
-PREVAIL_ORIGIN=https://github.com/vbpf/ebpf-verifier.git
+# THE PINS COME FROM ONE FILE, which bootstrap.sh also reads. They used to be constants here, and
+# bootstrap.sh would have needed the same four values to CREATE the tree this script verifies ---
+# two copies of a pin is exactly how the original disagreement between four documents started.
+PINS="$ROOT/substrate/vendor.pins"
+[ -f "$PINS" ] || { echo "*** no $PINS --- the pins have no single definition" >&2; exit 1; }
+. "$PINS"
 PATCHES="$ROOT/substrate/ubpf-patches"
+for v in UBPF_PIN UBPF_ORIGIN PREVAIL_PIN PREVAIL_TAG PREVAIL_ORIGIN; do
+    eval "_val=\$$v"
+    [ -n "$_val" ] || { echo "*** $PINS does not define $v" >&2; exit 1; }
+done
 
 fail() { echo "*** $*" >&2; exit 1; }
 n=0
