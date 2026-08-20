@@ -60,21 +60,38 @@ check_repo() {
 }
 
 check_repo ubpf          "$UBPF_PIN"    "$UBPF_ORIGIN"    "uBPF   "; n=$((n+1))
-check_repo ebpf-verifier "$PREVAIL_PIN" "$PREVAIL_ORIGIN" "PREVAIL"; n=$((n+1))
 
-# PREVAIL's tag, because a revision is precise and a tag is what a human quotes.
-_tag=$(git -C "$ROOT/ebpf-verifier" describe --tags --exact-match HEAD 2>/dev/null || echo "")
-[ "$_tag" = "$PREVAIL_TAG" ] || fail "PREVAIL is at revision $PREVAIL_PIN but describes as
+# PREVAIL CAN BE DELIBERATELY ABSENT, and that must not read the same as drift. bootstrap.sh
+# --no-prevail exists because PREVAIL needs boost and yaml-cpp and takes minutes, and a host
+# without them can still run every other check. So: absent-and-declared is a SKIP that says so,
+# absent-and-undeclared is a failure. What is never allowed is absent-and-silent.
+#
+# PIN_SKIP_PREVAIL=1 is the declaration. It is a word from the caller, not an inference from the
+# filesystem: inferring it would turn a genuinely missing dependency into a clean run.
+if [ "${PIN_SKIP_PREVAIL:-0}" = "1" ] && [ ! -d "$ROOT/ebpf-verifier" ]; then
+    echo "  SKIP  PREVAIL --- not present, and PIN_SKIP_PREVAIL=1 says that is intended."
+    echo "        check-shields will skip too. A skipped verifier is not a passing verifier."
+else
+    check_repo ebpf-verifier "$PREVAIL_PIN" "$PREVAIL_ORIGIN" "PREVAIL"; n=$((n+1))
+
+    # PREVAIL's tag, because a revision is precise and a tag is what a human quotes.
+    _tag=$(git -C "$ROOT/ebpf-verifier" describe --tags --exact-match HEAD 2>/dev/null || echo "")
+    [ "$_tag" = "$PREVAIL_TAG" ] || fail "PREVAIL is at revision $PREVAIL_PIN but describes as
     '${_tag:-<no exact tag>}', pinned as $PREVAIL_TAG."
-echo "  ok    PREVAIL tag $PREVAIL_TAG matches the pinned revision"; n=$((n+1))
+    echo "  ok    PREVAIL tag $PREVAIL_TAG matches the pinned revision"; n=$((n+1))
+fi
 
 # PREVAIL MUST BE UNMODIFIED. The whole verification argument rests on it being the upstream
 # verifier; a local change would have to be disclosed in a TMA, so it is checked rather than
 # promised.
+if [ "${PIN_SKIP_PREVAIL:-0}" = "1" ] && [ ! -d "$ROOT/ebpf-verifier" ]; then
+    _dirty=0
+else
 _dirty=$(git -C "$ROOT/ebpf-verifier" status --porcelain --untracked-files=no | wc -l)
 [ "$_dirty" -eq 0 ] || fail "PREVAIL has $_dirty modified tracked file(s). It is documented as
     unmodified, and 'we use the upstream verifier' is a claim a security review will test."
 echo "  ok    PREVAIL is unmodified (no tracked file differs)"; n=$((n+1))
+fi
 
 # uBPF: the tree is expected UNPATCHED, and the patch is expected to apply to it.
 _udirty=$(git -C "$ROOT/ubpf" status --porcelain --untracked-files=no | wc -l)

@@ -118,7 +118,17 @@ try_clone() {
     _origin="$1"; _dest="$2"; _name="$3"
     if [ -n "$MIRROR" ] && [ -d "$MIRROR/$(basename "$_dest")" ]; then
         info "cloning $_name from the mirror $MIRROR/$(basename "$_dest")"
-        git clone -q "$MIRROR/$(basename "$_dest")" "$_dest" && return 0
+        if git clone -q "$MIRROR/$(basename "$_dest")" "$_dest"; then
+            # POINT ORIGIN BACK AT THE CANONICAL URL. check_vendor_pin.sh asserts the origin, not
+            # just the revision, and it is right to: "we have these bytes" and "these bytes came
+            # from upstream" are different claims, and a tree whose origin is a path on somebody's
+            # laptop cannot support the second. The first run of this script left origin pointing
+            # at the mirror and the pin check failed --- correctly. Recording the canonical origin
+            # keeps that check strict while letting an offline host bootstrap at all.
+            git -C "$_dest" remote set-url origin "$_origin"
+            info "  origin recorded as $_origin (cloned via the mirror; the pin is checked next)"
+            return 0
+        fi
     fi
     info "cloning $_name from $_origin"
     git clone -q "$_origin" "$_dest" 2>/tmp/.bs_err && return 0
@@ -214,7 +224,19 @@ fi
 
 # ---------------------------------------------------------------------------------------------
 say "=== 6. verify the revisions are what the repository claims"
-sh "$ROOT/substrate/check_vendor_pin.sh" "$ROOT" | sed 's/^/  /'
+# EXIT CODE, NOT JUST OUTPUT. The first version piped this through sed, which swallowed the
+# failure --- the script printed "*** uBPF origin is ..." and carried on to report success. A
+# verification step whose result is discarded is decoration.
+[ "$WANT_PREVAIL" -eq 0 ] && export PIN_SKIP_PREVAIL=1
+if sh "$ROOT/substrate/check_vendor_pin.sh" "$ROOT" > /tmp/.bs_pin 2>&1; then
+    sed 's/^/  /' /tmp/.bs_pin
+else
+    sed 's/^/  /' /tmp/.bs_pin
+    rm -f /tmp/.bs_pin
+    fail "the vendored trees are NOT the revisions this repository pins. Do not build on them ---
+    the whole point of the pin is that what runs here is what the documents describe."
+fi
+rm -f /tmp/.bs_pin
 
 say "=== 7. now run the checks"
 info "make -C substrate check"
