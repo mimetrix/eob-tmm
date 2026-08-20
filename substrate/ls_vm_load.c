@@ -328,17 +328,19 @@ extern int  ls_vm_reload(int slot, const void *elf, size_t elf_len,
                          const char *section, const char *function, enum ls_mode m);
 extern void ls_vm_set_mode(int slot, enum ls_mode m);
 
-/* THE LAST THING SAID TO THE CALLER, kept so the audit record can quote it verbatim instead of
- * deriving a second verdict from the same inputs. Two independently computed answers to "was
+/* WHAT WAS SAID TO THE CALLER is handed to ls_audit so the record can quote it verbatim instead
+ * of deriving a second verdict from the same inputs. Two independently computed answers to "was
  * this allowed" is how an audit trail comes to disagree with what happened, and a trail that
  * disagrees is worse than none: it will be believed.
  *
- * A single static is correct here and would not be if the loader ever went concurrent. One
- * thread runs the accept loop and handles one connection at a time, so there is exactly one
- * request in flight. If that ever changes this must become per-connection state, and the
- * _Static_assert below is not able to catch it --- so it is written down here instead. */
-static char g_last_reply[320];
-
+ * THE BUFFER LIVES IN ls_audit.c, not here, and that is a build constraint rather than a
+ * preference. TMM's link gate (bin/diff-globals) keeps an exact manifest of every mutable
+ * global, so a static buffer here would be a second permanent entry for one feature. It belongs
+ * to the audit trail, so it lives with the audit trail's single state struct.
+ *
+ * One static is correct only because the loader is single-threaded: one accept loop, one
+ * connection at a time, so exactly one request is in flight. If that ever changes this must
+ * become per-connection state, and no assertion here can catch it --- hence the sentence. */
 static void
 reply(int fd, const char *fmt, ...)
 {
@@ -348,7 +350,7 @@ reply(int fd, const char *fmt, ...)
     int n = vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
     if (n > 0) {
-        snprintf(g_last_reply, sizeof g_last_reply, "%s", buf);
+        ls_audit_note_reply(buf);
         (void)!write(fd, buf, (size_t)n);
     }
 }
@@ -702,13 +704,14 @@ handle(int fd)
     struct shield_msg  copy;
     struct shield_msg *seen = NULL;
 
-    g_last_reply[0] = '\0';
+    ls_audit_clear_reply();
     handle_msg(fd, &seen, &copy);
-    /* An empty reply means a path returned without answering the caller. That is a bug rather
+    /* A missing reply means a path returned without answering the caller. That is a bug rather
      * than an outcome, and it is recorded as one instead of producing a record whose verdict
      * field is blank and therefore reads as "allowed". */
-    ls_audit_op(fd, seen, g_last_reply[0] != '\0' ? g_last_reply
-                                                  : "NO REPLY SENT --- handler returned silently");
+    const char *said = ls_audit_last_reply();
+    ls_audit_op(fd, seen, said != NULL ? said
+                                       : "NO REPLY SENT --- handler returned silently");
 }
 
 void ls_vm_loader_start(void);

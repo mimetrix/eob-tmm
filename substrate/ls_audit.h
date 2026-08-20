@@ -36,6 +36,12 @@
  *   - NO RECORD OF WHAT THE PROGRAM DID. This is the control plane: loads, arms, mode changes.
  *     A program's own output is the tracepoint ring, and the two are deliberately separate ---
  *     an audit trail that could be flooded by data-path volume is not an audit trail.
+ *   - ONE ENTRY IN TMM'S GLOBAL-STATE MANIFEST, and that shaped the code. src/compile/Makefile
+ *     runs bin/diff-globals against an exact list of every mutable global in the binary; any
+ *     difference in either direction fails the link. The first version of this file had five
+ *     statics and the loader had a sixth for the last reply, so the link refused all six and it
+ *     cost a build cycle. They are now one struct --- see the note at g_ls_audit --- which is
+ *     also why the reply buffer lives on this side of the interface rather than beside reply().
  *   - NO CAUSAL LINK TO A HUMAN. peer_pid identifies a process, and in a Kubernetes exec that
  *     process is spawned by an API call this code cannot see. Closing that needs the request to
  *     carry an operator identity, which needs the wire format to grow a field and something to
@@ -58,6 +64,14 @@ void ls_audit_init(void);
  * garbage is evidence, and dropping it would make malformed traffic the one thing that leaves
  * no trace. `reply_text` is the line the caller received, verbatim. */
 void ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text);
+
+/* The reply the caller was last given, remembered so the record can quote it rather than derive a
+ * second verdict from the same inputs. Called by the loader's reply(); the buffer lives HERE
+ * rather than beside reply() so this feature costs ONE entry in TMM's global-state manifest
+ * (src/compile/Makefile's diff-globals gate) instead of two. */
+void        ls_audit_note_reply(const char *text);
+const char *ls_audit_last_reply(void);   /* NULL if nothing was said --- which is a bug, not an outcome */
+void        ls_audit_clear_reply(void);
 
 /* Records emitted since init, for tests and for a "did anything get lost" check. */
 unsigned long long ls_audit_count(void);

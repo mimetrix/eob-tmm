@@ -44,13 +44,53 @@ _Static_assert(sizeof(struct ls_ucred) == 12, "struct ucred is three 32-bit fiel
 
 #define LS_AUDIT_LINE 1024
 
-static int                 g_file_fd = -1;
-static unsigned long long  g_count;
-static char                g_build[48] = "unknown";
-static int                 g_inited;
+/* ONE GLOBAL FOR THE WHOLE SUBSYSTEM, and the reason is a build gate rather than taste.
+ * src/compile/Makefile runs bin/diff-globals against a per-architecture manifest of every
+ * mutable global in the binary, and any new name fails the link. The first version of this file
+ * declared five separate statics --- and the loader's last-reply buffer made six --- so it cost
+ * a full build cycle and would have added six entries to a permanent manifest for one feature.
+ *
+ * The gate is right and the code was wrong. Its purpose is to make each piece of new global
+ * mutable state a deliberate, reviewed decision; six names for one subsystem is six decisions
+ * where there is only one. Folding them into a single struct makes the manifest entry match the
+ * unit of design, and a reader of that manifest learns "the audit trail has state" rather than
+ * five unrelated-looking nouns.
+ *
+ * Note also that the manifest is an EXACT match in both directions: deleting tracked state fails
+ * the link exactly as adding it does. So this struct is now the one thing that must be declared
+ * there, and splitting it back out later is a build-breaking change, not a refactor. */
+struct ls_audit_state {
+    int                file_fd;          /* optional LS_AUDIT_PATH sink, -1 if none        */
+    int                inited;
+    unsigned long long count;            /* records emitted, so a gap in seq is visible    */
+    char               build[48];        /* this binary's GNU build id, hex                */
+    char               last_reply[320];  /* what the caller was last told, quoted verbatim */
+};
+static struct ls_audit_state g_ls_audit = { .file_fd = -1, .build = "unknown" };
 
-unsigned long long ls_audit_count(void)   { return g_count; }
-const char *       ls_audit_build_id(void){ return g_build; }
+unsigned long long ls_audit_count(void)   { return g_ls_audit.count; }
+const char *       ls_audit_build_id(void){ return g_ls_audit.build; }
+
+/* Called by the loader's reply() so the record can quote what the caller was told rather than
+ * deriving a second verdict from the same inputs. Lives here, not in ls_vm_load.c, so the
+ * feature's state is one manifest entry instead of two. */
+void
+ls_audit_note_reply(const char *text)
+{
+    snprintf(g_ls_audit.last_reply, sizeof g_ls_audit.last_reply, "%s", text != NULL ? text : "");
+}
+
+const char *
+ls_audit_last_reply(void)
+{
+    return g_ls_audit.last_reply[0] != '\0' ? g_ls_audit.last_reply : NULL;
+}
+
+void
+ls_audit_clear_reply(void)
+{
+    g_ls_audit.last_reply[0] = '\0';
+}
 
 /* ---------------------------------------------------------------------------------------------
  * This binary's GNU build ID, read from /proc/self/exe.
@@ -123,7 +163,7 @@ ls_audit_read_build_id(void)
                 if (memcmp(note + off, pat, 16) != 0)
                     continue;
                 const unsigned char *id = note + off + 16;
-                char *o = g_build;
+                char *o = g_ls_audit.build;
                 for (unsigned int b = 0; b < ds; b++) {
                     static const char hex[] = "0123456789abcdef";
                     *o++ = hex[id[b] >> 4];
@@ -141,9 +181,9 @@ ls_audit_read_build_id(void)
 void
 ls_audit_init(void)
 {
-    if (g_inited)
+    if (g_ls_audit.inited)
         return;
-    g_inited = 1;
+    g_ls_audit.inited = 1;
     ls_audit_read_build_id();
 
     /* The optional file sink. Deliberately secondary: a file TMM can write is a file TMM can
@@ -152,15 +192,15 @@ ls_audit_init(void)
      * assumes durability that is not there. */
     const char *path = getenv("LS_AUDIT_PATH");
     if (path != NULL && path[0] != '\0') {
-        g_file_fd = open(path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
-        if (g_file_fd < 0)
+        g_ls_audit.file_fd = open(path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
+        if (g_ls_audit.file_fd < 0)
             fprintf(stderr, "ls_audit: cannot open LS_AUDIT_PATH=%s --- records go to stderr "
                             "only\n", path);
     }
     fprintf(stderr, "ls_audit: recording control-plane operations to stderr%s. Build %s. "
                     "Peer credentials are kernel-attested (SO_PEERCRED) and identify a PROCESS, "
                     "not an operator.\n",
-            g_file_fd >= 0 ? " and LS_AUDIT_PATH" : "", g_build);
+            g_ls_audit.file_fd >= 0 ? " and LS_AUDIT_PATH" : "", g_ls_audit.build);
 }
 
 /* /proc/<pid>/comm, trimmed, into a caller buffer. Best effort by design: the peer may exit
@@ -279,7 +319,7 @@ ls_audit_quote(const char *in, size_t in_max, char *out, size_t out_len)
 void
 ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text)
 {
-    if (!g_inited)
+    if (!g_ls_audit.inited)
         ls_audit_init();
 
     /* PEER CREDENTIALS FIRST, because they are the only field here the caller cannot influence.
@@ -309,7 +349,7 @@ ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text)
     char line[LS_AUDIT_LINE];
     int n;
 
-    unsigned long long seq = ++g_count;
+    unsigned long long seq = ++g_ls_audit.count;
 
     if (m == NULL) {
         /* A peer connected and sent something uninterpretable. Recorded rather than dropped:
@@ -319,7 +359,7 @@ ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text)
                      "peer_pid=%u peer_uid=%u peer_gid=%u peer_comm=%s "
                      "op=MALFORMED verdict=\"%s\"\n",
                      seq, (long long)rt.tv_sec, rt.tv_nsec, (long long)mo.tv_sec, mo.tv_nsec,
-                     (int)getpid(), g_build, uc.pid, uc.uid, uc.gid, comm, verdict);
+                     (int)getpid(), g_ls_audit.build, uc.pid, uc.uid, uc.gid, comm, verdict);
     } else {
         char hook[80];
         ls_audit_sanitize(m->binding.hook, sizeof m->binding.hook, hook, sizeof hook);
@@ -351,7 +391,7 @@ ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text)
                      "build_min=%u build_max=%u ceiling=%u ctx_abi=%u expires=%u "
                      "verdict=\"%s\"\n",
                      seq, (long long)rt.tv_sec, rt.tv_nsec, (long long)mo.tv_sec, mo.tv_nsec,
-                     (int)getpid(), g_build, uc.pid, uc.uid, uc.gid, comm,
+                     (int)getpid(), g_ls_audit.build, uc.pid, uc.uid, uc.gid, comm,
                      opname, m->epoch, m->mode, hook, m->prog_len, sha,
                      m->binding.build_min, m->binding.build_max, m->binding.mode_ceiling,
                      m->binding.ctx_abi_version, m->binding.expires_with, verdict);
@@ -371,6 +411,6 @@ ls_audit_op(int fd, const struct shield_msg *m, const char *reply_text)
     }
 
     (void)!write(2, line, len);
-    if (g_file_fd >= 0)
-        (void)!write(g_file_fd, line, len);
+    if (g_ls_audit.file_fd >= 0)
+        (void)!write(g_ls_audit.file_fd, line, len);
 }

@@ -46,6 +46,16 @@ Copy from this directory into `src/base/`:
 | `substrate/ls_sig.c`, `ls_sig.h` | `base/` — Ed25519 verification; needs `-lcrypto`, already linked |
 | `substrate/ls_audit.c`, `ls_audit.h` | `base/` — one record per control-plane operation |
 
+**And one line in each of `src/compile/{debug,default}_whitelist_x86_64`:** `g_ls_audit`. That
+file is TMM's exact manifest of mutable global state and the link fails on any difference in
+either direction. The audit trail cost a build cycle here: its first version declared five
+separate statics, plus a sixth in `ls_vm_load.c` for the last reply, and the link refused all six.
+Folding them into one struct was the right answer rather than adding six manifest lines — the gate
+exists to make new global state a deliberate decision, and six names for one feature is six
+decisions where there is one. **Predict the symbol with `nm` on the object and pre-add it**; a
+guessed pre-add costs the cycle it was meant to save, because the manifest is exact in both
+directions.
+
 ## 2. `src/compile/filelist`
 
 **Seventeen lines as of 2026-08-20, not the eight this section described until then.** The count

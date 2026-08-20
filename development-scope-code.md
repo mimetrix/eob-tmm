@@ -1897,6 +1897,34 @@ evidence — or its absence — in front of whoever issues it.
 Every op logged: who, what, when, and what happened. One structured record, emitted whether the
 operation succeeded or failed.
 
+> **BUILT, 2026-08-20 — and the skeleton below got two things wrong that the implementation had to
+> correct.** The working code is [`substrate/ls_audit.c`](substrate/ls_audit.c) with its interface
+> and limits in [`substrate/ls_audit.h`](substrate/ls_audit.h); its falsifiers are P7 in
+> [`02-RESEARCH-PARAMETERS.md`](02-RESEARCH-PARAMETERS.md) and its tests are `check-audit`
+> off-TMM plus `env/scripts/bnk-test-audit.sh` live. Read the sketch for shape and the two
+> corrections for why a sketch is not a design:
+>
+> **`actor[64]` — "authenticated operator, from the control plane" — does not exist and cannot,
+> here.** There is no authenticated operator: the loader speaks over an AF_UNIX socket with no
+> peer authentication, so any actor string it wrote would be self-reported by whoever connected,
+> which is worse than an empty field because it *looks* like identity. What the implementation
+> records instead is `SO_PEERCRED` — pid, uid and gid filled in by the *kernel* at `connect()`
+> and not settable by the peer. That is attribution within a trust domain rather than
+> authentication across one, and the header says so at the point of use.
+>
+> **`result` as an error code is one answer too many.** The sketch stores `int32_t result` derived
+> from the handler's return, while the caller receives a separately formatted reply string. Two
+> independent renderings of one verdict is how an audit trail comes to disagree with what
+> happened — and a trail that disagrees is worse than none, because it will be believed. The
+> implementation records the reply **verbatim**, quoted, as the last field. Its own test caught
+> the first version of this: the field was being sanitised, so `OK loaded slot=5` was recorded as
+> `OK_loaded_slot_5` — a paraphrase where the header promised a quotation.
+>
+> Two fields in the sketch are still worth having and are still absent: `mode_from`/`mode_to` (a
+> mode change records the requested mode, not the transition) and `fired_at_change` (the evidence
+> counter at the moment of a change). Neither is reachable from the loader thread without touching
+> per-slot state under a lock, which is why they are noted rather than added.
+
 ```c
 /*
  * audit.c — one record per shield operation. Emitted from the loader handler
