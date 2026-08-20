@@ -145,13 +145,20 @@ case "$LOG" in
 esac
 # And the LOAD's program identity must be the hash the signature commits to, not zeros --- a
 # record that cannot say WHICH program was armed is not an audit trail.
-case "$LOG" in
-  *"op=LOAD "*prog_sha256=0000000000000000*)
-      bad "the load recorded an all-zero program hash --- the record cannot say which program" ;;
-  *"op=LOAD "*)
-      ok "the load names the program by the hash its signature commits to" ;;
-  *)  bad "no LOAD record found in the last four" ;;
-esac
+#
+# ONE RECORD AT A TIME. The first version matched `*"op=LOAD "*prog_sha256=0000...*` against all
+# four records joined, so it found "op=LOAD" in one line and an all-zero hash in a LATER one --- the
+# ARM record, which legitimately carries no program --- and reported the load as unidentified. A
+# glob that spans record boundaries is not a test of a record.
+LOADREC=$(printf '%s\n' "$LOG" | grep 'op=LOAD ' | tail -1)
+SHA=$(printf '%s' "$LOADREC" | sed -n 's/.*prog_sha256=\([0-9a-f]*\).*/\1/p')
+if [ -z "$LOADREC" ]; then
+    bad "no LOAD record found in the last four"
+elif [ "$SHA" = "0000000000000000" ] || [ -z "$SHA" ]; then
+    bad "the load recorded an all-zero program hash --- the record cannot say which program" "$LOADREC"
+else
+    ok "the load names the program by the hash its signature commits to ($SHA)"
+fi
 
 echo
 echo "=== 8. one real record, in full"

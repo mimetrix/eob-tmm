@@ -118,6 +118,32 @@ request to carry a signed operator identity, which needs the wire format to grow
 after, and F7g is demonstrated on a live TMM rather than argued — the loader must still answer
 immediately after emitting a record.
 
+**P7 CLOSED, 2026-08-20 — 11 of 11 live on build `1c913003`, 21 of 21 off-TMM.** F7g is shown
+rather than argued: 10 of 10 round trips answered after records were emitted, on the thread whose
+allocator wedged signature verification two days earlier. F7a holds including the path most likely
+to leak — a malformed 3-byte request is recorded as `op=MALFORMED`. F7b, F7c and F7d were each
+caught failing first: the verdict was a paraphrase rather than a quotation, truncation was silent,
+and my first fix for the truncation checked the wrong buffer.
+
+**Two findings the pre-registered falsifiers did not cover, which is the interesting part.**
+Neither was on the list, and both came from *reading the first real records* rather than from any
+assertion:
+
+- **ARM and DISARM recorded as `op_4099` and `op_4100`.** The trail exists to answer "who armed
+  what" and the one record a reader would go looking for did not name itself. The off-TMM test had
+  built its messages from the four ops in `enum shield_op` — which is exactly the set that was
+  already named, so the test could not have found this. A falsifier list drawn from the interface
+  you are testing inherits that interface's blind spots.
+- **An ARM record carries an address, not a symbol.** `hook=0x1451204`. Name resolution happens in
+  the client, where the per-build index lives, so TMM never sees the string the operator typed.
+  Recorded as FALSIFIED in `GROUND_TRUTH.md` rather than fixed here: it is a wire-format change.
+
+**And the ordering caveat at the top of this entry earned itself.** The falsifiers were written
+alongside the code, and the two things they missed are both things the code's own shape made
+invisible. Pre-registration before implementation would not have guaranteed catching them — but
+registering afterwards guaranteed the list matched the implementation, which is the failure mode
+rule 3 exists to prevent.
+
 ---
 
 ### P6 · Can a program be refused unless it carries a valid signature?
