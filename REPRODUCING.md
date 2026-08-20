@@ -72,6 +72,28 @@ directions, the VM-geometry finding, the Ed25519 signature gate against freshly 
 audit trail's 21 assertions, and compilation of the actual in-TMM sources against the real uBPF
 API.
 
+### Signing, which a replication also needs from nothing
+
+```sh
+env/scripts/bnk-init-signing-key.sh          # create the key, emit the header the build compiles
+env/scripts/bnk-init-signing-key.sh --show   # report what exists, change nothing
+```
+
+**This was missing until 2026-08-20 and the gap was invisible for the usual reason.** Every script
+that signs a program reads `$SIGN_KEY`, defaulting to `~/.ls-signing/shield_sk.pem`, and nothing
+said how that file comes to exist. `make check-sig` generates *throwaway* keys for its own
+assertions, so the signature tests pass on a machine that could never sign a real program — a
+replicator following these documents would reach the signing step and stop. The largest thing built
+that week was the least reproducible part of it.
+
+The key stays **outside** the repository, mode 600, and `*_sk.pem` is gitignored so an accidental
+copy inside cannot be committed. A replication therefore produces a **different** key, which is
+correct: reproducing this work means reproducing the mechanism, not inheriting the trust. The
+header `substrate/ls_sig_pubkey.h` is generated from the public half and records the key's
+fingerprint in a comment, so the header itself says which key that build trusts.
+`--keyless` emits a header with no key: such a build refuses **every** load, including valid ones,
+which is fail-closed and not a working configuration.
+
 ### Measured, from nothing, on 2026-08-20
 
 Clone into an empty directory, `./bootstrap.sh`, `make -C substrate check`:
