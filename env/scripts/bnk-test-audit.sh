@@ -123,7 +123,38 @@ done
                   || bad "$okc of 10 answered --- the loader is wedged or slow" ""
 
 echo
-echo "=== 7. one real record, in full"
+echo "=== 7. the two operations this trail exists for must be NAMED, not numbered"
+# THE DEFECT THE FIRST LIVE RUN EXPOSED, which no off-TMM assertion had asked about: ARM and
+# DISARM were recorded as op_4099 and op_4100, so the one record a reader would go looking for ---
+# who armed what --- was the one that did not say what it was. Live, because the numbers come from
+# the loader's own switch and only a real arm exercises that path.
+HOOK=rst_why
+$K python3 /usr/bin/ls-load.py load 5 /usr/share/ls/rst_watch.bpf.o 1 >/dev/null 2>&1 || true
+$K python3 /usr/bin/ls-load.py arm 5 "$HOOK"    >/dev/null 2>&1 || true
+$K python3 /usr/bin/ls-load.py disarm "$HOOK"   >/dev/null 2>&1 || true
+LOG=$(kubectl logs "$POD" -c f5-tmm 2>/dev/null | grep '^ls_audit: seq=' | tail -4)
+case "$LOG" in
+  *"op=ARM "*)     ok "the arm is recorded as op=ARM" ;;
+  *op=op_4099*)    bad "the arm is recorded as op_4099 --- the record this trail exists for does not name itself" ;;
+  *)               bad "no ARM record found in the last four" ;;
+esac
+case "$LOG" in
+  *"op=DISARM "*)  ok "the disarm is recorded as op=DISARM" ;;
+  *op=op_4100*)    bad "the disarm is recorded as op_4100" ;;
+  *)               bad "no DISARM record found in the last four" ;;
+esac
+# And the LOAD's program identity must be the hash the signature commits to, not zeros --- a
+# record that cannot say WHICH program was armed is not an audit trail.
+case "$LOG" in
+  *"op=LOAD "*prog_sha256=0000000000000000*)
+      bad "the load recorded an all-zero program hash --- the record cannot say which program" ;;
+  *"op=LOAD "*)
+      ok "the load names the program by the hash its signature commits to" ;;
+  *)  bad "no LOAD record found in the last four" ;;
+esac
+
+echo
+echo "=== 8. one real record, in full"
 kubectl logs "$POD" -c f5-tmm 2>/dev/null | grep '^ls_audit: seq=' | tail -1 | fold -w 150 | sed 's/^/    /'
 
 echo
