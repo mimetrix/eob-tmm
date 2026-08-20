@@ -52,7 +52,11 @@ enum ls_sig_result {
     LS_SIG_NO_PUBKEY,        /* no key was baked in --- refuse rather than accept all   */
     LS_SIG_BAD_ARGS,
     LS_SIG_EVP_FAILED,       /* OpenSSL could not even attempt it                       */
-    LS_SIG_BAD_SIGNATURE,    /* the signature does not verify against the binding       */
+    LS_SIG_BAD_SIGNATURE,    /* the signature is INVALID --- EVP returned 0             */
+    LS_SIG_EVP_ERROR,        /* EVP returned NEGATIVE: a fault, not a verdict. Conflating
+                              * this with an invalid signature sends the reader to look for
+                              * a forgery when the actual problem is the crypto library ---
+                              * which is exactly what happened on 2026-08-20. */
     LS_SIG_BODY_MISMATCH     /* signature good, but prog_sha256 does not match the body */
 };
 

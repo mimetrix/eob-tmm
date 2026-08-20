@@ -13,6 +13,7 @@
 #include <ls_sig_pubkey.h>
 
 #include <openssl/evp.h>
+#include <openssl/err.h>
 #include <openssl/sha.h>
 
 #include <stdio.h>
@@ -26,7 +27,9 @@ ls_sig_strerror(enum ls_sig_result r)
     case LS_SIG_NO_PUBKEY:      return "no public key is baked into this build";
     case LS_SIG_BAD_ARGS:       return "malformed request (length or pointer)";
     case LS_SIG_EVP_FAILED:     return "the crypto library could not attempt verification";
-    case LS_SIG_BAD_SIGNATURE:  return "signature does not verify against the binding";
+    case LS_SIG_BAD_SIGNATURE:  return "signature is INVALID for these bytes and this key";
+    case LS_SIG_EVP_ERROR:      return "the crypto library FAILED (not a verdict about the "
+                                       "program --- see the ls_sig: line in the log)";
     case LS_SIG_BODY_MISMATCH:  return "signature is valid but the program body does not match "
                                        "the hash it commits to";
     }
@@ -70,6 +73,20 @@ ls_sig_verify(const void *binding, size_t binding_len,
     if (!ls_sig_have_pubkey())
         return LS_SIG_NO_PUBKEY;
 
+    /* FINGERPRINT WHAT IS ABOUT TO BE VERIFIED. Three separate checks outside TMM said the
+     * binding, the signature and the key were all correct while the live path refused --- and
+     * there was no way to tell which of them TMM was actually looking at. Eight bytes each is
+     * enough to identify them and short enough to log on every load. */
+    {
+        unsigned char bh[32];
+        if (SHA256((const unsigned char *)binding, binding_len, bh) != NULL)
+            fprintf(stderr, "ls_sig: verifying binding %02x%02x%02x%02x sig %02x%02x%02x%02x "
+                            "key %02x%02x%02x%02x prog %u bytes\n",
+                    bh[0], bh[1], bh[2], bh[3], sig[0], sig[1], sig[2], sig[3],
+                    ls_sig_pubkey[0], ls_sig_pubkey[1], ls_sig_pubkey[2], ls_sig_pubkey[3],
+                    (unsigned)prog_len);
+    }
+
     pk = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL,
                                      ls_sig_pubkey, LS_SIG_PUBKEY_LEN);
     if (pk == NULL)
@@ -82,9 +99,30 @@ ls_sig_verify(const void *binding, size_t binding_len,
     if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, pk) != 1)
         goto out;
 
-    if (EVP_DigestVerify(ctx, sig, sig_len, binding, binding_len) != 1) {
-        rc = LS_SIG_BAD_SIGNATURE;
-        goto out;
+    /* EVP_DigestVerify: 1 = verified, 0 = INVALID, negative = ERROR. Treating "!= 1" as an
+     * invalid signature conflates a forgery with a broken crypto library, and on 2026-08-20 that
+     * cost a diagnosis: a live refusal said "signature does not verify" while the bytes, the key
+     * and the signature had each been checked correct outside TMM. Distinguish them, and say
+     * which. */
+    {
+        int v = EVP_DigestVerify(ctx, sig, sig_len, binding, binding_len);
+        if (v == 0) {
+            rc = LS_SIG_BAD_SIGNATURE;
+            goto out;
+        }
+        if (v != 1) {
+            unsigned long e = ERR_peek_last_error();
+            char eb[160];
+
+            /* The OpenSSL error queue is the only thing that can distinguish "Ed25519 is not
+             * available in this build" from "the arguments were wrong", and neither is a
+             * verdict about the program. Logged here rather than returned, because the caller
+             * gets one refusal either way. */
+            ERR_error_string_n(e, eb, sizeof eb);
+            fprintf(stderr, "ls_sig: EVP_DigestVerify returned %d --- %s\n", v, eb);
+            rc = LS_SIG_EVP_ERROR;
+            goto out;
+        }
     }
 
     /* THE SIGNATURE COVERS THE BINDING, SO THE BODY IS ONLY AS BOUND AS ITS HASH. Skipping this
