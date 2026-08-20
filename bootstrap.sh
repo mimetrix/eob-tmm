@@ -4,6 +4,7 @@
 #   ./bootstrap.sh              fetch and build the vendored dependencies, then verify
 #   ./bootstrap.sh --check      say what is missing and stop --- change nothing
 #   ./bootstrap.sh --no-prevail skip PREVAIL (heavy: needs cmake, boost, yaml-cpp)
+#   ./bootstrap.sh --from=DIR   clone from a local mirror --- for a host with no internet route
 #
 # WHY THIS EXISTS, measured 2026-08-20. A fresh clone of this repository does NOT pass its own
 # checks. `make -C substrate check` fails four targets --- check-skeletons, check-vm, check-map,
@@ -32,10 +33,12 @@ ROOT=$(cd "$(dirname "$0")" && pwd)
 PINS="$ROOT/substrate/vendor.pins"
 MODE=""
 WANT_PREVAIL=1
+MIRROR=""
 for a in "$@"; do
     case "$a" in
         --check)      MODE=check ;;
         --no-prevail) WANT_PREVAIL=0 ;;
+        --from=*)     MIRROR=${a#--from=} ;;
         -h|--help)    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)            echo "*** unknown option $a" >&2; exit 2 ;;
     esac
@@ -96,6 +99,42 @@ say "=== 3. fetch, at the pinned revisions"
 # CLONE THEN CHECKOUT, not --depth 1 --branch, because a pin is a REVISION and a shallow clone of
 # a branch may not contain it. Bandwidth is not the scarce resource here; being able to state
 # exactly what was built is.
+# TRANSPORT DOES NOT MATTER; THE REVISION DOES. Observed on the first real run of this script:
+# `git clone https://github.com/...` failed with "server certificate verification failed. CAfile:
+# none" --- the host had no CA bundle, while ssh to the same host worked. A reproduction
+# environment is exactly where that is normal: no CA store, an egress proxy, or no internet at all.
+#
+# So each origin is tried over HTTPS, then over ssh, then from a local mirror given as
+# --from=<dir>. That is not a weakening of provenance, and it is worth being precise about why:
+# the identity of what you get is established by comparing HEAD to the pinned SHA-1 afterwards,
+# and check_vendor_pin.sh then re-checks it independently. A transport chooses who you talk to; the
+# hash decides whether you got the right bytes.
+ssh_form() {
+    # https://github.com/o/r.git -> git@github.com:o/r.git
+    printf '%s' "$1" | sed -e 's|^https://\([^/]*\)/|git@\1:|'
+}
+
+try_clone() {
+    _origin="$1"; _dest="$2"; _name="$3"
+    if [ -n "$MIRROR" ] && [ -d "$MIRROR/$(basename "$_dest")" ]; then
+        info "cloning $_name from the mirror $MIRROR/$(basename "$_dest")"
+        git clone -q "$MIRROR/$(basename "$_dest")" "$_dest" && return 0
+    fi
+    info "cloning $_name from $_origin"
+    git clone -q "$_origin" "$_dest" 2>/tmp/.bs_err && return 0
+    _e=$(tail -1 /tmp/.bs_err 2>/dev/null)
+    info "  https failed: $_e"
+    _ssh=$(ssh_form "$_origin")
+    if [ "$_ssh" != "$_origin" ]; then
+        info "  retrying over ssh: $_ssh"
+        rm -rf "$_dest"
+        git clone -q "$_ssh" "$_dest" 2>/tmp/.bs_err && return 0
+        info "  ssh failed: $(tail -1 /tmp/.bs_err 2>/dev/null)"
+    fi
+    rm -rf "$_dest"
+    return 1
+}
+
 fetch() {
     _dir="$1"; _origin="$2"; _pin="$3"; _name="$4"
     if [ -d "$ROOT/$_dir/.git" ]; then
@@ -108,8 +147,12 @@ fetch() {
     else
         [ -e "$ROOT/$_dir" ] && fail "$ROOT/$_dir exists and is not a git checkout. Move it aside;
     this script will not delete anything it did not create."
-        info "cloning $_name from $_origin"
-        git clone -q "$_origin" "$ROOT/$_dir"
+        try_clone "$_origin" "$ROOT/$_dir" "$_name" || fail "could not clone $_name.
+    Tried $_origin over https and over ssh. If this host has no route to the internet, mirror the
+    two repositories somewhere reachable and pass:
+        ./bootstrap.sh --from=/path/containing/$_dir
+    The pin is verified against the SHA-1 either way, so where the bytes came from does not change
+    whether they are the right ones."
         git -C "$ROOT/$_dir" checkout -q "$_pin"
     fi
     _got=$(git -C "$ROOT/$_dir" rev-parse HEAD)
