@@ -864,6 +864,14 @@ the harness reached the hook, not a packet. Do not read it as evidence the hook 
 is scheduler preemption rather than the program. It measures the program **only** — no `ctx`
 build, no trampoline, no poll loop — so it is a **floor**, for the smallest useful program.
 
+**`fired` is CUMULATIVE, and a fresh `load` does not reset it.** `gen` increments; the counter
+does not. So a `fired` read after a reload includes every earlier run's traffic, and comparing it
+against "how many requests did I just send" gives a ratio that is not a ratio. On 2026-08-20 that
+read as `fired=34` against 20 requests and looked like it contradicted the once-per-request claim
+recorded here. It did not: loading fresh, arming, and sending exactly ten took the counter from 34
+to 44. **Take the difference across the interval you drove, never the absolute value** — or
+`revoke` the slot first if you want the number to stand on its own.
+
 ## 12e · Traffic through the proxy
 
 **BNK uses Gateway API.** Not `F5VirtualServer` — that belongs to the **CNF** profiles, and
