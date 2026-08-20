@@ -43,19 +43,37 @@ Copy from this directory into `src/base/`:
 | `substrate/ls_swap.c` | `base/` |
 | `substrate/ls_arm.c`, `ls_arm.h` | `base/` |
 | `substrate/ls_prep.c` | `base/` |
+| `substrate/ls_sig.c`, `ls_sig.h` | `base/` — Ed25519 verification; needs `-lcrypto`, already linked |
+| `substrate/ls_audit.c`, `ls_audit.h` | `base/` — one record per control-plane operation |
 
 ## 2. `src/compile/filelist`
 
-Eight lines. **The last one is the one to get right** — see §5.
+**Seventeen lines as of 2026-08-20, not the eight this section described until then.** The count
+matters less than the two rules: the LAST line is the one to get right (see §5), and a header-only
+change compiles nothing, because this directory has no `.d` files — which is why
+`env/scripts/bnk-sync-substrate.sh` deletes the objects rather than trusting make.
+
+`filelist.mk` is GENERATED from `filelist`. Adding a line here without deleting the generated copy
+leaves the new source uncompiled while the build reports success.
 
 ```
 base/ls_vm_config.c   STDINC UBPF
 base/ls_vm_load.c     STDINC UBPF
 base/ls_vm.c          STDINC UBPF
+base/ls_tp_emit.c     STDINC UBPF
+base/ls_sig.c         STDINC UBPF
+base/ls_audit.c       STDINC UBPF
+base/ls_ctx_reg.c     STDINC UBPF
+base/ls_ctx_reg_rst.c STDINC UBPF
+base/ls_ctx_reg_sslerr.c STDINC UBPF
+base/ls_ctx_reg_h2abort.c STDINC UBPF
+base/ls_ctx_reg_parse.c STDINC UBPF
+base/ls_ctx_reg_alpn.c STDINC UBPF
 base/ls_tramp.c       STDINC UBPF
 base/ls_tramp_asm.c   STDINC
 base/ls_swap.c        STDINC
 base/ls_arm.c         STDINC
+base/ls_flow_cookie.c
 base/ls_prep.c
 ```
 

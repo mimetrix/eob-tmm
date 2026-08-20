@@ -66,6 +66,60 @@ stream, which is the current situation — the host validates only the length an
 
 **Status:** currently **failing**. Recorded as a limitation rather than a plan.
 
+### P7 · Can the loader say who armed what, when, and on which binary — and can that record be trusted?
+
+**Registered on 2026-08-20, AFTER the code was written, which is the wrong order and is recorded
+as such.** Rule 3 of this repository says a claim with no stated falsifier is not a claim yet. The
+falsifiers below were written as the assertions of `substrate/check_audit.c` while building it, so
+the *substance* of falsifier-first held — but the register was updated afterwards, and the whole
+point of pre-registration is that it cannot be tuned to what the code turned out to do. Treat
+this entry as weaker evidence than P6's for that reason.
+
+**Claim to be tested:** every control-plane operation on the loader socket leaves one durable
+record naming the operation, its target, the kernel's view of the process that asked, the binary
+it ran against, and the verdict the caller received.
+
+**Falsified if any of these:**
+
+- **F7a** — an operation happens with no record. Any hole makes the trail unusable as evidence,
+  and the paths most likely to leak are the *early returns*: a message too short or too large to
+  interpret. Malformed traffic must not be the one thing that leaves no trace.
+- **F7b** — the record disagrees with what the caller was told. A trail that says OK where the
+  reply said ERR is worse than no trail, because it will be believed. This is why the verdict
+  field is the reply *verbatim* rather than a second computation from the same inputs.
+- **F7c** — a caller can forge a record. A hook name is attacker-controlled text landing in a
+  structured line, so a newline in it must not produce a second record and a quote must not end a
+  field. Log injection is the oldest attack on an audit trail.
+- **F7d** — a record is silently truncated. A shortened verdict changes meaning ("refused because
+  X" versus "refused") while still looking complete, so any cut must be marked in the record.
+- **F7e** — the "who" is self-reported. If the identity comes from the message rather than from
+  the kernel, an attacker writes their own attribution. `SO_PEERCRED` is the only field here the
+  peer cannot choose, and the test asserts the recorded pid against one it already knows.
+- **F7f** — the binary named is not the one running. The record must carry the same GNU build ID
+  the arming gate compares, not a compile timestamp, or the record and the refusal are describing
+  different questions.
+- **F7g** — recording an operation breaks the loader. The audit path runs on the loader thread,
+  where `malloc` spins forever (`CONTESTED-PREMISES.md` #10). If a record cannot be emitted
+  without allocating, this design is wrong rather than merely awkward — the same falsifier that
+  fired on signature verification, registered again because the same thread is involved.
+
+**What is NOT claimed, and is not a falsifier because it is a known limit rather than an open
+question:** tamper evidence. A sequence number makes a deleted record visible as a gap and does
+nothing about a rewritten one, and a hash chain would not help either, since anything able to
+rewrite the log can recompute it. Durability here comes from the *sink* — stderr, which in this
+deployment is the container log stream collected off-box by something TMM cannot write to. The
+optional `LS_AUDIT_PATH` file sink is weaker on purpose and is for tests.
+
+**Also not claimed:** that the record identifies a *person*. `peer_pid` names a process, and in a
+`kubectl exec` that process is spawned by an API call this code cannot see. Closing that needs the
+request to carry a signed operator identity, which needs the wire format to grow a field.
+
+**Will not claim MEASURED until:** every F7 case has a test that fails before the fix and passes
+after, and F7g is demonstrated on a live TMM rather than argued — the loader must still answer
+immediately after emitting a record.
+
+---
+
 ### P6 · Can a program be refused unless it carries a valid signature?
 
 **Registered before the work, 2026-08-20.** The gap this closed was the largest one on

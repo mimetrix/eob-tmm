@@ -40,6 +40,7 @@
 
 #include "ls_vm.h"
 #include "ls_sig.h"
+#include "ls_audit.h"
 #include "ls_ctx_reg.h"
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
@@ -327,6 +328,17 @@ extern int  ls_vm_reload(int slot, const void *elf, size_t elf_len,
                          const char *section, const char *function, enum ls_mode m);
 extern void ls_vm_set_mode(int slot, enum ls_mode m);
 
+/* THE LAST THING SAID TO THE CALLER, kept so the audit record can quote it verbatim instead of
+ * deriving a second verdict from the same inputs. Two independently computed answers to "was
+ * this allowed" is how an audit trail comes to disagree with what happened, and a trail that
+ * disagrees is worse than none: it will be believed.
+ *
+ * A single static is correct here and would not be if the loader ever went concurrent. One
+ * thread runs the accept loop and handles one connection at a time, so there is exactly one
+ * request in flight. If that ever changes this must become per-connection state, and the
+ * _Static_assert below is not able to catch it --- so it is written down here instead. */
+static char g_last_reply[320];
+
 static void
 reply(int fd, const char *fmt, ...)
 {
@@ -335,8 +347,10 @@ reply(int fd, const char *fmt, ...)
     va_start(ap, fmt);
     int n = vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
-    if (n > 0)
+    if (n > 0) {
+        snprintf(g_last_reply, sizeof g_last_reply, "%s", buf);
         (void)!write(fd, buf, (size_t)n);
+    }
 }
 
 /* Scratch for one control message, from the kernel rather than from malloc.
@@ -374,8 +388,14 @@ ls_load_buf_free(unsigned char *p)
         (void)munmap(p, LS_LOAD_MAX);
 }
 
+/* The message handler. Its exits are audited by handle() below rather than here, so that no
+ * path can return without leaving a record --- including the early returns for input too short
+ * or too large to interpret, which is exactly the traffic an audit trail must not lose.
+ *
+ * Writes the interpreted message to *seen so the wrapper can record what was asked for. NULL
+ * means the bytes never became a message. */
 static void
-handle(int fd)
+handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
 {
     unsigned char *g_load_buf = ls_load_buf_alloc();
     if (g_load_buf == NULL) {
@@ -391,6 +411,13 @@ handle(int fd)
     }
 
     struct shield_msg *m = (struct shield_msg *)g_load_buf;
+
+    /* COPY THE HEADER FOR THE AUDIT RECORD NOW. The scratch mapping is released on every exit
+     * path below, so the wrapper cannot read from it afterwards --- pointing the record at freed
+     * memory would produce an audit trail that is occasionally, silently, wrong. Only the fixed
+     * header is copied; the program body is identified by the hash in the binding. */
+    memcpy(copy, m, sizeof *copy);
+    *seen = copy;
 
     /* O8: prog_len is attacker-influenced and is read before authentication.
      * There is no authentication here at all, so the length check is the only
@@ -666,6 +693,24 @@ handle(int fd)
     ls_load_buf_free(g_load_buf);
 }
 
+/* ONE RECORD PER CONNECTION, whatever happened on it. The wrapper exists because handle_msg has
+ * a dozen exits and an audit call at each one is an audit call that will be forgotten at the
+ * thirteenth --- which is the specific way this kind of instrumentation rots. */
+static void
+handle(int fd)
+{
+    struct shield_msg  copy;
+    struct shield_msg *seen = NULL;
+
+    g_last_reply[0] = '\0';
+    handle_msg(fd, &seen, &copy);
+    /* An empty reply means a path returned without answering the caller. That is a bug rather
+     * than an outcome, and it is recorded as one instead of producing a record whose verdict
+     * field is blank and therefore reads as "allowed". */
+    ls_audit_op(fd, seen, g_last_reply[0] != '\0' ? g_last_reply
+                                                  : "NO REPLY SENT --- handler returned silently");
+}
+
 void ls_vm_loader_start(void);
 void ls_vm_bootstrap(void);
 
@@ -770,9 +815,13 @@ loader_thread(void *arg)
      * it was true and not revisited when it stopped being true --- which is the whole failure
      * mode, not a typo. What is stated instead is the property that still holds: the program
      * is authenticated, the caller is not. */
+    /* Before the first accept, so the sink and the build ID are known for record 1 rather than
+     * being filled in lazily by whichever request happens to arrive first. */
+    ls_audit_init();
+
     fprintf(stderr,
             "ls_vm: LOADER LISTENING on %s --- programs are signature-checked, the PEER is "
-            "not. Anything that can reach this socket can ask. Lab builds only.\n",
+            "not, and every operation is recorded (ls_audit:). Lab builds only.\n",
             g_sock_path);
 
     for (;;) {

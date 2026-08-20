@@ -12,11 +12,11 @@ PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-sig shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-sig check-audit shield-blob gate clean
 
 check: check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -361,6 +361,21 @@ check-vendor-pin:
 # one committed in this directory. With -I. first, the test signed with a fresh key and verified
 # against the checked-in one --- and reported a failure of its own construction, which is the
 # most confusing possible way for a security test to fail.
+# THE AUDIT TRAIL, ATTACKED. check_audit.c is the list of ways a record could be wrong, executed:
+# forged by log injection, silently truncated, missing for malformed input, disagreeing with the
+# reply the caller got, or naming a build that is not the one running.
+#
+# --build-id IS REQUIRED and is not decoration. ls_audit.c reads this binary's GNU build-id note
+# to record WHICH BINARY performed an operation, matching the string the arming gate compares.
+# Without the flag the test binary has no note, the parse goes untested, and A8 fails rather than
+# skipping --- an unexercised ELF parse inside an audit trail is not a pass.
+check-audit:
+	@$(CC) -O2 -Wall -Wextra -Werror -I. -Wl,--build-id -o .audit.out \
+	    check_audit.c ls_audit.c
+	@./.audit.out >/dev/null 2>&1 && echo "ok    ls_audit.c  (19 assertions: injection, truncation, peer creds, build id)" \
+	  || { ./.audit.out; rm -f .audit.out; exit 1; }
+	@rm -f .audit.out
+
 check-sig:
 	@set -e; T=$$(mktemp -d); trap 'rm -rf $$T' EXIT; \
 	  openssl genpkey -algorithm ed25519 -out $$T/sk.pem 2>/dev/null; \
