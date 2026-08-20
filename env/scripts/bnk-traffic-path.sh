@@ -17,6 +17,15 @@
 #   2. an IPAMRange, so the VIP gets an address
 #   3. the virtual server binding the VIP to the backend
 #
+# HOW LONG IT TAKES: about 60--90 seconds, most of it waiting for the IPAM
+# controller and the virtual-server reconcile. I recorded "the launcher returns
+# exit 124" against this script five separate times and started looking for an
+# fd left open by the backgrounded server. Measured 2026-08-20: the backgrounding
+# is fine (`setsid nohup ... >log 2>&1 &` returns in 1.2 s, with or without
+# stdin closed). The 124s were my own `timeout 60` wrapper, set shorter than the
+# script's unavoidable waits. Nothing was broken; I misread my own instrument
+# five times because I never measured it. Allow 180 s.
+#
 # Assumes `client` and `server` pods already exist (env/bnk-dev-runbook.md
 # section 12e) and that kubectl targets the datkube cluster. All in `default`.
 set -e
@@ -48,8 +57,18 @@ spec:
     endAddress: $RANGE_END
 YAML
 
-echo "  waiting for the IPAM controller (takes ~30s)"
-sleep 30
+# DO NOT POLL THE SERVICE'S EXTERNAL IP. I replaced the fixed 30 s sleep with a
+# poll on svc/f5-tmm-tcp-service .status.loadBalancer.ingress[0].ip, ran it, and got
+# "STILL PENDING after 60s" on a cluster whose data path was working. On this
+# cluster that field stays <pending> permanently --- BNK programs the VIP into TMM
+# over gRPC and does not write it back into the Service status. So the poll was
+# checking something that is never true, and printing a scary and false diagnosis.
+# A fixed sleep that was merely a guess became a confident wrong answer, which is
+# worse. The condition that IS meaningful is the virtual server's own readiness,
+# and that is polled in step 3 where the VS exists.
+echo "  IPAMRange applied. Not polling the Service's external IP: on this cluster it"
+echo "  stays <pending> for good, because BNK programs the address into TMM over gRPC"
+echo "  rather than writing it back to the Service. Readiness is checked on the VS below."
 kubectl get svc f5-tmm-tcp-service --no-headers 2>/dev/null | sed 's/^/  /'
 
 echo "=== 3. pool + virtual server $VIP:80 -> $BACKEND"
@@ -97,9 +116,37 @@ spec:
   snat:
     type: automap
 YAML
-sleep 10
-kubectl get f5virtualserver eob-vs \
-    -o jsonpath='  vs: {.spec.destinationAddress}:{.spec.destinationPort} pool={.spec.pool}{"\n"}' 2>/dev/null
+# THE RESOURCE IS `f5-virtualservers`, HYPHENATED. `kubectl get f5virtualserver` ---
+# the spelling that reads naturally from the CRD kind F5VirtualServer --- does not
+# exist, and errors with "the server doesn't have a resource type". With 2>/dev/null
+# on the line, that error became an empty result, and an empty result counted as
+# "there are no virtual servers". I concluded the data path had no VS and went
+# looking for the wrong problem. Check `kubectl api-resources | grep -i virtualserver`
+# rather than trusting a plausible spelling, and never silence stderr on a get whose
+# emptiness you intend to interpret.
+#
+# AND POLL ITS STATUS, which is the condition that actually decides whether HTTP is
+# proxied. eob-vs sat at False --- "Waiting for one or more dependent CRs to be
+# applied" --- for six days because its POOL had been deleted. Traffic still returned
+# 200 the whole time, SNATed by TMM at layer 4, so nothing looked wrong: the only
+# symptom was that an HTTP hook never fired.
+echo "  waiting for the virtual server to reconcile (needs its pool to exist first)"
+i=0
+while [ $i -lt 120 ]; do
+    VS=$(kubectl get f5-virtualservers eob-vs --no-headers 2>/dev/null | awk '{print $2}')
+    [ "$VS" = "True" ] && break
+    i=$((i + 5)); sleep 5
+done
+if [ "$VS" = "True" ]; then
+    echo "  eob-vs ready after ${i}s"
+else
+    echo "  *** eob-vs is NOT ready after ${i}s:"
+    kubectl get f5-virtualservers eob-vs --no-headers 2>&1 | sed 's/^/      /'
+    echo "      Traffic may still return 200 --- TMM will proxy at layer 4 and SNAT it ---"
+    echo "      while no HTTP profile is programmed, so any HTTP hook fires zero times."
+fi
+kubectl get f5-virtualservers eob-vs \
+    -o jsonpath='  vs: {.spec.destinationAddress}:{.spec.destinationPort} pool={.spec.pool} http={.spec.http}{"\n"}' 2>/dev/null
 
 echo "=== 4. does traffic actually flow?"
 kubectl exec client -- curl -s -m 10 -w "\n  http=%{http_code} time=%{time_total}s\n" \

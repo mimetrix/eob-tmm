@@ -211,10 +211,12 @@ target. The only thing the target does is receive bytecode over a socket and pat
 
 Named plainly, because each is a real gap rather than a detail:
 
-- **No signature verification of bytecode.** The loader accepts what arrives on the socket.
-  A signing step and an in-TMM check against a baked-in key is the shippability gate, and it
-  is not built. Until it is, "only verified programs load" means only that PREVAIL ran
-  somewhere upstream, on the honour system.
+- **Signing is a step now, and the honour system moved rather than ended.** `bnk-build-programs.sh`
+  signs each program after PREVAIL accepts it, and TMM refuses anything whose Ed25519 signature over
+  the binding does not check out (measured on a live TMM, 2026-08-20). So "only verified programs
+  load" is no longer on trust — for the *program*. It is still on trust for the *asker*: the loader
+  socket authenticates bytes, not peers, and the private key sits in a file on a developer's
+  workstation rather than in an HSM.
 - **No audit trail.** Nothing records who armed what, when, against which build.
 - **The vendored uBPF revision is unrecorded.** The vendored copy carries one patch
   (`substrate/ubpf-patches/0001-jit-scratch-rightsize.patch`) and has no `.git`, and it

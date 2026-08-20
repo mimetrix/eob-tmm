@@ -599,6 +599,28 @@ ssh -L $PORT:127.0.0.1:$PORT -i $KEY <ldap-user>@$DATKUBE_IP
 
 ## 12 · The cycle — build box to Datkube box
 
+**There are TWO copies of this repo on the build box, they are refreshed by different scripts,
+and they feed different things.** Getting this wrong costs a whole cycle and the symptom points
+somewhere else entirely, so it goes first:
+
+| copy | refreshed by | what reads it |
+|---|---|---|
+| `code/tmm/src/{base,modules/…}` | `bnk-stage.sh` then `bnk-sync-substrate.sh` | the compiler — these become TMM |
+| `~/eob-tmm-staged/` | `bnk-stage.sh` | `bnk-package.sh` freshness checks, and `bnk-bake-tools.sh`, which copies the **tools baked into the image** from here |
+
+On 2026-08-20 the second was three commits behind. The image shipped an `ls-load.py` from before
+signatures existed, so it sent no signature, and TMM — working correctly — refused every load.
+Nothing in the pipeline read that tree's provenance, and the `-dirty` stamp added that morning
+covered `substrate/` only. **Always start a cycle with `bnk-stage.sh`.** It copies the working
+tree (not `HEAD`, because the substrate is normally built before it is committed), verifies the
+far end by content, and fails if the staged client cannot send a signature.
+
+```bash
+env/scripts/bnk-stage.sh            # BOTH trees start here. Verifies by content, not by exit code.
+env/scripts/bnk-sync-substrate.sh   # then the sources that get compiled in
+```
+
+
 ```bash
 # one-time, on the Datkube box: stop it pulling from Artifactory
 kubectl edit deploy/f5-tmm         #  image: tmm:local
@@ -782,8 +804,15 @@ ls_vm: bench slot=0 path=interp iters=100000 min=126 mean=287 max=1403200 cycles
 ls_vm: LOADER LISTENING on /tmp/ls_load.sock --- accepts UNVERIFIED programs
 ```
 
-**`LS_LOAD_SOCKET` has no signature verification** (scope item 4, deferred). It is off unless
-set, the socket is 0600, and every load says so. Do not leave it enabled in anything shared.
+**`LS_LOAD_SOCKET` verifies signatures** (scope item 4, built 2026-08-20) and still must not be
+left enabled in anything shared. The signature says the program came from the holder of the key;
+it says nothing about who asked for it to be armed. The socket is 0600 and off unless set, and
+that --- not the signature --- is what keeps it contained. A build compiled without a key refuses
+everything, which is the right direction to fail but means an unkeyed build looks broken.
+
+If a load is refused and the signature looks fine, check the CLIENT before the crypto: an image
+carrying an `ls-load.py` from before signatures existed sends none, and the refusal is correct.
+The one-line tell is in TMM's own log --- `ls_sig: verifying binding ... sig 00000000 ...`.
 
 ### Demonstrating the shield without traffic --- `LS_VM_SELFTEST`
 

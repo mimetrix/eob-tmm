@@ -13,9 +13,11 @@ real reproducibility failure, and this closes it.
 **Not the operator front-end.** Scope item 11 is *not written*; `shieldctl` in the walkthrough is
 illustrative naming for a `tmsh` subcommand and iControl endpoint that do not exist.
 
-**Not authenticated.** Signature verification (item 4) is unbuilt, so the loader accepts
-**unverified programs** whenever `LS_LOAD_SOCKET` is set. That is why it is env-gated and off by
-default, and why nothing here should be near a production box.
+**Authenticated, but still lab-only.** Signature verification (item 4) is built: the loader
+refuses any program whose Ed25519 signature over the binding does not check out against the key
+baked into TMM. What keeps this away from a production box is no longer the missing signature ---
+it is that the socket is env-gated on `LS_LOAD_SOCKET` with no authentication of the *peer*, so
+anything that can reach the socket can ask, and `LS_SIG_ENFORCE` can turn the check off.
 
 **Hand-encoded wire layout.** `ls_client.py` transcribes offsets from `../shield_abi.h` rather than
 deriving them. Change `struct shield_msg` and this breaks *silently*. `verify_layout()` pins the

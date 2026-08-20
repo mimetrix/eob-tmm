@@ -252,7 +252,7 @@ same answer today: not built, or not measured.
 
 | # | gap | state | why it blocks |
 |---|---|---|---|
-| 1 | **Program signature verification** | unbuilt (item 4) | Any program can be loaded. Nothing customer-facing ships on that |
+| 1 | **Peer authentication and key lifecycle** | signature verification **built and measured** (2026-08-20); these two are not | The program is now authenticated; the *requester* is not. Anything that can reach the socket may ask, and the verifying key is compiled in with no revocation path |
 | 2 | **Audit trail** | unbuilt (item 12) | (c)'s "customer made aware" needs a durable record |
 | 3 | **Per-function safe values** | hardcoded `0` | A wrong safe value turns a crash into silent misbehaviour |
 | 4 | **Per-invocation cost** | **unmeasured** | `rdtsc` is preemption-polluted, so the mean is meaningless; `perf_event_paranoid=4` on the node blocks hardware counters. Quote no per-call number |

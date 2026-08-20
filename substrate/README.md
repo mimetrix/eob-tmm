@@ -87,8 +87,11 @@ and there is no TMM here to attach to." Both were true when written and neither 
 
 What genuinely remains a stub is narrower, and it is the part that matters for a security review:
 
-- **`sig_verify` — nothing verifies a signature.** Item 4 is unbuilt, so the loader accepts
-  **unverified programs** whenever `LS_LOAD_SOCKET` is set. That is the perimeter, and it is open.
+- **`sig_verify` — built, and the perimeter is now narrower rather than closed.** Item 4 verifies
+  an Ed25519 signature over the binding before admitting a program, on a live TMM. What remains
+  open: the key is baked into the binary at build time with no revocation path, nothing records
+  who armed what, and a build compiled with no key refuses everything (fail-closed, which is
+  right, but means key handling is a build-time concern rather than an operational one).
 - **`hook_map_lookup` — there is no hook map.** Item 5 is unbuilt; entry addresses are supplied by
   hand and move with every rebuild.
 - The `shield_abi.h` entry points remain the *proposed product* ABI. The in-TMM sources above are a

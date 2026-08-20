@@ -91,11 +91,17 @@ COMMIT="${REPO_COMMIT:-}"
 if [ -z "$COMMIT" ]; then
     COMMIT=$(cd "$SRC/.." 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || true)
 fi
+# THE STAMP LEFT BY bnk-stage.sh, which is the machine that DID have the repo. Reading it here
+# closes the note this branch used to print: the answer was already written next to the tree,
+# and asking the operator to pass a variable they will forget is not a design.
+if [ -z "$COMMIT" ] && [ -f "$SRC/../.staged-commit" ]; then
+    COMMIT=$(cat "$SRC/../.staged-commit")
+    echo "  commit  : $COMMIT (from .staged-commit, written by bnk-stage.sh)"
+fi
 if [ -z "$COMMIT" ]; then
     COMMIT="unstamped"
-    echo "  note: no repo commit recorded. \$SRC is a staged extract, not a git checkout, so"
-    echo "        pass REPO_COMMIT=\$(git rev-parse --short HEAD) from the machine that staged"
-    echo "        it if you want the bake tied to a commit as well as a build id."
+    echo "  note: no repo commit recorded, and no .staged-commit next to \$SRC. Stage with"
+    echo "        env/scripts/bnk-stage.sh, which writes it --- or pass REPO_COMMIT= by hand."
 fi
 sh "$HERE/bnk-receipt.sh" write package "build_id=$PKGID" "commit=$COMMIT" \
                                        "deb=$(basename "$RDEB")"

@@ -45,8 +45,12 @@ Two real failures this closes, both of which reported success at the time:
   mode  <slot> <mode>         2  0 disable, 1 monitor, 2 enforce
   revoke <slot>               4
 
-Signature verification is NOT part of this path (scope item 4, deferred): the
-loader accepts unverified programs and says so on every load. Lab only.
+Signature verification IS part of this path: `load` reads <prog>.sig beside the
+object and sends the 112-byte binding and its 64-byte signature with the program.
+TMM refuses anything that does not check out against the key compiled into it, so
+a client that omits the signature is refused --- which looks like a broken gate and
+is not. What is still absent is authentication of the CALLER: whoever reaches the
+socket may ask. Lab only, for that reason rather than the old one.
 """
 import os
 import socket

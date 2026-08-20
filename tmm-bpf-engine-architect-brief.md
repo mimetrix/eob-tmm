@@ -208,7 +208,7 @@ to emit only on that condition.
 | **Padded functions only** | 30,009 index entries require displacement, which is designed and unimplemented. OpenSSL and every separately built component fall in this set |
 | **Per-invocation cost: a floor, not the data-path cost** | Program execution is ≤ 11 ns on the JIT path, and that figure is bounded by the measurement rather than the program. What an armed hook costs *on the data path* — the trampoline's register save and restore, the call and return, cache effects under real traffic — is **not** in it. `rdtsc` means remain meaningless (one pair spanning a context switch gave 130,720 cycles against a minimum of 132) and `perf_event_paranoid=4` still blocks hardware counters. Quote the floor as a floor |
 | **The safe return value is a fixed `0`** | Per-function safe values are unimplemented. An incorrect safe value converts a crash into silent misbehaviour. The mechanism is correct only for return types that fit in `rax` |
-| **No program signature verification** | The loader accepts any program and reports this on every load. This is the principal gap between the current state and anything customer-facing |
+| **The loader socket authenticates the program, not the peer** | Signature verification is built and running: an Ed25519 signature over the 112-byte binding is checked in TMM before admission, and unsigned, re-signed and altered programs are all refused (measured on a live TMM, 2026-08-20). What remains is one level out — anything able to reach the socket may ask, the key is baked in at build time with no revocation path, and a debug environment variable can disable the check. Those, not the missing signature, are now the gap to anything customer-facing |
 | **No audit trail** | Arming events — who, what, when, which mode, what outcome — are not durably recorded |
 | **The JIT does not consult the bounds callback** | Interpreter and JIT do not agree on memory safety, and the JIT is what the lab runs |
 | **Three helpers, two map types** | Map lookup, update and delete; hash maps and an event-output handle. Four maps per program, 256 entries, keys to 16 bytes, values to 32. No iteration, so a program can accumulate state but cannot summarise it |
@@ -221,8 +221,10 @@ documentation states that PREVAIL "assumes that r1 points to a valid memory regi
 uBPF "doesn't enforce any particular context layout" and "memory safety depends on the
 program". The defence in this implementation is a chain of admission-time identity checks —
 ELF section name, function symbol, context ABI version, build ID, and symbol ambiguity — and
-not a runtime bounds check. Signature verification is therefore load-bearing rather than
-merely desirable.
+not a runtime bounds check. Signature verification is therefore load-bearing rather than merely
+desirable — which is why it was built, and why the failure that mattered during that work was not
+cryptographic at all: an image shipped with a client too old to send a signature, and TMM refused
+every load correctly while looking broken.
 
 ---
 
@@ -243,7 +245,7 @@ Ordered by value against cost.
 
 | # | extension | effect | risk |
 |---|---|---|---|
-| 5 | Signature verification and audit trail | Prerequisite for any customer-facing use | Low technically; principally a key-management and process question |
+| 5 | Audit trail, and key management for the signing key | Signature verification is **done**; what is missing is the record of who armed what, when, in which mode, with what outcome — and a key lifecycle that is not "compiled in at build time" | Low technically; the key half is principally a process question, and it is the half that decides whether this is shippable |
 | 6 | Safe-return policy table | Makes suppression admissible, and refuses hooks whose return type does not fit `rax` | Low, and it removes an existing hazard |
 | 7 | Exit and return probes | Function outputs: in-TMM latency, and what a function decided rather than what it was asked | **Medium to high — the first extension able to corrupt control flow.** Requires per-thread, per-depth return-address storage, a depth limit, and an abandonment path for `longjmp`, unwind and `noreturn` |
 
@@ -331,6 +333,9 @@ That reasoning justifies not adopting it wholesale. It does not justify having d
 buffers and hash maps from first principles, and the accounting for what was rebuilt
 unnecessarily is set out in `hook-types.md` §4.
 
-**What is the minimum required to make this shippable?** Signature verification and an audit
-trail, together with the safe-return policy table if enforcement is in scope. The remaining
-items on the extension list are capability rather than admissibility.
+**What is the minimum required to make this shippable?** An audit trail and a key lifecycle,
+together with the safe-return policy table if enforcement is in scope. Signature verification
+itself was the largest of these and is now built and measured — which moved the answer rather
+than shortening it: a signature says a program came from the holder of a key, and says nothing
+about who asked for it to be armed, when, or on which build. The remaining items on the
+extension list are capability rather than admissibility.

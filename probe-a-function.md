@@ -212,8 +212,12 @@ The bytes travel on stdin into the loader socket. Nothing is written to the pod'
 the hook name is read from the object's own `fentry/` section rather than retyped. Mode 2 is
 ENFORCE; use 1 until you know what the program does.
 
-Every load prints `unverified=yes`. That is honest: there is **no signature verification**, the
-loader accepts what it is given, and that is what makes this lab-only.
+Every load is signature-checked. The reply ends `signature=verified`, and a program that is
+unsigned, re-signed with another key, or altered after signing is refused --- with different
+messages for "this signature is not valid for these bytes" and "this signature is valid but the
+program does not match the hash it commits to", because those send you to different places. What
+still makes this lab-only is the socket itself: reaching it is not authenticated, only the program
+travelling over it is.
 
 ---
 
@@ -307,7 +311,8 @@ the entry again with the step 7 command: `90 90 90 90 90`, byte-identical to bef
 
 ## What this procedure cannot do
 
-- **No signature verification.** Every load says `unverified=yes`. Lab only.
+- **The socket is not authenticated, only the program is.** Loads are signature-checked, but
+  anything that can reach `LS_LOAD_SOCKET` can ask, and there is no record of who did.
 - **Four map slots per process**, not reclaimed by `revoke` — see step 3.
 - **`pad_offset=0` functions are refused**, and 30,009 functions in this binary have no pad at
   all. Displacement would reach them; it is not built.

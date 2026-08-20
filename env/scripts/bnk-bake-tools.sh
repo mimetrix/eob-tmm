@@ -25,7 +25,15 @@ BASE="${1:-tmm:local}"
 OUT="${2:-tmm:ls}"
 TMM="${TMM:-$HOME/code/tmm}"
 DEBS="${DEBS:-$TMM/docker_build/DEBS/amd64}"
-REPO="${REPO:-$HOME/eob-tmm}"
+# DERIVE the repo from where this script lives, rather than assuming a name under $HOME.
+# The default was $HOME/eob-tmm, which is the path on the WORKSTATION. On the build box the
+# tree is ~/eob-tmm-staged, so running this there without REPO= set failed on the first file
+# it reached --- and every earlier successful bake had happened to pass REPO= by hand. A
+# default that only works on one of the two machines a script runs on is a trap for whoever
+# omits the variable, which will be me.
+REPO="${REPO:-$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)}"
+[ -d "$REPO/substrate" ] || REPO="$HOME/eob-tmm"
+[ -d "$REPO/substrate" ] || { echo "*** cannot locate the repo. Tried $(cd "$(dirname "$0")/../.." && pwd) and \$HOME/eob-tmm. Pass REPO=<path>." >&2; exit 2; }
 CTX="${CTX:-$HOME/lstools}"
 
 fail() { echo "*** $*" >&2; exit 1; }
@@ -96,6 +104,44 @@ SBID=$(awk -F'\t' '/^#build_id/{print $2}' "$CTX/signatures.tsv")
     signatures.tsv  $SBID
     Two tools read what should be one binary and got different answers. Do not bake this."
 echo "  build id  : $SBID (matches the hook index)"
+
+echo
+echo
+echo "=== 2c. is the staged tree the one we think it is?"
+# THE HOLE THAT COST A CYCLE, 2026-08-20. bnk-sync-substrate.sh refreshes the TMM tree and
+# stamps a commit for substrate/ --- but the BAKE reads $REPO/env/scripts for ls-load.py and
+# friends, and nothing checked those. The staged copy was three commits behind, so the image
+# shipped a client with no signature support and TMM correctly refused every load. The stamp I
+# added that morning covered substrate/ only; a gate over one directory and not its neighbour is
+# not a gate.
+#
+# So: compare the staged scripts against the repo they came from. This runs on the build box
+# where the repo may not exist, so a missing repo is reported and skipped rather than fatal ---
+# but a MISMATCH is fatal, because that is the case that ships a stale tool.
+if [ -d "$REPO/.git" ]; then
+    _drift=$(cd "$REPO" && git status --porcelain -- env/scripts env/docker substrate 2>/dev/null | wc -l)
+    _head=$(cd "$REPO" && git rev-parse --short HEAD)
+    echo "  staged from : $_head$( [ "$_drift" -gt 0 ] && echo " (+$_drift uncommitted)" )"
+else
+    # The usual case: $REPO here is a `git archive` extract with no history. Compare CONTENT
+    # against the checked-in copies instead --- there is nothing else to compare against, and
+    # the thing that actually matters is whether the tools are current, not their provenance.
+    echo "  staged tree has no git history (a tar extract), so provenance cannot be read from it."
+    echo "  Verifying the tools the image will carry are the ones staged:"
+    for _f in ls-load.py bnk-deliver-program.py; do
+        [ -f "$REPO/env/scripts/$_f" ] || fail "$_f missing from the staged tree at
+    $REPO/env/scripts. The bake copies its tools from there, so a missing one ships an image
+    without it. Re-stage with: git archive HEAD substrate env/scripts env/docker | ssh ... tar x"
+    done
+    # ls-load.py must be able to send a signature, or every load into this image is refused by
+    # the TMM baked beside it. Checked by capability rather than by version, because a version
+    # string would be one more thing to keep in step.
+    grep -q 'read_signature' "$REPO/env/scripts/ls-load.py" || fail "the staged ls-load.py cannot
+    send a signature (no read_signature). TMM in this image verifies signatures, so every load
+    would be refused --- which looks exactly like a broken signature check and is not.
+    Re-stage the scripts from a commit that has it."
+    echo "  ls-load.py   : can send signatures"
+fi
 
 echo
 echo "=== 3. assemble the build context"

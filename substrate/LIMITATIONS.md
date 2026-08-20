@@ -195,10 +195,19 @@ with `dev_probe`, drive traffic, check `fired > 0`. Fifteen minutes.
   programs and the JIT is on, so an armed program is **unbudgeted at runtime**.
   Acceptable for an observer on a warm path; not acceptable for enforce on an
   attacker-reachable one.
-- **Per-call cost unmeasured.** The bench op that would give a clean number
-  wedges the loader thread.
-- **No signature verification.** The loader accepts unverified programs whenever
-  `LS_LOAD_SOCKET` is set, which is why it is env-gated and off by default.
+- **Per-call cost known only as an upper bound.** The bench op works now (it runs
+  on a TMM thread, and it times the JIT-compiled program rather than the
+  interpreter). It reports **≤ 11 ns**, and that number is at the floor of the
+  instrument: a trivial program measured *faster* than an empty one, which is
+  impossible and means the timer's own overhead dominates. Treat 11 ns as "below
+  what this rig can resolve", not as the cost.
+- **Signature verification is on, and is not the whole perimeter.** An Ed25519
+  signature over the 112-byte binding is checked in TMM before a program is
+  admitted; an unsigned, re-signed or altered program is refused. What that does
+  **not** give you: no revocation list, so a signature is valid until the key
+  changes; no audit record of who armed what; and `LS_SIG_ENFORCE` can be set to
+  a fixed debug string to disable the check, which is deliberate for the lab and
+  must not exist in a shipped build.
 
 ---
 

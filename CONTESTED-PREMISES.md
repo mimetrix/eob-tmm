@@ -8,6 +8,45 @@ Ordered newest first.
 
 ---
 
+## 11 · "A `-dirty` stamp on the synced tree tells me what is deployed" — FALSIFIED the same
+day it was added
+
+**Claimed**, by me, in `bnk-sync-substrate.sh` on the morning of 2026-08-20: the staged copy is a
+tar extract with no `.git`, "so packaging cannot work this out for itself" — therefore stamp the
+commit, plus `-dirty` when the tree is not clean, and provenance is answered.
+
+**Killed by:** the first signed load into the image built afterwards. It was refused. So was
+every load after it. Nothing was wrong with the signature, the key, or the verifier: the image
+carried an `ls-load.py` from before signatures existed, which sent no signature at all, and TMM
+refused it correctly. The stamp said `-dirty` throughout and was true throughout.
+
+**Why the stamp could not have caught it.** It was scoped to `substrate/` — the sources compiled
+*into* TMM. The tools baked into the *image* come from `env/scripts/`, which no synchronisation
+step touched and no stamp described. The two live in one repository and are copied to the build
+box by different means, and I had checked the one I had just written a guard for.
+
+**The general shape, which has now cost three cycles here in different costumes:** a gate that
+covers one input and not its neighbour reads exactly like a gate that covers the input. It is
+worse than no gate, because it converts "I have not checked" into "I checked." The earlier two
+were the build-id gate that proved agreement and was read as freshness (entry 2), and the sync
+check that compared the substrate and was read as comparing the tree.
+
+**What it became:** `bnk-stage.sh`. One step refreshes `substrate/`, `env/scripts/` and
+`env/docker/` together, from the **working tree** rather than `HEAD` — staging `HEAD` would
+silently ship the previous version of the exact file under test. It verifies the far end by
+hashing every staged file on both sides and comparing, because "the transfer exited 0" and
+"the bytes match" are different claims. And it fails outright if the staged client cannot send a
+signature, checked by capability (`grep read_signature`) rather than by a version string, since a
+version is one more thing to keep in step.
+
+**What is still not covered, stated rather than left to be discovered:** nothing verifies that
+the *deployed* image's tools match the repo. `bnk-stage.sh` guards the input to the bake; a hand
+edit inside a running container, or an image baked from a tree since changed, would still pass
+everything here. The check that would close it is comparing hashes of the tools inside the
+running pod against the repo, which does not exist yet.
+
+---
+
 ## 10 · "OpenSSL can verify on the loader thread" — FALSIFIED, by the falsifier that
 predicted it
 

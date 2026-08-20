@@ -474,8 +474,14 @@ handle(int fd)
          * this class of call. The security property is unchanged --- nothing is loaded until the
          * signature checks out --- and the check simply happens on the thread where allocation
          * is legal. */
+        /* "RECEIVED", not "verified". This line prints on the loader thread, BEFORE the TMM
+         * thread has looked at the signature --- so the word "verified" here was a claim about
+         * something that had not happened yet. In an ordinary log that is sloppy; in a security
+         * log it is a false statement that a reader would reasonably believe, and the verdict
+         * arrives a few lines later under `ls_sig:` and `LOAD REFUSED`. */
         fprintf(stderr,
-                "ls_vm: LOAD accepted on %s --- signature verified; hook=%.63s bytes=%u\n",
+                "ls_vm: LOAD received on %s --- hook=%.63s bytes=%u (signature checked on the "
+                "prepare thread; see the ls_sig: line that follows)\n",
                 g_sock_path, m->binding.hook, m->prog_len);
         /* Handed to a TMM thread: preparing here would hang this thread in
          * TMM's allocator. See ls_prep above. */
@@ -492,7 +498,13 @@ handle(int fd)
         if (slot < 0)
             reply(fd, "ERR load refused (%s)\n", why);
         else
-            reply(fd, "OK loaded slot=%d mode=%d unverified=yes\n", slot, m->mode);
+            /* The reply said `unverified=yes` for as long as nothing verified anything, which
+             * was honest then and is false now --- reaching this line means the signature
+             * verified. It says which state it is in rather than being silent, because a reader
+             * who sees no mention of signatures cannot tell an enforcing build from one with
+             * LS_SIG_ENFORCE off. */
+            reply(fd, "OK loaded slot=%d mode=%d signature=%s\n", slot, m->mode,
+                  ls_vm_sig_enforce() ? "verified" : "NOT ENFORCED");
         break;
     }
     case SHIELD_OP_SET_MODE:
@@ -699,9 +711,9 @@ ls_vm_bootstrap(void)
     (void)ls_vm_arm_configured(ls_shield_blob, sizeof ls_shield_blob,
                                LS_SHIELD_SECTION, LS_SHIELD_FUNCTION);
 
-    /* Runtime load path. Does nothing unless LS_LOAD_SOCKET is set, and it
-     * accepts UNVERIFIED programs when it is --- signature verification is
-     * scope item 4 and is deferred. */
+    /* Runtime load path. Does nothing unless LS_LOAD_SOCKET is set. Programs arriving on it
+     * are signature-checked (ls_sig.c); the SOCKET itself is not authenticated, so what the
+     * env gate and the 0600 mode contain is who may ASK, not what may run. */
     ls_vm_loader_start();
 }
 
@@ -752,9 +764,16 @@ loader_thread(void *arg)
         return NULL;
     }
 
+    /* THE THIRD FALSE STRING FOUND IN ONE SWEEP, 2026-08-20, and the one that would have
+     * mattered most: it is the FIRST thing the loader says, so a reader who saw it and stopped
+     * would carry away exactly the wrong belief about a security property. It was written when
+     * it was true and not revisited when it stopped being true --- which is the whole failure
+     * mode, not a typo. What is stated instead is the property that still holds: the program
+     * is authenticated, the caller is not. */
     fprintf(stderr,
-            "ls_vm: LOADER LISTENING on %s --- accepts UNVERIFIED programs. "
-            "This must not exist in a build anyone else runs.\n", g_sock_path);
+            "ls_vm: LOADER LISTENING on %s --- programs are signature-checked, the PEER is "
+            "not. Anything that can reach this socket can ask. Lab builds only.\n",
+            g_sock_path);
 
     for (;;) {
         int fd = accept(srv, NULL, NULL);

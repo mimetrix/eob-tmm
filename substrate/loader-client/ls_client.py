@@ -14,11 +14,13 @@ WHAT IT TALKS TO. ls_vm_loader_start() in substrate/ls_vm_load.c runs a loader
 thread on an AF_UNIX SOCK_STREAM socket named by the LS_LOAD_SOCKET environment
 variable. It is off unless that variable is set.
 
-    THERE IS NO SIGNATURE CHECK ON THIS PATH YET (scope item 4). The loader
-    accepts UNVERIFIED programs. That is why it is env-gated rather than on by
-    default, and it is why this client is a test tool and not the operator
-    front-end (scope item 11, "not written" --- `shieldctl` in the walkthrough
-    is illustrative naming for a tmsh subcommand that does not exist).
+    THE PROGRAM IS CHECKED, THE CALLER IS NOT (scope item 4 built 2026-08-20).
+    The loader verifies an Ed25519 signature over the 112-byte binding before
+    admitting a program; it does nothing to establish who sent it. That is why the
+    path stays env-gated rather than on by default, and why this client is a test
+    tool and not the operator front-end (scope item 11, "not written" ---
+    `shieldctl` in the walkthrough is illustrative naming for a tmsh subcommand
+    that does not exist).
 
 THE WIRE LAYOUT is struct shield_msg, and the offsets below are hand-encoded
 from substrate/shield_abi.h. That is a real fragility: change the struct and

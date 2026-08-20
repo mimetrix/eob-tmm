@@ -68,8 +68,9 @@ stream, which is the current situation — the host validates only the length an
 
 ### P6 · Can a program be refused unless it carries a valid signature?
 
-**Registered before the work, 2026-08-20.** The gap this closes is the largest one on
-`GROUND_TRUTH.md`: the loader accepts anything and prints `unverified=yes` on every load.
+**Registered before the work, 2026-08-20.** The gap this closed was the largest one on
+`GROUND_TRUTH.md`: the loader accepted anything and printed `unverified=yes` on every load. Both
+verbs are past tense as of the same day --- see the closure note below.
 
 **Claim to be tested:** an Ed25519 signature over the 112-byte `struct shield_binding`, verified
 in TMM against a baked-in public key, refuses every program that is not signed by the holder of
@@ -100,7 +101,10 @@ comment is right and this must change — which is why it is written down here.
 **Will not claim MEASURED until:** every F6 case above has a test that fails before the fix and
 passes after.
 
-**P6 CLOSED, 2026-08-20 — all five falsifiers survived on a live TMM (build `bf7f7002`).**
+**P6 CLOSED, 2026-08-20 — all five falsifiers survived on a live TMM (build `bf7f7002`),
+and re-verified on `92454510` by `env/scripts/bnk-test-signatures.sh`, 16 of 16.** That suite
+exists because the first run of these tests was typed inline, and one of the checks is on a
+*string* — a string check typed from memory checks the memory, not the string.
 F6a: tampered body and tampered signature each refused, with *different* messages. F6b: a signed
 program loads, arms, and fires (`fired=26`/`15`). F6c: the body hash is checked, so a signature
 cannot be replayed. F6d: hook, build range, ceiling and expiry are inside the signed bytes.

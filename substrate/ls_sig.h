@@ -1,10 +1,13 @@
 /* ls_sig.h --- refuse any program not signed by the holder of the private key.
  *
- * THE GAP THIS CLOSES is the largest one on GROUND_TRUTH.md: the loader accepts whatever
- * arrives on the socket and prints `unverified=yes` on every load. Everything else in this
+ * THE GAP THIS CLOSED was the largest one on GROUND_TRUTH.md: the loader accepted whatever
+ * arrived on the socket and printed `unverified=yes` on every load. Everything else in this
  * substrate --- PREVAIL, the identity gates, the build-id refusal --- constrains what a program
- * may DO. None of it constrains WHO may send one. That is what makes the current state lab-only,
- * and no measurement changes it.
+ * may DO. None of it constrained WHO may send one.
+ *
+ * Past tense as of 2026-08-20: this file is compiled in and every load is checked. The gap that
+ * REMAINS is one level out --- nothing authenticates the peer on the socket, and nothing records
+ * who armed what. Signing the program is not the same as knowing who asked.
  *
  * WHAT IS SIGNED, and this deviates from shield_abi.h's comment on purpose.
  *
