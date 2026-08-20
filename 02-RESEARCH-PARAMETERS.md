@@ -100,6 +100,18 @@ comment is right and this must change — which is why it is written down here.
 **Will not claim MEASURED until:** every F6 case above has a test that fails before the fix and
 passes after.
 
+**P6 CLOSED, 2026-08-20 — all five falsifiers survived on a live TMM (build `bf7f7002`).**
+F6a: tampered body and tampered signature each refused, with *different* messages. F6b: a signed
+program loads, arms, and fires (`fired=26`/`15`). F6c: the body hash is checked, so a signature
+cannot be replayed. F6d: hook, build range, ceiling and expiry are inside the signed bytes.
+F6e: verification runs behind the prepare handoff and the loader answers immediately afterwards.
+Plus the debug toggle admits a bad program and shouts about it, and refuses again when reverted.
+
+Two things went wrong on the way that were **not** cryptographic, and both were mine: the image
+carried a client with no signature support (stale staging), and the signer hardcoded a context
+ABI version of 1 against a build that declares 3. Neither would have been found by an off-TMM
+test, and both produced refusals that were *correct* while looking like crypto failures.
+
 **F6e FIRED, 2026-08-20.** Verification on the loader thread wedged it — TMM overrides `malloc`
 globally, so OpenSSL's allocations hit the same allocator freeze the prepare handoff was built to
 avoid. No log line was produced, placing the hang inside verify. Fixed by moving verification
