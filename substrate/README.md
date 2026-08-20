@@ -4,8 +4,8 @@ This directory holds two different kinds of thing, and the distinction matters m
 other line in this file:
 
 1. **Sources that are built into TMM.** `ls_vm.c`, `ls_vm_load.c`, `ls_prep.c`, `ls_arm.c`,
-   `ls_swap.c`, `ls_tramp.c`, `ls_vm_config.c` and `trampoline_x86_64.S` are compiled into the
-   TMM binary in a different tree. They are the running mechanism, not illustrations of it.
+   `ls_swap.c`, `ls_tramp.c`, `ls_vm_config.c`, `ls_sig.c`, `ls_audit.c`, the six `ls_ctx_reg*.c`
+   and `trampoline_x86_64.S` are compiled into the TMM binary in a different tree. They are the running mechanism, not illustrations of it.
    [`TMM-TREE-DELTA.md`](TMM-TREE-DELTA.md) is what that other tree needs.
 2. **Candidate artifacts and checks**, kept as real files rather than illustrative blocks so they
    compile, validate and run — which caught four defects the prose versions carried unnoticed.
@@ -26,6 +26,9 @@ is unmeasured**.
 | [`ls_swap.c`](ls_swap.c) | The `text_poke_bp` protocol in userspace: INT3, `membarrier(SYNC_CORE)`, tail, sync, real opcode. Item **0b**. |
 | [`ls_tramp.c`](ls_tramp.c), [`trampoline_x86_64.S`](trampoline_x86_64.S) | The trampoline — one of them, shared by every armed hook. Item **1**. |
 | [`ls_vm_config.c`](ls_vm_config.c) | Environment overrides, so program source and names are a restart rather than a rebuild. |
+| [`ls_sig.c`](ls_sig.c), [`ls_sig.h`](ls_sig.h) | Ed25519 verification of the signed binding, before a program is admitted. The header is the one to read: it says what is signed, and why that deviates from `shield_abi.h`'s comment on purpose. Item **4**. |
+| [`ls_audit.c`](ls_audit.c), [`ls_audit.h`](ls_audit.h) | One record per control-plane operation, with the caller's kernel-attested pid/uid and the verdict quoted verbatim. Read the header first: most of it is what this **cannot** do — no operator identity, no tamper evidence in the format, and an address rather than a symbol on an ARM record. Item **12**. |
+| [`ls_ctx_reg.c`](ls_ctx_reg.c) + `ls_ctx_reg_*.c` | Which context builder a hook gets, resolved by symbol name through a linker set rather than by slot number — see `CONTESTED-PREMISES.md` #1 for what the slot-number version did. |
 | [`mk_shield_blob.py`](mk_shield_blob.py) | Generates `ls_shield_blob.h`, the built-in shield TMM arms at startup. Generated, so gitignored; `make check-vm` depends on it. |
 
 ## Driving a live TMM
