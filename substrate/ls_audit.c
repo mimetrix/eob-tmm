@@ -235,6 +235,13 @@ ls_audit_peer_comm(unsigned int pid, char *out, size_t out_len)
     out[o] = '\0';
 }
 
+/* THE DEV OPS ARE NAMED HERE TOO, and leaving them out was a real flaw rather than a cosmetic
+ * one. The first live run recorded the two operations this trail exists for as `op=op_4099` and
+ * `op=op_4100`: those are ARM and DISARM, 0x1003 and 0x1004. "Who armed what" is precisely the
+ * ARM op, so the one record a reader would go looking for was the one that did not say what it
+ * was. They are not in enum shield_op because that enum is the PROPOSED product ABI and these
+ * four are implementation ops --- which is a reason for them to be absent from the header, not a
+ * reason for the audit trail to be unable to name them. */
 static const char *
 ls_audit_opname(unsigned int op)
 {
@@ -243,6 +250,11 @@ ls_audit_opname(unsigned int op)
     case SHIELD_OP_SET_MODE: return "SET_MODE";
     case SHIELD_OP_STATUS:   return "STATUS";
     case SHIELD_OP_REVOKE:   return "REVOKE";
+    /* ls_vm_load.c's implementation ops, by the numbers its switch uses. */
+    case 0x1001:             return "BENCH";
+    case 0x1002:             return "SAMPLES";
+    case 0x1003:             return "ARM";
+    case 0x1004:             return "DISARM";
     default:                 return NULL;      /* printed as the number, see below */
     }
 }

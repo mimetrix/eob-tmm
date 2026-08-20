@@ -42,6 +42,14 @@
  *     statics and the loader had a sixth for the last reply, so the link refused all six and it
  *     cost a build cycle. They are now one struct --- see the note at g_ls_audit --- which is
  *     also why the reply buffer lives on this side of the interface rather than beside reply().
+ *   - THE HOOK IS AN ADDRESS ON AN ARM RECORD, NOT A NAME. Observed on the first live run:
+ *     `op=ARM ... hook=0x1451184`. The name-to-address resolution happens in the CLIENT, which
+ *     is where the per-build hook index lives, so TMM never sees the string the operator typed.
+ *     The record is therefore accurate and less useful than it looks --- correlating it with a
+ *     function name needs the index for that build ID, which the record does at least name.
+ *     Fixing it properly means the request carrying the name alongside the address, which is a
+ *     wire-format change and belongs with the operator front-end (scope item 11) rather than
+ *     being bolted on here.
  *   - NO CAUSAL LINK TO A HUMAN. peer_pid identifies a process, and in a Kubernetes exec that
  *     process is spawned by an API call this code cannot see. Closing that needs the request to
  *     carry an operator identity, which needs the wire format to grow a field and something to

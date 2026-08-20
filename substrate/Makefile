@@ -372,7 +372,7 @@ check-vendor-pin:
 check-audit:
 	@$(CC) -O2 -Wall -Wextra -Werror -I. -Wl,--build-id -o .audit.out \
 	    check_audit.c ls_audit.c
-	@./.audit.out >/dev/null 2>&1 && echo "ok    ls_audit.c  (19 assertions: injection, truncation, peer creds, build id)" \
+	@./.audit.out >/dev/null 2>&1 && echo "ok    ls_audit.c  (21 assertions: injection, truncation, peer creds, build id, op naming)" \
 	  || { ./.audit.out; rm -f .audit.out; exit 1; }
 	@rm -f .audit.out
 

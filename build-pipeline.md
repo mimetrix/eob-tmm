@@ -217,7 +217,12 @@ Named plainly, because each is a real gap rather than a detail:
   load" is no longer on trust — for the *program*. It is still on trust for the *asker*: the loader
   socket authenticates bytes, not peers, and the private key sits in a file on a developer's
   workstation rather than in an HSM.
-- **No audit trail.** Nothing records who armed what, when, against which build.
+- **The audit trail exists, and it records a process rather than an operator.** Every
+  control-plane operation leaves one `ls_audit:` record naming the op, the target, the program
+  hash, the binary's GNU build ID, and the verdict the caller was given verbatim. The caller is
+  identified by `SO_PEERCRED`, which the kernel fills in and the peer cannot choose — but in this
+  container that is uid 0 for everything, and the name-to-address resolution happens client-side,
+  so an ARM record carries the address rather than the symbol the operator typed.
 - **The vendored uBPF revision is unrecorded.** The vendored copy carries one patch
   (`substrate/ubpf-patches/0001-jit-scratch-rightsize.patch`) and has no `.git`, and it
   differs from the `508d5e4b` checkout on the build box. Reproducibility hole; PREVAIL is

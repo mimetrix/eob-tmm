@@ -159,6 +159,20 @@ int main(void)
     ok("A5  the injected text survives as inert, escaped characters",
        strstr(buf, "hook=x_ls_audit:") != NULL);
 
+    /* A9 --- the ops this trail exists for must be NAMED, not numbered. The first live run
+     * recorded ARM and DISARM as op_4099 and op_4100, so the one record a reader would go looking
+     * for --- who armed what --- was the one that did not say what it was. */
+    struct shield_msg armed = m;
+    armed.op = 0x1003;
+    ls_audit_op(sv[0], &armed, "OK ARMED LIVE entry=0x1451184 slot=5 (no restart)\n");
+    armed.op = 0x1004;
+    ls_audit_op(sv[0], &armed, "OK DISARMED LIVE entry=0x1451184\n");
+    n = slurp(path, buf, sizeof buf);
+    ok("A9  ARM is recorded as op=ARM, not as a number",
+       strstr(buf, "op=ARM ") != NULL && strstr(buf, "op=op_4099") == NULL);
+    ok("A9  DISARM likewise",
+       strstr(buf, "op=DISARM ") != NULL && strstr(buf, "op=op_4100") == NULL);
+
     /* A6 --- garbage in is still evidence. */
     lines_before = count_lines(buf, "ls_audit: seq=");
     ls_audit_op(sv[0], NULL, "ERR short message (3 bytes)\n");

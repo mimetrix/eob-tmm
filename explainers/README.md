@@ -20,7 +20,10 @@
 > ([`../GROUND_TRUTH.md`](../GROUND_TRUTH.md), 16 of 16 in
 > [`../env/scripts/bnk-test-signatures.sh`](../env/scripts/bnk-test-signatures.sh)). **What this does
 > not do is authenticate the caller** — the program is signed, the asker is anonymous, the verifying
-> key is compiled in with no revocation path, and nothing records who armed what. Where a page names
+> key is compiled in with no revocation path. **Every operation is now recorded** (2026-08-20):
+> one line per control-plane operation with the op, target, program hash, the binary's build id,
+> and the verdict the caller received verbatim, attributed to the pid/uid the kernel reports for
+> the connecting process --- which is a process, not a person. Where a page names
 > signature verification, the safe-return policy table and a runtime budget guard together, only the
 > first exists.
 >

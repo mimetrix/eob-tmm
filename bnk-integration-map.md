@@ -24,7 +24,9 @@ here is established for appliance or VE — whether those share this source tree
 | Runtime time guard (fuel) | **absent** | §7 — the JIT ignores the instruction limit |
 | Signature verification | **built and measured** | 16 of 16 in `env/scripts/bnk-test-signatures.sh` on build `92454510` |
 | Caller identity on the loader socket | **not built** | the program is signed; the asker is anonymous |
-| Audit trail | **not built** | nothing records who armed what, when, on which build (item 12) |
+| Audit trail | **built and measured live** | one record per operation on build `42a19734`, 8 of 8 in `env/scripts/bnk-test-audit.sh` |
+| Operator identity in the record | **not built** | `SO_PEERCRED` names a *process*, kernel-attested. Under `kubectl exec` that process is spawned by an API call TMM cannot see |
+| Tamper evidence on the trail | **not claimed** | durability comes from the sink (the pod log, collected off-box), not from the format |
 | Hook map | **not built** | entry addresses supplied by hand, and they move every rebuild (item 5) |
 
 Reproduce any row from [`REPRODUCING.md`](REPRODUCING.md).

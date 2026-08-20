@@ -76,7 +76,10 @@ does gain 39 files and three edited build-configuration files; see `DOC-STATUS.m
 **3. It is a signed pipeline, and that is not the same as a trusted one.** Programs are signed
 after PREVAIL accepts them and verified inside TMM before admission (scope item 4, built
 2026-08-20). What remains unsigned is the *request*: the loader socket does not authenticate its
-peer, so anything that can reach it may ask, and nothing records who did. The socket stays
+peer, so anything that can reach it may ask. Every request IS now recorded --- one `ls_audit:`
+line per operation, with the caller's pid, uid and gid as the kernel reported them --- but a pid
+is not a person, and under `kubectl exec` it belongs to a process spawned by an API call TMM
+cannot see. The socket stays
 env-gated and off by default for that reason, and the signing key lives in a file on a developer's
 workstation rather than in an HSM --- so none of this is near a production box.
 

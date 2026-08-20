@@ -18,9 +18,18 @@ and the reason, not a re-definition of the ask into something we happen to do.
 | **b** | Highlight vulnerabilities and active threats immediately | **split** | **Active threats: yes, and uniquely** — a kernel agent structurally cannot see TMM's decisions. **Vulnerabilities: no** — a shield does not change a package version, so the scanner still reports it |
 | **c** | Patch where you can / disable the exploit path, customer aware | **strongest** | "Disable the exploit path" is exactly what this does, and MONITOR mode already *is* "make the customer aware first". Blocked on signing and an audit trail, both unbuilt |
 
-**Three cross-cutting gaps block all three from being customer-facing**, and they are listed
-in §4 rather than buried: no program signature verification, no audit trail, and no
-measured per-invocation cost.
+**Three cross-cutting gaps blocked all three from being customer-facing when this was written.
+Two have since been built, and the third has moved rather than closed** — they are listed in §4
+rather than buried:
+
+- **Program signature verification** — *built and measured live*, 2026-08-20.
+- **Audit trail** — *built and measured live*, 2026-08-20. What it does not carry is an operator
+  identity: the record names the process that asked, as the kernel reports it.
+- **Per-invocation cost** — a **floor** is measured (≤ 11 ns) and it is the instrument's floor
+  rather than the program's; the data-path cost is still not established.
+
+The remaining blocker is therefore narrower and more procedural than technical: whose identity
+travels with an arming request, and who can revoke the key that vouched for the program.
 
 ---
 
@@ -245,7 +254,21 @@ story that ends "we disabled your exploit path", it is not enough that the progr
 somebody has to be able to say who armed it, when, against which build, and be able to revoke the
 key that vouched for it. Neither the audit trail (item 12) nor a key lifecycle exists.
 
-**There is no audit trail.** Scope item 12. Who armed what, when, in which mode, with what
+**The audit trail is built as of 2026-08-20, and what it cannot say matters.** Scope item 12.
+Every control-plane operation leaves one record: the op, the slot, the hook, the program hash from
+the signed binding, the build range and mode ceiling, the GNU build ID of the binary that served
+it, and the verdict the caller received *verbatim* rather than re-derived. The asker is identified
+by `SO_PEERCRED` — the kernel's own view of the connecting process, which the peer cannot forge.
+
+Three limits, because they decide whether this satisfies (c) rather than merely resembling it.
+The record names a **process, not a person**: under `kubectl exec` that process is spawned by an
+API call TMM cannot see. The trail is **not tamper-evident by format** — a sequence number makes a
+*deleted* record visible as a gap and does nothing about a rewritten one, so durability rests on
+the sink being the pod log, collected off-box by something TMM cannot write to. And an **ARM record
+carries an address rather than a symbol**, because the client resolves the name against the
+per-build index before sending.
+
+What the original text below asked for was: who armed what, when, in which mode, with what
 result, is not recorded anywhere durable. "Conditioned upon customers being made aware"
 implies a record they can be shown afterwards, and that record does not exist.
 
@@ -259,7 +282,7 @@ same answer today: not built, or not measured.
 | # | gap | state | why it blocks |
 |---|---|---|---|
 | 1 | **Peer authentication and key lifecycle** | signature verification **built and measured** (2026-08-20); these two are not | The program is now authenticated; the *requester* is not. Anything that can reach the socket may ask, and the verifying key is compiled in with no revocation path |
-| 2 | **Audit trail** | unbuilt (item 12) | (c)'s "customer made aware" needs a durable record |
+| 2 | **Operator identity in the audit trail** | the trail is **built and measured**; the identity is not | (c)'s "customer made aware" needs a durable record, and there is one — but it names the *process* that asked (kernel-attested `SO_PEERCRED`), not the person. Closing that needs a signed operator identity on the wire |
 | 3 | **Per-function safe values** | hardcoded `0` | A wrong safe value turns a crash into silent misbehaviour |
 | 4 | **Per-invocation cost on the data path** | **a floor only** | ≤ 11 ns of program execution on the compiled path, and that figure is bounded by the `rdtsc` pair measuring it rather than by the program — a record-building program timed *below* one that returns immediately, which is impossible. It excludes the trampoline's register save and restore, the call and return, and cache effects under traffic. `perf_event_paranoid=4` still blocks hardware counters. Quote the floor as a floor and no per-packet number |
 | 5 | **JIT skips the bounds callback** | by design in uBPF | The interpreter and the JIT do not agree on memory safety, and the lab runs the JIT (`LS_VM_JIT=1`) |

@@ -201,6 +201,11 @@ with `dev_probe`, drive traffic, check `fired > 0`. Fifteen minutes.
   instrument: a trivial program measured *faster* than an empty one, which is
   impossible and means the timer's own overhead dominates. Treat 11 ns as "below
   what this rig can resolve", not as the cost.
+- **Every operation is recorded, and the record names a process rather than a person.** One
+  `ls_audit:` line per control-plane operation, carrying the op, target, program hash, the binary's
+  GNU build ID and the verdict the caller was given verbatim. The asker is `SO_PEERCRED`, which
+  the kernel fills in — so it cannot be self-reported, and it also cannot tell you who ran the
+  `kubectl exec`. Not tamper-evident by format: durability is the pod log being collected off-box.
 - **Signature verification is on, and is not the whole perimeter.** An Ed25519
   signature over the 112-byte binding is checked in TMM before a program is
   admitted; an unsigned, re-signed or altered program is refused. What that does

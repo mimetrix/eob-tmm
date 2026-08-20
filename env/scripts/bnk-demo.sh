@@ -545,7 +545,7 @@ note ""
 note "  At 1,090 sites under load, streaming everything is a firehose. That is the"
 note "  difference between telemetry and a decision."
 pause
-say "CLOSING --- the three things you would ask me anyway"
+say "CLOSING --- the four things you would ask me anyway"
 # READ THE NUMBER FROM THIS RUN. It was hardcoded --- "one sample in this run reads 23.8
 # million cycles" --- while the run being presented reported cycles_max=1628. A number
 # introduced by the words "in this run" and not taken from the run is the exact move this
@@ -566,9 +566,13 @@ fi
 note "  2. Every load above was signature-checked --- that is what signature=verified in"
 note "     the replies means, and an unsigned or altered program is refused. What is NOT"
 note "     checked is WHO asked: anything that can reach the loader socket can ask, the"
-note "     verifying key is compiled into the binary with no way to revoke it, and nothing"
-note "     records who armed what. That, plus no audit trail, is what keeps this lab-only."
-note "  3. The JIT never consults the bounds callback, so the interpreter and the JIT do"
+note "     verifying key is compiled into the binary with no way to revoke it, and no operator"
+note "     identity travels with the request."
+note "  3. Every operation IS recorded, though --- one line each, with the op, the target, the"
+note "     program hash, the build id of this binary, and the verdict you were given, quoted"
+note "     verbatim. The asker is the pid and uid the KERNEL reports, which cannot be forged and"
+note "     is still a process rather than a person. That is what keeps this lab-only."
+note "  4. The JIT never consults the bounds callback, so the interpreter and the JIT do"
 note "     not agree on memory safety --- and the lab runs the JIT."
 note ""
 note "  What is proven: a verified program loads into a running TMM, arms at a function"
