@@ -169,6 +169,27 @@ than *what can be seen*.
 that watches an address and runs a uBPF program from the handler --- to find out whether
 the signal-context restrictions are survivable before proposing it near a data plane.
 
+> **PROTOTYPED 2026-08-20 --- see [`prototype/watchpoint/`](prototype/watchpoint/). Two things
+> above are now wrong, and one is confirmed with numbers.**
+>
+> **The signal objection does not apply.** `perf_event_open` with `PERF_TYPE_BREAKPOINT` samples
+> into an mmap'd ring that a DIFFERENT thread drains. The watched thread takes the trap and
+> continues; no handler runs in it; async-signal-safety never arises. Verified on x86_64 and
+> aarch64 --- samples appear in the ring with nothing installed to catch a signal. The paragraph
+> above assumed signal delivery was the only path, and it is not.
+>
+> **The privilege ask is worse than "privilege".** `perf_event_paranoid` is 4 on both x86 boxes,
+> and that is a gate rather than an off-switch --- but `CAP_PERFMON`, the narrow capability
+> intended for exactly this, is REFUSED at that setting. It takes `CAP_SYS_ADMIN` in the pod, or
+> the node's sysctl relaxed to ≤ 2. Naming CAP_PERFMON as the ask would have been wrong.
+>
+> **Four is exact.** Arming until refusal gives `ENOSPC` on the fifth, both architectures.
+>
+> **The per-hit cost §2.5 declines to quote is 501 ns on aarch64 and 4,755 ns on the x86 KVM
+> guest** --- against ≤ 11 ns for a pad hook. The x86 figure is inflated by debug exceptions
+> exiting to the hypervisor and must not be read as the hardware cost; the order-of-magnitude
+> gap between the two hosts is the evidence. Either way the ratio is 45x at best.
+
 ---
 
 ## 2.5 Do pads survive, once other hook types exist?
@@ -188,8 +209,15 @@ per-request rates, on an unbounded number of sites, with no privilege.
 | Execution context | ordinary thread | signal context, async-signal-safety rules |
 | Reach | padded functions only (TMM core) | any address |
 
-The ratio on per-hit cost is large --- a kernel trap and signal delivery against a call
-instruction --- but it is UNMEASURED here and no number should be quoted for it.
+The ratio on per-hit cost is large --- a kernel trap against a call instruction --- and it is
+**now measured**: 501 ns on aarch64, 4,755 ns on the x86 KVM guest, against ≤ 11 ns for the pad
+path. So 45x at best and 440x on the box TMM runs on, with the x86 figure inflated by
+virtualisation. See [`prototype/watchpoint/`](prototype/watchpoint/).
+
+**That turns this section from an argument into arithmetic.** 16,000 requests through the proxy
+--- the volume `rst_why` was measured over --- would cost between 8 and 88 MILLISECONDS of pure
+trap if a per-request site were watched rather than padded. On a path that fires once per exploit
+attempt, five microseconds is unmeasurable. The split below is not a preference.
 
 **This is the observability-versus-CVE split, and it explains the whole struggle.**
 `rst_why` fires on every teardown; a per-request hook needs the cheap path and needs
