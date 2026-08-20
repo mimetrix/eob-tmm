@@ -73,9 +73,12 @@ does gain 39 files and three edited build-configuration files; see `DOC-STATUS.m
 **2. It is not the cluster.** Reproducing the live arm needs a BNK build box and a datkube cluster.
 [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) stands both up from nothing.
 
-**3. It is not a signed pipeline.** Nothing verifies a signature (scope item 4), so the loader
-accepts **unverified programs** whenever `LS_LOAD_SOCKET` is set. That is why the socket is
-env-gated and off by default, and why none of this is near a production box.
+**3. It is a signed pipeline, and that is not the same as a trusted one.** Programs are signed
+after PREVAIL accepts them and verified inside TMM before admission (scope item 4, built
+2026-08-20). What remains unsigned is the *request*: the loader socket does not authenticate its
+peer, so anything that can reach it may ask, and nothing records who did. The socket stays
+env-gated and off by default for that reason, and the signing key lives in a file on a developer's
+workstation rather than in an HSM --- so none of this is near a production box.
 
 ---
 

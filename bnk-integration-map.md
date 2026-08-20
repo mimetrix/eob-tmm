@@ -22,7 +22,9 @@ here is established for appliance or VE — whether those share this source tree
 | A shield changing a request's outcome | **not shown** | every program armed live returns `FALLTHROUGH` by construction |
 | Per-call cost of an armed hook | **unmeasured** | §7 |
 | Runtime time guard (fuel) | **absent** | §7 — the JIT ignores the instruction limit |
-| Signature verification | **not built** | the loader accepts unverified programs (item 4) |
+| Signature verification | **built and measured** | 16 of 16 in `env/scripts/bnk-test-signatures.sh` on build `92454510` |
+| Caller identity on the loader socket | **not built** | the program is signed; the asker is anonymous |
+| Audit trail | **not built** | nothing records who armed what, when, on which build (item 12) |
 | Hook map | **not built** | entry addresses supplied by hand, and they move every rebuild (item 5) |
 
 Reproduce any row from [`REPRODUCING.md`](REPRODUCING.md).

@@ -801,7 +801,8 @@ What it prints:
 ls_vm: init  build=<stamp>  jit=0 fuel=0 timing=1
 ls_vm: ARMED slot=0 section=fentry/<hook> function=shield mode=2 bytes=4320
 ls_vm: bench slot=0 path=interp iters=100000 min=126 mean=287 max=1403200 cycles
-ls_vm: LOADER LISTENING on /tmp/ls_load.sock --- accepts UNVERIFIED programs
+ls_vm: signature verification ARMED --- unsigned programs are refused
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock.25 --- programs are signature-checked, the PEER is not
 ```
 
 **`LS_LOAD_SOCKET` verifies signatures** (scope item 4, built 2026-08-20) and still must not be

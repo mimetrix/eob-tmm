@@ -216,8 +216,10 @@ int ls_vm_arm(const void *elf, size_t elf_len,
 enum ls_verdict ls_vm_call(int slot, void *ctx, size_t ctx_len);
 
 /* Runtime load path (ls_vm_load.c). Started only if LS_LOAD_SOCKET is set.
- * ACCEPTS UNVERIFIED PROGRAMS --- signature verification is scope item 4 and is
- * not implemented. Off by default for that reason. */
+ * VERIFIES EVERY PROGRAM'S SIGNATURE (ls_sig.c) and NOTHING ABOUT ITS SENDER: the
+ * socket has no peer authentication, so the env gate and the 0600 mode are what
+ * limit who may ask. Off by default for that reason --- which is a different reason
+ * from the one this comment carried until 2026-08-20. */
 void ls_vm_loader_start(void);
 
 int  ls_vm_reload(int slot, const void *elf, size_t elf_len,

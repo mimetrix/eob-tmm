@@ -158,7 +158,9 @@ reset functions fell through and printed as raw hex.
 | Build-ID match | **enforced** at arm, since 2026-08-18 — the index carries the build id it was generated from, compared against `/proc/<pid>/exe` |
 | Ambiguous symbol name | **refused** — 591 names in this build have 2–21 entries each |
 | Arming a slot with no program | **refused**, since 2026-08-18 |
-| **Signature verification** | **ABSENT.** Scope item 4. The loader accepts any program and says so on every load. Lab only |
+| **Signature verification** | **enforced** at load, since 2026-08-20 — Ed25519 over the 112-byte binding, checked in TMM against a key compiled in; unsigned, re-signed and altered programs refused |
+| Peer identity on the loader socket | **ABSENT.** The program is authenticated, the caller is not: anything that can reach the socket may ask, and nothing records who armed what. Lab only for this reason |
+| Revoking a signing key | **ABSENT.** The verifying key is compiled into the binary, so revocation is a rebuild |
 | Per-invocation budget | pass exists (`budget_pass.py`) but is not enforced at admission |
 
 ---

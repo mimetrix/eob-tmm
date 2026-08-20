@@ -1270,10 +1270,11 @@ built, and that is a scheduling fact worth having early rather than discovering 
 > **Updated 2026-08-14.** Half of that has since been built and half has not, and the half that
 > has not is the one that matters for a merge request. **Item 0 exists**: preparation is handed to
 > a TMM poll thread through `ls_prep.c`, and loading a program into a running TMM works — that is
-> what the live arm/disarm runs exercise. **Item 4 does not.** Nothing verifies a signature, so the
-> loader accepts unverified programs whenever `LS_LOAD_SOCKET` is set, which is why it is env-gated
-> and off by default. The sequencing conclusion above therefore still holds, for a smaller reason
-> than when it was written: **the perimeter is the remaining gap**, not the mechanism.
+> what the live arm/disarm runs exercise. **Item 4 now exists too** (2026-08-20): an Ed25519
+> signature over the binding is verified inside TMM before a program is admitted, and the socket
+> stays env-gated because it does not authenticate its *peer*. The sequencing conclusion above
+> still holds, for a smaller reason again: **what remains of the perimeter is who may ask and what
+> record that leaves**, not whether the program can be trusted to be ours.
 
 **Also worth flagging for review:** the change adds **ten new entries to the global-state
 manifest**, three of them ours. Those three should move into TMM's per-instance structure

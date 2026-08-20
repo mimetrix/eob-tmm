@@ -143,7 +143,8 @@ cat <<'EOT'
 
   SAY THESE OUT LOUD, because a reviewer will ask inside five minutes:
 
-    - The loader socket does NO signature verification. Lab only.
+    - Programs are signature-checked; the socket does NOT authenticate the caller.
+        Lab only for that reason, and because nothing records who armed what.
     - Per-invocation cost is UNMEASURED. Quote no per-call number.
     - LS_VM_JIT=1, and uBPF's compiled path never consults the bounds callback, so
       this run does not exercise memory safety --- only functionality.

@@ -228,16 +228,22 @@ That progression is a real feature and it has not been part of how this gets des
 
 ### What is missing before it is customer-facing
 
-**Signature verification does not exist.** Scope item 4. The loader accepts any program and
-announces it on every load:
+**Signature verification exists as of 2026-08-20.** Scope item 4. Every load is checked against a
+key compiled into TMM, and the loader now states the property that actually holds:
 
 ```
-ls_vm: LOADER LISTENING on /tmp/ls_load.sock.23 --- accepts UNVERIFIED programs.
-       This must not exist in a build anyone else runs.
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock.25 --- programs are signature-checked, the PEER is
+       not. Anything that can reach this socket can ask. Lab builds only.
 ```
 
-For a story that ends "we disabled your exploit path", unsigned programs are not shippable.
-This is the single largest gap between what runs and what could ship.
+The earlier banner read `accepts UNVERIFIED programs`, which was true when written and was still
+being printed after it stopped being true --- one of five such strings found in a single sweep and
+recorded in `CONTESTED-PREMISES.md` rather than quietly corrected.
+
+**What is now the largest gap** is one level out from where this section used to put it: for a
+story that ends "we disabled your exploit path", it is not enough that the program was signed ---
+somebody has to be able to say who armed it, when, against which build, and be able to revoke the
+key that vouched for it. Neither the audit trail (item 12) nor a key lifecycle exists.
 
 **There is no audit trail.** Scope item 12. Who armed what, when, in which mode, with what
 result, is not recorded anywhere durable. "Conditioned upon customers being made aware"
