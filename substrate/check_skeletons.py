@@ -33,11 +33,28 @@ DOC = os.path.join(ROOT, "development-scope-code.md")
 # bit us once (ubpf_jit_fn's 2-argument basic form vs the 4-argument extended
 # form the design requires).
 UBPF_INC = os.path.join(ROOT, "ubpf", "vm", "inc")
-# ubpf.h opens with `#include <ubpf_config.h>`, which uBPF's build generates.
-# The vendored tree carries one, so point at it rather than writing a stub: a
-# hand-written config could disagree with the library's own and turn this check
-# into a source of drift instead of a guard against it.
-UBPF_CFG = os.path.join(ROOT, "ubpf", "vm")
+
+
+# ubpf.h opens with `#include <ubpf_config.h>`, which uBPF's build GENERATES. Point at it rather
+# than writing a stub: a hand-written config could disagree with the library's own and turn this
+# check into a source of drift instead of a guard against it.
+#
+# FIND IT, DO NOT ASSUME IT. This was hardcoded to ubpf/vm, and it worked here for one reason
+# only: this tree had been configured in-source at some point, so a copy existed at ubpf/vm as
+# well as at ubpf/build/vm. A fresh `cmake -S . -B build` writes ONLY build/vm --- so on a clean
+# clone the path was wrong and the failure read `fatal error: ubpf_config.h: No such file or
+# directory`, which looks like a missing dependency rather than a wrong include path. Measured on
+# a from-scratch clone, 2026-08-20. cmake's output layout is its business; locating the header is
+# ours.
+def _find_ubpf_config(root):
+    for base in (os.path.join(root, "ubpf", "build"), os.path.join(root, "ubpf")):
+        for dirpath, _dirs, files in os.walk(base):
+            if "ubpf_config.h" in files:
+                return dirpath
+    return os.path.join(root, "ubpf", "vm")   # the old guess, so the error names a real path
+
+
+UBPF_CFG = _find_ubpf_config(ROOT)
 CC = os.environ.get("CC", "cc")
 
 PROLOGUE = '#include "platform_stub.h"\n#include "example_hook_ctx.h"\n'

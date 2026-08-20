@@ -24,6 +24,12 @@ PYTHON ?= python3
 # target names the missing prerequisite and the one command that fixes it, BEFORE anything else
 # runs. It does not attempt to fetch anything: a check that silently mutates the tree it is
 # checking is worse than a check that fails.
+# WHERE ubpf_config.h IS, cmake decides; FINDING it is this Makefile's job. check-glue always
+# located it with `find`; check-vm and check_skeletons.py hardcoded ../ubpf/vm and worked here
+# only because this tree had once been configured in-source, leaving a second copy at that path.
+# On a clean clone `cmake -S . -B build` writes only build/vm, so the hardcoded path was wrong and
+# the error --- "ubpf_config.h: No such file or directory" --- read as a missing dependency rather
+# than a wrong include path. Two spellings of one lookup is how that survived; there is now one.
 check-prereqs:
 	@ok=1; \
 	 [ -f ../ubpf/vm/inc/ubpf.h ]          || { echo "MISSING  ../ubpf/vm/inc/ubpf.h  (uBPF source)"; ok=0; }; \
@@ -108,11 +114,13 @@ check-stack:
 # Compiled against the REAL vendored uBPF headers, so a signature drift upstream
 # fails here rather than at integration time. Compiled, not linked or run.
 check-vm: shield-blob
-	@$(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I../ubpf/vm ls_vm.c \
+	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
+	 $(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I "$$CFG" ls_vm.c \
 	  && echo "ok    ls_vm.c  (compiles against the real uBPF API, -Wall -Wextra clean)"
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_vm_config.c \
 	  && echo "ok    ls_vm_config.c  (stands alone, no uBPF headers needed)"
-	@$(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I../ubpf/vm ls_vm_load.c \
+	@CFG=$$(dirname $$(find ../ubpf -name ubpf_config.h | head -1)); \
+	 $(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I "$$CFG" ls_vm_load.c \
 	  && echo "ok    ls_vm_load.c  (runtime load path; compiles against the real ABI)"
 
 # The patched-entry trampoline. The .S is x86-64 only, so it is assembled where
