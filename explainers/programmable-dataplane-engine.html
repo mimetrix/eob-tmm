@@ -361,13 +361,26 @@
       <span class="td">provably safe</span>
     </div>
     <div class="scrollcue"><span class="arrow">↓</span> scroll</div>
-      <div class="callout sig"><p><b>Accuracy note — 2026-08-13.</b> This page was written as a proposal.
-      The data-plane mechanism described here now <b>runs on a live TMM</b>: a shield is loaded over a
-      socket into an already-running process, armed at a function entry while traffic flows, and
-      disarmed — no rebuild, no restart. Two claims remain genuinely unproven and stay conditional
-      throughout: <b>no CVE has been mitigated on live traffic</b>, and the <b>per-call cost of an
-      armed hook is unmeasured</b>. Where this page still reads &ldquo;would&rdquo;, treat the
-      mechanism as built and the outcome as not yet shown.</p></div>
+      <div class="callout sig"><p><b>Accuracy note — updated 2026-08-20.</b> This page was written as a
+      proposal. The data-plane mechanism described here now <b>runs on a live TMM</b>: a shield is loaded
+      over a socket into an already-running process, armed at a function entry while traffic flows, and
+      disarmed — no rebuild, no restart. Where the page still reads &ldquo;would&rdquo;, treat the
+      mechanism as built and the outcome as not yet shown.</p>
+      <p><b>Built since this page was written.</b> <b>Signature verification</b> is no longer part of the
+      proposal — an Ed25519 signature over the program's binding is checked inside TMM before admission,
+      and unsigned, re-signed and altered programs are refused. The <b>hook index</b> is generated per
+      build, so a hook is named rather than addressed, and arming is refused when the index and the
+      running binary disagree.</p>
+      <p><b>Still genuinely unproven, and conditional throughout.</b> <b>No CVE has been mitigated on live
+      traffic</b> — the mechanism is shown, the outcome is not. <b>The per-call cost of an armed hook on
+      the data path is unmeasured.</b> A floor exists: a small program executes in ≤ 11 ns on the
+      compiled path, and that figure is bounded by the timer measuring it rather than by the program, so
+      it excludes the trampoline's register save and restore, the call and return, and cache effects under
+      real traffic. Quote the floor as a floor and nothing as a per-packet cost.</p>
+      <p><b>And the perimeter moved rather than closed.</b> The loader authenticates the <em>program</em>,
+      not the <em>caller</em>: anything able to reach its socket may ask, the verifying key is compiled
+      into the binary with no revocation path, and nothing records who armed what. That, with the absent
+      audit trail, is what still makes this lab-only.</p></div>
 </section>
 
   <!-- 01 HOLDOUT -->

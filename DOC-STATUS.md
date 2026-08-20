@@ -36,6 +36,8 @@ built, reachable, or costly have in places been superseded by measurement.
 **RECORD** — the account of a particular investigation or run. Still accurate *as a record
 of that run*, and not a description of the present state.
 **PROCEDURE** — how to do something. Ages with the tooling rather than with the design.
+**PRESENTED** — a self-contained page written to be shown and circulated. Design-era by
+construction, kept that way on purpose, and carrying its own dated accuracy note in the hero.
 
 ### Current
 
@@ -88,6 +90,27 @@ reachable, or what something costs, prefer the current documents.
 | [`REPRODUCING.md`](REPRODUCING.md) | Reproduce the results |
 | [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) | Build and deploy environment, end to end |
 | [`live-patch-runbook.md`](live-patch-runbook.md) | Arming a live TMM |
+
+### Explainers — a fifth category, and this page did not classify them until 2026-08-20
+
+The four pages in [`explainers/`](explainers/) are **presented artifacts**: self-contained HTML
+written to be shown and circulated, not read as status. They belong to the design era and are
+deliberately not rewritten each time the build moves — a proposal rewritten into a status report
+stops being either. Each therefore carries an **accuracy note in its own hero**, updated in place,
+and that note is the authority for which of its claims have since been built.
+
+| page | era | what its accuracy note now says |
+|---|---|---|
+| [`explainers/programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) | design, mechanism since built | mechanism runs live; signature verification and the per-build hook index built since; data-path per-call cost unmeasured, floor only |
+| [`explainers/engine-hard-problems.html`](explainers/engine-hard-problems.html) | design | same note; several register entries now have measurements rather than estimates |
+| [`explainers/cve-mitigation.html`](explainers/cve-mitigation.html) | design, and the **least** demonstrated case | of the three safeguards it names, only signature verification exists; safe-return table and budget guard do not, and both bear on enforcement |
+| [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) | design exercise, **not a record** | the CVE is unreachable on this platform; the signature step is no longer conditional; the mitigation has never been performed |
+
+**They were omitted from this page for a week.** DOC-STATUS exists so a reader knows which era a
+document belongs to before acting on it, and the four most *circulated* documents in the repo were
+the ones it did not classify. Anything published from them to an external artifact host is a
+separate copy that this repo cannot update — retiring or repointing those is a manual step, and
+needs the owner's approval per [`CLAUDE.md`](CLAUDE.md) §1.
 
 ---
 

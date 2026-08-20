@@ -13,8 +13,22 @@
 > CVE pages as *the hardest case the surface was designed against*, not as the thing it demonstrably
 > does. Full constraint list: [`../substrate/LIMITATIONS.md`](../substrate/LIMITATIONS.md).
 >
+> **Signature verification is built, 2026-08-20.** The pages describe it as part of the proposal;
+> it now runs. An Ed25519 signature over the program's binding — which commits to the program by
+> hash and carries its hook, build range, mode ceiling and expiry — is checked inside TMM before
+> admission, and unsigned, re-signed and altered programs are refused
+> ([`../GROUND_TRUTH.md`](../GROUND_TRUTH.md), 16 of 16 in
+> [`../env/scripts/bnk-test-signatures.sh`](../env/scripts/bnk-test-signatures.sh)). **What this does
+> not do is authenticate the caller** — the program is signed, the asker is anonymous, the verifying
+> key is compiled in with no revocation path, and nothing records who armed what. Where a page names
+> signature verification, the safe-return policy table and a runtime budget guard together, only the
+> first exists.
+>
 > Still genuinely unproven and must stay conditional: **no CVE has been mitigated on live traffic**,
-> and **per-call hook cost is unmeasured** ([`../load-path-scope.md`](../load-path-scope.md) §7).
+> and the **per-call cost of an armed hook on the data path is unmeasured**. A floor is now measured
+> — ≤ 11 ns for a small program on the compiled path — and it is bounded by the timer rather than by
+> the program, so it excludes the trampoline, the call and return, and cache effects under traffic.
+> Quote it as a floor and nothing as a per-packet cost ([`../load-path-scope.md`](../load-path-scope.md) §7).
 
 | Page | What it covers | Read |
 |---|---|---|

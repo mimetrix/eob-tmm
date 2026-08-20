@@ -546,9 +546,23 @@ note "  At 1,090 sites under load, streaming everything is a firehose. That is t
 note "  difference between telemetry and a decision."
 pause
 say "CLOSING --- the three things you would ask me anyway"
-note "  1. Per-invocation cost is UNMEASURED. rdtsc is preemption-polluted --- one sample"
-note "     in this run reads 23.8 million cycles, which is not real work --- and the node"
-note "     blocks hardware counters. I will not quote a per-call number."
+# READ THE NUMBER FROM THIS RUN. It was hardcoded --- "one sample in this run reads 23.8
+# million cycles" --- while the run being presented reported cycles_max=1628. A number
+# introduced by the words "in this run" and not taken from the run is the exact move this
+# demo exists to argue against, and it is the fourth hardcoded build fact removed from this
+# script. If the slot cannot be read, say nothing about a sample rather than invent one.
+CMAX=$("$KUBECTL" exec "$POD1" -c f5-tmm -- python3 /usr/bin/ls-load.py status 5 2>/dev/null \
+        | sed -n 's/.*cycles_max=\([0-9]*\).*/\1/p' | head -1)
+note "  1. Per-invocation cost is UNMEASURED, and rdtsc is preemption-polluted: a pair of"
+if [ -n "$CMAX" ]; then
+note "     reads spanning a context switch measures the scheduler, not the program. The worst"
+note "     sample in THIS run is $CMAX cycles against a minimum in the tens --- same program,"
+note "     same hook. The node also blocks hardware counters, so I will quote no per-call number."
+else
+note "     reads spanning a context switch measures the scheduler, not the program, and the node"
+note "     blocks hardware counters. The slot's counters were not readable just now, so I am not"
+note "     quoting a sample --- and I will quote no per-call number either way."
+fi
 note "  2. Every load above was signature-checked --- that is what signature=verified in"
 note "     the replies means, and an unsigned or altered program is refused. What is NOT"
 note "     checked is WHO asked: anything that can reach the loader socket can ask, the"
