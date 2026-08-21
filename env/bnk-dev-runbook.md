@@ -1021,6 +1021,43 @@ for a build TMM does not run, differing in 3,132 functions.
 | `src/compile/obj_x86_64.*` | yes | a FULL rebuild, ~20 min --- this is the incremental state |
 | `tmm-img:v10.204.15` in the kind nodes | **no** | the cluster's baseline image, not ours |
 
+## 12g · Before any teardown: what must be IN HAND, not on the boxes
+
+Written 2026-08-21, when a from-nothing replay was proposed and the honest answer to "can these
+machines be restored" turned out to be **no**. Not because the software is unrecoverable — that
+part was audited and is complete (`env/scripts/bnk-replay-audit.sh`, 15 checks) — but because
+**three browser-issued credentials are needed to rebuild, and two of them exist only on the boxes
+themselves.**
+
+| needed to rebuild | where it lives today | if the boxes are deleted |
+|---|---|---|
+| `clouds.yaml` (OpenStack) | **nowhere reachable** — §1 builds it from `clouds-sea.yaml`, downloaded from the Horizon web UI | cannot provision *anything*. This alone is decisive |
+| GitSwarm SSH private key | `~/.ssh/id_rsa` on the **build box only** (`git@gitswarm.f5net.com:tmm/tmm.git`) | cannot clone TMM. A new key must be created in the GitSwarm UI |
+| Artifactory token | `~/.af_env` on the **datkube box only**, plus `~/.docker/config.json` on both | cannot pull the toolchain container or the BNK images. Tokens are shown **once**, so it must be regenerated in a browser |
+
+**The shape of this is worth naming, because it is the same shape as the vendored-dependency gap
+and the stale staging copy: the thing needed to reproduce lives only where the work was done.** A
+credential on a machine is not a credential you have; it is a credential the machine has. The
+software half was made reproducible by writing it down and checking it. The credential half cannot
+be — writing a token into a repository is the failure it would prevent — so what is possible is a
+checklist, and this is it.
+
+**Before deleting anything, confirm all three are in hand:**
+
+```bash
+ls ~/.config/openstack/clouds.yaml          # provisioning
+ssh -T git@gitswarm.f5net.com               # TMM clone   (expects a welcome, not a denial)
+grep -q AF_TOKEN ~/.af_env && echo token    # toolchain + images
+```
+
+If any line fails, a teardown is one-way. What survives regardless: this repository, the TMM tree
+delta (`substrate/.tree-expected-delta`, verified complete both ways), the vendored pins and
+`bootstrap.sh`, the traffic path (`env/scripts/bnk-traffic-path.sh`), and `~/lstools`, which the
+bake regenerates. What does not survive: the ability to get back to a machine where any of that
+can run.
+
+---
+
 ## 13 · Teardown
 
 ```bash
