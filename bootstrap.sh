@@ -118,7 +118,7 @@ try_clone() {
     _origin="$1"; _dest="$2"; _name="$3"
     if [ -n "$MIRROR" ] && [ -d "$MIRROR/$(basename "$_dest")" ]; then
         info "cloning $_name from the mirror $MIRROR/$(basename "$_dest")"
-        if git clone -q "$MIRROR/$(basename "$_dest")" "$_dest"; then
+        if git clone -q --recurse-submodules "$MIRROR/$(basename "$_dest")" "$_dest"; then
             # POINT ORIGIN BACK AT THE CANONICAL URL. check_vendor_pin.sh asserts the origin, not
             # just the revision, and it is right to: "we have these bytes" and "these bytes came
             # from upstream" are different claims, and a tree whose origin is a path on somebody's
@@ -131,14 +131,14 @@ try_clone() {
         fi
     fi
     info "cloning $_name from $_origin"
-    git clone -q "$_origin" "$_dest" 2>/tmp/.bs_err && return 0
+    git clone -q --recurse-submodules "$_origin" "$_dest" 2>/tmp/.bs_err && return 0
     _e=$(tail -1 /tmp/.bs_err 2>/dev/null)
     info "  https failed: $_e"
     _ssh=$(ssh_form "$_origin")
     if [ "$_ssh" != "$_origin" ]; then
         info "  retrying over ssh: $_ssh"
         rm -rf "$_dest"
-        git clone -q "$_ssh" "$_dest" 2>/tmp/.bs_err && return 0
+        git clone -q --recurse-submodules "$_ssh" "$_dest" 2>/tmp/.bs_err && return 0
         info "  ssh failed: $(tail -1 /tmp/.bs_err 2>/dev/null)"
     fi
     rm -rf "$_dest"
@@ -167,6 +167,17 @@ fetch() {
     fi
     _got=$(git -C "$ROOT/$_dir" rev-parse HEAD)
     [ "$_got" = "$_pin" ] || fail "$_name checked out $_got, wanted $_pin"
+    # SUBMODULES, and this cost a diagnosis. PREVAIL carries three --- ebpf-samples,
+    # external/bpf_conformance, external/libbtf --- and its CMakeLists add_subdirectory()s one of
+    # them, so a clone without them fails configure with "source ... which is not an existing
+    # directory" rather than anything mentioning submodules. Checking out a pinned revision moves
+    # them too, so this runs after the checkout, every time.
+    if [ -f "$ROOT/$_dir/.gitmodules" ]; then
+        git -C "$ROOT/$_dir" submodule update --init --recursive -q 2>/dev/null \
+          || info "  submodule init failed --- configure will fail on a missing external/ directory"
+        _n=$(git -C "$ROOT/$_dir" submodule status 2>/dev/null | grep -c '^ ' || echo 0)
+        info "  $_n submodule(s) initialised"
+    fi
     info "$_name at $_got"
 }
 fetch "$UBPF_DIR" "$UBPF_ORIGIN" "$UBPF_PIN" uBPF
@@ -215,8 +226,14 @@ else
         info "built: $("$ROOT/$PREVAIL_DIR/bin/prevail" --version 2>&1 | head -1)"
     else
         info "PREVAIL did NOT build. Everything else still works; check-shields will skip."
-        info "Most often this is a missing dependency --- on Debian/Ubuntu:"
-        info "    sudo apt-get install libboost-dev libyaml-cpp-dev"
+        info "TWO causes, both seen on 2026-08-21 rebuilding a build box from nothing:"
+        info "  1. submodules. PREVAIL's CMakeLists add_subdirectory()s external/bpf_conformance,"
+        info "     so a clone without --recurse-submodules fails configure with 'source ... which"
+        info "     is not an existing directory' and never says the word submodule."
+        info "  2. missing headers --- on Debian/Ubuntu:"
+        info "         sudo apt-get install libboost-dev libyaml-cpp-dev"
+        info "     Neither is in the dev-machine playbook's package list, so a freshly configured"
+        info "     build box cannot verify a shield program until they are installed by hand."
         info "Rerun by hand to see the real error:"
         info "    cd $PREVAIL_DIR && cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build"
     fi

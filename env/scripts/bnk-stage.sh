@@ -50,6 +50,13 @@ SCP="scp $SSH_OPTS"
 # are large, change constantly, and nothing downstream reads them, so staging them would make
 # every provenance stamp look dirty for reasons that cannot affect a binary.
 DIRS="substrate env/scripts env/docker"
+# bootstrap.sh TRAVELS TOO, and its absence was a hole. The build box needs the vendored
+# dependencies --- uBPF to compile against, PREVAIL to verify shield programs before they are
+# signed --- and both are gitignored, so the only way onto a fresh box is bootstrap.sh, which was
+# staged nowhere. Found 2026-08-21: bnk-build-programs.sh on a rebuilt box would have refused for
+# want of a verifier, correctly, with no way provided to supply one. It reads its pins from
+# substrate/vendor.pins, which is already in DIRS.
+FILES="bootstrap.sh"
 
 for d in $DIRS; do
     [ -d "$REPO/$d" ] || { echo "*** $REPO/$d does not exist --- refusing to stage a partial tree" >&2; exit 2; }
@@ -83,7 +90,7 @@ fi
 # this tree is a copy with no unique content --- and if that ever stops being true, the
 # freshness check in step 3 is what will notice.
 $SSH "$BUILD_BOX" "cd ~/$DEST 2>/dev/null && rm -rf $DIRS; mkdir -p ~/$DEST" 
-(cd "$REPO" && tar -cf - $DIRS) | $SSH "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
+(cd "$REPO" && tar -cf - $DIRS $FILES) | $SSH "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
 echo "$STAMP" | $SSH "$BUILD_BOX" "cat > ~/$DEST/.staged-commit"
 echo "  staged $DIRS -> $BUILD_BOX:~/$DEST"
 echo "  stamped $STAMP"
@@ -93,15 +100,15 @@ echo "=== 3. VERIFY the copy, from the far end --- not from this script's belief
 # Compare CONTENT, per file, both ways. The failure being guarded against is a file that
 # exists on both sides with different bytes, which every "did the transfer succeed" check
 # and every timestamp comparison reports as fine.
-LOCAL_SUM=$(cd "$REPO" && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16)
-REMOTE_SUM=$($SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16")
+LOCAL_SUM=$(cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16)
+REMOTE_SUM=$($SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16")
 echo "  local  : $LOCAL_SUM"
 echo "  staged : $REMOTE_SUM"
 if [ "$LOCAL_SUM" != "$REMOTE_SUM" ]; then
     echo
     echo "*** THE STAGED TREE DOES NOT MATCH THE REPO. Do not build on it. Files differing:"
     $SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum" > /tmp/.stage-remote
-    (cd "$REPO" && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum) > /tmp/.stage-local
+    (cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum) > /tmp/.stage-local
     diff /tmp/.stage-local /tmp/.stage-remote | sed 's/^/    /' | head -30
     rm -f /tmp/.stage-local /tmp/.stage-remote
     exit 1
