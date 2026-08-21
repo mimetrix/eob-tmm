@@ -271,6 +271,23 @@ already exist.
 
 ## 6 · Configure the box
 
+**ASSERT §5 FIRST. The order of §5 and §6 is load-bearing and nothing enforces it.** §6 installs
+and starts Docker; §5 is what stops Docker choosing an address pool that collides with the
+AdminNetwork the box is reached over. Run them the wrong way round and the box disconnects itself
+and looks dead. On 2026-08-21 I did exactly that on a rehearsal box — provisioned, then jumped
+straight to §6 — and got away with it only because `common`'s long apt phase runs before the
+`docker` role, leaving a window to write the file while `systemctl is-active docker` still said
+`inactive`. That is luck, not procedure. One line removes the luck:
+
+```bash
+ssh -i $KEY ubuntu@$IP 'test -f /etc/docker/daemon.json && echo pool-set' ||   { echo "*** §5 has not been applied. Do it before this playbook starts Docker."; exit 1; }
+```
+
+**And use the playbook named here.** The clone also contains `configure-only.yml`, which looks like
+the right thing and is not: it lists roles `go` and `vim`, neither of which exists in
+`roles/`, so it fails immediately with *"the role 'go' was not found"*. That is an upstream file
+that is not on this path — the one this runbook uses is `setup-dev-machine-slim.yml`.
+
 ```bash
 export ANSIBLE_HOST_KEY_CHECKING=False
 ~/.venvs/openstack/bin/ansible-playbook -i inventory_eob-bnk-build-01.ini \
