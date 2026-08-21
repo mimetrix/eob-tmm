@@ -303,12 +303,19 @@ skipped=37 ignored=3`**.
 
 It installs the toolchain this project needs — `gcc g++ gdb lldb clang cmake
 build-essential binutils elfutils pahole valgrind ltrace linux-tools-generic
-perf-tools-unstable universal-ctags python3-dev/pip/venv` — plus Docker CE. **Not Go, despite
-what this line used to claim.** Verified on a freshly configured box 2026-08-21: `gcc clang gdb
-cmake pahole docker` are all present and `go` is on neither `$PATH` nor `/usr/local/go`, while the
-recap reports `skipped=37` — the `golang` role is gated off by a flag this configuration does not
-set. Nothing in this project needs Go, so this is a correction to the sentence rather than a gap to
-fill; the 269 MB `~/go` tree on the older build box came from somewhere else. Note
+perf-tools-unstable universal-ctags python3-dev/pip/venv` — plus Docker CE and Go.
+
+**A correction I made here on 2026-08-21 was wrong, and it is left visible rather than deleted.**
+I wrote that Go is *not* installed, on the strength of `ssh box 'command -v go'` returning nothing
+and `/usr/local/go` not existing. Both observations were real and the conclusion was false, for two
+reasons at once: the `golang` role unarchives Go into **`$HOME`**, not `/usr/local`, so I looked in
+the wrong place; and it adds `~/go/bin` to `.bashrc`, which a **non-interactive** `ssh host 'cmd'`
+never sources, so `command -v` could not have found it either way. Checked properly on the same
+box: `~/go/bin/go version` → **`go1.27.0 linux/amd64`**, 282 MB in `~/go`. I also wrote that the
+269 MB `~/go` on the previous build box "came from somewhere else" — it came from exactly this role.
+
+Fourth time in one day I asserted from a single failed probe. The pattern is specific enough to
+name: **a negative result from one lookup is evidence about the lookup, not about the system.** Note
 `clang`, `pahole` and `elfutils` in that list: eBPF compilation and the `nm`/`readelf`
 symbol work both land on this box by default, which is why it is the right home for shield
 development.
