@@ -66,7 +66,17 @@ change compiles nothing, because this directory has no `.d` files — which is w
 `filelist.mk` is GENERATED from `filelist`. Adding a line here without deleting the generated copy
 leaves the new source uncompiled while the build reports success.
 
+**THREE include paths on the `UBPF` option, and the third is the one that gets forgotten.**
+`vm/inc` for `ubpf.h`, `build/vm` for the cmake-generated `ubpf_config.h`, and **`src/base` for
+`ls_sig_pubkey.h`** — which `ls_sig.c` includes in **angle brackets on purpose**, so that a
+generated key beats any copy committed next to the source (see the note at the top of `ls_sig.c`;
+getting that wrong made a signature test verify against a stale key and report a failure of its own
+construction). Angle brackets mean it must be found on an `-I` path, and being in the same directory
+as the `.c` file is not enough. This block was missing that third path until 2026-08-21, when a
+from-nothing rebuild stopped at `ls_sig_pubkey.h: No such file or directory`.
+
 ```
+UBPF = CFLAGS += -I$(TOPDIR)/.ubpf/vm/inc -I$(TOPDIR)/.ubpf/build/vm -I$(TOPDIR)/src/base
 base/ls_vm_config.c   STDINC UBPF
 base/ls_vm_load.c     STDINC UBPF
 base/ls_vm.c          STDINC UBPF

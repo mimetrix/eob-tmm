@@ -88,7 +88,22 @@ echo "=== 2. copy the substrate sources into their include worlds"
 if [ -n "$DRY" ]; then
     echo "  (dry run) would copy $(ls "$SRC"/ls_*.c "$SRC"/ls_*.h 2>/dev/null | wc -l) ls_* files"
 else
-    tar -C "$SRC" -cf - $(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null) \
+    # NOT JUST ls_* --- the tree needs two headers whose names do not match that glob, and this
+    # script never copied them. Found 2026-08-21 by rebuilding the build box from nothing: the
+    # compile stopped at `shield_abi.h: No such file or directory`. On the previous box both files
+    # had been placed by hand once, months of syncs never touched them, and nothing noticed because
+    # they were already there --- a file that is present for a reason nobody records is a file that
+    # only exists on one machine. substrate/.tree-expected-delta lists them; the glob did not.
+    #
+    # Derived from the manifest rather than restated, so adding a header there is enough.
+    EXTRA=$(grep -E '^\?\? src/base/' "$SRC/.tree-expected-delta" 2>/dev/null \
+              | awk '{print $2}' | sed 's|.*/||' \
+              | grep -vE '^ls_|^harness' | tr '\n' ' ')
+    for f in $EXTRA; do
+        [ -f "$SRC/$f" ] || { echo "  *** the manifest lists $f but substrate/$f does not exist"; exit 1; }
+    done
+    echo "  extra (non-ls_*) headers from the manifest: ${EXTRA:-none}"
+    tar -C "$SRC" -cf - $(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null) $EXTRA \
       | $SSH "$BUILD_BOX" "cd $TREE/base && tar -xf -"
     # SSL-MODULE FILES, listed explicitly. These are the .c files that must compile in
     # the ssl module's include world because they touch struct ssl_ctx --- a copy in
