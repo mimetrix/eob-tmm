@@ -320,6 +320,27 @@ name: **a negative result from one lookup is evidence about the lookup, not abou
 symbol work both land on this box by default, which is why it is the right home for shield
 development.
 
+**FOUR PACKAGES THE PLAYBOOK DOES NOT INSTALL, and each one stops a different stage.** All four
+found on 2026-08-21 by configuring a build box from nothing and then trying to use it:
+
+```bash
+sudo apt-get install -y libboost-dev libyaml-cpp-dev   # PREVAIL will not configure without them
+sudo apt-get install -y python3-pyelftools             # the SIGNATURE index is a DWARF walk
+# and llvm-readelf is present but UNLINKED --- /usr/lib/llvm-18/bin/llvm-readelf, not on PATH
+```
+
+The failures are all at one remove from the cause, which is why they are listed here rather than
+left to be met:
+
+| missing | what fails | how it looks |
+|---|---|---|
+| `libboost-dev`, `libyaml-cpp-dev` | `bootstrap.sh` cannot build PREVAIL | "Boost headers not found" — after a *different* error about a missing `external/` directory, which is the submodule problem, not this one |
+| `python3-pyelftools` | `bnk-bake-tools.sh` step 2b | the hook index builds fine (71,296 symbols) and then the **signature** index dies; the next line is `awk: cannot open signatures.tsv` |
+| `llvm-readelf` on `PATH` | `bnk-build-programs.sh` | **every** program reported as having no `fentry/` section, then a refusal to bake — on false evidence |
+
+`apt` may also be blocked by `unattended-upgrades` holding the dpkg lock on a freshly built box. It
+clears in a minute or two; a `&&` chain will hide the failure, so check the exit status.
+
 It also **creates a user named after `olympus_user` and disables `ubuntu`**. From here on,
 `ssh ubuntu@...` answers *"Permission denied (publickey,password)"* — that is the playbook
 having worked, not a lockout. Log in as your LDAP username. It adds that user to the
