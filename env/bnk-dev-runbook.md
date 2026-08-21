@@ -303,7 +303,12 @@ skipped=37 ignored=3`**.
 
 It installs the toolchain this project needs — `gcc g++ gdb lldb clang cmake
 build-essential binutils elfutils pahole valgrind ltrace linux-tools-generic
-perf-tools-unstable universal-ctags python3-dev/pip/venv` — plus Docker CE and Go. Note
+perf-tools-unstable universal-ctags python3-dev/pip/venv` — plus Docker CE. **Not Go, despite
+what this line used to claim.** Verified on a freshly configured box 2026-08-21: `gcc clang gdb
+cmake pahole docker` are all present and `go` is on neither `$PATH` nor `/usr/local/go`, while the
+recap reports `skipped=37` — the `golang` role is gated off by a flag this configuration does not
+set. Nothing in this project needs Go, so this is a correction to the sentence rather than a gap to
+fill; the 269 MB `~/go` tree on the older build box came from somewhere else. Note
 `clang`, `pahole` and `elfutils` in that list: eBPF compilation and the `nm`/`readelf`
 symbol work both land on this box by default, which is why it is the right home for shield
 development.
@@ -312,6 +317,12 @@ It also **creates a user named after `olympus_user` and disables `ubuntu`**. Fro
 `ssh ubuntu@...` answers *"Permission denied (publickey,password)"* — that is the playbook
 having worked, not a lockout. Log in as your LDAP username. It adds that user to the
 `docker` group too, so no `usermod` is needed.
+
+**Replayed 2026-08-21 on a fresh box and the recap matched this line exactly** — `ok=50 changed=25
+unreachable=0 failed=0 skipped=37 ignored=3` — on a *different flavour* (`m1.small`), which makes it
+a statement about the playbook rather than about one machine. Also confirmed the same run:
+`starin` created with groups `starin sudo docker` and passwordless sudo, and `ssh ubuntu@…` refused
+with *"Permission denied (publickey,password)"*, which is this playbook having worked.
 
 **Three tasks fail and are ignored. All three are expected; none needs action:**
 
