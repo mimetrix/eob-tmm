@@ -1042,13 +1042,55 @@ software half was made reproducible by writing it down and checking it. The cred
 be — writing a token into a repository is the failure it would prevent — so what is possible is a
 checklist, and this is it.
 
-**Before deleting anything, confirm all three are in hand:**
+**Before deleting anything, confirm all three are in hand — and TEST them, do not test for the
+presence of a file:**
 
 ```bash
-ls ~/.config/openstack/clouds.yaml          # provisioning
-ssh -T git@gitswarm.f5net.com               # TMM clone   (expects a welcome, not a denial)
-grep -q AF_TOKEN ~/.af_env && echo token    # toolchain + images
+# 1. provisioning.  The clouds files live in the REPO DIRECTORY, not $HOME, and are gitignored.
+python3 env/scripts/merge-clouds-yaml.py sea=clouds-sea.yaml sjc=clouds-sjc.yaml
+openstack --os-cloud sea token issue -f value -c project_id      # expects a project id
+
+# 2. TMM clone.  The key is id_ed25519_gitswarm --- NOT the id_rsa sitting beside it, which is
+#    rejected --- and git does not pick it up on its own, because there is no ~/.ssh/config.
+GIT_SSH_COMMAND="ssh -i ~/.bnk-creds/gitswarm_id_ed25519"   git ls-remote git@gitswarm.f5net.com:tmm/tmm.git HEAD          # expects a sha
+
+# 3. toolchain + images.  The OLD token still works; it is shown once, so the preserved copy is
+#    the only way to keep it.
+. ~/.bnk-creds/af_env
+curl -s -o /dev/null -w '%{http_code}\n' -u "$AF_USERNAME:$AF_TOKEN"   https://artifactory.f5net.com/artifactory/api/system/ping      # expects 200
 ```
+
+**CORRECTION, 2026-08-21, recorded rather than rewritten.** The first version of this section
+concluded the boxes could not be restored, on the strength of three lookups that all missed. It was
+wrong on all three counts:
+
+| I said | actually |
+|---|---|
+| "`clouds.yaml` nowhere reachable" | the clouds files are in the **repo directory**; I looked only in `$HOME`. They carry an *application credential*, so no password is needed, and `openstack --os-cloud sea token issue` authenticates |
+| "GitSwarm key on the build box only" | true, and preservable — `scp` it off first. But it is **`id_ed25519_gitswarm`**, not the `id_rsa` beside it. I tested `id_rsa`, got `Permission denied (publickey)`, and concluded the key did not work |
+| "token must be regenerated" | the **old** token still works: `api/system/ping` returns 200 and the `tc-tmm` tag list comes back |
+
+Three lookups, three wrong conclusions, one shape: **I tested for the existence of a file rather
+than for the capability, and asserted absence from a single failed probe.** The `id_rsa` case is the
+sharpest — a real key, in the right place, that authenticates nowhere, sitting next to the one that
+works.
+
+**What is still genuinely open: access to a NEWLY provisioned box.** `spk-devmachine` grants the
+LDAP user whatever key booted the instance (`roles/common/tasks/main.yml` copies
+`/home/ubuntu/.ssh/authorized_keys`, which Nova fills from `--key-name`). The existing keypairs
+`eob-bnk-dev` and `eob-datkube` share a fingerprint that matches **none** of the private keys on
+this machine, so provisioning with either would produce a box nobody here can log into. The fix is
+one command, and it changes nothing that exists:
+
+```bash
+openstack --os-cloud sea keypair create --public-key ~/.ssh/id_ed25519.pub eob-bnk-restore
+```
+
+**And the quota is exact, so plan around it rather than discovering it:** 40 cores / 81920 MB total,
+**32 and 65536 in use** by the two live boxes. A `datkube-dev-large` is 16 / 32768. Nothing else
+fits — a replay must free a box before it can create one. Rebuild **one at a time**, build box
+first: the cluster survives while the harder half is proven, and the surviving box keeps a copy of
+every credential above.
 
 If any line fails, a teardown is one-way. What survives regardless: this repository, the TMM tree
 delta (`substrate/.tree-expected-delta`, verified complete both ways), the vendored pins and
