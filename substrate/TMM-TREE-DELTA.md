@@ -97,6 +97,31 @@ base/ls_flow_cookie.c
 base/ls_prep.c
 ```
 
+**AND TWO LINES IN THE SSL MODULE'S OWN SECTION OF THE SAME FILE**, which this block omitted until
+2026-08-21. `ls_ssl_cookie.c` and `ls_ctx_alpn.c` are copied into `modules/hudfilter/ssl/` because
+they touch `struct ssl_ctx` and must compile in that module's include world — §1's table says so and
+`bnk-sync-substrate.sh` puts them there — but nothing compiled them, because `filelist` never
+mentioned them. Add them next to the module's other entries, not with the `base/` block:
+
+```
+modules/hudfilter/ssl/ls_ssl_cookie.c
+modules/hudfilter/ssl/ls_ctx_alpn.c
+```
+
+The symptom is a **link** failure two thousand objects later, and it names the callers rather than
+the missing files:
+
+```
+ls_ctx_reg_sslerr.c:19: undefined reference to `ls_ssl_cookie'
+ls_ctx_reg_alpn.c:20:   undefined reference to `ls_ctx_alpn_build_v'
+```
+
+Both files were sitting in the tree, correct and unread. On the previous build box these entries
+were added by hand once and lived only in that box's `filelist` — which is precisely what
+`.tree-expected-delta` records as `M src/compile/filelist` without being able to say *what* the
+modification was. The manifest can only carry names, so the substance has to live here, and until
+today two of the eighteen-plus lines did not.
+
 ## 3. `src/compile/default_whitelist_x86_64` and `debug_whitelist_x86_64`
 
 TMM's build fails if a global appears that the whitelist does not list. It is a manifest checked
