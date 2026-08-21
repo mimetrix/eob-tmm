@@ -211,7 +211,10 @@ export OS_CLOUD=sea PATH="$HOME/.local/bin:$PATH"
 skips, so the next task parses empty output and dies in `from_json`. Run it for real.
 
 The final "Test SSH connectivity" task fails with *"SSH port not available after 300
-seconds"* on a box that is up and answering. The generated inventory takes the **first**
+seconds"* on a box that is up and answering. **Re-confirmed verbatim on 2026-08-21** against a
+freshly provisioned box: `elapsed: 300`, `failed=1`, and `ssh ubuntu@<ipv4>` answered throughout.
+Worth recording that a documented prediction held, not only the ones that did not — the two
+findings this replay produced were elsewhere. The generated inventory takes the **first**
 address, and SEA's AdminNetwork is **dual-stack**, so it writes the IPv6 one, which this
 sandbox cannot route. Fix the inventory and carry on:
 
