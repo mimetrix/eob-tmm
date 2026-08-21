@@ -31,6 +31,40 @@ set -e
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OUT="${1:-$HOME/lstools/shields}"
 PREVAIL="${PREVAIL:-$REPO/ebpf-verifier/bin/prevail}"
+
+# WHICH readelf, RESOLVED ONCE AND ASSERTED --- because a missing tool here reads as a broken
+# program. This used `llvm-readelf --sections` with 2>/dev/null, and on a build box configured from
+# the dev-machine playbook llvm-readelf is NOT on PATH: it ships at /usr/lib/llvm-18/bin and nothing
+# links it. So the section lookup returned empty for all 18 programs and the script reported
+#
+#     *** rst_watch: no fentry/<hook> section --- nothing says what it attaches to
+#
+# eighteen times, then refused to bake --- correctly, on completely false evidence. The objects were
+# fine; `readelf -S` on the same file shows `fentry/rst_why` right there. Measured 2026-08-21 on a
+# box rebuilt from nothing.
+#
+# Same failure shape as `strings` being absent inside the TMM container, and as every other
+# single-probe negative in this project: a silenced command's empty output is not a fact about the
+# input. So: try the tools in order, prove the chosen one can actually read a section table, and
+# fail loudly naming the tool if none can.
+READELF=""
+# -W ON GNU readelf IS NOT OPTIONAL, and my first version of this fallback omitted it. GNU readelf
+# TRUNCATES long section names in its table: `fentry/ssl_alpn_match` comes back as
+# `fentry/ssl_a[...]`. Fifteen programs verified and signed because their hook names are short, and
+# alpn_guard --- the one long name in the set --- was reported as "expected PASS, got REFUSAL",
+# with PREVAIL saying `Section not found` and then helpfully printing the real name one line below.
+# A fallback that is ALMOST equivalent is worse than none: it works for most inputs and lies about
+# the rest, and the lie looked like a broken program.
+for _c in "llvm-readelf --sections" "/usr/lib/llvm-18/bin/llvm-readelf --sections" "readelf -SW"; do
+    set -- $_c
+    command -v "$1" >/dev/null 2>&1 || continue
+    READELF="$_c"
+    break
+done
+[ -n "$READELF" ] || { echo "*** no usable readelf. Tried llvm-readelf, /usr/lib/llvm-18/bin/llvm-readelf
+    and readelf -SW. Install binutils or llvm, or set READELF. Refusing to report every program as
+    section-less, which is what the previous version of this script did." >&2; exit 1; }
+echo "  readelf: $READELF"
 # The signing key, outside the repo by default. SIGN_CEILING is the MOST a signed program may be
 # run at --- monitor unless asked otherwise, because enforce should be requested rather than
 # defaulted into.
@@ -71,7 +105,7 @@ for f in "$SRC"/*.bpf.c; do
     # The section name IS the hook, read from the object rather than from a table beside it.
     # bnk-deliver-program.py derives the hook the same way, so a program cannot be loaded
     # against a different function than the one it was compiled for.
-    sec=$(llvm-readelf --sections "$o" 2>/dev/null | grep -o 'fentry/[^ ]*' | head -1)
+    sec=$($READELF "$o" 2>/dev/null | grep -o 'fentry/[^ ]*' | head -1)
     [ -n "$sec" ] || { echo "  *** $b: no fentry/<hook> section --- nothing says what it attaches to"
                        nbad=$((nbad + 1)); continue; }
 
