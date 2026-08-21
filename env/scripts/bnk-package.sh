@@ -63,7 +63,14 @@ if [ -z "$CHECK_ONLY" ]; then
         grep -nE "error:|Error [0-9]" "$LOG" | head -8 | cut -c1-160 | sed 's/^/  /'
         fail "make container failed. The log is at $LOG.
     'gcc: fatal error: no input files' on an unrelated object means a stale BUILD_* survived
-    --- which step 1 exists to prevent, so read its output above before anything else."
+    --- which step 1 exists to prevent, so read its output above before anything else.
+
+    'LOGEN ERROR ... make_auto_log_files_v2' on a FRESH tree means something else entirely:
+    run it again. F5's own log generator fails the first time, and the failed run leaves behind
+    the generated files that make the second run skip it. Measured 2026-08-21 on a box rebuilt
+    from nothing; see env/bnk-dev-runbook.md at the packaging section. That is not a workaround
+    for our code --- it is a property of the tree we build against, and it is invisible on any
+    tree that has been built before."
     fi
 fi
 
