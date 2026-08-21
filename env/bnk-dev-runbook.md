@@ -487,9 +487,25 @@ expansions come back empty and `_start` runs `docker run … :v` → **`docker: 
 reference format`**, which names neither `yq` nor the manifest. Install **mikefarah's Go
 `yq`**, not the Python wrapper of the same name:
 
+**And verify it, because it is a downloaded binary going onto a machine that builds a security
+appliance.** mikefarah publishes a `checksums` file per release; the trick is that it is one row per
+artifact with **31 hashes side by side**, and which column is which is given by
+`checksums_hashes_order` — **one hash type per line**, so the field number is the line number plus
+one. SHA-256 is line 18, so field 19. Getting that wrong is not harmless: my first attempt read
+field 2 and compared the release's **CRC32** (`fbeb8af8`) against a SHA-256, which "mismatched" and
+looked like a corrupted download of a perfectly good file.
+
 ```bash
-curl -sSLo /tmp/yq https://github.com/mikefarah/yq/releases/download/v4.44.5/yq_linux_amd64
-sudo install -m0755 /tmp/yq /usr/local/bin/yq && yq --version
+cd /tmp && V=v4.44.5
+curl -sSLo yq   https://github.com/mikefarah/yq/releases/download/$V/yq_linux_amd64
+curl -sSLo sums https://github.com/mikefarah/yq/releases/download/$V/checksums
+curl -sSLo ord  https://github.com/mikefarah/yq/releases/download/$V/checksums_hashes_order
+N=$(grep -n '^SHA-256$' ord | cut -d: -f1)                       # 18
+WANT=$(grep -E '^yq_linux_amd64 ' sums | awk -v f=$((N+1)) '{print $f}')
+GOT=$(sha256sum yq | cut -d' ' -f1)
+[ "$WANT" = "$GOT" ] && [ ${#GOT} -eq 64 ] || { echo "*** refusing to install"; exit 1; }
+sudo install -m0755 yq /usr/local/bin/yq && yq --version
+#   638c4b251c49201fc94b598834b715f8f1c6e9b1854d2820772d2c79f0289002  (v4.44.5, verified 2026-08-21)
 
 # confirm the manifest resolves before starting a 40-minute pull
 cd ~/code/tmm && make -n _start | grep -oE 'artifactory[^ ]*tc-tmm[^ ]*'
