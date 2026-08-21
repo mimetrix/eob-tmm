@@ -1086,6 +1086,37 @@ one command, and it changes nothing that exists:
 openstack --os-cloud sea keypair create --public-key ~/.ssh/id_ed25519.pub eob-bnk-restore
 ```
 
+**Prove the provisioning path on a THROWAWAY box first.** This is not in the original runbook and
+it should be. There is a `m1.small` flavour (1 vCPU / 2 GB / 20 GB) that fits inside the 8 cores and
+16 GB left over while both real boxes are running, so the whole of §2–§6 — the provisioner, the
+keypair injection, the LDAP user, `sudo`, ssh from the workstation, the docker address pool — can be
+exercised against a box that matters to nobody, *before* anything is deleted. It cannot build TMM;
+it does not need to. What it answers is the only question a teardown really turns on: **can I get
+into a machine I have just created.**
+
+```bash
+# in spk-devmachine, with instance_config.yml pointing at m1.small and a keypair you hold
+~/.venvs/openstack/bin/ansible-playbook provision-machine.yml   -e "cloud_name=sea instance_name=eob-bnk-test-01" -e "@vars.yml" -e "@instance_config.yml"
+# then, and this is the assertion:
+ssh -i ~/.ssh/id_ed25519 starin@<ip> 'id; sudo -n true && echo sudo-ok'
+openstack --os-cloud sea server delete eob-bnk-test-01 --wait    # costs nothing to throw away
+```
+
+**Keypair, and the trap §3 warns about applies here too.** `openstack keypair create NAME` with no
+`--public-key` generates the key *server-side*, and the public half you derive locally will not
+match what OpenStack stored — the playbook then fails with *"key name present but key hash not the
+same as offered"*. Uploading your own public half is the form that works:
+
+```bash
+openstack --os-cloud sea keypair create --public-key ~/.ssh/id_ed25519.pub eob-bnk-restore
+openstack --os-cloud sea keypair show eob-bnk-restore -f value -c fingerprint   # must equal:
+ssh-keygen -E md5 -lf ~/.ssh/id_ed25519 | awk '{print $2}'
+```
+
+The two existing keypairs, `eob-bnk-dev` and `eob-datkube`, share one fingerprint that matches
+**none** of the private keys on the workstation — so provisioning with either would produce a box
+nobody can log into. That is worth knowing *before* the box that can log in has been deleted.
+
 **And the quota is exact, so plan around it rather than discovering it:** 40 cores / 81920 MB total,
 **32 and 65536 in use** by the two live boxes. A `datkube-dev-large` is 16 / 32768. Nothing else
 fits — a replay must free a box before it can create one. Rebuild **one at a time**, build box
