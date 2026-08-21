@@ -35,6 +35,20 @@ TREE="${TREE:-code/tmm/src}"
 DRY=""
 [ "$1" = "--dry-run" ] && DRY=1
 
+# SSH OPTIONS ARE A VARIABLE, because a REPLAY talks to a box that has never been seen before.
+# Found 2026-08-21 rebuilding the build box from nothing: this script died at "Host key
+# verification failed" on the first byte it tried to send. On a long-lived box the key is already
+# trusted and the plain `ssh` here works forever; on a fresh one it does not, and the failure comes
+# after the provenance banner has already printed, which reads like a transfer problem rather than
+# a trust problem. Worse on a workstation whose ~/.ssh is read-only: `accept-new` cannot record the
+# key either, so it warns and proceeds, and only a caller can decide whether that is acceptable.
+#
+#   SSH_OPTS="-o StrictHostKeyChecking=accept-new"                 # first contact, key recorded
+#   SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"   # read-only ~/.ssh
+SSH_OPTS="${SSH_OPTS:--o StrictHostKeyChecking=accept-new}"
+SSH="ssh $SSH_OPTS"
+SCP="scp $SSH_OPTS"
+
 SRC="$REPO/substrate"
 [ -d "$SRC" ] || { echo "*** no substrate/ under $REPO" >&2; exit 2; }
 
@@ -75,7 +89,7 @@ if [ -n "$DRY" ]; then
     echo "  (dry run) would copy $(ls "$SRC"/ls_*.c "$SRC"/ls_*.h 2>/dev/null | wc -l) ls_* files"
 else
     tar -C "$SRC" -cf - $(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null) \
-      | ssh "$BUILD_BOX" "cd $TREE/base && tar -xf -"
+      | $SSH "$BUILD_BOX" "cd $TREE/base && tar -xf -"
     # SSL-MODULE FILES, listed explicitly. These are the .c files that must compile in
     # the ssl module's include world because they touch struct ssl_ctx --- a copy in
     # base/ would need every -I that module has, which is the build-config guessing the
@@ -83,7 +97,7 @@ else
     # <local/base/...>, so only the .c moves.
     for f in ls_ctx_alpn.c ls_ctx_alpn.h ls_ssl_cookie.c; do
         [ -f "$SRC/$f" ] || { echo "  *** $SRC/$f missing"; exit 1; }
-        scp -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
+        $SCP -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
     done
     echo "  copied (base/ + 3 ssl-module files)"
     # STAMP THE COMMIT THE STAGED COPY CAME FROM. The staged tree is a tar extract with no
@@ -99,14 +113,14 @@ else
     if [ -n "$(cd "$REPO" && git status --porcelain -- substrate 2>/dev/null)" ]; then
         C="$C-dirty"
     fi
-    echo "$C" | ssh "$BUILD_BOX" "cat > $TREE/../.substrate-commit" 2>/dev/null || true
+    echo "$C" | $SSH "$BUILD_BOX" "cat > $TREE/../.substrate-commit" 2>/dev/null || true
     echo "  stamped commit $C"
 fi
 
 echo
 echo "=== 3. INVALIDATE the objects --- the step whose absence caused the bug"
 if [ -n "$DRY" ]; then
-    ssh "$BUILD_BOX" "ls $TREE/compile/obj_x86_64.*/ls_*.o 2>/dev/null | sed 's|.*/|  would remove |'" || true
+    $SSH "$BUILD_BOX" "ls $TREE/compile/obj_x86_64.*/ls_*.o 2>/dev/null | sed 's|.*/|  would remove |'" || true
 else
     # sudo, AND count afterwards instead of announcing. The objects are created by
     # the build running as root INSIDE the toolchain container, so a plain rm gets
@@ -115,7 +129,7 @@ else
     # exactly what happened on 2026-08-18, and it cost a whole 40-minute build:
     # make ran clean, the binary was stale, and only `nm` on the result showed it.
     # Never report an outcome you have not measured.
-    ssh "$BUILD_BOX" "
+    $SSH "$BUILD_BOX" "
         cd $TREE/compile || exit 1
         n=\$(ls obj_x86_64.*/ls_*.o 2>/dev/null | wc -l)
         sudo rm -f obj_x86_64.*/ls_*.o

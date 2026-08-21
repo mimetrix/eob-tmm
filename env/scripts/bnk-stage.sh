@@ -32,6 +32,20 @@ DEST="${DEST:-eob-tmm-staged}"
 DRY=""
 [ "$1" = "--dry-run" ] && DRY=1
 
+# SSH OPTIONS ARE A VARIABLE, because a REPLAY talks to a box that has never been seen before.
+# Found 2026-08-21 rebuilding the build box from nothing: this script died at "Host key
+# verification failed" on the first byte it tried to send. On a long-lived box the key is already
+# trusted and the plain `ssh` here works forever; on a fresh one it does not, and the failure comes
+# after the provenance banner has already printed, which reads like a transfer problem rather than
+# a trust problem. Worse on a workstation whose ~/.ssh is read-only: `accept-new` cannot record the
+# key either, so it warns and proceeds, and only a caller can decide whether that is acceptable.
+#
+#   SSH_OPTS="-o StrictHostKeyChecking=accept-new"                 # first contact, key recorded
+#   SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"   # read-only ~/.ssh
+SSH_OPTS="${SSH_OPTS:--o StrictHostKeyChecking=accept-new}"
+SSH="ssh $SSH_OPTS"
+SCP="scp $SSH_OPTS"
+
 # WHAT THE STAGED TREE IS FOR, and therefore what belongs in it. Not the whole repo: the docs
 # are large, change constantly, and nothing downstream reads them, so staging them would make
 # every provenance stamp look dirty for reasons that cannot affect a binary.
@@ -68,9 +82,9 @@ fi
 # believed. tar cannot express that, so remove the staged directories first. Safe because
 # this tree is a copy with no unique content --- and if that ever stops being true, the
 # freshness check in step 3 is what will notice.
-ssh "$BUILD_BOX" "cd ~/$DEST 2>/dev/null && rm -rf $DIRS; mkdir -p ~/$DEST" 
-(cd "$REPO" && tar -cf - $DIRS) | ssh "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
-echo "$STAMP" | ssh "$BUILD_BOX" "cat > ~/$DEST/.staged-commit"
+$SSH "$BUILD_BOX" "cd ~/$DEST 2>/dev/null && rm -rf $DIRS; mkdir -p ~/$DEST" 
+(cd "$REPO" && tar -cf - $DIRS) | $SSH "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
+echo "$STAMP" | $SSH "$BUILD_BOX" "cat > ~/$DEST/.staged-commit"
 echo "  staged $DIRS -> $BUILD_BOX:~/$DEST"
 echo "  stamped $STAMP"
 
@@ -80,13 +94,13 @@ echo "=== 3. VERIFY the copy, from the far end --- not from this script's belief
 # exists on both sides with different bytes, which every "did the transfer succeed" check
 # and every timestamp comparison reports as fine.
 LOCAL_SUM=$(cd "$REPO" && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16)
-REMOTE_SUM=$(ssh "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16")
+REMOTE_SUM=$($SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16")
 echo "  local  : $LOCAL_SUM"
 echo "  staged : $REMOTE_SUM"
 if [ "$LOCAL_SUM" != "$REMOTE_SUM" ]; then
     echo
     echo "*** THE STAGED TREE DOES NOT MATCH THE REPO. Do not build on it. Files differing:"
-    ssh "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum" > /tmp/.stage-remote
+    $SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum" > /tmp/.stage-remote
     (cd "$REPO" && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum) > /tmp/.stage-local
     diff /tmp/.stage-local /tmp/.stage-remote | sed 's/^/    /' | head -30
     rm -f /tmp/.stage-local /tmp/.stage-remote
@@ -98,7 +112,7 @@ echo
 echo "=== 4. the specific capability whose absence cost a cycle"
 # Checked by capability, not by version string: a version would be one more thing to keep in
 # step, and the question that matters is whether the client can do the thing TMM requires.
-ssh "$BUILD_BOX" "
+$SSH "$BUILD_BOX" "
     f=~/$DEST/env/scripts/ls-load.py
     grep -q read_signature \$f && echo '  ls-load.py : can send a signature' \
       || { echo '  *** ls-load.py CANNOT send a signature. TMM verifies them, so every load'; \
