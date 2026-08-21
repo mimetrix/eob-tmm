@@ -523,6 +523,19 @@ mkdir -p ~/code && cd ~/code
 git clone git@gitswarm.f5net.com:tmm/tmm.git        # ~2.5 GB
 cd tmm
 
+# PIN THE REVISION. `main` moves, and this section said nothing about it until 2026-08-21, when a
+# from-nothing replay cloned it and got **v10.209.13** --- while every result in this repository was
+# taken against **v10.207.3**, revision e2104734a9, which is the base substrate/.tree-expected-delta
+# names. Two minor versions of TMM apart, so functions move, offsets move, and the hook index and
+# every measured address belong to a binary you did not build. Nothing would have failed loudly;
+# arming would just have been refused by the build-id gate, which is the confusing kind of correct.
+git checkout e2104734a940a099a9190eb84bfbea01fb4b81d4     # v10.207.3, the recorded base
+git describe --always --tags                              # expect v10.207.3
+#
+# To move the substrate onto a newer TMM deliberately, change the Base line in
+# substrate/.tree-expected-delta in the same commit --- that file is the only place the pairing is
+# written down, and a replay reads it.
+
 # TMM's own .env — separate from every other credential, and gitignored by the repo
 umask 077
 printf 'ARTIFACTORY_USER=%s\nARTIFACTORY_TOKEN=%s\n' "<ldap-user>" "<token>" > .env
