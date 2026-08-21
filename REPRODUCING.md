@@ -125,10 +125,20 @@ clean). On aarch64 those skip loudly rather than silently passing.
 
 ## The three things this repo is not
 
+**Counts here are deliberately few and named where they are checked.** "Eight `filelist` entries,
+23 whitelist symbols" was true when written and drifted silently, because a number in prose is not
+compared to anything. The list that IS compared is
+[`substrate/.tree-expected-delta`](substrate/.tree-expected-delta) — the exact set of changes the
+substrate makes to a clean TMM tree, checked both ways by
+[`env/scripts/bnk-check-tree-sync.sh`](env/scripts/bnk-check-tree-sync.sh), so an entry missing
+from either side fails. It was itself 18 entries stale on 2026-08-21; that is recorded in its
+header rather than quietly corrected, because it is the file that answers "if the build box died,
+could we continue".
+
 **1. It is not the TMM source tree.** The `substrate/ls_*.c` sources are compiled into TMM
 *elsewhere* — `gitswarm.f5net.com/tmm/tmm` (MBIP), built with `make tmm-gdb`. Everything that tree
-needs is in [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md): eight `filelist` entries,
-23 whitelist symbols per variant, one compiler flag, and why `ls_prep.c` is the one file without
+needs is in [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md): **18** `filelist` entries,
+the global-state whitelist symbols, one compiler flag, and why `ls_prep.c` is the one file without
 `STDINC`. **No existing F5 function body is modified** — checkable, and worth checking. The tree
 does gain 39 files and three edited build-configuration files; see `DOC-STATUS.md`.
 

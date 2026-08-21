@@ -218,11 +218,37 @@ fi
 d=$(dupes)
 if [ -n "$d" ]; then
     echo
-    echo "  SAME NAME IN TWO PLACES (only the first was compared):"
+    # THREE OF THESE ARE THE DESIGN, NOT A PROBLEM, and treating them as divergence made this
+    # check print DIVERGED on every run with (0 only-in-tree, 0 only-in-repo) --- a verdict that
+    # contradicted its own counts. bnk-sync-substrate.sh deliberately copies ls_ctx_alpn.c,
+    # ls_ctx_alpn.h and ls_ssl_cookie.c into modules/hudfilter/ssl, because they touch struct
+    # ssl_ctx and must compile in that module's include world; their headers stay in base/ and are
+    # reached as <local/base/...>. So the same name legitimately exists twice.
+    #
+    # This is the failure this script was written to prevent, committed by the script itself: a
+    # guard that is always red is a guard nobody reads, and the line that matters --- ONLY IN TREE
+    # --- was sitting underneath a permanent false alarm. Expected duplicates are now listed as
+    # BY DESIGN; an unexpected one still fails.
+    #
+    # The expected set is READ FROM the sync script rather than restated here, so the two cannot
+    # drift. If that grep ever finds nothing, every duplicate is unexpected and the check fails
+    # loudly --- which is the right direction to be wrong in.
+    SSL_COPIES=$(sed -n 's/^ *for f in \(.*\); do$/\1/p' \
+                   "$(dirname "$0")/bnk-sync-substrate.sh" 2>/dev/null | head -1)
+    unexpected=""
     for b in $d; do
-        printf '    %-24s %s\n' "$b" "$(grep "$b" "$TMPD/paths" | tr '\n' ' ')"
+        _paths=$(grep "$b" "$TMPD/paths" | tr '\n' ' ')
+        case " $SSL_COPIES " in
+            *" $b "*) printf '    %-24s %s  <- BY DESIGN (ssl module include world)\n' "$b" "$_paths" ;;
+            *)        printf '    %-24s %s  <- UNEXPECTED\n' "$b" "$_paths"; unexpected=1 ;;
+        esac
     done
-    differ=1
+    if [ -n "$unexpected" ]; then
+        echo "  SAME NAME IN TWO PLACES, and at least one is not accounted for:"
+        differ=1
+    else
+        echo "  (all $(echo $d | wc -w) accounted for by bnk-sync-substrate.sh's ssl-module list)"
+    fi
 fi
 
 echo

@@ -23,6 +23,22 @@
 #
 # Base: tmm/tmm at e2104734a9. Regenerate with:
 #   ssh <build-box> 'cd ~/code/tmm && git status --porcelain src/' | sed 's/^ *//' | sort
+#
+# STALE BY 18 ENTRIES, found 2026-08-21 while auditing loose ends. Every file added to the tree
+# since this list was last written was missing from it: the audit trail (ls_audit.*), Ed25519
+# verification (ls_sig.*, and the GENERATED ls_sig_pubkey.h), the whole ctx-builder registry
+# (ls_ctx_reg*, six files), and five headers. Eighteen of the fifty-six entries.
+#
+# That is a direct hit on the question this file exists to answer --- "if the build VM died could
+# we continue" --- and the answer had quietly become "not without redoing the last week". The
+# check that would have caught it, bnk-check-tree-sync.sh, WAS reporting it on every run, under a
+# DIVERGED verdict that also fired permanently for three duplicate filenames that are by design.
+# A guard that is always red is a guard nobody reads, which is the exact failure this file's own
+# header warns about. Both are fixed: the duplicates are recognised, and this list is current.
+#
+# ls_sig_pubkey.h is listed and is GENERATED --- by bnk-init-signing-key.sh from whichever key a
+# build trusts. Its presence in the tree is expected; its CONTENT is machine-specific and must not
+# be copied between trees, or one build would verify against another's key.
 ?? src/base/harness.c
 ?? src/base/ls_arm.c
 ?? src/base/ls_arm.h
@@ -58,6 +74,24 @@
 ?? src/base/ls_ctx_sslerr.h
 ?? src/base/ls_ssl_cookie.h
 ?? src/modules/hudfilter/ssl/ls_ssl_cookie.c
+?? src/base/ls_audit.c
+?? src/base/ls_audit.h
+?? src/base/ls_ctx_alpn.c
+?? src/base/ls_ctx_alpn.h
+?? src/base/ls_ctx_h2abort.h
+?? src/base/ls_ctx_reg.c
+?? src/base/ls_ctx_reg.h
+?? src/base/ls_ctx_reg_alpn.c
+?? src/base/ls_ctx_reg_h2abort.c
+?? src/base/ls_ctx_reg_parse.c
+?? src/base/ls_ctx_reg_rst.c
+?? src/base/ls_ctx_reg_sslerr.c
+?? src/base/ls_json.h
+?? src/base/ls_sig.c
+?? src/base/ls_sig.h
+?? src/base/ls_sig_pubkey.h
+?? src/base/ls_ssl_cookie.c
+?? src/base/ls_tp_http.h
 M src/compile/debug_whitelist_x86_64
 M src/compile/default_whitelist_x86_64
 M src/compile/filelist
