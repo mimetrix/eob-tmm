@@ -249,6 +249,48 @@ PY
 '
 
 echo
+echo "=== 5b. does the binary TRUST the key the programs beside it were SIGNED with?"
+# THE CHECK THAT DID NOT EXIST, and its absence cost a full build-and-deploy cycle on 2026-08-21.
+# An image was produced in which TMM trusted one key (the workstation's) while the 15 programs
+# shipped alongside it were signed with another (the build box's). Every gate this script already
+# ran was green --- build ids matched, the index matched the binary, the substrate functions were
+# all present --- because none of them compares those two artifacts to each other. The failure
+# surfaced only on a live TMM, as "slot 5 holds NO PROGRAM" three assertions downstream of a load
+# that had been refused.
+#
+# The check is direct rather than clever: the public key is compiled in as 32 raw bytes, so take
+# the 32 raw bytes of the signing key's public half and look for them IN the binary. No addresses,
+# no .rodata arithmetic --- byte-archaeology at a guessed offset is how I got the previous
+# generation of this wrong. Present or absent, and nothing in between.
+SIGN_KEY="${SIGN_KEY:-$HOME/.ls-signing/shield_sk.pem}"
+if [ -f "$SIGN_KEY" ]; then
+    _kh=$(openssl pkey -in "$SIGN_KEY" -pubout -outform DER 2>/dev/null | tail -c 32 | xxd -p | tr -d '\n')
+    if [ ${#_kh} -eq 64 ]; then
+        docker run --rm --entrypoint sh "$OUT" -c "
+            B=\$(readlink -f /usr/bin/tmm)
+            python3 - \"\$B\" $_kh <<'PYEOF'
+import sys
+b = open(sys.argv[1], 'rb').read()
+k = bytes.fromhex(sys.argv[2])
+n = b.count(k)
+print('  trusted key present in the binary: %d' % n)
+sys.exit(0 if n > 0 else 1)
+PYEOF" \
+          && echo "  MATCH --- this image's loader will accept the programs this image ships" \
+          || fail "the binary does NOT contain the public half of $SIGN_KEY.
+    Every program in this image would be refused, and the error would talk about invalid
+    signatures rather than about a mismatched key. Regenerate the header ON THE BUILD BOX
+    (env/scripts/bnk-init-signing-key.sh), remove obj_*/ls_sig.o, and relink."
+    else
+        echo "  could not read 32 raw bytes from $SIGN_KEY --- skipping, and that is not a pass"
+    fi
+else
+    echo "  no $SIGN_KEY on this machine, so the pairing is unchecked. Not a pass:"
+    echo "  an image whose loader refuses everything it ships is indistinguishable from a"
+    echo "  crypto failure once it is running."
+fi
+
+echo
 echo "=== 6. record what this stage produced"
 sh "$REPO/env/scripts/bnk-receipt.sh" write bake "build_id=$BID" "tag=$OUT" \
                                       "programs=$(ls "$CTX"/shields/*.bpf.o | wc -l)"
