@@ -103,8 +103,29 @@ else
         [ -f "$SRC/$f" ] || { echo "  *** the manifest lists $f but substrate/$f does not exist"; exit 1; }
     done
     echo "  extra (non-ls_*) headers from the manifest: ${EXTRA:-none}"
-    tar -C "$SRC" -cf - $(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null) $EXTRA \
+    # ls_sig_pubkey.h MUST NOT TRAVEL. It is GENERATED from whichever signing key the build box
+    # owns, and it is the key TMM will trust. Copying one machine's copy over another's means the
+    # binary trusts key A while the programs beside it are signed with key B --- and every load is
+    # then refused, correctly, with a message about an invalid signature that points nowhere near
+    # the cause.
+    #
+    # That happened on 2026-08-21, on a build box rebuilt from nothing. The box generated its own
+    # key (92f1570c), the header was generated from it, and then this sync copied the workstation's
+    # header (b4695cde) over it. TMM was built trusting a key whose private half is on a different
+    # machine. The suite reported "slot 5 holds NO PROGRAM" --- because the load before it had been
+    # refused --- and seven assertions failed for one cause, none of them naming it.
+    #
+    # This is the same hazard ls_sig.c's angle-bracket note is about, wearing different clothes:
+    # the wrong copy of a generated key header wins. There it was the include path; here it is a
+    # file transfer. Excluded by name, and asserted afterwards.
+    _files=$(cd "$SRC" && ls ls_*.c ls_*.h harness.c 2>/dev/null | grep -v '^ls_sig_pubkey.h$')
+    tar -C "$SRC" -cf - $_files $EXTRA \
       | $SSH "$BUILD_BOX" "cd $TREE/base && tar -xf -"
+    # The tree's own header must still exist --- generated there, by whoever owns the key.
+    $SSH "$BUILD_BOX" "test -f $TREE/base/ls_sig_pubkey.h" \
+      || echo "  *** $TREE/base/ls_sig_pubkey.h is ABSENT. Generate it ON THE BUILD BOX:
+      env/scripts/bnk-init-signing-key.sh   (with HDR=$TREE/base/ls_sig_pubkey.h)
+      A build with no key refuses every load, including valid ones."
     # SSL-MODULE FILES, listed explicitly. These are the .c files that must compile in
     # the ssl module's include world because they touch struct ssl_ctx --- a copy in
     # base/ would need every -I that module has, which is the build-config guessing the

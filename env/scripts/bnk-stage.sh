@@ -90,7 +90,11 @@ fi
 # this tree is a copy with no unique content --- and if that ever stops being true, the
 # freshness check in step 3 is what will notice.
 $SSH "$BUILD_BOX" "cd ~/$DEST 2>/dev/null && rm -rf $DIRS; mkdir -p ~/$DEST" 
-(cd "$REPO" && tar -cf - $DIRS $FILES) | $SSH "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
+# ls_sig_pubkey.h is EXCLUDED for the same reason it is excluded from the tree sync: it is
+# generated from the signing key of whichever machine built it, and shipping one machine's copy to
+# another silently repoints the trust. See the long note in bnk-sync-substrate.sh.
+(cd "$REPO" && tar -cf - --exclude='substrate/ls_sig_pubkey.h' $DIRS $FILES) \
+  | $SSH "$BUILD_BOX" "cd ~/$DEST && tar -xf -"
 echo "$STAMP" | $SSH "$BUILD_BOX" "cat > ~/$DEST/.staged-commit"
 echo "  staged $DIRS -> $BUILD_BOX:~/$DEST"
 echo "  stamped $STAMP"
@@ -100,15 +104,15 @@ echo "=== 3. VERIFY the copy, from the far end --- not from this script's belief
 # Compare CONTENT, per file, both ways. The failure being guarded against is a file that
 # exists on both sides with different bytes, which every "did the transfer succeed" check
 # and every timestamp comparison reports as fine.
-LOCAL_SUM=$(cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16)
-REMOTE_SUM=$($SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum | sha256sum | cut -c1-16")
+LOCAL_SUM=$(cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' ! -name 'ls_sig_pubkey.h' | sort | xargs sha256sum | sha256sum | cut -c1-16)
+REMOTE_SUM=$($SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS $FILES -type f ! -name '*.pyc' ! -name 'ls_sig_pubkey.h' | sort | xargs sha256sum | sha256sum | cut -c1-16")
 echo "  local  : $LOCAL_SUM"
 echo "  staged : $REMOTE_SUM"
 if [ "$LOCAL_SUM" != "$REMOTE_SUM" ]; then
     echo
     echo "*** THE STAGED TREE DOES NOT MATCH THE REPO. Do not build on it. Files differing:"
     $SSH "$BUILD_BOX" "cd ~/$DEST && find $DIRS -type f ! -name '*.pyc' | sort | xargs sha256sum" > /tmp/.stage-remote
-    (cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' | sort | xargs sha256sum) > /tmp/.stage-local
+    (cd "$REPO" && find $DIRS $FILES -type f ! -name '*.pyc' ! -name 'ls_sig_pubkey.h' | sort | xargs sha256sum) > /tmp/.stage-local
     diff /tmp/.stage-local /tmp/.stage-remote | sed 's/^/    /' | head -30
     rm -f /tmp/.stage-local /tmp/.stage-remote
     exit 1
