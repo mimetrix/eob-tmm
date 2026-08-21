@@ -91,6 +91,26 @@ python3 env/scripts/merge-clouds-yaml.py sea=clouds-sea.yaml sjc=clouds-sjc.yaml
 ~/.venvs/openstack/bin/ansible-galaxy collection install \
     openstack.cloud community.general ansible.posix
 
+# THE COLLECTION MUST BE 2.6.0 OR NEWER, and this is not a detail --- it is where a replay of this
+# runbook stops. Found 2026-08-21 by actually running it: the first provisioning attempt died on
+# its first real task, "Upload SSH public key", with
+#
+#   module 'openstack' has no attribute 'version'
+#
+# openstacksdk 4.x removed the openstack.version module; openstack.cloud 2.5.0 still imports it.
+# The venv ships 2.5.0 bundled with ansible, so a plain `pip install ansible openstacksdk` gives an
+# incompatible pair and the error names neither package. `--force` fetches 2.6.0, which knows about
+# sdk 4.x, and it installs to ~/.ansible/collections --- which takes precedence only if you say so:
+~/.venvs/openstack/bin/ansible-galaxy collection install --force openstack.cloud
+export ANSIBLE_COLLECTIONS_PATH="$HOME/.ansible/collections"
+~/.venvs/openstack/bin/ansible-galaxy collection list openstack.cloud   # expect 2.6.0 first
+#
+# Do NOT pin openstacksdk backwards instead. python-openstackclient in the same venv is working
+# against 4.18.0, and downgrading the SDK to suit the collection trades a broken playbook for a
+# broken CLI. Only one task in provision-machine.yml uses the collection at all --- the VM itself
+# is created by shelling out to `senf/bin/openstack server create` --- so the forward fix is small
+# and the backward one is not.
+
 openstack --os-cloud sea token issue -f value -c project_id    # auth smoke test
 ```
 
