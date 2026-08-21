@@ -157,8 +157,33 @@ removal as a step, and verifies it by counting rather than announcing it: the ob
 are root-owned from inside the toolchain container, so a plain `rm -f` prints
 "Permission denied" and keeps going.
 
-**The list below is prose and drifted.** An audit on 2026-08-17 found the tree adds
-**30** symbols, not the 22 written here: `g_ls_shapes`, `g_ls_nshapes`, `g_tp_seg`,
+**THE AUTHORITATIVE LIST, recovered from a from-nothing rebuild on 2026-08-21.** The gate's own
+diff is the generator: build, let the link fail, and it prints exactly the symbols to add, with a
+sign telling you which direction. On a clean tree it named **30**, all `+`, nothing stale:
+
+```
+_initialized  _ubpf_filter_instruction_lookup_table  _ubpf_instruction_filter  atfork_done
+ebpf_atomic_store_immediate_enumerated  ebpf_movsx_alu64_offset_enumerated
+ebpf_movsx_alu_offset_enumerated  g_cfg  g_filebuf  g_installed  g_loader  g_loader_running
+g_ls_audit  g_ls_names  g_ls_nshapes  g_ls_shapes  g_origin  g_pad  g_prep  g_prev
+g_prog_stack  g_ready  g_slots  g_sock_path  g_tp_seg  g_tp_seg_tried  g_tp_seq
+ls_prep_timer  ls_prep_timer_on  register_map
+```
+
+**Note the split, because it changes who owns the list.** Ten are the substrate's own state
+(`g_ls_*`, `g_prep`, `g_slots`, `g_sock_path`, `ls_prep_timer*`, `g_ready`, …). The other twenty come
+from **uBPF's translation units**, now linked into TMM — `_ubpf_*`, `ebpf_*_enumerated`,
+`register_map`, `atfork_done`. So this list is a property of *the vendored revision as much as of our
+code*, and bumping the uBPF pin will change it. That is a second reason not to trust a hand-kept
+prose list: half of it is somebody else's.
+
+**Do not pre-add from memory. Regenerate.** Build, read the diff, add what it names — the runbook's
+advice to predict and pre-add only pays when the prediction is measured, and here the measurement is
+free because the gate performs it. Both files also get a `.pre-ubpf` copy first, which is why
+`.tree-expected-delta` lists two of those.
+
+**The older prose below is kept for the record and should not be used.** An audit on 2026-08-17
+found the tree adds **30** symbols, not the 22 written here: `g_ls_shapes`, `g_ls_nshapes`, `g_tp_seg`,
 `g_tp_seg_tried`, `g_tp_seq` and `_ubpf_instruction_filter` were added to the tree
 and never added here. The authority is now `substrate/.tree-expected-delta` plus the
 build's own whitelist files; regenerate this list rather than trusting it.

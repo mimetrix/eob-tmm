@@ -559,6 +559,31 @@ INSTALL_DEBUG_TMM=TRUE container`. Before any `make container`, delete stale art
 **your changes are silently absent from the new image** — it builds, deploys and runs the
 old code:
 
+**ON A FRESH TREE, `make container` FAILS THE FIRST TIME AND SUCCEEDS THE SECOND.** Measured
+2026-08-21 on a build box rebuilt from nothing. The first run dies inside `rpmbuild` in **F5's own
+log-definition generator**, on a file the substrate never touches:
+
+```
+LOGEN ERROR: The log definition has incorrect syntax
+  Message ID: 0x4
+  Message name: IBD_TRANSACTION_MITIGATION_TIMEOUT
+make: *** [Makefile:1339: make_auto_log_files_v2] Error 255
+```
+
+Traced rather than guessed: `yaml_to_in.py` **succeeds** and writes
+`src/compile/bigip_tmm_log_defs_v2.{in,c,h}`; the step that fails is the next one, `mklogapi`,
+consuming that `.in`. And `src/compile/Makefile:1334`'s `AUTO_LOG_TEST_V2` only runs the generator
+when those files are **missing or stale** — so once the failed run has left them behind, the second
+`make container` skips the failing step and completes. Exit 0, packaged build id `136fcb0f`, 41 of 41
+substrate functions present.
+
+**Which is why this was never seen before.** Every previous build ran on a tree that had already
+produced those files, so the failing path was unreachable. The old build box was buildable partly
+because of generated artifacts nobody knew were load-bearing — the same shape as the vendored
+dependencies and the stale staging copy, arriving this time in the tree we build *against* rather
+than in ours. Not our defect to fix; ours to know about, because the error names a log definition
+and gives no hint that the answer is "run it again".
+
 **Do not do this by hand --- use `env/scripts/bnk-package.sh`.** It performs the removal,
 verifies it by COUNTING what survived (the files are root-owned and `rm -f` keeps going after
 Permission denied, so a script can report success having removed nothing), runs `make
