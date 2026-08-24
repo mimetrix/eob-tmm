@@ -29,7 +29,26 @@ if [ "$1" = "--show" ]; then
     exit 0
 fi
 
-pods(){ kubectl get pods -l app=f5-tmm --no-headers | awk '$3=="Running"{print $1}'; }
+# NEWEST pods first, and NOT filtered to Running.
+#
+# Two bugs lived here, both of which made a working demonstration report NOT-SEEN:
+#
+#  1. Filtering to Running meant the MONITOR arm read the wrong pods entirely. Its whole point
+#     is that the new pods die at init, so they are never Running --- the filter silently
+#     returned the OLD enforce-arm pods, whose logs say SAFE_RETURN. A control arm reporting
+#     the treatment arm's verdict is worse than no control arm.
+#  2. `kubectl logs --tail=400` missed the lines completely. The self-test runs at INIT and TMM
+#     writes thousands of startup lines after it: measured 2026-08-24, the first SELFTEST line
+#     was at 997 of 3451, and the tail=400 window began at 3051. Read the WHOLE log.
+#  3. Even unfiltered, "the newest few pods" is wrong during the monitor arm: the OLD enforce
+#     pods are still Running (the new ReplicaSet never goes ready, so the old one is never
+#     scaled down), and their logs say SAFE_RETURN. Reading both arms' pods together lets the
+#     treatment arm's verdict overwrite the control arm's. So select by the CURRENT
+#     ReplicaSet's pod-template-hash and read nothing else.
+cur_hash(){ kubectl describe deploy "$DEPLOY" 2>/dev/null \
+            | sed -n 's/^NewReplicaSet: *\([^ ]*\).*/\1/p' | tail -1 | sed 's/.*-//'; }
+pods(){ H=$(cur_hash); [ -n "$H" ] || return 0
+        kubectl get pods -l "app=f5-tmm,pod-template-hash=$H" --no-headers 2>/dev/null | awk '{print $1}'; }
 
 # One arm. Sets the mode, rolls, and reads the verdict out of the log of the process that
 # actually ran --- including, when it died, the log of the incarnation that died.
@@ -41,24 +60,29 @@ arm_run() {
     kubectl rollout status "deploy/$DEPLOY" --timeout=300s >/dev/null 2>&1 || true
     sleep 6
 
-    VERDICT=""; SURVIVED=""; RESTARTS=0; SRC=current
+    VERDICT=""; SURVIVED=""; RESTARTS=0; SRC=current; NEGCTL=ok
     for P in $(pods); do
         R=$(kubectl get pod "$P" -o jsonpath='{.status.containerStatuses[?(@.name=="f5-tmm")].restartCount}' 2>/dev/null || echo 0)
         RESTARTS=$(( RESTARTS + ${R:-0} ))
-        L=$(kubectl logs "$P" -c f5-tmm --tail=400 2>/dev/null | grep -a "SELFTEST" || true)
+        L=$(kubectl logs "$P" -c f5-tmm 2>/dev/null | grep -a "SELFTEST" || true)
         # If this incarnation restarted, the arm that matters is the one that DIED. Reading a
         # neighbouring healthy pod here once produced a crash reported next to a log line proving
         # the opposite --- the pair proves nothing without the verdict from the dead process.
         if [ "${R:-0}" -gt 0 ]; then
-            PREV=$(kubectl logs "$P" -c f5-tmm --previous --tail=400 2>/dev/null | grep -a "SELFTEST" || true)
+            PREV=$(kubectl logs "$P" -c f5-tmm --previous 2>/dev/null | grep -a "SELFTEST" || true)
             [ -n "$PREV" ] && { L="$PREV"; SRC=previous; }
         fi
         [ -n "$L" ] && { echo "$L" | sed 's/^/    /'; }
         echo "$L" | grep -q "SAFE_RETURN"  && VERDICT=SAFE_RETURN
         echo "$L" | grep -q "FALLTHROUGH"  && VERDICT=FALLTHROUGH
         echo "$L" | grep -q "survived"     && SURVIVED=yes
+        # NEGATIVE CONTROL. This line prints only if the dereference RETURNED. Its absence is
+        # the pass condition; its presence means the crash was survivable (page zero mapped, or
+        # the compiler elided the read) and the whole demonstration proves nothing.
+        echo "$L" | grep -q "did NOT crash" && NEGCTL=FAILED
     done
     note "    verdict=${VERDICT:-NOT-SEEN} survived=${SURVIVED:-no} restarts=$RESTARTS log=$SRC"
+    [ "$NEGCTL" = "FAILED" ] && note "    *** NEGATIVE CONTROL FAILED: 'did NOT crash' appeared --- the dereference returned."
     RES_VERDICT="$VERDICT"; RES_SURVIVED="$SURVIVED"; RES_RESTARTS="$RESTARTS"; RES_SRC="$SRC"
 }
 
@@ -86,8 +110,13 @@ arm_run monitor
 M_VERDICT="$RES_VERDICT"; M_SURVIVED="$RES_SURVIVED"; M_RESTARTS="$RES_RESTARTS"; M_SRC="$RES_SRC"
 
 # ---- leave the cluster in the safe arm ----------------------------------------------------
-say "restoring enforce"
-kubectl set env "deploy/$DEPLOY" -c "$CONTAINER" LS_SHIELD_MODE=enforce >/dev/null
+say "restoring enforce and UNSETTING the self-test"
+# Step C in runbook 12d, and it is NOT optional. Left set, the self-test runs at every init:
+# in monitor that is a crash loop that looks like a broken deployment, and even in enforce it
+# calls ls_vm_call() and so inflates `fired` and prints "FIRST INVOCATION --- the hook is
+# reached" with no packet anywhere near it. My first version of this script restored the mode
+# and left LS_VM_SELFTEST=2 set --- which poisons every hook count measured afterwards.
+kubectl set env "deploy/$DEPLOY" -c "$CONTAINER" LS_VM_SELFTEST- LS_SHIELD_MODE=enforce >/dev/null
 kubectl rollout status "deploy/$DEPLOY" --timeout=300s >/dev/null 2>&1 || true
 note "  left in enforce --- the arm that survives."
 
