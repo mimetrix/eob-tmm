@@ -86,6 +86,7 @@ reachable, or what something costs, prefer the current documents.
 |---|---|
 | [`tmm-integration-findings.md`](tmm-integration-findings.md) | The first integration into the TMM tree |
 | [`design-review-findings.md`](design-review-findings.md) | An adversarial review of the design. Several findings are now closed; **T4 remains open** — the worked CVE example is not a real published advisory |
+| [`cve-selftest.md`](cve-selftest.md) | **CURRENT, and measured.** How the NULL-dereference CVE condition is reproduced against a live TMM, exactly where the simulation boundary sits, both arms with their captured output, and why the condition is synthesised rather than configured |
 | [`probe-a-function.md`](probe-a-function.md) | **CURRENT, and every command was run.** The reverse-engineering procedure as a command sequence, walked end to end on build 03c6f0e0 |
 | [`build-pipeline.md`](build-pipeline.md) | **CURRENT, and measured.** The build-time artifact pipeline: what is generated per build, the forced ordering, where each stage runs, the gates, and the defect the gates caught while it was being written (two debug binaries in one package, differing in 3,132 functions) |
 | [`load-path-scope.md`](load-path-scope.md) | The runtime load path, and why the per-call cost figure in it must not be quoted |
