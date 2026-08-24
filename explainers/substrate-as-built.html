@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The live surface, as built — a verified eBPF substrate inside TMM</title>
+<style>
+  /* Light is the base palette. Dark redefines only tokens, guarded so an explicit
+     light choice beats a dark OS. Components read tokens only, never literals. */
+  :root{
+    --paper:#f4f2f7; --surface:#ffffff; --surface-2:#faf8fc;
+    --ink:#141020; --muted:#585073; --faint:#837b9a;
+    --line:#ddd8e6; --line-2:#c6bed6;
+    --accent:#6d4aa8; --accent-bg:#efe9f8; --accent-ink:#4a2f78;
+    --warn:#a4620a; --warn-bg:#f8efdf; --warn-ink:#77450a;
+    --good:#2f7d54; --good-bg:#e6f2eb; --good-ink:#1f5d3c;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --maxw:46rem;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --paper:#08070c; --surface:#12101a; --surface-2:#0e0c15;
+    --ink:#ece8f4; --muted:#9d95b4; --faint:#736c8a;
+    --line:#241f33; --line-2:#3a3350;
+    --accent:#a98adf; --accent-bg:#1d1630; --accent-ink:#c9b4f0;
+    --warn:#e0a24d; --warn-bg:#2a2011; --warn-ink:#f0c98a;
+    --good:#4fb47d; --good-bg:#10251a; --good-ink:#7bd3a3;
+  }}
+  :root[data-theme="dark"]{
+    --paper:#08070c; --surface:#12101a; --surface-2:#0e0c15;
+    --ink:#ece8f4; --muted:#9d95b4; --faint:#736c8a;
+    --line:#241f33; --line-2:#3a3350;
+    --accent:#a98adf; --accent-bg:#1d1630; --accent-ink:#c9b4f0;
+    --warn:#e0a24d; --warn-bg:#2a2011; --warn-ink:#f0c98a;
+    --good:#4fb47d; --good-bg:#10251a; --good-ink:#7bd3a3;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+       line-height:1.62;font-size:17px}
+  main{max-width:var(--maxw);margin:0 auto;padding:0 1.25rem 5rem}
+  h1,h2,h3{text-wrap:balance;line-height:1.18;margin:0}
+  a{color:var(--accent-ink)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface-2);
+       border:1px solid var(--line);border-radius:4px;padding:.06em .32em}
+
+  /* ---- hero ---- */
+  header.hero{max-width:var(--maxw);margin:0 auto;padding:4.5rem 1.25rem 2.5rem}
+  .eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;
+           text-transform:uppercase;color:var(--accent);margin:0 0 1.1rem}
+  .hero h1{font-size:clamp(1.85rem,4.6vw,2.9rem);font-weight:680;max-width:30ch}
+  .hero h1 em{font-style:normal;color:var(--accent-ink)}
+  .hero .sub{font-size:clamp(1.02rem,1.9vw,1.2rem);color:var(--muted);
+             margin:1.5rem 0 0;max-width:54ch}
+  .chips{display:flex;flex-wrap:wrap;gap:.45rem;margin:1.8rem 0 0}
+  .chip{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;
+        border:1px solid var(--line-2);border-radius:100px;padding:.28rem .7rem;
+        color:var(--muted);background:var(--surface)}
+  .chip.m{color:var(--good-ink);border-color:var(--good);background:var(--good-bg)}
+  .chip.n{color:var(--warn-ink);border-color:var(--warn);background:var(--warn-bg)}
+
+  /* ---- beats ---- */
+  section{margin:3.2rem 0 0;padding:0}
+  .kicker{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;
+          text-transform:uppercase;color:var(--faint);margin:0 0 .6rem}
+  .kicker .num{color:var(--accent);font-weight:700}
+  section h2{font-size:clamp(1.22rem,2.5vw,1.55rem);font-weight:660}
+  section p{margin:.95rem 0 0;color:var(--ink)}
+  section p.lede{color:var(--muted);font-size:1.03rem}
+  b{font-weight:640}
+
+  /* ---- byte strip visual ---- */
+  .bytes{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+         padding:1.15rem 1rem .95rem;margin:1.5rem 0 0;overflow-x:auto}
+  .bytes .row{display:flex;align-items:stretch;gap:3px;min-width:34rem}
+  .bytes .row + .row{margin-top:.5rem}
+  .cell{font-family:var(--mono);font-size:.78rem;padding:.42rem .1rem;text-align:center;
+        border:1px solid var(--line-2);border-radius:4px;flex:1 1 0;
+        background:var(--surface-2);color:var(--muted)}
+  .cell.pad{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  .cell.hot{background:var(--good-bg);border-color:var(--good);color:var(--good-ink);font-weight:700}
+  .bytes .lbl{display:flex;gap:3px;min-width:34rem;margin-top:.4rem}
+  .bytes .lbl span{flex:1 1 0;text-align:center;font-family:var(--mono);
+                   font-size:.62rem;color:var(--faint);letter-spacing:.02em}
+  .bytes figcaption{font-size:.84rem;color:var(--muted);margin:.85rem 0 0;line-height:1.5}
+  .bytes .arrow{font-family:var(--mono);font-size:.72rem;color:var(--accent);
+                margin:.55rem 0 .1rem;letter-spacing:.08em}
+
+  /* ---- reach bar ---- */
+  .reach{margin:1.5rem 0 0}
+  .reach .bar{display:flex;height:2.4rem;border-radius:7px;overflow:hidden;
+              border:1px solid var(--line-2)}
+  .reach .seg{display:flex;align-items:center;justify-content:center;
+              font-family:var(--mono);font-size:.7rem;font-weight:700;color:#fff}
+  .reach .s1{background:var(--accent);flex:37211 0 0}
+  .reach .s2{background:var(--warn);flex:29384 0 0}
+  .reach .s3{background:var(--line-2);flex:4701 0 0;color:var(--ink)}
+  .reach .key{display:grid;gap:.4rem;margin:.9rem 0 0;font-size:.87rem;color:var(--muted)}
+  .reach .key div{display:flex;gap:.55rem;align-items:baseline}
+  .reach .sw{width:.8rem;height:.8rem;border-radius:3px;flex:0 0 auto;margin-top:.35rem}
+
+  /* ---- pipeline ---- */
+  .pipe{margin:1.5rem 0 0;border:1px solid var(--line);border-radius:10px;
+        background:var(--surface);overflow:hidden}
+  .pipe .stage{display:grid;grid-template-columns:1.5rem 1fr auto;gap:.75rem;
+               padding:.8rem .95rem;border-bottom:1px solid var(--line);align-items:baseline}
+  .pipe .stage:last-child{border-bottom:0}
+  .pipe .n{font-family:var(--mono);font-size:.72rem;color:var(--accent);font-weight:700}
+  .pipe .what{font-size:.93rem}
+  .pipe .what em{font-style:normal;color:var(--muted);font-size:.86rem;display:block;
+                 font-family:var(--mono);margin-top:.15rem}
+  .pipe .zone{font-family:var(--mono);font-size:.63rem;letter-spacing:.06em;
+              text-transform:uppercase;padding:.2rem .5rem;border-radius:100px;
+              border:1px solid var(--line-2);color:var(--faint);white-space:nowrap}
+  .pipe .zone.build{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-bg)}
+  .pipe .zone.live{color:var(--good-ink);border-color:var(--good);background:var(--good-bg)}
+
+  /* ---- evidence table ---- */
+  table{width:100%;border-collapse:collapse;margin:1.4rem 0 0;font-size:.92rem}
+  th,td{text-align:left;padding:.6rem .5rem;border-bottom:1px solid var(--line);
+        vertical-align:top}
+  th{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--faint);font-weight:600}
+  td.t{white-space:nowrap;font-family:var(--mono);font-size:.72rem;font-weight:700}
+  td.t.m{color:var(--good-ink)} td.t.n{color:var(--warn-ink)}
+
+  .callout{margin:1.6rem 0 0;padding:1rem 1.1rem;border-radius:10px;
+           background:var(--warn-bg);border:1px solid var(--warn)}
+  .callout p{margin:0;color:var(--warn-ink);font-size:.94rem}
+  .callout p + p{margin-top:.6rem}
+  footer{max-width:var(--maxw);margin:4rem auto 0;padding:1.6rem 1.25rem 0;
+         border-top:1px solid var(--line);color:var(--faint);font-size:.84rem}
+  @media print{body{background:#fff}.bytes,.pipe{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <p class="eyebrow">F5 TMM · BIG-IP Next for Kubernetes · as built</p>
+  <h1>Five bytes change, and a running proxy starts <em>explaining itself</em>.</h1>
+  <p class="sub">A verified eBPF program is loaded into a live TMM over a socket, patched into a
+  function entry while traffic flows, and removed again leaving the bytes exactly as they were.
+  No rebuild. No restart. This page is what exists and what it has been measured to do — not a
+  proposal.</p>
+  <div class="chips">
+    <span class="chip m">measured on build 499b8c30</span>
+    <span class="chip m">signatures 16/16 · audit 11/11</span>
+    <span class="chip n">no CVE mitigated live</span>
+    <span class="chip n">per-call data-path cost unmeasured</span>
+  </div>
+</header>
+
+<main>
+
+<section>
+  <p class="kicker"><span class="num">01</span> the mechanism</p>
+  <h2>The compiler reserves five bytes at every function entry. That is the whole opening.</h2>
+  <p class="lede">TMM is built with <code>-fpatchable-function-entry=5,0</code>, which costs
+  0.182% of binary size and leaves five <code>nop</code>s after Intel CET's
+  <code>endbr64</code> guard. Arming overwrites exactly those five with a call to one shared
+  trampoline. Nothing is displaced, so there is no instruction to relocate, no decoder in the
+  process, and no window where another thread's program counter sits inside bytes being
+  rewritten.</p>
+
+  <figure class="bytes">
+    <div class="row">
+      <div class="cell">f3</div><div class="cell">0f</div><div class="cell">1e</div><div class="cell">fa</div>
+      <div class="cell pad">90</div><div class="cell pad">90</div><div class="cell pad">90</div><div class="cell pad">90</div><div class="cell pad">90</div>
+      <div class="cell">41</div><div class="cell">55</div><div class="cell">4d</div><div class="cell">63</div><div class="cell">c0</div>
+    </div>
+    <div class="lbl"><span>endbr64</span><span></span><span></span><span></span>
+      <span>five reserved nops</span><span></span><span></span><span></span><span></span>
+      <span>the real first instruction</span><span></span><span></span><span></span><span></span></div>
+    <p class="arrow">↓ ls-load.py arm 5 rst_why &nbsp;→&nbsp; OK ARMED LIVE (no restart)</p>
+    <div class="row">
+      <div class="cell">f3</div><div class="cell">0f</div><div class="cell">1e</div><div class="cell">fa</div>
+      <div class="cell hot">e8</div><div class="cell hot">68</div><div class="cell hot">fb</div><div class="cell hot">fd</div><div class="cell hot">fe</div>
+      <div class="cell">41</div><div class="cell">55</div><div class="cell">4d</div><div class="cell">63</div><div class="cell">c0</div>
+    </div>
+    <div class="lbl"><span>untouched</span><span></span><span></span><span></span>
+      <span>call rel32 → trampoline</span><span></span><span></span><span></span><span></span>
+      <span>untouched</span><span></span><span></span><span></span><span></span></div>
+    <figcaption>Real bytes, read out of <code>/proc/&lt;pid&gt;/mem</code> before and after —
+      not from the loader's own reply. Disarm restores the five <code>90</code>s
+      <b>byte-for-byte</b>, which is asserted rather than assumed: the entry is re-read from
+      process memory afterwards and compared.</figcaption>
+  </figure>
+
+  <p>Arming is by <b>symbol name</b>, never by address. The name resolves through an index
+  generated per build and gated on the binary's GNU build ID. That gate exists because
+  <code>rst_why</code> occupied four different addresses across four builds of identical source —
+  and because a stale address once armed the neighbouring function, which also carries a pad, so
+  the patch succeeded, <code>OK ARMED LIVE</code> printed, and nothing fired across 16,000
+  requests. A pad cannot distinguish itself from another pad. A build ID can.</p>
+</section>
+
+<section>
+  <p class="kicker"><span class="num">02</span> reach</p>
+  <h2>Where it can go, counted from the binary rather than estimated.</h2>
+  <p class="lede">71,296 symbols in TMM core, regenerated every build. The split is a property of
+  how the binary is assembled — a flag applied to TMM's own compilation cannot reach two dozen
+  separately-built components.</p>
+
+  <div class="reach">
+    <div class="bar">
+      <div class="seg s1">37,211 armable today</div>
+      <div class="seg s2">29,384 displaceable</div>
+      <div class="seg s3">4,701</div>
+    </div>
+    <div class="key">
+      <div><span class="sw" style="background:var(--accent)"></span><span><b>37,211 armable now</b> —
+        padded, unique, <code>endbr64</code> present, armed at entry+4.</span></div>
+      <div><span class="sw" style="background:var(--warn)"></span><span><b>29,384 need displacement</b> —
+        no pad at all. Reachable only by copying leading bytes verbatim, which is designed and
+        <b>unbuilt</b>. OpenSSL's 1,781 linked symbols are in here.</span></div>
+      <div><span class="sw" style="background:var(--line-2)"></span><span><b>4,701 padded but refused</b> —
+        no <code>endbr64</code> (statics, <code>.isra</code>/<code>.constprop</code> clones). The
+        arming path requires one today.</span></div>
+    </div>
+  </div>
+
+  <p>591 names in this build resolve to between 2 and 21 entries each. Arming <b>refuses</b> rather
+  than picking one — most of the resolver's assertions are refusals, because a resolver that fell
+  back to something plausible would reproduce the stale-address bug with extra steps.</p>
+</section>
+
+<section>
+  <p class="kicker"><span class="num">03</span> the pipeline</p>
+  <h2>Seven stages, each emitting an artifact the next one checks.</h2>
+  <p class="lede">The identity that carries through all of it is the GNU build ID. Every index,
+  every receipt and the arming gate key on the same string, so a mismatch anywhere is a refusal
+  rather than a wrong answer.</p>
+
+  <div class="pipe">
+    <div class="stage"><span class="n">1</span><span class="what">Compile the program
+      <em>clang -target bpf → .bpf.o with a fentry/&lt;hook&gt; section</em></span>
+      <span class="zone build">build</span></div>
+    <div class="stage"><span class="n">2</span><span class="what">Verify — in both directions
+      <em>PREVAIL must ACCEPT the shields and REJECT the known-bad ones</em></span>
+      <span class="zone build">build</span></div>
+    <div class="stage"><span class="n">3</span><span class="what">Sign what was verified
+      <em>Ed25519 over a 112-byte binding: program hash, hook, build range, ceiling, expiry</em></span>
+      <span class="zone build">build</span></div>
+    <div class="stage"><span class="n">4</span><span class="what">Index the <i>packaged</i> binary
+      <em>71,296 hook entries + 63,796 signature entries — from the DEBs, because packaging relinks</em></span>
+      <span class="zone build">build</span></div>
+    <div class="stage"><span class="n">5</span><span class="what">Bake, and check the image against itself
+      <em>index build id == binary build id, and the compiled-in key == the key its programs carry</em></span>
+      <span class="zone build">build</span></div>
+    <div class="stage"><span class="n">6</span><span class="what">Load over the socket
+      <em>signature verified on a TMM thread, then admitted — or refused, and recorded</em></span>
+      <span class="zone live">live tmm</span></div>
+    <div class="stage"><span class="n">7</span><span class="what">Arm by name, watch, disarm
+      <em>five bytes; fired=17 under traffic; entry restored byte-identical</em></span>
+      <span class="zone live">live tmm</span></div>
+  </div>
+
+  <p>Stage 5's second check exists because its absence cost a full build-and-deploy cycle: an
+  image was produced in which TMM trusted one key while the programs beside it were signed with
+  another. Every other gate was green — build IDs matched, index matched binary — because none of
+  them compared <i>those two artifacts to each other</i>.</p>
+</section>
+
+<section>
+  <p class="kicker"><span class="num">04</span> the perimeter</p>
+  <h2>What a signature settles, and what it leaves open.</h2>
+  <p class="lede">An Ed25519 signature over the binding is checked inside TMM before a program is
+  admitted. Unsigned, re-signed and altered programs are all refused — and the two tampering cases
+  produce <i>different</i> messages, because they send an operator to different places.</p>
+  <p>The distinguishing message goes to the <b>log</b>, not the wire. The reply is a generic
+  refusal so a forger cannot use it as an oracle for which half of a forgery to fix. Every
+  operation also leaves one audit record: the op, the target, the program's hash, the serving
+  binary's build ID, and the verdict the caller received quoted verbatim — attributed to the pid
+  and uid the <i>kernel</i> reports, which the peer cannot forge.</p>
+  <div class="callout">
+    <p><b>And that is attribution, not authentication.</b> The program is signed; the
+    <i>caller</i> is anonymous. Anything that can reach the socket can ask. The verifying key is
+    compiled into the binary with no revocation path, and a <code>kubectl exec</code> pid belongs
+    to an API call TMM cannot see.</p>
+    <p>The trail is also <b>not tamper-evident by format</b>. A sequence number makes a deleted
+    record visible as a gap and does nothing about a rewritten one; a hash chain would not help,
+    since anything able to rewrite the log can recompute it. Durability rests on the sink — the
+    container log stream, collected off-box.</p>
+  </div>
+</section>
+
+<section>
+  <p class="kicker"><span class="num">05</span> evidence</p>
+  <h2>Every claim, tiered — and the ones that are not claims.</h2>
+  <table>
+    <thead><tr><th>claim</th><th>tier</th><th>how it is known</th></tr></thead>
+    <tbody>
+      <tr><td>Load, arm and disarm on a running TMM</td><td class="t m">MEASURED</td>
+          <td>entry bytes read from process memory either side; both pods, restarts=0</td></tr>
+      <tr><td>A hook fires once per event</td><td class="t m">MEASURED</td>
+          <td>1:1 across 16,000 requests; corroborated by a packet capture sharing no code with the hook</td></tr>
+      <tr><td>Signature gate refuses tampered, unsigned, wrong-key</td><td class="t m">MEASURED</td>
+          <td>16 of 16 live, plus a keyless build that refuses everything</td></tr>
+      <tr><td>Every operation is recorded</td><td class="t m">MEASURED</td>
+          <td>11 of 11 live, including a malformed request recorded as <code>op=MALFORMED</code></td></tr>
+      <tr><td>The environment rebuilds from the repository</td><td class="t m">MEASURED</td>
+          <td>build box destroyed and rebuilt; suites green afterwards</td></tr>
+      <tr><td>Program execution ≤ 11 ns</td><td class="t m">BOUND</td>
+          <td>at the timer's floor — a record-building program timed <i>faster</i> than an empty one</td></tr>
+      <tr><td>Per-call cost on the data path</td><td class="t n">NOT ESTABLISHED</td>
+          <td>the floor excludes the trampoline, the call and return, and cache effects under load</td></tr>
+      <tr><td>A CVE mitigated on live traffic</td><td class="t n">NOT SHOWN</td>
+          <td>mechanism proven; five candidates screened, none reachable on the test platform</td></tr>
+      <tr><td>Displacement reaches the unpadded 29,384</td><td class="t n">ROADMAP</td>
+          <td>designed, unimplemented</td></tr>
+    </tbody>
+  </table>
+  <p>The distinction the whole record turns on: <b>who witnessed it</b>. A counter our own code
+  incremented is weaker evidence than a byte the kernel showed us, and the two are tracked
+  separately throughout.</p>
+</section>
+
+<section>
+  <p class="kicker"><span class="num">06</span> what it is for</p>
+  <h2>A proxy that can answer the one question it currently cannot.</h2>
+  <p class="lede">TMM already knows why it tore a connection down — 14 macros over 4 functions,
+  used at 1,090 call sites, each carrying a file, a line and a string in English. That vocabulary
+  goes into a ring that overwrites, reaches no log, and is attached to no request. The client gets
+  a bare TCP reset.</p>
+  <p>Armed at those sites, a program turns that into a record: <code>tcp.c:3193 "ICMP unreachable
+  received"</code>, <code>flow_table.c:2618 "No local listener"</code>, and adjacent sites 993 and
+  994 firing together because a proxy is two connections. And because the program decides what is
+  worth emitting — using a clock, in the poll loop — 120 host records became 4 program-emitted
+  under 40 concurrent requests. That ratio, decided inside the data plane with nothing downstream
+  counting, is the difference between telemetry and a decision.</p>
+</section>
+
+</main>
+
+<footer>
+  <p>Repository is the system of record. Claims here are anchored in <code>GROUND_TRUTH.md</code>;
+  what would falsify them is pre-registered in <code>02-RESEARCH-PARAMETERS.md</code>; the
+  premises that were attacked and lost are kept in <code>CONTESTED-PREMISES.md</code> rather than
+  tidied away. Companion pages: the engine as a general capability, the engineering register, the
+  CVE case, and the worked walkthrough — each with its own dated accuracy note.</p>
+</footer>
+
+</body>
+</html>
