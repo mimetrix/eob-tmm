@@ -14,8 +14,15 @@
  *
  * THE COST, STATED: these offsets are true for ONE build. That is already the
  * contract for a function-boundary probe -- build-specific, re-validated per
- * build -- but here it is silent if wrong, so the program checks a value it can
- * predict (see ls_ctx_parse_sane) rather than trusting the numbers.
+ * build -- but here it is silent if wrong, so the builder checks values it can
+ * predict (ls_ctx_parse_sane, below) rather than trusting the numbers.
+ *
+ * THAT SENTENCE WAS FALSE UNTIL 2026-08-24. It read "see ls_ctx_parse_sane" for
+ * months while no such function existed anywhere in the tree -- the one design
+ * that would have caught a wrong offset was described, and never written, in a
+ * comment phrased as though it had been. It was found by trying to answer
+ * "would this have mitigated a real CVE?", which needs exactly this check to
+ * have been run. See CONTESTED-PREMISES.md 12.
  */
 #ifndef LS_CTX_PARSE_H
 #define LS_CTX_PARSE_H
@@ -71,6 +78,60 @@ ls_ctx_build_parse(struct ls_ctx_parse *c, const void *a0, const void *a2)
         c->status_code   = *(const ls_u32 *)(p + LS_OFF_PI_STATUS);
         c->invalid_flags = (*(const ls_u32 *)(p + LS_OFF_PI_INVALID)) & LS_INVALID_MASK;
     }
+}
+
+
+/* ---------------------------------------------------------------------------
+ * ls_ctx_parse_sane --- is this record worth handing to a program?
+ *
+ * TWO TIERS, because they cost different things to know.
+ *
+ * TIER 1 is build-independent and always compiled: if BOTH source pointers were
+ * null, ls_ctx_build_parse read nothing and every field is a zero it wrote
+ * itself. A program then decides on data that does not exist, and -- this is the
+ * part that matters -- it returns a VERDICT, which the host counts, which a
+ * reader takes for a measurement. Declining is not caution here; running is a
+ * fabricated answer.
+ *
+ * TIER 2 is the predictable-value check, and it needs the build to state the
+ * bound: `state` is an enum, so it has a greatest enumerator, and a byte read
+ * from the WRONG offset lands above it most of the time. check_ctx_parse.py
+ * reads that enumerator out of the shipped debug info and writes
+ * ls_ctx_parse_bounds.h. Until it has run for a given build there is nothing
+ * honest to compare against, so tier 2 compiles out -- and says so at startup
+ * rather than passing quietly, because a check that silently degrades to "true"
+ * is the failure this file already made once.
+ *
+ * ONLY `state`, deliberately. `header_count` looks like the better discriminator
+ * -- it is a u16, so a wrong offset escapes a tight ceiling far more often than
+ * a one-byte enum does. But no ceiling for it exists in the debug info: it would
+ * have to be a number someone chose and wrote down as though the build had said
+ * it. That is the same move as the comment this file used to carry. A weaker
+ * check that is derived beats a stronger one that is invented.
+ */
+#if defined(__has_include)
+#  if __has_include("ls_ctx_parse_bounds.h")
+#    include "ls_ctx_parse_bounds.h"
+#    define LS_CTX_PARSE_GATED 1
+#  endif
+#endif
+#ifndef LS_CTX_PARSE_GATED
+#  define LS_CTX_PARSE_GATED 0
+#endif
+
+static inline int
+ls_ctx_parse_sane(const struct ls_ctx_parse *c, const void *a0, const void *a2)
+{
+    if (a0 == 0 && a2 == 0)
+        return 0;                       /* tier 1: nothing was read */
+
+#if LS_CTX_PARSE_GATED
+    if (a0 != 0 && c->state > LS_PARSE_STATE_MAX)
+        return 0;                       /* tier 2: not a parser state */
+#else
+    (void)c;
+#endif
+    return 1;
 }
 
 #endif /* LS_CTX_PARSE_H */

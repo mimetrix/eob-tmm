@@ -10,14 +10,57 @@
  * or h3 entry is armed it registers its own hook id against its own function name, in its
  * own file, and nothing here changes.
  */
+#include <stdio.h>
 #include "ls_ctx_reg.h"
 #include "ls_ctx_parse.h"
 #include "ls_tp.h"
 
+/* Refusals are COUNTED AND ANNOUNCED, not merely returned.
+ *
+ * Returning 0 makes the trampoline fall through without running the program, which is the
+ * right disposition --- but on its own it is the original defect wearing a different hat: the
+ * operator sees `fired` stay at zero under traffic and cannot tell whether the hook is cold,
+ * the program is wrong, or the record was refused. So the first refusal says so once, and the
+ * count keeps accruing after that. One fprintf in the lifetime of the process is not a
+ * firehose; a per-invocation one on this path would be.
+ *
+ * The first CALL also announces whether tier 2 is armed for this build, because "the bounds
+ * header was never generated" and "the bounds were checked and passed" are indistinguishable
+ * from the outside, and that indistinguishability is exactly what CONTESTED-PREMISES.md 12 is
+ * about. */
+static unsigned long ls_ctx_parse_refused;   /* records declined as not trustworthy */
+
 static unsigned long
 build_parse(void *out, const unsigned long long *a)
 {
-    ls_ctx_build_parse((struct ls_ctx_parse *)out, (const void *)a[0], (const void *)a[2]);
+    static int announced, warned;
+    struct ls_ctx_parse *c = (struct ls_ctx_parse *)out;
+    const void *a0 = (const void *)a[0];
+    const void *a2 = (const void *)a[2];
+
+    if (!announced) {
+        announced = 1;
+        fprintf(stderr, "ls_vm: parse ctx sanity: tier 1 on, tier 2 %s\n",
+                LS_CTX_PARSE_GATED
+                    ? "on (bounds from this build's debug info)"
+                    : "OFF --- ls_ctx_parse_bounds.h was never generated for this build, so a "
+                      "wrong offset is caught only when both source pointers are null. Run "
+                      "substrate/check_ctx_parse.py --emit-bounds against the shipped debuginfo.");
+    }
+
+    ls_ctx_build_parse(c, a0, a2);
+
+    if (!ls_ctx_parse_sane(c, a0, a2)) {
+        ls_ctx_parse_refused++;
+        if (!warned) {
+            warned = 1;
+            fprintf(stderr, "ls_vm: parse ctx REFUSED --- the record is not trustworthy, so no "
+                            "program ran and no verdict was counted. A verdict over a record "
+                            "that was never read is a fabricated measurement, not a cautious "
+                            "one. Further refusals are counted silently.\n");
+        }
+        return 0;                      /* fall through without running the program */
+    }
     return sizeof(struct ls_ctx_parse);
 }
 

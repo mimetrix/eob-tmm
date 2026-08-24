@@ -52,7 +52,7 @@ check-prereqs:
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -433,3 +433,22 @@ check-sig:
 	  python3 gen_sig_pubkey.py --none -o $$T/ls_sig_pubkey.h >/dev/null; \
 	  $(CC) -O2 -Wall -Wextra -Werror -I$$T -I. -o $$T/nokey check_sig.c ls_sig.c -lcrypto; \
 	  LS_SIG_EXPECT_NOKEY=1 $$T/nokey $$T/signed.bin $$T/prog.o $$T/other.o
+
+# ls_ctx_parse.h reaches into two TMM structs by hard-coded byte offset and its own banner said
+# so --- "here it is silent if wrong" --- while pointing at a checking function that did not
+# exist for months (CONTESTED-PREMISES.md 12). Two things run here:
+#
+#   the PREDICATE, executed, in both its gated and ungated forms; and
+#   the OFFSETS, compared against real DWARF when a debuginfo is available.
+#
+# check_ctx_parse.py without --debuginfo verifies nothing and says so rather than passing
+# quietly, which is the whole point of the entry it was written for. The bake supplies
+# DEBUGINFO=<file> and should add --strict once TMM's real member names are filled in.
+check-ctx-parse:
+	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .ctxsane.out check_ctx_parse_sane.c \
+	  && ./.ctxsane.out && rm -f .ctxsane.out
+	@if [ -n "$(DEBUGINFO)" ]; then \
+	  $(PYTHON) ./check_ctx_parse.py --debuginfo "$(DEBUGINFO)"; \
+	else \
+	  $(PYTHON) ./check_ctx_parse.py; \
+	fi
