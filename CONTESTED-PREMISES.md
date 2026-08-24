@@ -212,6 +212,72 @@ configuration files edited, one compiler flag.
 
 ---
 
+## 12 · "The shield's context is validated on live traffic" — MOSTLY FALSIFIED, and the
+advertised safeguard does not exist
+
+**The premise, as it was being relied on (2026-08-24).** Asked whether the demonstrated mitigation
+would have stopped a real CVE, the honest gap is the *context builder*: the self-test hands the
+shield a struct it synthesised, while in production a builder in the trampoline reads the same
+fields out of live registers and memory. The shield's logic being right says nothing about the
+builder being right. So: is any builder validated against live traffic?
+
+**What the falsifier was.** Drive traffic whose parse outcome is known in advance, arm a program
+whose disposition depends on a context field, and require the counters to move as predicted. A
+field read from the wrong offset produces a value uncorrelated with the input.
+
+**Measured, on the working Gateway path:**
+
+| input | predicted | measured |
+|---|---|---|
+| 20 well-formed requests | `fired +20`, `safe_returns +0` | `fired +20`, `safe_returns +0` ✓ |
+| 10 × bad method `G@T` | `safe_returns` tracks `fired` | `fired +10`, **`safe_returns +0`** ✗ |
+| 10 × control char in path | `safe_returns` tracks `fired` | `fired +10`, **`safe_returns +0`** ✗ |
+| 10 × bad scheme | `safe_returns` tracks `fired` | `fired +10`, **`safe_returns +0`** ✗ |
+| 10 × well-formed, same raw path | `safe_returns +0` | `fired +10`, `safe_returns +0` |
+
+`fired` is exact and 1:1 with requests in every row — so **the trampoline fires on the real path,
+once per real invocation, and that half of the delivery chain is validated.** But the malformed rows
+are indistinguishable from the well-formed ones: the discriminating counter never moves.
+
+**Three findings, none of which were visible from reading the code once:**
+
+1. **`parse_watch.bpf.c` tests a field this repository already knew was dead.** Its predicate is
+   `invalid_flags != 0`. The header of `http_hdrs_watch.bpf.c` records, as a defect it had already
+   fixed in itself, that `invalid_flags` is *"HTTP/2+3 pseudo-header validity; never written on the
+   1.x path, so it read uninitialised memory. It produced the RIGHT COUNT for the wrong reason."*
+   We drive HTTP/1.1. So `parse_watch`'s disposition carries no information on this traffic, and
+   the measurement above cannot separate "the offsets are wrong" from "the field is never written."
+   The lesson that fixed one program was not swept into the other — see the standing rule about
+   sweeping by claim rather than by file.
+
+2. **The safeguard `ls_ctx_parse.h` advertises does not exist.** That header states the cost of its
+   byte offsets plainly — *"here it is silent if wrong, so the program checks a value it can predict
+   (see `ls_ctx_parse_sane`)"*. There is no `ls_ctx_parse_sane`. The only occurrence of that
+   identifier in the repository is the comment claiming it. The one design that would have caught a
+   wrong offset was described and never written, and the description reads as though it had been.
+
+3. **The program that *does* carry a pre-registered prediction table cannot be armed here.**
+   `http_hdrs_watch.bpf.c` uses `parse_err` (correctly) and ships three predicted counter movements.
+   Its hook is `tmm_l7_http_headers`, a USDT tracepoint that is **not in this build's index**, so it
+   is unarmable. Arming it at `http_parse_client_headers` instead — which is what happened earlier
+   the same day — hands it a context it was not written for. `fired` still counts correctly, because
+   `fired` is incremented by the host and is independent of the context; every field is not.
+
+**What survives, and it is not nothing.** One builder *is* validated on live traffic: `rst_why`.
+Ten records captured today read `file="tcp.c"`, `line=4689`, `cause="TCP RST from remote system"` —
+a mutually consistent triple matching a call site documented independently in `rst-why-feed.md`
+(`RST_WHY_CF(cf, "TCP RST from remote system")` at `tcp.c:4689`, the top-ranked site in an earlier
+live sample). A builder reading the wrong argument register yields a mismatched or garbage triple,
+which is exactly how the defect in premise 1 above was found. So the mechanism *can* deliver a
+correct context from live registers, and has been shown to.
+
+**Where this leaves the CVE claim.** `the shield stops this crash` stands. `it would have mitigated
+the CVE` requires the builder for **that** hook to be right, and that hook has never fired
+(`fired +0` across 30 requests, because it needs a security log profile with `${profile_name}` and
+no CRD creates one). So the claim is *supported by the mechanism working elsewhere* and *unproven
+for this target* — which is a weaker statement than the demonstration invites, and the reason to
+keep saying it.
+
 ## 9 · Claims retired but not individually documented here
 
 `DOC-STATUS.md` §"claims the build falsified" carries the pre-build design claims that the
