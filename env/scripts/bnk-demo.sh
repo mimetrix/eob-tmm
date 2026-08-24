@@ -619,10 +619,21 @@ if d.get("held") == "yes":
     print("Same binary, same condition, same pods. One variable changed and the outcome")
     print("flipped between surviving and a fatal dereference.")
     print("")
-    print("The monitor line comes from `kubectl logs --previous` --- the incarnation that")
-    print("DIED, not a neighbouring pod. Without the verdict from the dead process the pair")
-    print("proves nothing, and reading a healthy neighbour once showed a crash next to a log")
-    print("line proving the opposite.")
+    # PROVENANCE READ FROM THE RUN, not asserted. Which log the control verdict came from
+    # depends on whether Kubernetes RESTARTED the pod or REPLACED it, and this script is not
+    # entitled to claim one when the other happened.
+    if m.get("log") == "previous":
+        print("The monitor verdict comes from `kubectl logs --previous` --- the incarnation")
+        print("that DIED, not a neighbouring pod.")
+    else:
+        print("The monitor verdict comes from the current log of a pod in the NEW ReplicaSet,")
+        print("which crash-looped: Kubernetes replaced these pods rather than restarting them,")
+        print("so there is no --previous to read. It is still the dying process's own log ---")
+        print("pods are selected by the current ReplicaSet's pod-template-hash, so the old")
+        print("enforce pods (which stay Running throughout, and say SAFE_RETURN) are excluded.")
+    print("")
+    print("That distinction is not pedantry: reading a healthy neighbour once showed a crash")
+    print("next to a log line proving the opposite.")
 else:
     print("NOT DEMONSTRATED in that run. Saying so beats quoting the last good one.")
 PYX
@@ -645,10 +656,17 @@ say "CLOSING --- the four things you would ask me anyway"
 # introduced by the words "in this run" and not taken from the run is the exact move this
 # demo exists to argue against, and it is the fourth hardcoded build fact removed from this
 # script. If the slot cannot be read, say nothing about a sample rather than invent one.
+#
+# AND ZERO IS NOT A SAMPLE. `-o 7` runs move 7 alone, so slot 5 was never armed, cycles_max
+# reads 0, and the guard's -n test passed --- producing "the worst sample in THIS run is 0
+# cycles against a minimum in the tens", which is incoherent on its face. An unarmed counter is
+# a slot that "cannot be read" in every sense that matters here, so it takes the same branch as
+# a missing one. This is the same defect the comment above describes, surviving in the guard
+# that was written to prevent it.
 CMAX=$("$KUBECTL" exec "$POD1" -c f5-tmm -- python3 /usr/bin/ls-load.py status 5 2>/dev/null \
         | sed -n 's/.*cycles_max=\([0-9]*\).*/\1/p' | head -1)
 note "  1. Per-invocation cost is UNMEASURED, and rdtsc is preemption-polluted: a pair of"
-if [ -n "$CMAX" ]; then
+if [ -n "$CMAX" ] && [ "$CMAX" -gt 0 ] 2>/dev/null; then
 note "     reads spanning a context switch measures the scheduler, not the program. The worst"
 note "     sample in THIS run is $CMAX cycles against a minimum in the tens --- same program,"
 note "     same hook. The node also blocks hardware counters, so I will quote no per-call number."
