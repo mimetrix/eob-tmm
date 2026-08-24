@@ -86,9 +86,37 @@ else
     if [ "$OK" -eq 0 ]; then
         echo
         echo "  NOTHING SUCCEEDED --- so any hook count measured over this interval says nothing"
-        echo "  about the hook. Fix the path first. If refused, arm rst_why and drain: TMM will"
-        echo "  name its own reason, and 'Port denied' means no listener is open at that address"
-        echo "  (see the runbook, 12g-bis)."
+        echo "  about the hook. Fix the path first."
+        echo
+
+        # THE CHECK THAT SHOULD HAVE FIRED FIRST.
+        # 2026-08-24: I debugged this failure for an hour --- IPAM ranges, LoadBalancer status,
+        # RBAC, VLAN allow-lists, HTTP profile references --- while runbook 12e already said, in
+        # bold, that BNK uses Gateway API and that adapting a CNF F5VirtualServer manifest makes
+        # "every symptom point at ports and addresses" with none of the fixes holding. That is a
+        # verbatim description of the hour. Documentation I have to RECALL is not a control, so
+        # the check runs here, in the tool you reach for when traffic fails.
+        if kubectl get f5-virtualservers -A --no-headers 2>/dev/null | grep -q .; then
+            echo "  *** AN F5VirtualServer EXISTS ON THIS CLUSTER. That is the CNF config model,"
+            echo "      not BNK's. It will sit at Programmed=False \"Waiting for one or more"
+            echo "      dependent CRs\" forever, because it wants F5BigCnePool --- a CRD bnk-core"
+            echo "      does not install. TMM then answers 'Port denied' and every fix you try"
+            echo "      (addresses, ports, VLANs, IPAM) will look plausible and change nothing."
+            echo
+            kubectl get f5-virtualservers -A --no-headers 2>/dev/null | awk '{print "        "$1"/"$2}'
+            echo
+            echo "      BNK uses Gateway API: GatewayClass + Gateway + Pool + HTTPRoute."
+            echo "      The working manifest is in env/bnk-dev-runbook.md 12e. Expect"
+            echo "      PROGRAMMED=True and, measured 2026-08-24, 40 requests -> 40 hook fires."
+        else
+            echo "  If refused, read the reset payload FIRST --- it is the single most useful"
+            echo "  diagnostic and TMM writes its reason into the RST body:"
+            echo "      kubectl exec client -- sh -c 'nohup timeout 8 tcpdump -i client-net -n -s0 \\"
+            echo "          -w /tmp/c.pcap >/dev/null 2>&1 & sleep 2; curl -s -m 4 -o /dev/null \\"
+            echo "          http://<vip>/; sleep 8; tcpdump -r /tmp/c.pcap -n -A | grep -a BIG-IP'"
+            echo "  'Port denied' means the listener never opened --- a config-model problem,"
+            echo "  not a firewall one. See runbook 12e."
+        fi
     fi
 fi
 
