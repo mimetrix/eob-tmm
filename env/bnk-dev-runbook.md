@@ -1298,7 +1298,47 @@ still `Waiting`. Note the reference manifest in `~/code/datkube/profiles/virtual
 is **not** applicable as-is: it uses kind `F5BigCnePool`, which the `bnk-core` profile does not
 install, so `Pool` is the right kind here.
 
+**THE DECISIVE CLUE, 2026-08-24, and it came from our own shield.** Rather than guessing further at
+CR semantics, arm `rst_watch` on `rst_why`, knock on the VIP, and drain. TMM says exactly why it is
+refusing:
+
+```
+4   tcp.c:4689         TCP RST from remote system
+2   drop.c:136         Port denied          <-- the connection attempts
+1   flow_table.c:2618  No flow found for ACK
+```
+
+**`drop.c:136 "Port denied"`.** TMM is not waiting on a pool or a CR — it is refusing the port,
+because BNK opens only ports it has been told to open and no listener exists at that address. One
+arm-and-drain cycle, where four hypotheses had produced nothing. That is also the capability
+demonstrating its own value: the cause was in TMM's vocabulary the whole time, reaching no log.
+
+**Two things follow, and neither is the controller version.**
+
+`f5-tmm-tcp-service` never leaves `<pending>`, so BNK never assigned it an address — and the IPAM
+controller logs, on startup, `No IPAM Range resource found on start of controller` plus
+`required environment variable is missing` and `no such file or directory`. A controller that cannot
+assign means no listener, whatever the CRs say.
+
+And the runbook's own defaults contain a mismatch: `VIP=11.11.11.99` with `RANGE=11.11.11.200-220`.
+The VIP is **outside its own IPAM range**. Moving the VIP inside the range (`.200`) did not fix it
+either, so the mismatch is not sufficient on its own — but it should not be there.
+
+**ELIMINATED, so nobody spends the cycles again:**
+
+| hypothesis | test | result |
+|---|---|---|
+| controller version drift | pinned datkube to `6e22dc83`, giving `f5ingress:v14.91.12` — the exact version the working cluster ran, verified by image tag | **no change.** Cost a cluster recreate and the deployed TMM, which then had to be re-shipped |
+| `spec.namespace` unset | set on pool and VS | moved the pool into TMM on one cluster, **not** on the rebuilt one |
+| VIP outside the IPAM range | moved the VIP to `.200` | no change |
+| IPAMRange too narrow | widened to `.90–.220` | no change |
+| VS shape (protocol, fastL4, vlans) | applied from datkube's own reference manifest | no change; and that manifest's `F5BigCnePool` kind does not exist under `bnk-core` |
+
 **Where to pick this up, cheapest first:**
+
+0. **The IPAM controller's own health.** `Port denied` plus a permanently `<pending>` service plus a
+   controller complaining about a missing environment variable is one story, not three. Fix the
+   assignment and the listener should open. Start there, not with the CRs.
 
 1. **Pin datkube.** Find the version this config last worked against and install that. It converts
    an undocumented-semantics problem into a version pin — and the pin belongs in this runbook, since
