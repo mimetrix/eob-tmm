@@ -1264,6 +1264,46 @@ can run.
 
 ---
 
+## 12h · When an instance is wedged at the hypervisor, not in the guest
+
+2026-08-24. `eob-bnk-datkube-01` stopped answering: SSH refused, no ping, ports 22 / 6443 / 80 all
+closed — tested from the build box on the same network, so not a routing problem at the
+workstation. OpenStack meanwhile reported `status ACTIVE`, `power_state 1`, `vm_state active`.
+
+**`server list` is a check that passes while the thing it describes is dead.** Every health check in
+this runbook starts by asking Kubernetes, which needs the box. Nothing asked "is the guest answering
+at all", independently.
+
+**The probe that located the fault** — compare the console of the sick instance against a healthy
+one:
+
+```bash
+openstack --os-cloud sea console log show eob-bnk-build-01   --lines 3   # -> "... login:"
+openstack --os-cloud sea console log show eob-bnk-datkube-01 --lines 5   # -> HTTP 504 from Nova
+```
+
+A 504 for **one** instance while `server list` and another instance's console both work is not a
+guest failure and not an API outage: Nova cannot reach that instance's hypervisor. Consistent with
+what followed — a soft reboot left it in `status REBOOT` for four minutes with the guest never
+acting, and `reboot --hard`, which should not need guest cooperation, hung at
+`task_state rebooting_hard` and never cleared.
+
+**What is possible from there, in order:**
+
+1. Nothing in-place. While `task_state` is set, Nova refuses `stop`, `start` and most operations.
+2. `server delete` — **works anyway**, which is worth knowing: a stuck `task_state` does not block
+   deletion.
+3. Reprovision. It may land on the same sick compute host, in which case this is an escalation to
+   whoever runs the stack rather than a fix.
+
+**Do not reach for the reboot before confirming you can rebuild.** The check that matters is not
+"is a reboot safe" but "if this box never comes back, do I have what I need": credentials tested
+against live services, quota for a replacement, a keypair whose private half is in hand, both git
+remotes reachable, and the image still sitting on the *other* box. All of it verified before the
+first reboot was issued, which is why the delete was a decision rather than a loss.
+
+---
+
 ## 13 · Teardown
 
 ```bash
