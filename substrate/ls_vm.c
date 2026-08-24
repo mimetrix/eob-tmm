@@ -63,6 +63,7 @@
 #include "ls_map.h"
 #include "ls_map_glue.h"
 #include "ls_ctx_reg.h"   /* the hook name decides the ctx builder, not the slot */
+#include "ls_ctx_http_psm.h"  /* the self-test feeds the REAL ctx type, never a copy of it */
 
 #include <elf.h>
 #include <stdio.h>
@@ -660,8 +661,24 @@ fail:
 static void
 ls_vm_selftest(int slot, unsigned level)
 {
-    /* Exactly the ctx the call site builds when the listener has no profile. */
-    struct { uint64_t ptlp, ptlp_name; uint32_t key, name_len; } c;
+    /* Exactly the ctx the call site builds when the listener has no profile --- and it is the
+     * REAL TYPE, not a local struct that happens to match today.
+     *
+     * This was an anonymous `struct { uint64_t ptlp, ptlp_name; uint32_t key, name_len; }`,
+     * duplicating the layout of struct ls_ctx_http_psm by hand. It matched --- 24 bytes, same
+     * order, same widths --- and nothing enforced it. Add a field to the real ctx and this
+     * self-test would go on feeding the program a different shape while printing a confident
+     * verdict, which is worse than failing. ls_ctx_rst has already grown once; the ctx ABI
+     * version exists because that happens.
+     *
+     * Asked on 2026-08-24 how we know the synthesised ctx is identical to the one a real hook
+     * would produce. By inspection was the honest answer, and by inspection is not good enough
+     * for the input to the only demonstration this shield has. */
+    struct ls_ctx_http_psm c;
+    _Static_assert(sizeof(struct ls_ctx_http_psm) == 24,
+                   "the http_psm ctx changed shape --- the self-test's input is no longer the "
+                   "ctx the call site builds, and the demonstration is invalid until this is "
+                   "reconciled (see cve-selftest.md on where the simulation boundary sits)");
     memset(&c, 0, sizeof c);          /* ptlp == NULL --- the CVE condition */
 
     enum ls_verdict v = ls_vm_call(slot, &c, sizeof c);
