@@ -258,7 +258,7 @@ RSTOFF=$(PADOFF rst_why)
 
 # =============================================================================
 if want 1; then
-say "MOVE 1 of 6 --- a stock, running TMM"
+say "MOVE 1 of 7 --- a stock, running TMM"
 note "  A proxy is a machine that makes decisions about connections. Accept or reject,"
 note "  forward or hold, close cleanly or reset --- thousands of times a second. That is"
 note "  not a feature of the product, it IS the product."
@@ -303,7 +303,7 @@ fi
 
 # =============================================================================
 if want 2; then
-say "MOVE 2 of 6 --- the vocabulary TMM already has, and throws away"
+say "MOVE 2 of 7 --- the vocabulary TMM already has, and throws away"
 note "  You would assume the reason a connection died is unavailable because nobody"
 note "  recorded it. The opposite is true."
 run ""$KUBECTL" exec $POD1 -c f5-tmm -- grep -c . /usr/share/ls/hook-index.tsv"
@@ -331,7 +331,7 @@ fi
 
 # =============================================================================
 if want 3; then
-say "MOVE 3 of 6 --- arm it by name, on a running TMM, under traffic"
+say "MOVE 3 of 7 --- arm it by name, on a running TMM, under traffic"
 for p in $PODS; do
   L "$p" load 5 /usr/share/ls/rst_watch.bpf.o 2 rst_why
   L "$p" arm 5 rst_why
@@ -353,7 +353,7 @@ fi
 
 # =============================================================================
 if want 4; then
-say "MOVE 4 of 6 --- what TMM is actually deciding"
+say "MOVE 4 of 7 --- what TMM is actually deciding"
 AMB=/tmp/.demo_ambient.$$
 REQ=/tmp/.demo_requests.$$
 REJ=/tmp/.demo_reject.$$
@@ -429,7 +429,7 @@ fi
 
 # =============================================================================
 if want 5; then
-say "MOVE 5 of 6 --- you pick the target"
+say "MOVE 5 of 7 --- you pick the target"
 # COUNTED FROM THIS IMAGE'S INDEX. These read "41,148" and "30,009" --- true of the build the
 # script was written against. Every build relinks and the optimiser makes different inlining
 # choices, so the populations move. Quoting last build's numbers at an audience looking at this
@@ -480,7 +480,7 @@ fi
 
 # =============================================================================
 if want 6; then
-say "MOVE 6 of 6 --- a decision made INSIDE the data plane"
+say "MOVE 6 of 7 --- a decision made INSIDE the data plane"
 note "  Everything so far is observation. This one is different: the same mechanism, but"
 note "  the program decides what is worth reporting, using a clock, in the poll loop."
 # LOAD, and arm ONLY IF the entry is not already patched.
@@ -545,6 +545,100 @@ note ""
 note "  At 1,090 sites under load, streaming everything is a firehose. That is the"
 note "  difference between telemetry and a decision."
 pause
+fi
+
+# =============================================================================
+if want 7; then
+say "MOVE 7 of 7 --- the one the customer actually asks about: a CVE"
+note "  A logging path reads a name through a pointer the caller never set. When the profile is"
+note "  absent that pointer is NULL, TMM reads through it, and the process dies --- taking the"
+note "  traffic it was carrying with it. One request from anyone who can reach the listener."
+note ""
+note "  The shield reads the same field FIRST and returns the safe value when it is NULL, so the"
+note "  body that would dereference it never runs. Three fields, and it returns on the first."
+note ""
+# ARM IT AT THE REAL ENTRY, LIVE. This part is not a story --- the address comes from the
+# build's own artifact and the pad state is read back out of the running process.
+# Resolved ONCE, from the build's own index, exactly as move 3 does for rst_why. If the name
+# is not in this image's index the helper refuses rather than guessing an address --- guessing
+# one is the failure this whole demo exists to argue against.
+PSM=$(ENTRY http_psm_profile_name_lookup) || PSM=""
+for p in $PODS; do
+  L "$p" load 7 /usr/share/ls/ls_2026_http_psm.bpf.o 2
+  _pad=$([ -n "$PSM" ] && PADSTATE "$p" "$PSM" || echo unknown)
+  if [ "$_pad" = "nops" ]; then
+      L "$p" arm 7 http_psm_profile_name_lookup
+  else
+      printf '\n  %s# %s: entry already holds a call --- the hook is live from an earlier move.%s\n' \
+             "$DIM" "$p" "$OFF"
+  fi
+done
+note ""
+note "  That is the real function entry, patched on a running TMM. Now the honest part."
+pause
+
+# WHAT IT DOES NOT DO. Measured here, in front of everyone, rather than omitted.
+say "         ...and it does not fire"
+_base=0; for p in $PODS; do
+  _f=$("$KUBECTL" exec "$p" -c f5-tmm -- python3 /usr/bin/ls-load.py status 7 2>/dev/null \
+        | sed -n 's/.*fired=\([0-9]*\).*/\1/p' | head -1); _base=$(( _base + ${_f:-0} ))
+done
+run ""$KUBECTL" exec client -- sh -c 'i=0; while [ \$i -lt 30 ]; do curl -s -m 3 -o /dev/null http://$VIP/; i=\$((i+1)); done; echo \"30 requests sent\"'"
+_after=0; for p in $PODS; do
+  _f=$("$KUBECTL" exec "$p" -c f5-tmm -- python3 /usr/bin/ls-load.py status 7 2>/dev/null \
+        | sed -n 's/.*fired=\([0-9]*\).*/\1/p' | head -1); _after=$(( _after + ${_f:-0} ))
+done
+note ""
+note "  hook fired: +$(( _after - _base )) across those 30 requests."
+note ""
+note "  Move 3 armed http_parse_client_headers on this same path and it fired once per request,"
+note "  so hooks demonstrably fire here. This one needs a security log profile whose format"
+note "  string contains \${profile_name} --- and that has no Kubernetes CRD, so no configuration"
+note "  available on BNK can produce the NULL. The condition cannot be reached from the control"
+note "  plane. That is why the next part is a self-test and not a request."
+pause
+
+# THE PAIR. Read from the artifact the measurement wrote --- never hardcoded, and if it was
+# never run, say that instead of quoting a number from a different day.
+say "         one variable: the shield's mode"
+_CVE=/tmp/ls-cve-result.json
+if [ -r "$_CVE" ]; then
+python3 - "$_CVE" <<'PYX' 2>/dev/null | sed 's/^/  /'
+import sys, json
+try: d = json.load(open(sys.argv[1]))
+except Exception: print("result file unreadable --- run bnk-demo-cve.sh"); raise SystemExit
+e, m = d.get("enforce", {}), d.get("monitor", {})
+print("measured %s" % d.get("stamp", "?"))
+print("")
+print("  enforce  verdict=%-12s survived=%-4s restarts=%s"
+      % (e.get("verdict"), e.get("survived"), e.get("restarts")))
+print("  monitor  verdict=%-12s                restarts=%s  (log=%s)"
+      % (m.get("verdict"), m.get("restarts"), m.get("log")))
+print("")
+if d.get("held") == "yes":
+    print("Same binary, same condition, same pods. One variable changed and the outcome")
+    print("flipped between surviving and a fatal dereference.")
+    print("")
+    print("The monitor line comes from `kubectl logs --previous` --- the incarnation that")
+    print("DIED, not a neighbouring pod. Without the verdict from the dead process the pair")
+    print("proves nothing, and reading a healthy neighbour once showed a crash next to a log")
+    print("line proving the opposite.")
+else:
+    print("NOT DEMONSTRATED in that run. Saying so beats quoting the last good one.")
+PYX
+else
+note "  Not run on this cluster yet --- so there is no number to show, and I am not going to"
+note "  quote one from another day. It is one command:  bnk-demo-cve.sh"
+note "  It rolls TMM twice (the monitor arm deliberately crash-loops), so it is deliberately"
+note "  not run inside this walkthrough."
+fi
+note ""
+note "  What this proves: the mechanism prevents this crash. What it does NOT prove: that this"
+note "  CVE was mitigated on live traffic --- that claim stays NOT SHOWN in GROUND_TRUTH.md,"
+note "  where it has always been. The input is synthesised because it CANNOT BE CONFIGURED,"
+note "  not because synthesising was easier. See cve-selftest.md."
+pause
+
 say "CLOSING --- the four things you would ask me anyway"
 # READ THE NUMBER FROM THIS RUN. It was hardcoded --- "one sample in this run reads 23.8
 # million cycles" --- while the run being presented reported cycles_max=1628. A number
