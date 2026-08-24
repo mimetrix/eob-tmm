@@ -372,7 +372,13 @@
       build, so a hook is named rather than addressed, and arming is refused when the index and the
       running binary disagree.</p>
       <p><b>Still genuinely unproven, and conditional throughout.</b> <b>No CVE has been mitigated on live
-      traffic</b> — the mechanism is shown, the outcome is not. <b>The per-call cost of an armed hook on
+      traffic</b> <b>Demonstrated 2026-08-24, with the condition synthesised:</b> given the vulnerable input, an
+      armed shield in enforce mode returns <code>SAFE_RETURN</code> and TMM survives; in monitor mode
+      it falls through and the same binary dies on the dereference. Real signed program, real VM,
+      real TMM process, real dereference — but the condition is built directly rather than reached by
+      traffic, because no CRD can create it. So the mechanism is shown to prevent the crash; no
+      reachable attack path has been closed. Both claims, and the boundary between them, are set out
+      in <code>cve-selftest.md</code>. — the mechanism is shown, the outcome is not. <b>The per-call cost of an armed hook on
       the data path is unmeasured.</b> A floor exists: a small program executes in ≤ 11 ns on the
       compiled path, and that figure is bounded by the timer measuring it rather than by the program, so
       it excludes the trampoline's register save and restore, the call and return, and cache effects under

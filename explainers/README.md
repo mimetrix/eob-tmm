@@ -27,6 +27,12 @@
 > signature verification, the safe-return policy table and a runtime budget guard together, only the
 > first exists.
 >
+> **The shield is now shown to prevent the NULL-deref crash (2026-08-24)** — enforce returns a safe
+> value and TMM survives, monitor falls through and the same binary dies — against a **synthesised**
+> condition, since no CRD can create the real one. That is the mechanism preventing a crash, which is
+> a different claim from a reachable attack path being closed. See
+> [`../cve-selftest.md`](../cve-selftest.md) for exactly where the boundary sits.
+>
 > Still genuinely unproven and must stay conditional: **no CVE has been mitigated on live traffic**,
 > and the **per-call cost of an armed hook on the data path is unmeasured**. A floor is now measured
 > — ≤ 11 ns for a small program on the compiled path — and it is bounded by the timer rather than by

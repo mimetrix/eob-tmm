@@ -304,8 +304,12 @@
           <td>at the timer's floor — a record-building program timed <i>faster</i> than an empty one</td></tr>
       <tr><td>Per-call cost on the data path</td><td class="t n">NOT ESTABLISHED</td>
           <td>the floor excludes the trampoline, the call and return, and cache effects under load</td></tr>
+      <tr><td>The shield prevents the NULL-deref crash</td><td class="t m">MEASURED</td>
+          <td>enforce → <code>SAFE_RETURN</code>, TMM survives; monitor → fall-through and the same
+          binary dies. <b>Condition synthesised</b>, not reached by traffic — no CRD can create it</td></tr>
       <tr><td>A CVE mitigated on live traffic</td><td class="t n">NOT SHOWN</td>
-          <td>mechanism proven; five candidates screened, none reachable on the test platform</td></tr>
+          <td>the line above is the mechanism preventing a crash; this is a reachable attack path
+          being closed, and they are different claims. Five candidates screened, none reachable</td></tr>
       <tr><td>Displacement reaches the unpadded 29,384</td><td class="t n">ROADMAP</td>
           <td>designed, unimplemented</td></tr>
     </tbody>
