@@ -1264,6 +1264,57 @@ can run.
 
 ---
 
+## 12g-bis · OPEN: driving the data path on demand — the control-plane gap
+
+**Status 2026-08-24: unresolved, and bounded.** The substrate is validated on this rebuilt cluster
+(audit 11/11; signatures 14/16 with every cryptographic assertion; `rst_why` armed by name and
+`fired=48` with records decoded). What does *not* work is aiming it: there is no virtual server
+accepting traffic, so events cannot be triggered deliberately — only observed as ambient noise.
+
+**What is established, so nobody repeats these probes:**
+
+| probe | result |
+|---|---|
+| VIP reachable? | **yes** — `ping 11.11.11.99` 2/2 from the client pod, so TMM answers for it |
+| VS in TMM? | **yes** — `tmctl virtual_server_stat` shows `default-eob-vs`, destination `0b:0b:0b:63` |
+| pool member in TMM? | **yes, after a fix** — `default-pool-eob-pool-pool`, but only once `spec.namespace` is set |
+| TCP connect? | **no** — `curl` exit **7**, so TMM answers with a RST; `tot_requests 0` |
+| backend up? | yes, one listener on `:80` (see the `[h]ttp.server` note in `bnk-traffic-path.sh`) |
+| controller reconciling? | yes — "Added F5LTMVirtualServer", `createMsgV2` sent, both dependencies in its relationship map |
+| CR status | `Accepted=True`, **`Programmed=False reason=Waiting`** — "waiting for one or more dependent CRs" while naming none |
+
+**One real cause found and fixed:** a `Pool` with `spec.namespace` unset is filed by the reconciler
+under namespace **`N_A`** and never programmed. Setting it explicitly puts the member into TMM. That
+field was empty in the config that worked before, which points at the actual problem —
+
+**version drift.** This cluster runs `spk-f5ingress` **v14.94.13**; the working config was written
+against **v14.91.12**, and nothing in this repo records which datkube version the environment was
+built with. Same shape as the unpinned TMM revision, except TMM's pairing is recorded in
+`substrate/.tree-expected-delta` and datkube's is recorded nowhere.
+
+**Things tried that did NOT fix it:** widening the IPAMRange to cover the VIP (`.90–.220`);
+`protocol: tcp`; `fastL4: sys-default-fastl4`; `vlans.vlanList: [tmm-client]` — all applied, all
+still `Waiting`. Note the reference manifest in `~/code/datkube/profiles/virtualserver/resources/`
+is **not** applicable as-is: it uses kind `F5BigCnePool`, which the `bnk-core` profile does not
+install, so `Pool` is the right kind here.
+
+**Where to pick this up, cheapest first:**
+
+1. **Pin datkube.** Find the version this config last worked against and install that. It converts
+   an undocumented-semantics problem into a version pin — and the pin belongs in this runbook, since
+   its absence is what allowed the drift.
+2. **Ask the reconciler which dependency it means.** The status message names none. The relationship
+   map logs a three-boolean tuple per dependency (`{eob-vs F5VirtualServer default true false true}`);
+   the `false` is worth identifying.
+3. **Use a profile whose reference manifests match the installed CRDs** — `bnk-external` ships
+   `gateway.yaml` and `pools.yaml`, which may be the shape this controller expects.
+
+**And note what is NOT blocked by this.** Arming, firing, record decoding, signature refusal and the
+audit trail are all demonstrated on ambient traffic. What the VIP buys is *choosing* the event —
+which the HTTP-parser hook needs, and which an enforce-mode demonstration will need.
+
+---
+
 ## 12h · When an instance is wedged at the hypervisor, not in the guest
 
 2026-08-24. `eob-bnk-datkube-01` stopped answering: SSH refused, no ping, ports 22 / 6443 / 80 all

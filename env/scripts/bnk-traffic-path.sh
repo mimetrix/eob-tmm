@@ -37,7 +37,13 @@ RANGE_END="${RANGE_END:-11.11.11.220}"
 
 echo "=== 1. backend on $BACKEND:80"
 kubectl exec server -- sh -c '
-  pkill -f "http.server" 2>/dev/null
+  # [h]ttp.server, NOT http.server. This shell'"'"'s own command line contains the pattern, so an
+  # unbracketed pkill -f kills the shell that is running it --- exit 143, and the backend never
+  # starts. Measured twice: on 2026-08-20 the step reported "command terminated with exit code 143"
+  # and left the server down, and on 2026-08-24 a rebuilt cluster had zero listeners on :80 for
+  # exactly this reason, which then read as a broken data path rather than a missing daemon.
+  # The bracket makes the pattern not match itself.
+  pkill -f "[h]ttp.server" 2>/dev/null
   mkdir -p /tmp/www && echo "served-by-backend" > /tmp/www/index.html
   cd /tmp/www && setsid nohup python3 -m http.server 80 --bind 0.0.0.0 >/tmp/httpd.log 2>&1 &
   sleep 2; echo "  listeners on :80 = $(ss -lnt 2>/dev/null | grep -c :80)"' 2>&1 | tail -2
