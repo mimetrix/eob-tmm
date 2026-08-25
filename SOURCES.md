@@ -45,3 +45,4 @@ Nothing external is currently cited without a row here, but this page was create
 the repository was written, so absence of a row is not yet proof that no uncited external claim
 survives somewhere. Sweeping for that is unfinished work and is recorded as such rather than
 declared complete.
+| bpftime latency (arXiv 2311.07923) | https://arxiv.org/abs/2311.07923 | 2026-08-25T16:49:24Z | `evidence/cache/bpftime-arxiv-2311.07923-latency.md` | ae368a303e7455b332e51ca834245edad7c6cdd5f9c41b7843711be3fc408405 | CITED-FROM-ABSTRACT — full PDF not byte-cached |
