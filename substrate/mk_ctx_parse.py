@@ -96,7 +96,14 @@ def _num(v):
     one trusted one.
     """
     m = re.findall(r"(0x[0-9a-fA-F]+|-?\d+)", v)
-    return int(m[-1], 0) if m else None
+    if not m:
+        return None
+    t = m[-1]
+    try:
+        return int(t, 0)            # 0x.. hex, or a plain decimal with no leading zero
+    except ValueError:
+        return int(t, 10)           # readelf writes enumerators like "001" --- base-0 rejects the
+                                    # leading zero (would-be octal); it is plain decimal
 
 
 class Readelf:
