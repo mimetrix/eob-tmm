@@ -20,3 +20,10 @@ PREVAIL_ORIGIN=https://github.com/vbpf/ebpf-verifier.git
 PREVAIL_PIN=06769f7b508214e63b97905d275920f7e90182fa
 PREVAIL_TAG=v0.2.5
 PREVAIL_DIR=ebpf-verifier
+
+# VERIFICATION IS CLANG-VERSION-SENSITIVE — verify only on the pinned toolchain (CLAUDE.md rule 5).
+# 2026-08-25: alpn_guard.bpf.c and alpn_generic.bpf.c compiled with Debian clang-14 both PASSED
+# PREVAIL v0.2.5 (06769f7b); the SAME sources compiled with the build box's clang-18 both FAILED
+# the same PREVAIL ("154: Upper bound must be at most 96" / "43: ... total_stack_size"). The
+# compiler version alone flips the verdict. A PREVAIL result off the pinned clang is a hint, never
+# a conclusion. Build box uses clang-18; that is the authority.

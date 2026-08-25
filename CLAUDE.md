@@ -33,7 +33,7 @@ shield." That was true when written and is now superseded. **Replace such claims
 falsified rather than letting them stand — and add the new limit in the same edit**, which is why the
 three bullets above exist.
 
-**How claims are governed here — four rules, binding.** They exist so the output can be
+**How claims are governed here — five rules, binding.** They exist so the output can be
 *argued with*, and so my own errors stay visible rather than being smoothed out of the record.
 
 1. **No cached file, no claim.** Any statement about something external cites a row in
@@ -49,6 +49,23 @@ three bullets above exist.
 4. **Being wrong is recorded, not tidied away.** [`CONTESTED-PREMISES.md`](CONTESTED-PREMISES.md)
    keeps attacks on our own premises, including a fix that measurement overturned within the same
    session. Retracting quietly destroys the audit trail that makes the rest worth anything.
+5. **The pre-claim gate: reproduce in the authoritative place BEFORE stating a result.** This is
+   the rule most often bypassed for speed, and every bypass costs a walk-back. Before saying *X
+   passes / fails / works / is measured / is falsified*:
+   - **Toolchain- or build-sensitive claims** (PREVAIL, clang, the binary, arming) are verified on
+     the **build box with the pinned toolchain**. A workstation, an aarch64 host, or a different
+     clang is a **hint, never a conclusion** — `clang-14` passed a PREVAIL program that `clang-18`
+     (the pinned build) *refused*: the compiler version alone flipped the verdict.
+   - **Claims about our own system**: read the [`GROUND_TRUTH.md`](GROUND_TRUTH.md) /
+     [`CONTESTED-PREMISES.md`](CONTESTED-PREMISES.md) / [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md)
+     row **first**. If a record already states it, trust the record over a fresh convenient check —
+     or reproduce in the *recorded* environment before contradicting it. The answer is usually
+     already written down; re-deriving it from a faster vantage is how the same thing gets learned
+     twice.
+   - **Cluster claims**: the pinned image and a **stable** pod, not whichever pod is fastest to
+     reach — a churning replica and load-balancer hashing produce false negatives.
+   A hint is not a finding until reproduced where it counts. When the fast check and the record
+   disagree, the record wins until the authoritative environment says otherwise.
 
 **Reading order across a repo that spans both eras: see [`DOC-STATUS.md`](DOC-STATUS.md).** It
 classifies every document as current, design (pre-build), record, or procedure, and lists the

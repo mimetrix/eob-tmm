@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s\\n' 'PRE-CLAIM GATE (CLAUDE.md rule 5): reproduce in the authoritative place before stating X passes/fails/works/is measured. Toolchain-sensitive (PREVAIL/clang/build/arming) -> build box + pinned toolchain; a workstation or different clang is a HINT not a conclusion (clang-14 passed what clang-18 refused). Own-system claim -> read the GROUND_TRUTH / CONTESTED-PREMISES / runbook row FIRST; the record wins over a fast convenient check. Cluster -> pinned image + a STABLE pod. A hint is not a finding until reproduced where it counts.'"
+          }
+        ]
+      }
+    ]
+  }
+}
