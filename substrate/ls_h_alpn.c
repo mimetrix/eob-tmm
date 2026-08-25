@@ -34,14 +34,20 @@
 #  include <local/base/ls_ctx_alpn_abi.h>
 #endif
 
-#include <stdint.h>
+/* Fixed-width types WITHOUT <stdint.h>: the shipping no_pgo build is -nostdinc and the system
+ * stdint.h pulls bits/ headers off the curated include path. __UINT*_TYPE__ are compiler builtins
+ * (gcc/clang), need no header, and resolve to the exact platform types uint64_t/uint32_t map to,
+ * so the cast to uBPF's external_function_t is type-clean. */
+typedef __UINT64_TYPE__  ls_u64;
+typedef __UINT32_TYPE__  ls_u32;
+typedef __UINTPTR_TYPE__ ls_uptr;
 
 #define LS_ALPN_GET_MAX  64u              /* must not exceed the shield's ALPN_MAX */
 
 /* uBPF external_function_t: five uint64_t, no context. (dst, len, sc, -, -).
  * Returns the entry-list length copied into dst (1..len), or (uint64_t)-1 on any failure. */
-uint64_t
-ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc_u, uint64_t d, uint64_t e)
+ls_u64
+ls_h_alpn_get(ls_u64 dst, ls_u64 len, ls_u64 sc_u, ls_u64 d, ls_u64 e)
 {
     BYTE  *ext = 0;
     SIZE   sz  = 0;
@@ -49,22 +55,22 @@ ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc_u, uint64_t d, uint64_t e)
     (void)d; (void)e;
 
     if (dst == 0 || len == 0 || len > LS_ALPN_GET_MAX || sc_u == 0)
-        return (uint64_t)-1;
+        return (ls_u64)-1;
 
-    if (ssl_ext_get_by_type((struct ssl_ctx *)(uintptr_t)sc_u,
+    if (ssl_ext_get_by_type((struct ssl_ctx *)(ls_uptr)sc_u,
                             SSL_EXT_ALPN, &ext, &sz) != ERR_OK)
-        return (uint64_t)-1;                       /* no ALPN --- nothing to judge */
+        return (ls_u64)-1;                       /* no ALPN --- nothing to judge */
 
     skip = sizeof(struct ssl_extension) + 2;       /* 4-byte ext header + 2-byte list length */
     if (ext == 0 || sz < skip)
-        return (uint64_t)-1;                       /* too short to hold a list */
+        return (ls_u64)-1;                       /* too short to hold a list */
 
     ext += skip;
     sz  -= skip;                                   /* ext = entry-list start, sz = its length */
 
     n = (sz < (SIZE)len) ? sz : (SIZE)len;         /* never write past the program's buffer */
     for (i = 0; i < n; i++)
-        ((BYTE *)(uintptr_t)dst)[i] = ext[i];
+        ((BYTE *)(ls_uptr)dst)[i] = ext[i];
 
-    return (uint64_t)n;
+    return (ls_u64)n;
 }
