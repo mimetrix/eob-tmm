@@ -52,7 +52,7 @@ check-prereqs:
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -444,6 +444,10 @@ check-sig:
 # check_ctx_parse.py without --debuginfo verifies nothing and says so rather than passing
 # quietly, which is the whole point of the entry it was written for. The bake supplies
 # DEBUGINFO=<file> and should add --strict once TMM's real member names are filled in.
+check-alpn-get:
+	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .alpnget.out check_alpn_get.c \
+	  && ./.alpnget.out && rm -f .alpnget.out
+
 check-ctx-parse:
 	@$(CC) -g -O0 -w -o .ctxfix.out check_ctx_parse_fixture.c
 	@$(PYTHON) ./mk_ctx_parse.py --debuginfo .ctxfix.out --cross-check \

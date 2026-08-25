@@ -64,13 +64,13 @@ main(void)
      * map=0. That program loads, verifies and runs with maps always empty. */
     reset();
     assert(owner_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 h112 ") == 0);
     printf("ok    install order: %s\n", calls);
 
     /* --- 3. the non-owning TU installs identically ------------------------- */
     reset();
     assert(user_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 h112 ") == 0);
     printf("ok    non-owning TU installs identically (no divergence by includer)\n");
 
     /* --- 4. a NULL vm is refused before anything is registered ------------- */
