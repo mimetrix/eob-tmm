@@ -63,3 +63,8 @@ hook-index.tsv
 # never commit a signing key --- it lives in ~/.ls-signing, outside the repo
 *_sk.pem
 *.sig
+
+# credentials --- .env slipped past every existing rule and reached GitHub in 61a6866 (2026-08-21)
+.env
+.env.*
+*.env
