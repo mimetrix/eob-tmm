@@ -123,6 +123,14 @@ trade is acceptable is a judgement no artifact in this repo currently records.
 
 ## 4. The CVE question, specifically
 
+> **UNCITED — flagged 2026-08-25.** Every number in this section comes from a Bugzilla session
+> whose results were **never cached**. There is no file in `evidence/cache/` and no row in
+> `SOURCES.md` for any of it, which breaks this project's first rule: no cached file, no claim.
+> Treat the figures below as **NOT_RETRIEVED** — directionally believed, not verifiable from this
+> repository — until the queries are re-run and their output cached. The specific casualty: only
+> **one** of the two TMM-resident CVEs was ever identified, and the second cannot now be recovered
+> from anything we kept.
+
 Enumerated from Bugzilla (paginated; an earlier count of 39 came from reading a truncated
 800-result set as a total):
 
@@ -139,7 +147,28 @@ so the scanner still reports the CVE.** Dependency-CVE pain is audit pain; the f
 which is cheaper and permanent. Shielding a dependency only wins when no upgrade exists yet.
 
 **So: no CVE in TMM can be demonstrated as mitigated, and that is a property of the population
-rather than of this mechanism.**
+rather than of this mechanism.** That conclusion is unchanged by the citation problem above —
+it rests on where the CVEs are (packages, other containers), which is structural — but the
+supporting counts should not be quoted as measured until they are re-run and cached.
+
+### 4.1 Which OpenSSL copy, and why it halves the question
+
+Established from the build tree 2026-08-25: TMM **statically links `libcrypto_tmm.a`**, F5's own
+OpenSSL build, supplied by the build sysroot (`$(DEVFS)/usr/$(LIB_DIR)/libcrypto_tmm.a`; `DEVFS` is
+empty in `src/compile/Makefile` and injected at container-build time). OpenSSL does not appear in
+the TMM source tree at all.
+
+Two consequences, and they point opposite ways:
+
+- **In scope, in principle.** A statically linked archive is inside TMM's address space, so a
+  shield could reach it — *if* it had entry pads, which it does not (§5).
+- **Mostly out of scope, in practice.** CVEs tracked against `a_baseOS` / `a_baseOS3rdParty` are
+  about the OS's **shared** OpenSSL — a different copy, a different address space, unreachable by
+  any hooking mechanism from inside TMM. Only CVEs against F5's own `libcrypto_tmm` build can
+  matter.
+
+**Unresolved:** the version of that archive is not determinable from the build box, so whether
+`CVE-2022-4304` applies to TMM's copy at all is an open question, not a settled one.
 
 ---
 
