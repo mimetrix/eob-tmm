@@ -630,6 +630,7 @@ ls_h_probe_read(uint64_t dst, uint64_t size, uint64_t src, uint64_t d, uint64_t 
  * tests, which do not link the TMM-integrated helper, resolve the symbol; the strong definition in
  * ls_h_alpn.c overrides it in the real build. A weak accessor that refuses everything is the safe
  * default --- a program armed against it simply never gets ALPN bytes. */
+uint64_t ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc, uint64_t d, uint64_t e);
 __attribute__((weak)) uint64_t
 ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc, uint64_t d, uint64_t e)
 {
