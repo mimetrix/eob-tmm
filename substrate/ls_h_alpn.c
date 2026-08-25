@@ -44,6 +44,11 @@ typedef __UINTPTR_TYPE__ ls_uptr;
 
 #define LS_ALPN_GET_MAX  64u              /* must not exceed the shield's ALPN_MAX */
 
+/* Forward prototype --- the no_pgo build compiles with -Wmissing-prototypes -Werror, and a global
+ * with no prior declaration is fatal there. The registration + weak default live in ls_map_glue.h;
+ * this makes the strong definition below self-declaring. */
+ls_u64 ls_h_alpn_get(ls_u64 dst, ls_u64 len, ls_u64 sc_u, ls_u64 d, ls_u64 e);
+
 /* uBPF external_function_t: five uint64_t, no context. (dst, len, sc, -, -).
  * Returns the entry-list length copied into dst (1..len), or (uint64_t)-1 on any failure. */
 ls_u64
