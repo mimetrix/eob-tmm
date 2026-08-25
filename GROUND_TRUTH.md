@@ -46,7 +46,8 @@ weaker evidence than something an independent tool observed, and conflating the 
 | Program execution ≤ 11 ns on the JIT path | MEASURED (as an **upper bound**) | SELF | `ls-load.py bench`, `path=jit`, min 26–28 cycles at 2.60 GHz. Bounded by the `rdtsc` pair measuring it: a record-building program timed *below* one that returns immediately, which is impossible. `load-path-scope.md` §7 |
 | `bpf_probe_read` ≈ 26 ns, maps+clock+emit ≈ 105 ns | MEASURED | SELF | same op; these clear the instrument floor and are resolvable |
 | ~10 ns JIT / ~48 ns interpreter | MEASURED | INDEPENDENT | an off-TMM harness recorded this months earlier by a different method; agrees with the above |
-| **What an armed hook costs on the data path** | **NOT ESTABLISHED** | — | the floor excludes the trampoline's register save/restore, the call and return, and cache effects under traffic |
+| **What an armed hook costs on the data path**, in nanoseconds | **NOT ESTABLISHED** | — | the floor excludes the trampoline register save/restore, the call and return, and cache effects. The shipped counters time the PROGRAM only (an rdtsc pair inside `ls_vm_call`), not the trampoline, so this figure is not obtainable from the running image without new instrumentation |
+| An armed hook adds no measurable throughput cost at request granularity | MEASURED (upper bound) | SELF | 2026-08-25, live cluster: `ab -n 6000 -c 20` through the Gateway, hook armed at `http_parse_client_headers` firing 1:1. Disarmed 730.8/735.3/752.0 rps; armed 744.1/734.7 rps — identical within run-to-run noise. Bounds per-request overhead below noise; does NOT yield a per-call ns figure, and does not distinguish from a ~1µs uprobe, since either is invisible at once-per-request against a 27 ms request |
 | Padding costs 0.182% of binary size | MEASURED | KERNEL | section sizes from the linked binary |
 
 ## Reach
