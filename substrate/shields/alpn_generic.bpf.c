@@ -38,7 +38,7 @@ struct ls_ctx_generic { __u64 arg[5]; };
 #define ALPN_MAX     64u          /* bytes we inspect; power of two */
 #define ALPN_ENTRIES 32u          /* max entries walked (fully unrolled) */
 
-__attribute__((section("uprobe/ssl_alpn_match"), used))
+__attribute__((section("fentry/ssl_alpn_match"), used))
 __u64
 shield(struct ls_ctx_generic *c)
 {
