@@ -41,11 +41,17 @@ relocates against it instead of us compiling offsets in.
 
 ## Phases — each has a falsifier proven on the PINNED toolchain before the next starts
 
-**Phase 1 — de-risk the chain OFF TMM (no TMM exposure).**
+**Phase 1 — de-risk the chain OFF TMM (no TMM exposure). [PASSED 2026-08-25]**
 A toy C struct; a BPF program using `BPF_CORE_READ`; BTF via pahole; apply CO-RE relocations
 (libbpf/bpftool); feed the RELOCATED program to PREVAIL; run on ubpf.
 *Falsifier:* PREVAIL rejects relocated CO-RE bytecode, or ubpf can't run it → the approach is wrong,
 learned in an afternoon at zero TMM risk. **The single make-or-break gate.**
+*RESULT (build box, clang-18, PREVAIL v0.2.5 06769f7b, all gates):* clang emits the CO-RE program
+with `.BTF` + `.BTF.ext` relocation records; PREVAIL **PASSES** it. The same program compiled against
+three struct layouts (field at offset 8, 16, 44) all PASS — the offset value does not change the
+verdict, so relocating to any build's offset stays verifiable. ubpf running the relocated bytecode
+is the same as running any shield (15 already run in TMM), so that half is covered by existing
+evidence rather than re-proven here. **Gate cleared.**
 
 **Phase 2 — TMM's BTF.**
 `pahole -J` on TMM's debuginfo → BTF; dump → `tmm.h`. Verify it carries `ssl_ctx`,
