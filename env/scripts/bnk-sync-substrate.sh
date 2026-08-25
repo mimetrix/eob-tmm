@@ -131,7 +131,7 @@ else
     # base/ would need every -I that module has, which is the build-config guessing the
     # STDINC split exists to avoid. Their HEADERS stay in base/ and are reached as
     # <local/base/...>, so only the .c moves.
-    for f in ls_ctx_alpn.c ls_ctx_alpn.h ls_ssl_cookie.c; do
+    for f in ls_ctx_alpn.c ls_ctx_alpn.h ls_h_alpn.c ls_ssl_cookie.c; do
         [ -f "$SRC/$f" ] || { echo "  *** $SRC/$f missing"; exit 1; }
         $SCP -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
     done
