@@ -445,10 +445,8 @@ check-sig:
 # quietly, which is the whole point of the entry it was written for. The bake supplies
 # DEBUGINFO=<file> and should add --strict once TMM's real member names are filled in.
 check-ctx-parse:
+	@$(CC) -g -O0 -w -o .ctxfix.out check_ctx_parse_fixture.c
+	@$(PYTHON) ./mk_ctx_parse.py --debuginfo .ctxfix.out --cross-check \
+	    -o ls_ctx_parse_offsets.h
 	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .ctxsane.out check_ctx_parse_sane.c \
-	  && ./.ctxsane.out && rm -f .ctxsane.out
-	@if [ -n "$(DEBUGINFO)" ]; then \
-	  $(PYTHON) ./check_ctx_parse.py --debuginfo "$(DEBUGINFO)"; \
-	else \
-	  $(PYTHON) ./check_ctx_parse.py; \
-	fi
+	  && ./.ctxsane.out; rc=$$?; rm -f .ctxsane.out .ctxfix.out; exit $$rc

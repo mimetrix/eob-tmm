@@ -1,46 +1,42 @@
-/* GENERATED for build 1778975c... --- offsets read from that build's DWARF.
+/* Flat record for http_parse_client_headers, and the host-side builder that fills it.
  *
- * THE TRACEPOINT: tmm:l7:parse_error, at http_parse_client_headers.
- * Chosen because it is the ONE function on this traffic's path that provably
- * fires 1:1 with requests (env/scripts/bnk-survey-hooks.sh), and because
- * struct http_parse_info carries the five parse-violation bits that are the
- * signal this tracepoint exists to capture.
+ * NO NUMBER ABOUT TMM'S LAYOUT IS WRITTEN HERE. Offsets, bit shifts, masks, struct sizes and the
+ * parser-state bound all arrive from ls_ctx_parse_offsets.h, which mk_ctx_parse.py derives from a
+ * build artifact. Field NAMES are specification -- which of TMM's fields the program may see is a
+ * design choice -- but every number is read out of the build.
  *
- * WHY OFFSETS RATHER THAN FIELD ACCESS. ls_tramp.c is compiled STDINC; the
- * structs live in src/modules/hudfilter/http/http_parser.h, which is a
- * source-tree header, not an installed one. Reaching it means an include-path
- * change or a relative include with cascade risk. Byte offsets make this file
- * self-contained: no headers, no include world to satisfy.
+ * WHY, AND IT IS NOT HYPOTHETICAL. This file used to open "GENERATED for build 1778975c" above
+ * seven hand-written #defines. On 2026-08-25 the debug tree was e35ed0ed and the cluster was
+ * running 499b8c30: three builds, one frozen set of literals, nothing in the tree able to say
+ * whether they still held. They did -- verified against TMM's own debuginfo, all seven correct --
+ * which is luck, not design, and luck is not a property you can ship. The builder also carried
+ * `>> 4` and `& 0x3u` for the version bits; those are generated now too.
  *
- * THE COST, STATED: these offsets are true for ONE build. That is already the
- * contract for a function-boundary probe -- build-specific, re-validated per
- * build -- but here it is silent if wrong, so the builder checks values it can
- * predict (ls_ctx_parse_sane, below) rather than trusting the numbers.
+ * WHY OFFSETS AT ALL, rather than including TMM's header. ls_tramp.c is compiled STDINC and the
+ * structs live in src/modules/hudfilter/http/http_parser.h -- a source-tree header, not an
+ * installed one. Reaching it means an include-path change with cascade risk. So the layout is
+ * read from the build's DEBUG INFO instead, which needs no include world at all.
  *
- * THAT SENTENCE WAS FALSE UNTIL 2026-08-24. It read "see ls_ctx_parse_sane" for
- * months while no such function existed anywhere in the tree -- the one design
- * that would have caught a wrong offset was described, and never written, in a
- * comment phrased as though it had been. It was found by trying to answer
- * "would this have mitigated a real CVE?", which needs exactly this check to
- * have been run. See CONTESTED-PREMISES.md 12.
+ * ABSENCE IS A BUILD FAILURE, not a fallback. An earlier design let the checks compile out when
+ * the generated header was missing; a check that silently degrades to "true" is the exact failure
+ * this file already made once. See CONTESTED-PREMISES.md 12.
  */
 #ifndef LS_CTX_PARSE_H
 #define LS_CTX_PARSE_H
+
+#if defined(__has_include)
+#  if !__has_include("ls_ctx_parse_offsets.h")
+#    error "ls_ctx_parse_offsets.h is missing. Generate it from THIS build: \
+substrate/mk_ctx_parse.py --debuginfo <tmm.debug> -o substrate/ls_ctx_parse_offsets.h \
+--- there are deliberately no fallback offsets, because a wrong one is silent."
+#  endif
+#endif
+#include "ls_ctx_parse_offsets.h"
 
 typedef unsigned long long ls_u64;
 typedef unsigned int       ls_u32;
 typedef unsigned short     ls_u16;
 
-/* struct http_parse_ctx  (size 64) */
-#define LS_OFF_PC_STATE        10   /* enum parse_state : 8   */
-#define LS_OFF_PC_OFFSET       20   /* UINT32                 */
-/* struct http_parse_info (size 416) */
-#define LS_OFF_PI_BITS0         0   /* is_trailer/is_request/is_crlf/lws_found/version/original_version */
-#define LS_OFF_PI_METHOD        1   /* BYTE                   */
-#define LS_OFF_PI_HDRCOUNT      2   /* UINT16                 */
-#define LS_OFF_PI_STATUS        8   /* int                    */
-#define LS_OFF_PI_INVALID      12   /* UINT32 holding 5 flag bits */
-#define LS_INVALID_MASK    0x1fu    /* method|scheme|path|status|authority */
 
 /* Flat, no pointers. This is the program's entire world. */
 struct ls_ctx_parse {
@@ -71,8 +67,9 @@ ls_ctx_build_parse(struct ls_ctx_parse *c, const void *a0, const void *a2)
     }
     if (a2 != 0) {
         p = (const unsigned char *)a2;
-        /* little-endian: bitfields fill from the LSB, so version is bits 4-5 */
-        c->version       = (p[LS_OFF_PI_BITS0] >> 4) & 0x3u;
+        /* little-endian: bitfields fill from the LSB. The shift and mask are DERIVED from the
+         * declared widths of the fields ahead of `version`, not counted by hand. */
+        c->version       = (p[LS_OFF_PI_BITS0] >> LS_PI_VERSION_SHIFT) & LS_PI_VERSION_MASK;
         c->method        = p[LS_OFF_PI_METHOD];
         c->header_count  = *(const ls_u16 *)(p + LS_OFF_PI_HDRCOUNT);
         c->status_code   = *(const ls_u32 *)(p + LS_OFF_PI_STATUS);
@@ -109,15 +106,7 @@ ls_ctx_build_parse(struct ls_ctx_parse *c, const void *a0, const void *a2)
  * it. That is the same move as the comment this file used to carry. A weaker
  * check that is derived beats a stronger one that is invented.
  */
-#if defined(__has_include)
-#  if __has_include("ls_ctx_parse_bounds.h")
-#    include "ls_ctx_parse_bounds.h"
-#    define LS_CTX_PARSE_GATED 1
-#  endif
-#endif
-#ifndef LS_CTX_PARSE_GATED
-#  define LS_CTX_PARSE_GATED 0
-#endif
+#define LS_CTX_PARSE_GATED 1     /* the bound is in the required generated header */
 
 static inline int
 ls_ctx_parse_sane(const struct ls_ctx_parse *c, const void *a0, const void *a2)
@@ -125,12 +114,8 @@ ls_ctx_parse_sane(const struct ls_ctx_parse *c, const void *a0, const void *a2)
     if (a0 == 0 && a2 == 0)
         return 0;                       /* tier 1: nothing was read */
 
-#if LS_CTX_PARSE_GATED
     if (a0 != 0 && c->state > LS_PARSE_STATE_MAX)
         return 0;                       /* tier 2: not a parser state */
-#else
-    (void)c;
-#endif
     return 1;
 }
 

@@ -271,6 +271,26 @@ live sample). A builder reading the wrong argument register yields a mismatched 
 which is exactly how the defect in premise 1 above was found. So the mechanism *can* deliver a
 correct context from live registers, and has been shown to.
 
+**Resolved in part, 2026-08-25 — the offsets were right, and are no longer typed.** The frozen
+`#define`s were checked against TMM's own debug info: all seven correct, plus the struct sizes and
+the version bit-shift. So the silent-wrong-offset risk had not materialised. It was also never
+being managed: the banner read `GENERATED for build 1778975c` while the debug tree was `e35ed0ed`
+and the cluster ran `499b8c30`. Three builds, one frozen set of literals, and nothing able to say
+whether they still held.
+
+They are now derived per build by `mk_ctx_parse.py` into a generated header, with **no fallback** —
+absence is a compile error, because a fallback is how a wrong offset stays silent. Two independent
+DWARF readers must agree on all 13 derived values; on TMM's real debuginfo they do. The
+cross-check has already caught two of its own defects that a single reader would have shipped: a
+`DW_AT_const_value : 1 byte block: 0` form that appears in real DWARF but not in a fixture, and a
+bitfield whose byte the two readers reported differently until the comparison moved from the raw
+`offsetof` primitive to the derived result. `ls_ctx_parse_sane` exists and executes. The
+constraints this must live under are written down in `substrate/FIELD-CONTRACT.md`.
+
+**Still open:** the measurement that started this — whether the ctx the *CVE* hook's builder
+produces matches what the shield expects — remains unmade, because that hook has never fired.
+Correct offsets are necessary and not sufficient.
+
 **Where this leaves the CVE claim.** `the shield stops this crash` stands. `it would have mitigated
 the CVE` requires the builder for **that** hook to be right, and that hook has never fired
 (`fired +0` across 30 requests, because it needs a security log profile with `${profile_name}` and
