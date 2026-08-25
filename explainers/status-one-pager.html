@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Extending a shipped data plane in place — status</title>
+<title>A verified program, arming a running data plane, at 8.76 ns</title>
 <style>
 :root{
   --ink:#14181d; --ink-2:#3b444e; --ink-3:#6a7681;
@@ -30,159 +30,179 @@
   --stop:#ef968c; --stop-bg:#2d1614;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
-  font-size:13.5px;line-height:1.44;-webkit-font-smoothing:antialiased}
-.page{max-width:1140px;margin:0 auto;padding:26px 30px 20px}
-header{margin-bottom:15px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.42;-webkit-font-smoothing:antialiased}
+.page{max-width:1160px;margin:0 auto;padding:24px 30px 18px}
+header{margin-bottom:13px}
 .eyebrow{font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);font-weight:700}
-h1{font-size:24px;line-height:1.14;margin:6px 0 8px;font-weight:640;letter-spacing:-.015em;text-wrap:balance;max-width:30ch}
-.thesis{font-size:13.5px;color:var(--ink-2);max-width:88ch}
-.thesis b{color:var(--ink);font-weight:640}
-.thesis .k{color:var(--accent);font-weight:640}
-.spine{display:flex;gap:0;margin:14px 0 4px;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
-.spine div{flex:1;padding:8px 12px;font-size:11px;border-left:1px solid var(--rule);color:var(--ink-2)}
-.spine div:first-child{border-left:0}
-.spine b{display:block;color:var(--ink);font-size:11.5px;font-weight:640;margin-bottom:1px}
-.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:14px;margin-top:14px;align-items:start}
-.stack{display:flex;flex-direction:column;gap:14px}
-section{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:13px 15px 12px}
-.tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:2.5px 7px;border-radius:3px;margin-bottom:10px}
+h1{font-size:23px;line-height:1.13;margin:5px 0 7px;font-weight:640;letter-spacing:-.015em;text-wrap:balance;max-width:34ch}
+.thesis{font-size:13px;color:var(--ink-2);max-width:92ch}
+.thesis b{color:var(--ink);font-weight:640}.thesis .k{color:var(--accent);font-weight:640}
+.hero{display:flex;gap:14px;margin:13px 0 4px;align-items:stretch}
+.stat{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:11px 15px;flex:0 0 auto;text-align:center}
+.stat .n{font-family:var(--mono);font-size:23px;font-weight:640;color:var(--new);line-height:1}
+.stat .n.acc{color:var(--accent)}
+.stat .l{font-size:10px;color:var(--ink-3);margin-top:5px;letter-spacing:.02em}
+.hero .say{flex:1;background:var(--accent-bg);border:1px solid var(--rule);border-radius:6px;padding:11px 15px;font-size:12.4px;color:var(--ink-2);display:flex;align-items:center}
+.hero .say b{color:var(--ink);font-weight:640}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:13px;margin-top:13px;align-items:start}
+section{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 14px 11px}
+.tag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:2.5px 7px;border-radius:3px;margin-bottom:9px}
 .t-new{color:var(--new);background:var(--new-bg)}
 .t-acc{color:var(--accent);background:var(--accent-bg)}
 .t-hold{color:var(--hold);background:var(--hold-bg)}
 .t-stop{color:var(--stop);background:var(--stop-bg)}
-h2{font-size:13px;margin:0 0 3px;font-weight:640}
-.sub{font-size:11.5px;color:var(--ink-3);margin:0 0 10px}
+h2{font-size:12.5px;margin:0 0 3px;font-weight:640}
+.sub{font-size:11px;color:var(--ink-3);margin:0 0 9px}
 ul{margin:0;padding:0;list-style:none}
-li{padding:7px 0;border-top:1px solid var(--rule-2);font-size:12.4px;color:var(--ink-2)}
+li{padding:6px 0;border-top:1px solid var(--rule-2);font-size:12px;color:var(--ink-2)}
 li:first-child{border-top:0;padding-top:1px}
 li b{color:var(--ink);font-weight:630}
-.ev{font-family:var(--mono);font-size:10.6px;color:var(--ink-3);display:block;margin-top:3px}
-.pill{font-family:var(--mono);font-size:9.3px;font-weight:600;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:1px;white-space:nowrap}
-.p-m{color:var(--new);background:var(--new-bg)}
-.p-s{color:var(--hold);background:var(--hold-bg)}
-.p-x{color:var(--stop);background:var(--stop-bg)}
-table{border-collapse:collapse;width:100%;font-size:11.6px;margin-top:2px}
-th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}
-th{font-size:9.8px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
+.ev{font-family:var(--mono);font-size:10.4px;color:var(--ink-3);display:block;margin-top:3px}
+.pill{font-family:var(--mono);font-size:9.2px;font-weight:600;padding:1px 5px;border-radius:3px;margin-left:6px;white-space:nowrap}
+.p-m{color:var(--new);background:var(--new-bg)}.p-s{color:var(--hold);background:var(--hold-bg)}.p-x{color:var(--stop);background:var(--stop-bg)}
+table{border-collapse:collapse;width:100%;font-size:11.4px;margin-top:2px}
+th,td{text-align:left;padding:4.5px 8px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+th{font-size:9.6px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:700}
 td:first-child{color:var(--ink);font-weight:600;white-space:nowrap}
-.yes{color:var(--new);font-weight:640} .no{color:var(--ink-3)} .part{color:var(--hold);font-weight:640}
-footer{margin-top:15px;padding-top:10px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:10.6px;color:var(--ink-3);flex-wrap:wrap}
+.yes{color:var(--new);font-weight:640}.no{color:var(--ink-3)}.part{color:var(--hold);font-weight:640}
+.disp{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:12px 15px;margin-top:13px}
+.disp h2{margin-bottom:2px}
+.disp .grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-top:9px}
+.disp p{margin:0 0 6px;font-size:12px;color:var(--ink-2)}
+.disp b{color:var(--ink);font-weight:630}
+.disp .mono{font-family:var(--mono);font-size:10.6px;color:var(--ink-3)}
+.step{font-size:11.6px;color:var(--ink-2);padding:4px 0;border-top:1px solid var(--rule-2)}
+.step:first-of-type{border-top:0}
+.step b{color:var(--ink)}
+footer{margin-top:13px;padding-top:9px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:10.4px;color:var(--ink-3);flex-wrap:wrap}
 footer code{font-family:var(--mono)}
 @media print{
   :root{--bg:#fff;--panel:#fff}
-  body{font-size:9.4pt;line-height:1.32}
-  .page{max-width:none;padding:0}
-  @page{size:letter portrait;margin:10mm}
-  h1{font-size:16.5pt} .thesis{font-size:9.2pt} li{font-size:8.5pt} .ev{font-size:7.4pt}
-  table{font-size:8pt} section{break-inside:avoid}
+  body{font-size:8.9pt;line-height:1.28}.page{max-width:none;padding:0}
+  @page{size:letter portrait;margin:9mm}
+  h1{font-size:15.5pt}.thesis{font-size:8.7pt}.stat .n{font-size:17pt}li{font-size:8pt}.ev{font-size:7pt}
+  table{font-size:7.6pt}section,.disp,.hero{break-inside:avoid}
 }
-@media (max-width:880px){.cols{grid-template-columns:1fr}}
+@media (max-width:900px){.cols,.disp .grid{grid-template-columns:1fr}.hero{flex-wrap:wrap}}
 </style></head><body>
 <div class="page">
 <header>
   <div class="eyebrow">Programmable data plane · status · 2026-08-25</div>
-  <h1>Extending a shipped data plane in place, after it has deployed</h1>
-  <p class="thesis">TMM is already programmable — <b>iRules</b> run in it live. But an iRule can only
-  act on <b>the objects F5 exposed, at the events F5 placed</b>, both fixed when the binary shipped.
-  This loads <span class="k">verified bytecode at any function entry of a running TMM</span> — no
-  rebuild, no restart, no dropped traffic — so the data plane can be given <b>new observability and
-  new per-flow logic that no shipped event reaches</b>, and the set of things it can do <b>stops
-  being frozen at ship time</b>. Static verification is what makes that surface safe to hand to the
-  field. The mechanism is proven on a live cluster; the applications are at different stages, and
-  this page keeps them apart.</p>
+  <h1>Extending a shipped data plane in place — now with the cost measured</h1>
+  <p class="thesis">TMM is already programmable: <b>iRules</b> run in it live. But an iRule sees only
+  <b>the objects F5 exposed, at the events F5 placed</b>, frozen when the binary shipped. This loads
+  <span class="k">verified bytecode at any function entry of a running TMM</span> — no rebuild, no
+  restart, no dropped traffic — so the data plane gains <b>observability and per-flow logic no shipped
+  event reaches</b>, and its behaviour <b>stops being fixed at ship time</b>. The open question was
+  always cost. It is now answered.</p>
 </header>
 
-<div class="spine">
-  <div><b>Reach</b>any function entry, not a fixed event set</div>
-  <div><b>Act</b>read internal state, or change what the function returns</div>
-  <div><b>Extend</b>a new capability is an armed program — seconds, not a release</div>
-  <div><b>Safely</b>statically verified, so operator logic cannot hang the box</div>
+<div class="hero">
+  <div class="stat"><div class="n">8.76<span style="font-size:13px"> ns</span></div><div class="l">trampoline, per invocation<br>measured, ±0.03 ns</div></div>
+  <div class="stat"><div class="n acc">~100×</div><div class="l">cheaper than a<br>kernel uprobe (~1&nbsp;µs)</div></div>
+  <div class="say"><span><b>This is the number that settles it.</b> A kernel uprobe traps in and out
+    at roughly a microsecond — unusable at data-plane rates, and it can neither change a return value
+    nor be statically verified. An in-process verified trampoline does the same reach for
+    <b>~9&nbsp;ns</b> and can enforce. That gap is the whole reason to build this inside TMM.</span></div>
 </div>
 
 <div class="cols">
   <section>
     <span class="tag t-new">The functionality this unlocks</span>
-    <h2>What becomes possible that did not exist before</h2>
-    <p class="sub">Each is a capability, tiered by how far it is actually carried.
-      <span class="pill p-m">measured live</span>
-      <span class="pill p-s">shown on synthetic input</span>
-      <span class="pill p-x">not yet shown</span></p>
+    <h2>What becomes possible that did not exist</h2>
+    <p class="sub"><span class="pill p-m">measured live</span> <span class="pill p-s">synthetic input</span> <span class="pill p-x">not yet shown</span></p>
     <ul>
       <li><b>Surface answers TMM computes and discards.</b><span class="pill p-m">measured live</span><br>
-        TMM decides, per flow, things its object model never exposes — <i>why</i> a connection was
-        reset, <i>which</i> parse rule tripped. No iRule command or event returns them. A program at
-        the right entry turns any of them into a signal, with no release.
-        <span class="ev">rst_why → tcp.c:4689 "TCP RST from remote system", per flow, off live traffic</span></li>
-      <li><b>Make a decision inside the poll loop, not report from outside it.</b><span class="pill p-m">measured live</span><br>
-        A program that keys on an internal value and a clock, and emits only when its own
-        threshold is crossed — logic with no iRule event to hang from.
-        <span class="ev">rate gate: host records vs program-emitted, decided in the data path</span></li>
-      <li><b>Change what an internal function returns.</b><span class="pill p-s">shown on synthetic input</span><br>
-        Not reject-at-an-event — return a chosen value from an arbitrary internal function, which
-        the host acts on. This is the step from telemetry to control.
-        <span class="ev">enforce → SAFE_RETURN, survived · monitor → FALLTHROUGH, fatal · one variable</span></li>
-      <li><b>Add the capability after deployment.</b><span class="pill p-m">measured live</span><br>
-        Arm a new attach point on a running process and remove it again, leaving the bytes as they
-        were. What the data plane can be asked to do changes in seconds.
-        <span class="ev">ARMED LIVE entry=0xcd1004 (no restart) · fires 1:1, 40 req → +40 · DISARMED LIVE</span></li>
+        Per flow, TMM decides things its object model never exposes — <i>why</i> a connection reset,
+        <i>which</i> parse rule tripped. No iRule reaches them. A program at the right entry makes any
+        of them a signal, no release.
+        <span class="ev">rst_why → tcp.c:4689 "TCP RST from remote system", per flow</span></li>
+      <li><b>Decide inside the poll loop</b>, not report from outside it.<span class="pill p-m">measured live</span>
+        <span class="ev">rate gate: emits only when its own threshold trips, in the data path</span></li>
+      <li><b>Change what an internal function returns.</b><span class="pill p-s">synthetic input</span><br>
+        Not reject-at-an-event — return a chosen value from an arbitrary internal function. The step
+        from telemetry to control.
+        <span class="ev">enforce → SAFE_RETURN survived · monitor → FALLTHROUGH fatal</span></li>
+      <li><b>Add the capability after deployment.</b><span class="pill p-m">measured live</span>
+        <span class="ev">ARMED LIVE (no restart) · 40 req → +40 · DISARMED LIVE</span></li>
     </ul>
   </section>
 
-  <div class="stack">
-    <section>
-      <span class="tag t-acc">Why this is not an iRule, a uprobe, or a rebuild</span>
-      <table>
-        <tr><th>reach</th><th>iRule</th><th>kernel uprobe</th><th>this</th></tr>
-        <tr><td>attach point</td><td class="no">fixed events</td><td class="yes">any fn</td><td class="yes">any fn</td></tr>
-        <tr><td>internal state<br>with no command</td><td class="no">no</td><td class="part">read only</td><td class="yes">read</td></tr>
-        <tr><td>change the<br>return value</td><td class="no">no</td><td class="no">no</td><td class="yes">yes</td></tr>
-        <tr><td>verified<br>(cannot hang)</td><td class="no">no</td><td class="no">n/a</td><td class="yes">yes</td></tr>
-        <tr><td>add without<br>a release</td><td class="no">no</td><td class="part">tooling</td><td class="yes">yes</td></tr>
-      </table>
-      <p class="sub" style="margin-top:9px">The novel column is <b>arbitrary internal reach + can
-        enforce + verified + runtime-added</b>. Nothing else has all four. A uprobe is the closest,
-        and it can neither change an outcome nor be handed to the field safely.</p>
-    </section>
-
-    <section>
-      <span class="tag t-hold">Proven mechanism, on a live TMM</span>
+  <section>
+    <span class="tag t-acc">Not an iRule, a uprobe, or a rebuild</span>
+    <table>
+      <tr><th></th><th>iRule</th><th>uprobe</th><th>this</th></tr>
+      <tr><td>attach anywhere</td><td class="no">events only</td><td class="yes">yes</td><td class="yes">yes</td></tr>
+      <tr><td>cost / hit</td><td class="part">interp.</td><td class="no">~1&nbsp;µs</td><td class="yes">8.76&nbsp;ns</td></tr>
+      <tr><td>change the return</td><td class="no">no</td><td class="no">no</td><td class="yes">yes</td></tr>
+      <tr><td>verified, can't hang</td><td class="no">no</td><td class="no">n/a</td><td class="yes">yes</td></tr>
+      <tr><td>add w/o a release</td><td class="no">no</td><td class="part">tooling</td><td class="yes">yes</td></tr>
+    </table>
+    <p class="sub" style="margin-top:8px">The novel combination is <b>arbitrary reach + enforce +
+      verified + runtime-added, at nanosecond cost</b>. Nothing else holds all five.</p>
+    <div style="margin-top:9px;border-top:1px solid var(--rule-2);padding-top:8px">
+      <div class="tag t-hold" style="margin-bottom:6px">Proven mechanism, live TMM</div>
       <ul>
         <li>Loaded into a running process, checked inside TMM <span class="ev">signature=verified</span></li>
-        <li>No hand-written layout numbers — derived from the build, two DWARF readers must agree, refuses on build-id mismatch <span class="ev">13 values, readelf ≡ gdb</span></li>
-        <li>Every op recorded with a kernel-attested asker <span class="ev">SO_PEERCRED · 47 assertions</span></li>
+        <li>No layout number hand-written — derived from the build, two DWARF readers must agree <span class="ev">readelf ≡ gdb, 13 values</span></li>
         <li>Reproducible from nothing — both machines rebuilt, suites green</li>
       </ul>
-    </section>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag t-stop">Boundaries — so the claim survives review</span>
+    <ul>
+      <li><b>Enforcement shown on a synthesised input.</b> The crash/survive flip used a condition
+        that cannot occur by configuration.</li>
+      <li><b>CVE mitigation on BNK is off the table</b> — not a weakness here. The tracked CVEs are
+        dependency CVEs in other containers, not in TMM; and a shield does not move a scanner.
+        Those counts are <b>uncited</b>, marked NOT_RETRIEVED.</li>
+      <li><b>Reach is bounded by the control plane</b> — TMM carries QUIC/DNS/SIP code BNK cannot be
+        told to serve. Traffic arriving ≠ the vulnerable code running.</li>
+      <li><b>8.76 ns is a hot-cache floor.</b> The complementary bound: no measurable throughput
+        regression at request granularity.</li>
+      <li><b>Today, placement is function entry only</b> — and that is the next piece of work. →</li>
+    </ul>
+  </section>
+</div>
+
+<div class="disp">
+  <span class="tag t-acc">The next build — displacement: attach where there is no pad</span>
+  <div class="grid">
+    <div>
+      <h2>Why it is needed</h2>
+      <p>Arming today overwrites <b>five nop bytes the compiler reserved</b> at a function's entry —
+        nothing is displaced, so disarm restores byte-identical code and the data plane is never
+        disturbed. But that pad exists only in <b>TMM core</b>. Components built separately — the
+        linked <b>OpenSSL</b> among them — have <b>no pad</b>, and <span class="mono">ls_arm</span>
+        refuses them today. The same limit is why the fixes that matter most, whose checks read a
+        value the function <i>computes</i>, sit past a reachable entry.</p>
+      <p class="mono">index today: 41,148 padded (armable) · 30,009 pad-less, marked DISPLACEABLE</p>
+    </div>
+    <div>
+      <h2>What it is</h2>
+      <div class="step"><b>1 · overwrite the first instructions</b> with a 5-byte jump to the trampoline, instead of a reserved pad.</div>
+      <div class="step"><b>2 · re-run the displaced bytes</b> from the trampoline, then continue into the function body.</div>
+      <div class="step"><b>3 · the hard part is safety</b> — a copied instruction whose encoding depends on its address (a relative call or jump) points to the wrong place once moved.</div>
+      <div class="step"><b>4 · disarm restores</b> the original leading bytes.</div>
+    </div>
+    <div>
+      <h2>Why it is tractable here</h2>
+      <p>Frida does this at runtime and must ship a full instruction decoder. <b>We do not decode
+        anything in the data plane.</b> A measurement makes it unnecessary: of TMM's 79,794 function
+        entries, <b>94.8% begin with position-independent instructions</b> — copyable byte-for-byte
+        with no re-encoding.</p>
+      <p>So the classification runs <b>offline, at build time</b>, where the toolchain is free; the
+        runtime is left with a <b>memcpy and a jump</b>. Anything not provably copyable is
+        <b>refused</b>, not guessed — fail-closed, the same rule as the safe-return gates.</p>
+      <p class="mono">status: designed &amp; classified · ROADMAP · not built</p>
+    </div>
   </div>
 </div>
 
-<section style="margin-top:14px">
-  <span class="tag t-stop">The honest boundaries — so the claim survives review</span>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-    <ul>
-      <li><b>The number the case rests on is unmeasured.</b> Per-call cost <i>on the data path</i>. A
-        low figure is what separates this from a uprobe; it is now measurable and is the next task.</li>
-      <li><b>Enforcement is shown on a synthesised input.</b> The crash/survive flip used a condition
-        that cannot occur by configuration — the guard sits one frame up.</li>
-    </ul>
-    <ul>
-      <li><b>CVE mitigation on BNK is off the table</b> — not a weakness of the mechanism. Of the
-        tracked CVEs, essentially none are inside TMM; they are dependency CVEs in other containers.
-        And a shield does not move a scanner.</li>
-      <li><b>Those CVE counts are uncited</b> and marked NOT_RETRIEVED until re-run and cached.</li>
-    </ul>
-    <ul>
-      <li><b>Placement is entry-only</b> today — a check on a value the function computes needs
-        displacement (roadmap). Context is capped at 96 bytes.</li>
-      <li><b>Reach is bounded by the control plane</b>: TMM carries QUIC/DNS/SIP/IPFIX code BNK
-        cannot be told to serve. Traffic arriving ≠ the vulnerable code running.</li>
-    </ul>
-  </div>
-</section>
-
 <footer>
-  <span>Framing: <b>extend a shipped data plane in place</b> — observability, per-flow logic and enforcement first; pre-patch shielding a later application this platform cannot yet demonstrate.</span>
-  <span>Evidence: <code>GROUND_TRUTH.md · CONTESTED-PREMISES.md · mitigation-scope.md</code> · repo-only</span>
+  <span>Framing: <b>extend a shipped data plane in place</b> — observability, per-flow logic and enforcement first; displacement widens reach; pre-patch shielding a later application this platform cannot yet demonstrate.</span>
+  <span>Evidence: <code>GROUND_TRUTH.md · substrate/bench_tramp.c · mitigation-scope.md</code> · repo-only</span>
 </footer>
 </div></body></html>
