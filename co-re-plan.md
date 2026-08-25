@@ -1,10 +1,13 @@
-# CO-RE for TMM — the plan to portable, build-decoupled shields
+# Build-decoupled live surfaces — CO-RE for TMM
 
-**The target.** A shield is portable bytecode: it references TMM fields by *name*, carries CO-RE
-relocation records, and the loader resolves offsets against **TMM's own type info at load time**.
+**The target.** The live surface is a general substrate; a shield is only ITS FIRST CONSUMER.
+Observability, per-flow logic, tracepoints and enforcement are all surfaces, and ALL of them should
+be **build-decoupled portable bytecode** — referencing TMM fields by *name*, carrying CO-RE
+relocation records, with the loader resolving offsets against **TMM's own type info at load time**.
 TMM ships a fixed, general VM surface baked once (probe_read, maps, clock, trampoline). After that:
-new capability = new bytecode, **zero TMM builds, zero bespoke C**, and the *same* shield runs across
-TMM builds. This is the kernel CO-RE model, sourced from TMM instead of the kernel.
+any new surface = new bytecode, **zero TMM builds, zero bespoke C**, and the *same* bytecode runs
+across TMM builds. This is the kernel CO-RE model, sourced from TMM instead of the kernel — applied
+to the whole live surface, not just the shield use case.
 
 **Why.** Every reach mechanism built before this — typed ctx builders, bespoke accessor helpers,
 DWARF-offsets-baked-into-bytecode — is build-coupled: each new data source burns a TMM build, which
