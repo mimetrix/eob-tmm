@@ -162,7 +162,7 @@ footer code{font-family:var(--mono)}
         told to serve. Traffic arriving ≠ the vulnerable code running.</li>
       <li><b>8.76 ns is a hot-cache floor.</b> The complementary bound: no measurable throughput
         regression at request granularity.</li>
-      <li><b>Today, placement is function entry only</b> — and that is the next piece of work. →</li>
+      <li><b>Placement is function entry only.</b> A fix whose check reads a value the function <i>computes</i> needs mid-function placement — a separate, larger capability, not the displacement below.</li>
     </ul>
   </section>
 </div>
@@ -176,8 +176,10 @@ footer code{font-family:var(--mono)}
         nothing is displaced, so disarm restores byte-identical code and the data plane is never
         disturbed. But that pad exists only in <b>TMM core</b>. Components built separately — the
         linked <b>OpenSSL</b> among them — have <b>no pad</b>, and <span class="mono">ls_arm</span>
-        refuses them today. The same limit is why the fixes that matter most, whose checks read a
-        value the function <i>computes</i>, sit past a reachable entry.</p>
+        refuses them today. Displacement reaches those pad-less <b>entries</b>.</p>
+      <p><b>What it does NOT do:</b> it is still an <i>entry</i> hook. A fix whose check reads a value
+        computed <i>inside</i> a function is not reached by displacement — that needs mid-function
+        placement, a separate capability.</p>
       <p class="mono">index today: 41,148 padded (armable) · 30,009 pad-less, marked DISPLACEABLE</p>
     </div>
     <div>
@@ -202,7 +204,7 @@ footer code{font-family:var(--mono)}
 </div>
 
 <footer>
-  <span>Framing: <b>extend a shipped data plane in place</b> — observability, per-flow logic and enforcement first; displacement widens reach; pre-patch shielding a later application this platform cannot yet demonstrate.</span>
+  <span>Framing: <b>extend a shipped data plane in place</b> — observability, per-flow logic and enforcement first; displacement extends reach to pad-less code (e.g. OpenSSL) at entry; pre-patch shielding a later application this platform cannot yet demonstrate.</span>
   <span>Evidence: <code>GROUND_TRUTH.md · substrate/bench_tramp.c · mitigation-scope.md</code> · repo-only</span>
 </footer>
 </div></body></html>
