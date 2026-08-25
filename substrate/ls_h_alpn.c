@@ -24,9 +24,14 @@
 #ifdef LS_ALPN_TEST
 #  include "ls_h_alpn_stubs.h"          /* standalone unit test provides TMM types + a stub accessor */
 #else
+/* Same include world as the ssl-module ls_ctx_alpn.c --- ssl.h carries ssl_ext_get_by_type,
+ * SSL_EXT_ALPN, struct ssl_ctx and struct ssl_extension. */
 #  include <local/sys/def.h>
 #  include <local/sys/err.h>
-#  include <local/base/ls_ctx_alpn_abi.h>   /* struct ssl_ctx, ssl_extension, ssl_ext_get_by_type, SSL_EXT_ALPN */
+#  include <local/sys/queue.h>
+#  include "ssl.h"
+#  include "ssl_magic.h"
+#  include <local/base/ls_ctx_alpn_abi.h>
 #endif
 
 #include <stdint.h>
