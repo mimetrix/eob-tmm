@@ -105,6 +105,37 @@ SBID=$(awk -F'\t' '/^#build_id/{print $2}' "$CTX/signatures.tsv")
     Two tools read what should be one binary and got different answers. Do not bake this."
 echo "  build id  : $SBID (matches the hook index)"
 
+# 2b-bis. THE OFFSETS HEADER MUST DESCRIBE THIS BINARY TOO.
+#
+# ls_ctx_parse_offsets.h carries the byte offsets the substrate uses to read TMM's parser structs,
+# derived by mk_ctx_parse.py from a build artifact and stamped with that artifact's build id.
+# Nothing compared that stamp to anything until now, so a header generated against one tree could
+# be compiled into a binary built from another --- and a wrong offset there is SILENT: the
+# substrate reads a plausible number out of the wrong field and every counter still moves.
+#
+# This closes the one missing link in a chain that is otherwise already enforced. With it the
+# offsets are verified against the RUNNING binary transitively: offsets == index here, index ==
+# image binary at step 5, and index == /proc/<pid>/exe at arm time, where ls-load.py already
+# refuses. No new mechanism, and nothing installed in any container --- substrate/FIELD-CONTRACT.md
+# records why the field-side alternative is deliberately not taken.
+OFFH="$REPO/substrate/ls_ctx_parse_offsets.h"
+if [ -f "$OFFH" ]; then
+    OBID=$(sed -n 's/.*LS_CTX_PARSE_BUILD_ID[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$OFFH")
+    [ -n "$OBID" ] || fail "ls_ctx_parse_offsets.h carries no build id --- regenerate it:
+    substrate/mk_ctx_parse.py --debuginfo <tmm.debug> -o substrate/ls_ctx_parse_offsets.h"
+    [ "$OBID" = "$BID" ] || fail "the ctx offsets describe a DIFFERENT binary:
+    hook-index.tsv            $BID
+    ls_ctx_parse_offsets.h    $OBID
+    The substrate would read TMM's parser structs at offsets taken from another build, which is
+    silent when wrong. Regenerate from THIS build's debuginfo and rebuild TMM."
+    echo "  ctx offsets: $OBID (matches the hook index)"
+else
+    echo "  ctx offsets: no ls_ctx_parse_offsets.h in the staged tree."
+    echo "               If this TMM was built with the parse ctx builder then that build could"
+    echo "               not have compiled --- the header has no fallback offsets by design. If it"
+    echo "               was not, there is nothing to check here. Not guessing which."
+fi
+
 echo
 echo
 echo "=== 2c. is the staged tree the one we think it is?"

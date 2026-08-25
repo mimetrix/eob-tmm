@@ -5,11 +5,30 @@ Two environments, one boundary, and everything that crosses it is an artifact.
 **Build side.** Any tool is available — a compiler, `gdb`, `pahole`, `readelf`, the source tree,
 the debug info. A build runs and emits artifacts. **Those artifacts are the entire contract.**
 
-**Field side.** All that exists is the running software. No source, no debug info, no compiler, no
-DWARF reader. **Nothing can be derived there.** Every fact must already be inside what shipped.
+**Field side.** All that exists is the running software.
 
-Verified in the running TMM container, 2026-08-25: `gdb` — absent. `readelf` — absent. So this is
-not a policy we intend to keep; it is the environment we are already in.
+**Corrected 2026-08-25 — the first version of this page was wrong about what that includes.** It
+said "no debug info", which was an assumption, not a measurement. Measured inside the running TMM
+container:
+
+| | |
+|---|---|
+| `/usr/lib/debug` | **233 MB**, shipped with the TMM package |
+| `.build-id/49/9b8c300bcc…debug` | symlink to `tmm64.no_pgo.debug` — **the build id the cluster is running** |
+| `tmm64.no_pgo.debug` | **146 MB**, carries `.debug_info`, and contains `http_parse_ctx`, `http_parse_info` and `parse_state` |
+| any DWARF reader | **absent** — no `readelf`, `objdump`, `gdb`, `nm`, `eu-readelf` in either container |
+| the `debug` sidecar | `f5-debug-sidecar:v10.146.1`, Debian-based with `apt`/`dpkg`; `binutils` and `elfutils` are **not** installed |
+
+So the field is missing a **tool**, not the **information**. Full DWARF for the running binary is
+right there. That is a materially different constraint from the one this page first asserted, and
+worth stating precisely because it changes what is possible rather than merely what is convenient.
+
+**It does not change where derivation belongs.** Work that can be done once at build time should
+not be repeated on every pod at every start — 146 MB of DWARF is not free to walk, and the build
+already knows the answer. Build-time derivation stays the design.
+
+**It does change what can be PROVEN in the field**, which is the more valuable half. See the gap
+below.
 
 The artifacts for any deployed build remain retrievable, so a stale derived number has no excuse
 to survive a rebuild. Regenerating is always possible; guessing is never necessary.
@@ -55,17 +74,35 @@ Anything here is a deployment requirement, not an implementation detail.
 | `/usr/share/ls/` | the index, signatures and programs are read from disk at arm time | baked into the image layer |
 | `ls_drain` | reads the record ring; static, no runtime dependencies | baked in |
 
-Nothing else. No network egress, no sidecar, no host mount, no privileged capability beyond what
-TMM already holds, and no tool that reads debug information — because none is present and none is
-needed.
+Nothing else. No network egress, no host mount, and no privileged capability beyond what TMM
+already holds. No tool that reads debug information is present, and none is required by the load
+path — adding `binutils` to the debug sidecar is optional, and buys the field-side verification
+described below.
 
-**Declared gap: nothing yet asserts the stamped build id matches the target.**
-`ls_ctx_parse_offsets.h` records the build id it was derived from, and the header is regenerated
-per build, so a stale file cannot survive a clean build. But an incremental build could in
-principle compile a header derived from a *different* artifact, and no check currently compares
-that stamp against the binary being produced. The hook index already has this guarantee — its
-build id is compared against `/proc/<pid>/exe` and arming is refused on a mismatch — and the
-offsets header does not. Until it does, the protection here is procedural, not enforced.
+**The staleness gap, and why no field tooling is needed to close it.**
+`ls_ctx_parse_offsets.h` records the build id it was derived from. Nothing yet compares that stamp
+to anything, so a generated header reused across trees could in principle be compiled in.
+
+The fix is a transitive chain built entirely from artifacts the build already produces:
+
+| link | where | status |
+|---|---|---|
+| offsets header build id **=** hook index build id | bake | **the missing one** |
+| signature index build id **=** hook index build id | bake | enforced — a mismatch is fatal |
+| hook index build id **=** the binary inside the image | bake, step 5 | enforced |
+| hook index build id **=** `/proc/<pid>/exe` of the running TMM | run time, `ls-load.py` | enforced, and tested (`check_ls_load.py`: a mismatched build id must refuse to arm) |
+
+Close the first row and the offsets are verified against the **running** binary, transitively,
+through a gate that already exists and already refuses. One comparison in the bake, no new
+mechanism, and nothing added to any container.
+
+**So the field-side option is recorded and NOT recommended.** The running container does hold the
+DWARF (see above), so re-deriving the offsets in the field is possible — but it would mean
+installing a reader into the debug sidecar, and the rule here is that nothing gets installed unless
+the build artifacts cannot answer the question. They can. This is a technique still being worked
+out, so the possibility is worth keeping on the page; it is not worth taking while a build artifact
+settles it. If a future question genuinely cannot be answered from the build, that is when adding
+`binutils` earns its argument — and it should arrive with the reason written down.
 
 **The one that has bitten us.** A freshly installed deployment has the substrate compiled in and
 every `LS_*` variable absent. The pods report healthy, and the absence shows up only as an absence:
