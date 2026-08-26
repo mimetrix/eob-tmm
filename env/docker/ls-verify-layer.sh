@@ -22,7 +22,9 @@ test -s "$SIG_FILE"       || { echo "*** $SIG_FILE missing or empty"; exit 1; }
 grep -q '^#build_id' "$SIG_FILE" || { echo "*** signature index carries no #build_id header"; exit 1; }
 test -x /usr/bin/ls_drain || { echo "*** /usr/bin/ls_drain missing or not executable"; exit 1; }
 test -f /usr/bin/ls-load.py || { echo "*** /usr/bin/ls-load.py missing"; exit 1; }
-ls /usr/share/ls/*.bpf.o >/dev/null 2>&1 || { echo "*** no verified programs baked in"; exit 1; }
+# NO programs are baked --- bytecode is compiled/verified/signed as a completely independent
+# process and loaded over the socket at runtime (see BYTECODE-BUILD.md). This layer verifies
+# only the build artifacts: the binary/index/signatures/tools and their build-id agreement.
 
 R=$(readlink -f /usr/bin/tmm)
 case "$R" in
