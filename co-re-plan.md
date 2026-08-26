@@ -326,3 +326,35 @@ Attach points/fields below are real — present in the build BTF (`http_parse_ct
 - **"iRules can't" for probe/trace/debug demo claims** still depends on the iRules-boundary
   verification (in progress) — the *tests* assert substrate behavior and need no iRules; the
   *comparison narrative* needs the cited boundary.
+
+## Next structural extension — function EXIT (`fexit`) — ROADMAP
+
+Today a hook attaches only at a function **entry**. Reading a function's *result* or its
+post-execution state — and timing a single function's own duration — needs an **exit** hook. This
+is a **structural change** (trampoline + a small ctx-ABI bump), tier **ROADMAP**: designed, not
+built. It is the highest-leverage extension because it turns "read state before a function runs"
+into "measure and act on what it did" — and it directly answers the `fentry`-timing limitation the
+trace surface hit (fields read `0` at entry because the parser has not populated them yet).
+
+**Mechanism — return-address hijack (no exit pad exists).** `-fpatchable-function-entry` gives a
+pad at *entry* only; a `ret` is one byte with no room to patch, so exit is done the way the kernel's
+`fexit`, frida, and bpftime all do it — hijack the return address, from the entry trampoline we
+already have. At entry the stack is `[rsp]=body-return` (pushed by the pad's `call trampoline`),
+`[rsp+8]=caller-return` (pushed by the caller). The trampoline overwrites `[rsp+8]` with an **exit
+stub** and saves the real caller-return (plus the entry args) on a **per-core shadow stack**; the
+body runs, its `ret` lands in the stub; the stub reads `rax` (the return value), pops the shadow
+frame, runs the VM with an exit context, restores `rax`, and jumps to the real caller. LIFO handles
+nesting/recursion.
+
+**Checklist.** (1) a `(kind, slot)` dispatch split — a hook carries entry-vs-exit, arming an exit
+hook still patches the *entry* pad but dispatches differently; (2) a per-core shadow stack, bounded
+depth, overflow → fall through (never crash); (3) the asm exit stub + the `[rsp+8]` swap in
+`ls_tramp_asm.c` / `trampoline_x86_64.S` (kept mirrored); (4) an exit ctx shape — the generic ctx
+gains the **return value** (+ saved entry args): a `ctx_abi` version bump (already versioned); (5) a
+`fexit/<fn>` program type PREVAIL admits. Everything else — the VM, ctx assembly, `ls_vm_call`,
+CO-RE relocation, arming-by-name, signing, the ring — is unchanged.
+
+**The gate (see P8).** A non-local exit (`setjmp`/`longjmp`) skips the body's `ret`, so the shadow
+stack desyncs and the next exit jumps somewhere wrong. **Whether TMM uses `longjmp` on any path
+under a hookable function decides feasibility** and is the pre-registered falsifier. Tail calls and
+shadow-stack depth are secondary guards.

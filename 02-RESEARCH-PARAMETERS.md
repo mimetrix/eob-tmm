@@ -202,6 +202,26 @@ avoid. No log line was produced, placing the hang inside verify. Fixed by moving
 behind `ls_prep`; see `CONTESTED-PREMISES.md` #10. **F6a–F6d remain proven off-TMM; the live path
 is unproven again until the next ship.**
 
+### P8 · Can a function EXIT (`fexit`) hook be installed without desyncing on a non-local exit?
+
+**The design (ROADMAP, `co-re-plan.md`).** Exit hooks are done by hijacking the return address from
+the entry trampoline — overwrite the caller-return on the stack with an exit stub, save the real one
+(and the entry args) on a per-core LIFO shadow stack, run the VM with the return value at the stub.
+This is the single extension that turns "read state before a function runs" into "measure/act on its
+result", and answers the `fentry`-timing limit (fields `0` at entry).
+
+**Falsified if:** any hookable function sits under a `setjmp`/`longjmp` (or C++ unwind) on a live
+TMM path — a non-local exit skips the body's `ret`, so the shadow frame is never popped and the next
+exit returns to the wrong address. If that is reachable in TMM's data path, the return-hijack design
+is **wrong rather than awkward**, and exit hooks need a different mechanism (e.g. bounded per-target
+opt-out, or intercepting the unwind). Secondary killers: tail-call `jmp` (no `ret` through the stub)
+reachable on a hooked target, or shadow-stack depth unbounded by any real call graph.
+
+**How to settle it before building:** survey TMM's debuginfo for `longjmp`/`_setjmp`/`siglongjmp`
+call sites and their dominators; if none dominate a candidate hook target, the gate is clear for
+that target set. Toolchain-/build-sensitive — run on the build box against the pinned binary
+(rule 5), not from memory.
+
 ---
 
 ## Retired

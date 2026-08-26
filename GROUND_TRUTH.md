@@ -57,6 +57,7 @@ weaker evidence than something an independent tool observed, and conflating the 
 | ~41k functions armable via the pad; ~30k need displacement | MEASURED | KERNEL | generated per build from the packaged binary. **Counts move every build** — 41,148 then 41,160. Count from the image, per `env/bnk-dev-runbook.md` §12f |
 | OpenSSL's 1,781 linked symbols are unreachable | MEASURED | KERNEL | no entry padding outside TMM core; the index records them as displacement-only |
 | Displacement reaches them | ROADMAP | — | designed, unimplemented |
+| Function EXIT (`fexit`) hooks — read a function's return value / post-execution state, time its own duration | ROADMAP | — | designed, unbuilt; return-address hijack + per-core shadow stack, gated on the `longjmp` survey (`02-RESEARCH-PARAMETERS.md` P8) |
 | Hardware watchpoints reach any address | MEASURED, outside TMM | KERNEL | `prototype/watchpoint/`, `perf_event_open` |
 
 ## Watchpoints (prototyped outside TMM, 2026-08-20)
