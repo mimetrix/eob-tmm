@@ -55,6 +55,8 @@
 ?? src/base/ls_tp_ring.h
 ?? src/base/ls_tramp.c
 ?? src/base/ls_tramp_asm.c
+?? src/base/ls_fexit.c
+?? src/base/ls_fexit.h
 ?? src/base/ls_vm.c
 ?? src/base/ls_vm.h
 ?? src/base/ls_vm_config.c

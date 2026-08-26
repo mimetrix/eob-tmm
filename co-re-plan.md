@@ -364,7 +364,18 @@ under a hookable function decides feasibility** — and the P8 survey (2026-08-2
 falsifier survived. The trampoline mechanism itself is now **proven in a standalone harness**
 (`substrate/check_fexit.c`, build box, `make check-fexit`): the return-address hijack, the SP-keyed
 shadow stack, and the reclaim all hold across nesting, recursion, and a `longjmp`-skipped return, at
-`-O2`/`-O0`/`-fcf-protection=full`. What remains is the in-TMM wiring, not the mechanism. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
+`-O2`/`-O0`/`-fcf-protection=full`. What remains is the in-TMM wiring, not the mechanism.
+
+**#1 BUILT INTO TMM and verified (2026-08-26, build `01680045`).** The per-slot exit trampoline is
+folded into `trampoline_x86_64.S` (`ls_fexit_slot0..11` + `ls_fexit_stub` + `ls_fexit_table`,
+mirroring `LS_TRAMP`; `ls_tramp_asm.c` regenerated), the shadow stack is per-instance `g_ls_fexit_*`
+state, and TMM compiles and links with it. **Build-tree delta** (documents the whitelist gap left by
+the absent `TMM-TREE-DELTA.md`): `filelist` gains `base/ls_fexit.c  STDINC`; both
+`{default,debug}_whitelist_x86_64` gain the 9 mutable globals `g_ls_fexit_{stack,top,seq,log,log_n,
+exits,reclaimed,overflow,desync}`. `nm` confirms `ls_fexit_slot0`/`ls_fexit_stub`/`ls_fexit_table`
+and all 9 globals in the binary; `diff-globals` passed both variants. Not yet armed on traffic ---
+#2 (exit ctx + `ls_vm_call` from leave), #3 (`fexit/<fn>` PREVAIL type), #4 (arm-time exclusion),
+#5 (return-type admission), #6 (live arm) remain. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
 through): the SP-keyed reclaim above handles a `longjmp` for free (it bypasses the return slot), but a
 C++ exception *walks* the frames via the unwind tables and would read our stub address as the return —
 corrupting the unwind, not just the shadow stack. So the primary guard is **arm-time exclusion**:
