@@ -221,6 +221,28 @@ pads present in the binary (`__patchable_function_entries` section confirmed). D
 mean a different, worse attach mechanism (breakpoint/trap, or bpftime-style inline rewriting) — not
 worth 5 nops per function, the standard kernel-ftrace approach.
 
+## LIVE ARM — the first end-to-end surface (PASSED 2026-08-26)
+
+*MEASURED, cluster-witnessed (datkube eob-bnk-datkube-01 / 10.145.40.193, pinned image build
+ee2056234fd0 with embedded `.BTF`, stable pod, Gateway-API listener VIP 11.11.11.99):*
+
+`probe_parser` (independently compiled → PREVAIL → signed; NOT baked) delivered over the loader
+socket into a running TMM:
+- **Signature verified** on the prepare thread; **`ls_vm: CO-RE relocated 1 field offset(s)`** — the
+  loader read the binary's OWN embedded `.BTF` (`/proc/self/exe`) and resolved `http_parse_ctx.version_num`
+  live; **`ARMED LIVE entry=0xccc604 slot=0 (no restart)`**, JIT on.
+- **Fires once per request:** 40 requests → `fired=40`; +20 → +20 (exact hook fidelity).
+- **Field read works live:** `errors=0` across 60 fires (a wrong/unreadable offset would fault
+  probe_read and increment errors).
+- **Disarm live:** `DISARMED LIVE`; +20 requests → +0 fired (frozen); traffic 200 throughout.
+
+This closes the whole architecture on a running BIG-IP: attach to an internal function with no iRule
+event, read its internal field via CO-RE against the binary's own type info, arm/disarm on live
+traffic with no restart — and the bytecode was compiled/verified/signed as a completely independent
+process and loaded over the socket. Two-step load then arm: `ls-load.py load <slot> <prog> <mode>`
+puts the (relocated, verified, JIT'd) program in the slot; `ls-load.py arm <slot> <hook>` patches the
+function entry. Per-call cost NOT claimed here (the `cycles` counter is preemption-dominated — probe #5).
+
 ## Surface test matrix (surfaces not shields)
 
 Four surfaces the substrate serves — **shield · probe · trace · debug** — each with tests that
