@@ -111,7 +111,7 @@ binary rather than the build tree's, because packaging re-links and every addres
 since the packaged binary only exists after `make container`, they cannot be part of the
 runtime image build and are layered on top of it. That is also why no F5 build stage is
 replaced or reordered. It costs 2m9s of build time and nothing at run time.
-[`build-pipeline.md`](build-pipeline.md) is the whole of it — stages, gates, costs, and the
+`build-pipeline.md` is the whole of it — stages, gates, costs, and the
 six things it still does not do.
 
 **One earlier integration did edit F5 source, and was rolled back.** A designed-in HTTP

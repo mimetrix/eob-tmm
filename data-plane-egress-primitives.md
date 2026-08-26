@@ -99,7 +99,7 @@ to the ring. That is the property being bought.
 
 **Where the schema lives, and why this ships before the hook map does.** Decoding is the
 **consumer's** job, resolved out of band by `hook_id` + `schema_id` against the per-build hook map
-and its BTF ([`development-scope.md`](development-scope.md) item 5, **unbuilt**). The split is
+and its BTF (`development-scope.md` item 5, **unbuilt**). The split is
 clean and worth stating because it decides sequencing: **the transport needs no schema; only
 decoding does.** A consumer can drain and record `hook_id`/`schema_id` plus opaque bytes today, and
 nothing in the transport changes when the map arrives.

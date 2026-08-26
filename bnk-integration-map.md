@@ -113,7 +113,7 @@ its padded entry.
 **Preparation cannot run on the loader thread.** `ubpf_create`/`ubpf_load_elf`/`ubpf_compile_ex` all
 allocate, and TMM aliases `malloc` to its own per-core allocator whose spinlock is never initialised
 on a thread we create — the loader spins forever. Work is handed to a TMM poll thread through a
-prepare/complete structure driven by a periodic timer ([`load-path-scope.md`](load-path-scope.md) §5).
+prepare/complete structure driven by a periodic timer (`load-path-scope.md` §5).
 
 That constraint generalises and is the one to remember: **anything on a thread TMM did not create
 must avoid the allocator.** Use `mmap`.

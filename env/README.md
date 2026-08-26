@@ -21,10 +21,10 @@ machines*, not proposal content.
 |---|---|
 | [`bnk-dev-runbook.md`](bnk-dev-runbook.md) | **The copy-paste procedure.** Exact CLI commands to stand up the BNK build box and the Datkube run box from nothing, in order, with each gotcha stated where it bites. Every command in it was executed. |
 | [`tmm-build-environment.md`](tmm-build-environment.md) | **The reference.** Why each runbook step exists: CBIP-vs-MBIP (**two** build worlds, and whether they share one source tree is *unverified* — see that doc), the BNK pipeline, what is gated, the stacks, the docker address-pool trap, and what has been measured. |
-| [`openstack-cli-reference.md`](openstack-cli-reference.md) | How to install and drive `python-openstackclient` against the F5 stacks; image selection, network gotchas, instance launch recipe. |
+| `openstack-cli-reference.md` | How to install and drive `python-openstackclient` against the F5 stacks; image selection, network gotchas, instance launch recipe. |
 | [`sandbox-ebpf-limitations.md`](sandbox-ebpf-limitations.md) | What the Claude dev sandbox can do with eBPF (build/codegen only — capabilities are stripped from the bounding set, so nothing loads). |
-| [`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md) | The 2026-07-17 BIG-IP VE boot attempt and the kernel-3.10/no-BTF blocker it found. |
-| [`bigip-mcp-server.md`](bigip-mcp-server.md) | Backlog: the internal BIG-IP MCP Server page, gated on having a stable TMM. |
+| `bigip-ve-boot-2026-07-17.md` | The 2026-07-17 BIG-IP VE boot attempt and the kernel-3.10/no-BTF blocker it found. |
+| `bigip-mcp-server.md` | Backlog: the internal BIG-IP MCP Server page, gated on having a stable TMM. |
 | [`scripts/`](scripts/) | `bootstrap-openstack-cli.sh` (rebuild the CLI — needed every session), `merge-clouds-yaml.py` (assemble a multi-cloud `clouds.yaml` from Horizon downloads). |
 | [`archive-eob-bigip/`](archive-eob-bigip/) | Two verbatim files from the retired `eob-bigip` repo whose subject matter overlaps this repo's design docs. Archival only — see the README there. |
 

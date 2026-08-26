@@ -37,7 +37,7 @@
 > 1. **The mechanism works on a live TMM.** A shield is loaded over a socket into an already-running
 >    process, armed at a function entry while traffic flows, and disarmed — no rebuild, no restart.
 >    A hook fired 1:1 with requests through the proxy (16,000 of them). See
->    [`load-path-scope.md`](load-path-scope.md).
+>    `load-path-scope.md`.
 > 2. **Designed-in call sites are gone.** This document weighed them against patched function entries
 >    and treated both as live options. They were **removed from the TMM tree**, because their reach is
 >    fixed at build time and therefore cannot cover the unforeseen function a CVE lands on. The
@@ -50,7 +50,7 @@
 >    is left alone.
 >
 > Still not shown: **no CVE has been mitigated on live traffic**, and **per-call hook cost is
-> unmeasured** — see [`load-path-scope.md`](load-path-scope.md) §7 for what was and was not established.
+> unmeasured** — see `load-path-scope.md` §7 for what was and was not established.
 **Audience:** TMOS (BIG-IP's operating system) architecture, F5 SIRT (Security Incident Response Team), BIG-IP security engineering
 **Scope:** On-box, vendor-authored runtime shields for TMOS's *own* control-plane and data-plane code paths
 **Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — its CVE shield is the first consumer) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `substrate/` (**candidate ABI (application binary interface) artifacts + their checkers** — shield ABI header, hook-map schema and example map, budget/offset/gate checks; **not a running prototype** — no shield executes anywhere in this repo)
@@ -738,7 +738,7 @@ project than this document describes.
 >
 > Everything measured and built in this repo is **MBIP/BNK only**, from `gitswarm.f5net.com/tmm/tmm` at `10.207.3-main.bdbfc7e182`. What would not transfer if the trees differ is not the *idea* — an entry pad is an entry pad — but every integration detail: the `src/compile/filelist` and whitelist mechanism, where `-fpatchable-function-entry` is injected, `INIT_FUNC`'s group semantics, and the `STDINC` include-world split.
 >
-> **A divergence has already been observed, and it is not a conditional.** `sthread_handler_register()` — which initializes the per-thread allocator's spinlocks — is called from exactly one site in the tree, `dev/ndal/xnet/if_xnet.c:1642`, and **BNK does not load xnet**. That is why `malloc` on a thread we create spins forever here ([`load-path-scope.md`](load-path-scope.md) §1). An appliance that *does* load xnet would not have that bug at all, which means the root cause we fixed is **form-factor-specific behaviour of one source tree**, discovered by accident. The right conclusion is that form-factor differences here come from *what gets loaded and linked*, not only from `#ifdef`s — so reading conditionals is not sufficient to establish equivalence.
+> **A divergence has already been observed, and it is not a conditional.** `sthread_handler_register()` — which initializes the per-thread allocator's spinlocks — is called from exactly one site in the tree, `dev/ndal/xnet/if_xnet.c:1642`, and **BNK does not load xnet**. That is why `malloc` on a thread we create spins forever here (`load-path-scope.md` §1). An appliance that *does* load xnet would not have that bug at all, which means the root cause we fixed is **form-factor-specific behaviour of one source tree**, discovered by accident. The right conclusion is that form-factor differences here come from *what gets loaded and linked*, not only from `#ifdef`s — so reading conditionals is not sufficient to establish equivalence.
 >
 > **Settle this before any cross-form-factor claim is made externally.** Ask the TMM team whether GitSwarm `tmm/tmm` is the single source of truth with Perforce mirrored, and if not, diff the trees for the files in [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md). **Coverage** is not: **BIG-IP VE** (Virtual Edition — pure software, no offload) is the best case — the VM sees the entire data path; an **appliance** carries the offload dead zone above; **BNK** on a DPU (data-processing unit) depends on how much traffic the DPU steers versus lands in the containerized TMM. Coverage scales inversely with how much the platform offloads to hardware.
 

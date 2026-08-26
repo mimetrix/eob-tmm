@@ -7,7 +7,7 @@ separate **Datkube box** (kind cluster, runs the TMM pod).
 **Status:** every command below was run, in this order, on 2026-08-12. Where something
 bites, the reason is stated inline rather than left as folklore. Companion documents:
 [`tmm-build-environment.md`](tmm-build-environment.md) for *why* each step exists, and
-[`openstack-cli-reference.md`](openstack-cli-reference.md) for the OpenStack basics.
+`openstack-cli-reference.md` for the OpenStack basics.
 
 **Two boxes, deliberately.** Building is not running. The proposal's open questions are
 about TMM's *runtime* cost, and measuring that on a machine simultaneously compiling

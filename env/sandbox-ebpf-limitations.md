@@ -42,7 +42,7 @@ Current, authoritative sources — do not re-derive from this file:
 - [`tmm-build-environment.md`](tmm-build-environment.md) — endpoints for
   both stacks, the credential runbook, TLS/`verify: false` rationale, and
   failure modes.
-- [`openstack-cli-reference.md`](openstack-cli-reference.md) — CLI install,
+- `openstack-cli-reference.md` — CLI install,
   image selection, network gotchas, instance launch.
 - [`scripts/bootstrap-openstack-cli.sh`](scripts/bootstrap-openstack-cli.sh)
   — the venv/pip bootstrap that this section used to describe in prose

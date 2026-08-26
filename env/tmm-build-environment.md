@@ -184,7 +184,7 @@ Extracted `/usr/bin/tmm` from `tmm-img:v0.950.0-0.1.0`. A symlink chain — `tmm
 functions are not exported, so a hook map cannot be derived from a shipped artifact — not
 by us, not by a customer. It must be generated **at build time inside F5 from DWARF/BTF
 and shipped signed alongside the build**, which is exactly what
-[`../development-scope.md`](../development-scope.md) item 5 specifies. The proposal
+`../development-scope.md` item 5 specifies. The proposal
 asserted it; this demonstrates it.
 
 ## What was measured
@@ -432,7 +432,7 @@ time:
   path is gitignored, so an 11 MB `bin/` under a vendored tree is expected.
 
 `prevail --help` confirms from the shipped binary what
-[`../development-scope.md`](../development-scope.md) item 3a records from source:
+`../development-scope.md` item 3a records from source:
 `--termination` *"Default: ignore"*, `--allow-division-by-zero` *"Default: allow"*,
 `--strict` off. Pass them explicitly; "verified" otherwise means less than it sounds.
 
@@ -473,10 +473,10 @@ Not needed for BNK. Recorded so the follow-on does not start from zero.
   on that network.
 - **`DEV TMM Compile and Debug`** — `docs.f5net.com/spaces/~garlapati/pages/936700918/` —
   is presumably the authority on CBIP compile-and-debug and is behind the Confluence auth
-  wall. See [`bigip-mcp-server.md`](bigip-mcp-server.md) for the personal-access-token
+  wall. See `bigip-mcp-server.md` for the personal-access-token
   route.
 - **Kernel/BTF on TMOS is still unverified.** `BIGIP-tmos-rocky-22.0.0-0.0.570` is the
-  Rocky-based image [`bigip-ve-boot-2026-07-17.md`](bigip-ve-boot-2026-07-17.md) was
+  Rocky-based image `bigip-ve-boot-2026-07-17.md` was
   waiting for, but an image *name* is not proof of kernel version. The cheap probe is to
   boot it and read `openstack console log show` for the kernel line — the console may
   answer without a shell at all, which is why it is the cheapest test available.

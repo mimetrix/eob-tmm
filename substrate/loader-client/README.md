@@ -91,4 +91,4 @@ It expects `/tmp/demo_block.elf`, `/tmp/demo_pass.elf` and `/tmp/shield.elf`, bu
 `0x1001` (BENCH) and `0x1002` (SAMPLES) still run on the **loader** thread rather than going
 through the prepare handoff, so they hit TMM's allocator on a foreign thread and **wedge the
 loader**. Do not call them. This is why the per-call hook cost is still unmeasured — see
-[`../../load-path-scope.md`](../../load-path-scope.md) §7.
+`../../load-path-scope.md` §7.

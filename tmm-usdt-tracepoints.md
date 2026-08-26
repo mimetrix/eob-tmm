@@ -44,7 +44,7 @@ The engine is generic; the shield is one application on top of it. The reason a 
 > hot path — and both are staged follow-ons whose destination is an open question in their own items. So
 > the day-one visible surface is the shield console (mode, armed, epoch, per-core fire counters) and not
 > one field from any row below. Recorded as a gap in
-> [`development-scope.md`](development-scope.md) item 14a rather than left to be noticed; it matters
+> `development-scope.md` item 14a rather than left to be noticed; it matters
 > most here, because observability is this document's primary lens.
 
 > **On the names, and on what exists.** `tmmtrace` and `tmmdump` are **placeholder names for proposed

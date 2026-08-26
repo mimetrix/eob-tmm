@@ -87,7 +87,7 @@ example of a program that verifies clean and is useless.
 > constraint on what any of this can express — rate limiting, "has this client
 > done this before", correlation across requests are all currently inexpressible.
 > It was recorded as a ceiling; it is a gap. See
-> [`../widening-plan.md`](../widening-plan.md) Phase 1.
+> `../widening-plan.md` Phase 1.
 
 ### 1.2 The predicate must be bounded, and the verifier means it
 
@@ -321,5 +321,5 @@ silent failure the hook map exists to prevent.
 
 ### 3.3 A deliberately vulnerable build exists
 
-`tmm:vuln-alpn`. See [`VULNERABLE-BUILD.md`](VULNERABLE-BUILD.md). Never present a
+`tmm:vuln-alpn`. See `VULNERABLE-BUILD.md`. Never present a
 result from it without saying so.

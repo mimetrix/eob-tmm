@@ -2,7 +2,7 @@
 
 ### The problems the explainers gloss — real-time, interface & scope, distributed state, security, certification, operations. What building this entails, surfaced up front: what's day-one vs. deferred, and the honest mitigations
 
-**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), [`development-scope.md`](development-scope.md) (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
+**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), `development-scope.md` (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
 **Audience:** TMM core engineering, architecture, F5 SIRT / security review, product & certification
 
 ---
@@ -341,7 +341,7 @@ what is per-core is the **scratch stack** passed as `ubpf_jit_ex_fn`'s third and
 which is why the extended JIT form is the required one. **Open:** whether the VM set is per address
 space or per TMM instance, because if instances are separate processes the count and the memory both
 multiply by instance — the same shared-mapping question that selects the arm/disarm form
-([`development-scope.md`](development-scope.md) §1 item 2), and the reason memory accounting is on the
+(`development-scope.md` §1 item 2), and the reason memory accounting is on the
 loader handler's list.
 
 **1. One program per hook, and say so.** `struct hook_slot` holds a single `shield_jit_fn`, so
@@ -512,7 +512,7 @@ nothing at all in the designed-in-call-site form — but that form was removed o
 rendezvous is now unavoidable rather than optional.) **Quiescence** for reclamation is
 needed in every form, but has three answers — a poll-loop epoch, per-invocation read-side markers, or a
 capped leak. The decomposition and what each form costs is in
-[`development-scope.md`](development-scope.md) §1, items 0 · 0b · 0c. Two are not open questions: keeping the verifier out of TMM is a decision
+`development-scope.md` §1, items 0 · 0b · 0c. Two are not open questions: keeping the verifier out of TMM is a decision
 already taken, and the concurrency item records a property that is the reason three other things are
 simple. Four are ordinary lifecycle and governance work. One is scope-dependent, biting only on
 per-packet hooks. Certification has the best existing answer, since BIG-IP already runs customer TCL and

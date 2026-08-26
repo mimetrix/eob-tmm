@@ -18,8 +18,6 @@ rule, not a substitute for it.
 | **What the engine does, has done, and could do** — the current state, with evidence | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) |
 | Every axis in flat form: hook types, maps, helpers, ceilings | [`vm-capability-inventory.md`](vm-capability-inventory.md) |
 | The three customer requests, answered — including where the answer is no | [`ebpf-requests-capability-map.md`](ebpf-requests-capability-map.md) |
-| Whether "CVE mitigation" is even the right frame for BNK | [`cve-survey-bnk.md`](cve-survey-bnk.md) — the Bugzilla survey, and it says no |
-| What can actually be demonstrated, and the gating unknown | [`demo-options.md`](demo-options.md) |
 | How to reproduce any of it | [`REPRODUCING.md`](REPRODUCING.md), [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) |
 
 **These six were written for the architecture review of 2026-08-18** and are the set to hand
@@ -55,10 +53,7 @@ construction, kept that way on purpose, and carrying its own dated accuracy note
 | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) | The entry point. Mechanism, results with evidence, limits, ranked extensions |
 | [`vm-capability-inventory.md`](vm-capability-inventory.md) | Hook types, context shapes and the measured 96-byte ceiling, maps, helpers, verdicts, egress, admission gates |
 | [`ebpf-requests-capability-map.md`](ebpf-requests-capability-map.md) | Attack-surface reduction, threat observability, defence in depth — what fits and what does not |
-| [`cve-survey-bnk.md`](cve-survey-bnk.md) | The Bugzilla survey. **Supersedes** any earlier CVE framing in this repo |
-| [`demo-options.md`](demo-options.md) | What can be demonstrated, and the four-part structure |
 | [`rst-why-feed.md`](rst-why-feed.md) | The reset feed, its record format, and its measured triggers |
-| [`hook-types.md`](hook-types.md) · [`hook-types-plan.md`](hook-types-plan.md) | What the VM can attach to, and how to add to it |
 
 ### Design — pre-build intent
 
@@ -69,15 +64,10 @@ reachable, or what something costs, prefer the current documents.
 |---|---|
 | [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) | The threat model and lifecycle stand. The worked CVE example is not a real advisory (see `design-review-findings.md` T4), and the cost discussion predates any measurement |
 | [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) | **Still says nothing executes.** The programmability spectrum and hook-point catalogue stand |
-| [`development-scope.md`](development-scope.md) · [`development-scope-code.md`](development-scope-code.md) | The 17-item scope stands as a map. Items 1, 2, 3, 5 and much of 6 are now built; items 4 (signing) and 12 (audit) are not, and remain the gate on customer use |
 | [`engine-hard-problems.md`](engine-hard-problems.md) | The register of hard problems is still the right register. Several entries now have measurements attached |
 | [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) | The egress ring is built and running; the design's contract sketch predates it |
 | [`data-plane-intelligence.md`](data-plane-intelligence.md) | Unchanged by the build — it is a product argument, not a mechanism claim |
 | [`tmm-usdt-tracepoints.md`](tmm-usdt-tracepoints.md) | The catalogue stands. The designed-in HTTP tracepoint it proposes **was built and rolled back** — iRules already saw every field it captured |
-| [`hook-point-catalog.md`](hook-point-catalog.md) | Superseded in practice by the generated index: ~71k entries produced per build (71,157 then 71,169 across two builds of identical source), rather than a hand-maintained list |
-| [`safe-swap-plan.md`](safe-swap-plan.md) | Built. Live arm and disarm with byte-identical restore is now routine |
-| [`cve-mitigation-plan.md`](cve-mitigation-plan.md) | **Substantially superseded.** See `cve-survey-bnk.md`: a shield does not change a package version, so it does not clear a scan. CVE work moved off BNK |
-| [`widening-plan.md`](widening-plan.md) | Its assertion that a third-party inline hooker could not work inside TMM was **tested and disproved**. The library was declined on provenance, not capability |
 | [`mechanism-tradeoff.md`](mechanism-tradeoff.md) | The scope discipline it sets out — never quote whole-binary padding reach — is still the rule and is worth reading for that alone |
 
 ### Record — accounts of specific investigations
@@ -86,10 +76,7 @@ reachable, or what something costs, prefer the current documents.
 |---|---|
 | [`tmm-integration-findings.md`](tmm-integration-findings.md) | The first integration into the TMM tree |
 | [`design-review-findings.md`](design-review-findings.md) | An adversarial review of the design. Several findings are now closed; **T4 remains open** — the worked CVE example is not a real published advisory |
-| [`cve-selftest.md`](cve-selftest.md) | **CURRENT, and measured.** How the NULL-dereference CVE condition is reproduced against a live TMM, exactly where the simulation boundary sits, both arms with their captured output, and why the condition is synthesised rather than configured |
 | [`probe-a-function.md`](probe-a-function.md) | **CURRENT, and every command was run.** The reverse-engineering procedure as a command sequence, walked end to end on build 03c6f0e0 |
-| [`build-pipeline.md`](build-pipeline.md) | **CURRENT, and measured.** The build-time artifact pipeline: what is generated per build, the forced ordering, where each stage runs, the gates, and the defect the gates caught while it was being written (two debug binaries in one package, differing in 3,132 functions) |
-| [`load-path-scope.md`](load-path-scope.md) | The runtime load path, and why the per-call cost figure in it must not be quoted |
 | [`bnk-integration-map.md`](bnk-integration-map.md) | What BNK exposes and what it does not |
 | [`env/tmm-build-environment.md`](env/tmm-build-environment.md) | The padding measurement. Source of the 48.9% whole-binary figure — which is **correctly scoped there** and routinely misquoted elsewhere as "coverage" |
 
@@ -99,7 +86,6 @@ reachable, or what something costs, prefer the current documents.
 |---|---|
 | [`REPRODUCING.md`](REPRODUCING.md) | Reproduce the results |
 | [`env/bnk-dev-runbook.md`](env/bnk-dev-runbook.md) | Build and deploy environment, end to end |
-| [`live-patch-runbook.md`](live-patch-runbook.md) | Arming a live TMM |
 
 ### Explainers — a fifth category, and this page did not classify them until 2026-08-20
 
@@ -159,3 +145,9 @@ not:
 - The two gaps that block customer use are the two the scope document named at the start —
   program signing and an audit trail. Neither has been built, and neither has been
   reclassified as less important.
+
+---
+
+## Removed as obsolete (2026-08-26)
+
+21 documents were deleted in a cleanup: superseded planning (`development-scope*`, `*-plan`, `hook-point-catalog`, `load-path-scope`, `build-pipeline`, `live-patch-runbook`), the set-aside CVE-on-BNK thread (`cve-*`, `substrate/VULNERABLE-BUILD.md`), and the pre-BNK BIG-IP-VE environment notes (`env/archive-eob-bigip/`, `env/bigip-*`, `env/openstack-cli-reference.md`). The current story lives in `docs/TMM-BUILD.md`, `docs/BYTECODE-BUILD.md`, and `co-re-plan.md`; the design record is the remaining root docs.

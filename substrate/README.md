@@ -43,7 +43,7 @@ discriminated. Not the operator front-end; that is item **11** and is unwritten.
 |---|---|---|
 | [`shield_abi.h`](shield_abi.h) | The substrate ABI: the loader message (`struct shield_msg`), the signed binding, the safe-return policy, the hook slot, and the host-side entry points. Items **3, 4, 7, 9, 10**. | compiles standalone; include-guard clean; 15 `_Static_assert`s pin the wire layout of `struct shield_msg` *and* `struct shield_binding` |
 | [`check_sr_gates.c`](check_sr_gates.c) | Five cases asserting the safe-return **two-gate** rule — an unanalysed body is never enforce-capable, whatever its return type. Item **7**. | compiled and run; fails the build on regression |
-| [`platform_stub.h`](platform_stub.h) | The gaps that stopped [`../development-scope-code.md`](../development-scope-code.md)'s skeletons from being readable by a compiler — two control-plane types, one bound, and the helpers no block declares. Deliberately minimal: it restates nothing `shield_abi.h` or the blocks themselves already declare, because a second declaration that disagreed would be a defect this file introduced rather than one it found. Every symbol is a declaration only; nothing is linked. | compiled by `make check-skeletons`; declarations only, never linked |
+| [`platform_stub.h`](platform_stub.h) | The gaps that stopped `../development-scope-code.md`'s skeletons from being readable by a compiler — two control-plane types, one bound, and the helpers no block declares. Deliberately minimal: it restates nothing `shield_abi.h` or the blocks themselves already declare, because a second declaration that disagreed would be a defect this file introduced rather than one it found. Every symbol is a declaration only; nothing is linked. | compiled by `make check-skeletons`; declarations only, never linked |
 | [`check_skeletons.py`](check_skeletons.py) | Hands each ```c block in that document to a compiler. They are the exemplar an engineer reads for the shape of each item, and before this nothing had ever compiled them — which is how the JIT typedef came to be uBPF's 2-argument basic form while the design needs the 4-argument extended one. A block may opt out with a `not-compiled:` reason; opting out is **reported**, never silent. A pass means the skeletons agree with the ABI header and with each other on types, fields, arity and signatures. It does not mean they run. | run by `make check-skeletons`: 7 of 8 blocks compile, 1 opted out and reported |
 | [`check_vm_geometry.py`](check_vm_geometry.py) | **Item 6a**, and it fails today. PREVAIL proves against a *declared* machine; uBPF provides an *actual* one; nothing enforces that they match, and a divergence is silent because the artifact is still authentic and the theorem still valid — just about different hardware. Parses the constants out of both vendored trees at run time rather than transcribing them. Reports under `make check`; `make gate` is the same check with the exit code a build pipeline needs. | run by `make check-geometry`; **reports a real divergence today** — `make gate` fails on it |
 | [`budget_pass.py`](budget_pass.py) | The admission-time cost gate: parses a real eBPF ELF, decodes the instruction stream, builds the CFG, prices the longest path. Item **8**. | run against a six-case self-test (hand-assembled eBPF in a synthesized ELF) |
@@ -101,7 +101,7 @@ What genuinely remains a stub is narrower, and it is the part that matters for a
   working implementation of the mechanism, not of that ABI, and the two have not been reconciled.
 
 The skeletons that *use* the proposed ABI live in
-[`../development-scope-code.md`](../development-scope-code.md) and are candidates for review, not
+`../development-scope-code.md` and are candidates for review, not
 production code.
 
 **Deliberately a subset:** the schema's `required` list is scoped to what the hand-written
@@ -122,5 +122,5 @@ different prefixes on purpose — `ls_*` names the worked example's types, `shie
 product ABI. Neither *header* is attached to anything, but the `ls_*` **sources** in this directory
 are: they are compiled into TMM and they do execute a shield. The
 naming-reconciliation table in
-[`../development-scope-code.md`](../development-scope-code.md) maps between them, and between
+`../development-scope-code.md` maps between them, and between
 both and the spellings already committed in the explainers.

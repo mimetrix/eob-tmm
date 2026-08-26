@@ -42,7 +42,7 @@ struct http_psm_log_data {
 That matters because a shield includes the `ctx` definition for its hook, and that layout is
 **a property of one build**. Previously these programs were written against structs typed
 out by hand, which can drift from the binary silently. This is
-[`../../development-scope.md`](../../development-scope.md) item 6 — ctx-descriptor emission —
+`../../development-scope.md` item 6 — ctx-descriptor emission —
 in miniature, and the real one is a generator, not a person running `pahole`.
 
 **The ctx is flat and bounded on purpose.** The C code walks
@@ -109,7 +109,7 @@ and that one fails as intended: *"Loop counter is too large (pc[8] < 100000)"*.
 **PREVAIL's defaults are permissive, and it says so in `--help`.** `--termination` is
 *"Default: ignore"*; `--allow-division-by-zero` is *"Default: allow"*; `--strict` is off.
 `reject_termination.bpf.c` **passes** under the defaults and **fails** when the flags are
-asked for. This is [`../../development-scope.md`](../../development-scope.md) item 3a, and
+asked for. This is `../../development-scope.md` item 3a, and
 it is why `substrate/check_vm_geometry.py` treats the defaults as a finding.
 
 ## Reproducing
