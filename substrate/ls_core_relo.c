@@ -183,7 +183,17 @@ static long core_field_offset(const struct btf *L, uint32_t local_id,
 /* ---- the library entry point ---- */
 
 /* Patch the s32 immediate (bytes 4..7) of the 8-byte insn at `insn_off` in the
- * program section, after bounds-checking. */
+ * program section, after bounds-checking.
+ *
+ * SCOPE BOUND (verified against docs.kernel.org/bpf/llvm_reloc.html, cached
+ * kernel-llvm_reloc.html): a FIELD_BYTE_OFFSET relocation patches EITHER an
+ * immediate (ALU/LD ops) OR an instruction's offset field (LDX/STX/ST). We patch
+ * the IMMEDIATE only. That is correct for our programs because a verified program
+ * cannot directly load `p->field` (PREVAIL refuses chasing the pointer); it must
+ * use bpf_probe_read(&p->field), and `&p->field` compiles to an ALU add with the
+ * offset as an immediate. The LDX/STX offset-field form does not arise for the
+ * probe_read'd target fields we relocate. Supporting it would mean dispatching on
+ * the insn opcode class here. */
 static int patch_imm(uint8_t *sec, uint64_t sec_size, uint32_t insn_off, int32_t val) {
     if ((uint64_t)insn_off + 8 > sec_size) return -1;
     uint8_t *insn = sec + insn_off;
