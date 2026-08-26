@@ -66,6 +66,31 @@ sh "$REPO/env/scripts/bnk-receipt.sh" require package build_id "$LIVEID" || fail
     that was compiled, and records the build id this stage just refused to accept."
 
 echo
+echo "=== 1b. derive THIS build's BTF and embed it into the runtime binary (.BTF section)"
+# The loader reads the binary's OWN .BTF (ls_vm_target_btf -> /proc/self/exe): the kernel's
+# vmlinux model minus sysfs. BTF is derived from this build's DWARF by the patched pahole
+# (atomic->volatile + C++ excluded; substrate/toolchain/build-pahole.sh) and embedded with
+# objcopy, which PRESERVES the GNU build-id --- so the arming build-id gate is unaffected
+# (verified: same id before/after). objcopy runs HERE on the build box; the image needs no
+# binutils. The .BTF then travels inside whatever binary was armed --- it cannot drift.
+mkdir -p "$CTX"
+PAHOLE=$(sh "$REPO/substrate/toolchain/build-pahole.sh") || fail "could not build the patched
+    pahole (needs libdw-dev/libelf-dev/zlib1g-dev on the build box; patch under substrate/toolchain)."
+DBGDIR=$(mktemp -d); trap 'rm -rf "$RT" "$DBGDIR"' EXIT
+dpkg-deb -x "$DBG_DEB" "$DBGDIR"
+DBGBIN=$(find "$DBGDIR" -name 'tmm64.no_pgo.debug' | head -1)
+[ -n "$DBGBIN" ] || fail "no tmm64.no_pgo.debug in $DBG_DEB --- cannot derive BTF"
+LD_LIBRARY_PATH="$(dirname "$PAHOLE")" "$PAHOLE" --lang_exclude=c++     --btf_encode_detached="$CTX/tmm.btf" "$DBGBIN" 2>/dev/null
+[ -s "$CTX/tmm.btf" ] || fail "pahole produced no BTF from $DBGBIN"
+REALBIN="$RT/usr/bin/tmm64.no_pgo"
+BID_BEFORE=$(readelf -n "$REALBIN" | sed -n 's/.*Build ID: //p')
+objcopy --add-section .BTF="$CTX/tmm.btf" --set-section-flags .BTF=readonly,data     "$REALBIN" "$CTX/tmm64.no_pgo" || fail "objcopy failed to embed .BTF"
+BID_AFTER=$(readelf -n "$CTX/tmm64.no_pgo" | sed -n 's/.*Build ID: //p')
+readelf -SW "$CTX/tmm64.no_pgo" | grep -q '\.BTF' || fail "embedded binary has no .BTF section"
+[ "$BID_BEFORE" = "$BID_AFTER" ] || fail "objcopy changed the build-id ($BID_BEFORE -> $BID_AFTER) --- would break the arming gate"
+echo "  BTF: $(du -h "$CTX/tmm.btf" | cut -f1) embedded into tmm64.no_pgo; build-id preserved (${BID_AFTER%${BID_AFTER#????????}})"
+
+echo
 echo "=== 2. generate the index (mk_hook_map.py checks the pair's build ids agree)"
 mkdir -p "$CTX/shields"
 python3 "$REPO/substrate/mk_hook_map.py" --debs "$DEBS" \

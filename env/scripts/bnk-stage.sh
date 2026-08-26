@@ -27,7 +27,7 @@
 set -e
 
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
-BUILD_BOX="${BUILD_BOX:-starin@10.145.42.119}"
+BUILD_BOX="${BUILD_BOX:-starin@10.145.37.36}"   # eob-bnk-build-01; .42.119 retired (SSH refused 2026-08-26)
 DEST="${DEST:-eob-tmm-staged}"
 DRY=""
 [ "$1" = "--dry-run" ] && DRY=1
