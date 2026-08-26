@@ -11,7 +11,7 @@ CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
+        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
         check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-prereqs check-sig check-audit shield-blob gate clean
 
 # THE FIRST THING `check` DOES IS SAY WHETHER IT CAN RUN. Measured on a fresh clone 2026-08-20:
@@ -51,7 +51,7 @@ check-prereqs:
 	 fi
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-arm check-swap \
+       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get
 
 # The header must compile standalone, be include-guard clean, and its
@@ -137,6 +137,22 @@ check-tramp:
 	  rm -f .tramp.out; \
 	else \
 	  echo "skip  trampoline_x86_64.S  (host is $$(uname -m), not x86_64; assembly cannot run here)"; \
+	fi
+
+# The function-EXIT trampoline: return-address hijack + a shadow stack keyed by
+# the stack pointer, with reclaim of returns a non-local exit skipped. The .S is
+# x86-64 only. check_fexit.c arms four stand-ins and asserts capture, caller
+# transparency, nested LIFO, recursion, and the longjmp-reclaim path.
+check-fexit:
+	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_fexit.c \
+	  && echo "ok    ls_fexit.c  (the shadow stack; arch-generic C half)"
+	@if [ "$$(uname -m)" = "x86_64" ]; then \
+	  $(CC) -O2 -fcf-protection=branch -I. -o .fexit.out check_fexit.c ls_fexit.c ls_fexit_x86_64.S fexit_victims.S 2>/dev/null && \
+	  ./.fexit.out >/dev/null && \
+	  echo "ok    ls_fexit_x86_64.S  (armed a stand-in exit; return captured, caller transparent, nesting/recursion synced, skipped return reclaimed)" && \
+	  rm -f .fexit.out; \
+	else \
+	  echo "skip  ls_fexit_x86_64.S  (host is $$(uname -m), not x86_64; assembly cannot run here)"; \
 	fi
 
 # Arming: write the patch into live code and take it back out. Runs the real

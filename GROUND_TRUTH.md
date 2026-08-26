@@ -59,6 +59,7 @@ weaker evidence than something an independent tool observed, and conflating the 
 | Displacement reaches them | ROADMAP | — | designed, unimplemented |
 | Function EXIT (`fexit`) hooks — read a function's return value / post-execution state, time its own duration | ROADMAP | — | designed, unbuilt; return-address hijack + per-core shadow stack, gated on the `longjmp` survey (`02-RESEARCH-PARAMETERS.md` P8) |
 | …its gate is clear: TMM contains **no `setjmp`/`longjmp` and no C++ unwind machinery** | MEASURED | KERNEL | `readelf` on build box, builds `ef2496ca`/`80aff243`: zero `longjmp`/`setjmp` symbols, zero `_Unwind_*`/`__cxa_*` imports. So no non-local exit can desync the shadow stack. `02-RESEARCH-PARAMETERS.md` P8 |
+| …its trampoline mechanism (return-address hijack + stack-pointer-keyed shadow stack + reclaim) works | MEASURED (harness) | SELF | `substrate/check_fexit.c` on the build box arms four stand-ins: return captured, caller transparent, entry args carried, nested LIFO, 8-deep recursion, and a `longjmp`-skipped return **reclaimed** without desync. Passes `-O2`, `-O0`, and `-fcf-protection=full`. Standalone harness, not yet in TMM |
 | Hardware watchpoints reach any address | MEASURED, outside TMM | KERNEL | `prototype/watchpoint/`, `perf_event_open` |
 
 ## Watchpoints (prototyped outside TMM, 2026-08-20)

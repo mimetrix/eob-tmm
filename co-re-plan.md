@@ -361,7 +361,10 @@ stack desyncs and the next exit jumps somewhere wrong. **Whether TMM uses `longj
 under a hookable function decides feasibility** — and the P8 survey (2026-08-26, build box) settled it
 **CLEAR**: TMM dynamically links glibc and imports no `longjmp`/`setjmp` and no C++ unwind machinery
 (`_Unwind_*`/`__cxa_*`), so no non-local exit can bypass a hooked frame's `ret`. The pre-registered
-falsifier survived. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
+falsifier survived. The trampoline mechanism itself is now **proven in a standalone harness**
+(`substrate/check_fexit.c`, build box, `make check-fexit`): the return-address hijack, the SP-keyed
+shadow stack, and the reclaim all hold across nesting, recursion, and a `longjmp`-skipped return, at
+`-O2`/`-O0`/`-fcf-protection=full`. What remains is the in-TMM wiring, not the mechanism. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
 through): the SP-keyed reclaim above handles a `longjmp` for free (it bypasses the return slot), but a
 C++ exception *walks* the frames via the unwind tables and would read our stub address as the return —
 corrupting the unwind, not just the shadow stack. So the primary guard is **arm-time exclusion**:
