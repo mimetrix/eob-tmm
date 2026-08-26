@@ -32,11 +32,11 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
   font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 .page{max-width:1080px;margin:0 auto;padding:34px 32px 26px}
-header{margin-bottom:18px;max-width:78ch}
+header{margin-bottom:18px;max-width:none}
 .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
 h1{font-size:29px;line-height:1.12;margin:8px 0 12px;font-weight:660;letter-spacing:-.015em;
   text-wrap:balance;max-width:24ch}
-.lede{font-size:15px;color:var(--ink-2);max-width:74ch}
+.lede{font-size:15px;color:var(--ink-2);max-width:none}
 .lede b{color:var(--ink);font-weight:640}
 .proof{display:inline-flex;align-items:center;gap:9px;margin-top:15px;padding:8px 14px;
   background:var(--good-bg);border:1px solid var(--rule);border-radius:7px;font-size:13px;color:var(--ink-2)}
@@ -77,9 +77,10 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-si
     <div class="eyebrow">BIG-IP Next for Kubernetes · Traffic Management Microkernel</div>
     <h1>A programmable data plane — safe, and live</h1>
     <p class="lede">Customers can shape BIG-IP traffic today with iRules, or wait on a software
-      release. This adds a third path: <b>small, provably-safe programs loaded into a running
-      data plane at runtime</b> — reaching internal state iRules can't, applied and removed on live
-      traffic with no restart, and written once to run on any build. It is the same class of
+      release. This adds a third path: <b>live surfaces</b> — small, provably-safe programs attached
+      to a <b>running</b> data plane at runtime, reaching internal state iRules can't, applied and
+      removed on live traffic with no restart, and written once to run on any build. One general
+      engine hosts a family of surfaces (observe, diagnose, protect); it is the same class of
       technology that made the Linux kernel programmable (eBPF), brought inside TMM.</p>
     <div class="proof"><span class="dot"></span><span>Proven live in the lab: a program attached to
       an internal traffic function on a running BIG-IP Next, read internal state on real requests,
@@ -120,13 +121,13 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-si
     <h2>What it unlocks</h2>
     <p class="sub">Three product capabilities, one mechanism.</p>
     <div class="value">
-      <div class="v"><h3>See &amp; trace</h3><p>Live visibility into internal traffic state no
+      <div class="v"><h3>See &amp; trace <span style="color:var(--ink-3);font-weight:400">· probe / trace</span></h3><p>Live visibility into internal traffic state no
         tool exposes today — effectively a dynamic tracer for the data plane, streaming what's
         happening inside TMM on real traffic.</p></div>
-      <div class="v"><h3>Diagnose live</h3><p>Attach to any function on a running system, read any
+      <div class="v"><h3>Diagnose live <span style="color:var(--ink-3);font-weight:400">· debug</span></h3><p>Attach to any function on a running system, read any
         internal field, detach — with no restart and no traffic disruption. Faster root-cause on
         production issues than anything available now.</p></div>
-      <div class="v"><h3>Protect fast</h3><p>Apply a targeted mitigation — for example, a CVE
+      <div class="v"><h3>Protect fast <span style="color:var(--ink-3);font-weight:400">· shield</span></h3><p>Apply a targeted mitigation — for example, a CVE
         workaround — to a running fleet in minutes, without waiting on a full patch and release
         cycle.</p></div>
     </div>

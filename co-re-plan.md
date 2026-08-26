@@ -261,9 +261,14 @@ function entry. Per-call cost NOT claimed here (the `cycles` counter is preempti
 - **#2 armed cost floor** — MEASURED live: added `cycles_min` to the per-slot timing. Over 80 fires:
   `cycles_min=1484`, mean ≈ 15k, `cycles_max=578370` — the mean/max are preemption-dominated (our
   recorded caveat), so **1484 cycles (≈ 570 ns @ 2.6 GHz) is the floor**. Scope: the rdtsc pair
-  brackets the VM exec + the range-checked `probe_read` helper inside `ls_vm_call`; it EXCLUDES the
-  trampoline register save/restore. The full armed-path floor (probe #5 5b) needs the rdtsc bracket
-  moved into `ls_tramp_dispatch` — a further refinement, not this number.
+  brackets the VM exec + the range-checked `probe_read` helper inside `ls_vm_call`; it excludes the
+  trampoline register save/restore. **Probe #5 5b RESOLVED 2026-08-26:** rather than risk rdtsc in the
+  live trampoline asm (a bug there crashes every armed request), the exact wrapper sequence
+  (`9 pushq + call/ret + 9 popq`) was microbenched in isolation with the same rdtsc min method ---
+  it comes in **below the rdtsc measurement floor** (< 24 cycles, ~0 after subtracting the instrument):
+  register ops on the L1 stack overlap out-of-order. So the trampoline wrapper adds nothing measurable,
+  and **the full armed-path floor ~= 1484 cycles (~570 ns @ 2.6 GHz)** --- dominated by the VM exec and
+  the range-checked `probe_read`, not the attach mechanism.
 
 ## Surface test matrix (surfaces not shields)
 
