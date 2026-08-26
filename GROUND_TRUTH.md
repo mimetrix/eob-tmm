@@ -58,6 +58,7 @@ weaker evidence than something an independent tool observed, and conflating the 
 | OpenSSL's 1,781 linked symbols are unreachable | MEASURED | KERNEL | no entry padding outside TMM core; the index records them as displacement-only |
 | Displacement reaches them | ROADMAP | — | designed, unimplemented |
 | Function EXIT (`fexit`) hooks — read a function's return value / post-execution state, time its own duration | ROADMAP | — | designed, unbuilt; return-address hijack + per-core shadow stack, gated on the `longjmp` survey (`02-RESEARCH-PARAMETERS.md` P8) |
+| …its gate is clear: TMM contains **no `setjmp`/`longjmp` and no C++ unwind machinery** | MEASURED | KERNEL | `readelf` on build box, builds `ef2496ca`/`80aff243`: zero `longjmp`/`setjmp` symbols, zero `_Unwind_*`/`__cxa_*` imports. So no non-local exit can desync the shadow stack. `02-RESEARCH-PARAMETERS.md` P8 |
 | Hardware watchpoints reach any address | MEASURED, outside TMM | KERNEL | `prototype/watchpoint/`, `perf_event_open` |
 
 ## Watchpoints (prototyped outside TMM, 2026-08-20)

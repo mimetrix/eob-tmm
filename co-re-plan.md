@@ -356,5 +356,8 @@ CO-RE relocation, arming-by-name, signing, the ring — is unchanged.
 
 **The gate (see P8).** A non-local exit (`setjmp`/`longjmp`) skips the body's `ret`, so the shadow
 stack desyncs and the next exit jumps somewhere wrong. **Whether TMM uses `longjmp` on any path
-under a hookable function decides feasibility** and is the pre-registered falsifier. Tail calls and
+under a hookable function decides feasibility** — and the P8 survey (2026-08-26, build box) settled it
+**CLEAR**: TMM dynamically links glibc and imports no `longjmp`/`setjmp` and no C++ unwind machinery
+(`_Unwind_*`/`__cxa_*`), so no non-local exit can bypass a hooked frame's `ret`. The pre-registered
+falsifier survived. Tail calls and
 shadow-stack depth are secondary guards.

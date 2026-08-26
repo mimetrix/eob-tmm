@@ -222,6 +222,23 @@ call sites and their dominators; if none dominate a candidate hook target, the g
 that target set. Toolchain-/build-sensitive — run on the build box against the pinned binary
 (rule 5), not from memory.
 
+**SURVEYED 2026-08-26 on the build box (`eob-bnk-build-01`) — falsifier SURVIVED, gate CLEAR.**
+`readelf` over two pinned binaries: the shipped debug companion `tmm64.no_pgo.debug` (build
+`80aff243`, from `tmm-debuginfo_10.207-3.HEAD.b13f8f034e`) and the runtime `tmm.no_pgo` (build
+`ef2496ca`). The runtime binary **dynamically links glibc**, so any `longjmp` call in TMM (or in code
+statically compiled into it) would appear as an undefined import — and there are **none**:
+`longjmp`/`setjmp`/`siglongjmp`/`_setjmp` are absent from `.dynsym`, `.symtab`, and DWARF. The C++
+residual is closed the same way: **zero** `_Unwind_RaiseException` / `_Unwind_ForcedUnwind` /
+`_Unwind_Resume` / `__cxa_throw` / `__cxa_begin_catch` imports — TMM's own code can neither *initiate*
+an unwind nor *catch* one, so no hooked TMM frame can sit on a throw→catch chain. (`.eh_frame` /
+`.gcc_except_table` are present but are passive CFI/backtrace metadata — `-fasynchronous-unwind-tables`
+is default — not active propagation, confirmed by the total absence of any unwind-initiating import.)
+Both candidate hook targets are present (`http_parse_client_headers @ 0xccc600`,
+`ssl_alpn_match @ 0x101f940`). **Verdict:** the return-address-hijack + shadow-stack design is sound
+for the data-path targets; the residual guard is per-target — a future hook placed on a frame that a
+NEEDED C++ library could unwind through would need re-checking, but no such throw/catch chain exists
+in TMM code today. MEASURED, tool-witnessed (`readelf`).
+
 ---
 
 ## Retired
