@@ -81,6 +81,9 @@ SRC="$REPO/substrate/shields"
 [ -d "$SRC" ] || fail "no $SRC"
 
 mkdir -p "$OUT"
+# CLEAN first: a program retired from the tree must not survive in the bake context
+# (that is how 15 stale bespoke .bpf.o rode into an image after the ctx-layer retirement).
+rm -f "$OUT"/*.bpf.o "$OUT"/*.bpf.sig
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 echo "  clang    : $($CLANG --version | head -1)"
@@ -89,7 +92,8 @@ echo "  out      : $OUT"
 echo
 
 npass=0; nreject=0; nbad=0
-for f in "$SRC"/*.bpf.c; do
+for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
+    [ -e "$f" ] || continue
     b=$(basename "$f" .bpf.c)
     o="$TMP/$b.bpf.o"
 
