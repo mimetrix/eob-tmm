@@ -147,3 +147,62 @@ build-coupled detour in CONTESTED-PREMISES.md.
   against our DWARF oracle.
 - **DWARF→BTF cleanliness** (Phase 2) — *FIRED & RESOLVED 2026-08-25:* stock pahole died on `_Atomic`
   types; fixed with pahole v1.29 + a one-line atomic→volatile encoder patch (now a toolchain pin). See Phase 2.
+
+---
+
+## Surface test matrix (surfaces not shields)
+
+Four surfaces the substrate serves — **shield · probe · trace · debug** — each with tests that
+exercise it. Readiness: **▶** provable off the load path today (compile → relocate → PREVAIL, plus
+the two-build portability check) · **⧗** needs the build's BTF baked into the image + a cluster arm ·
+**⚠** additionally gates on the threat-model analysis (TMA). *No performance claim is a claim until
+measured on the pinned build + a stable pod (rule 5); report distributions, not means — the counter
+mean is dominated by preemption artifacts.*
+
+Attach points/fields below are real — present in the build BTF (`http_parse_ctx`, `ssl_ctx`,
+`connflow`); `http_parse_client_headers` is proven to fire once per request.
+
+### probe — attach where no iRule can, read internal state, count/sample/measure
+1. **Count-by-internal-field** ▶⧗ — read `http_parse_ctx.version_num`, bucket per request. *Pass iff* bucket deltas equal driven traffic.
+2. **Hook fidelity** ⧗ — fires exactly once per request across N. *Pass iff* fired-delta == request count.
+3. **Bitfield read** ▶ — read `http_parse_ctx.state` (byte-aligned bitfield → byte 10). *Pass iff* value matches; a sub-byte bitfield is rejected, not mis-read.
+4. **Arm/disarm live** ⧗ — counts rise armed, freeze disarmed, no restart.
+5. **Armed-hook overhead** — the one that needs a measurement, in two honest parts:
+   - **5a external A/B** ▶⧗ (bytecode-only, aggregate bound): arm a **no-op probe**; steady traffic
+     (fixed RPS, connection reuse, stable pod, pinned build); per-request latency **distribution**
+     (p50/p90/p99) + throughput, **disarmed vs armed**, A/B-alternated to cancel drift, ≥100k
+     req/state. Report the **delta distribution**. *Honest limit:* bounds the cost (≤ X µs/req); a
+     single hook's ns cost sits below request-latency noise, so 5a cannot pin per-call ns.
+   - **5b in-trampoline rdtsc** ⧗ (**the single structural change** — an rdtsc pair around the VM
+     dispatch in `ls_tramp.c`, our own code, accumulating per-core {count,sum,min,max} read out via
+     the ring/audit): per-invocation cycles for **trampoline dispatch + VM**, isolated from traffic
+     noise. Report **min + histogram** (min = least preemption), convert to ns at the known clock,
+     **subtract the empty rdtsc-pair cost** (as the bench already does). *Excludes* i-cache warm
+     effects under real traffic — state it.
+
+### trace — stream internal events off-box, live (via the ring + ls_drain)
+1. **One-record-per-event** ⧗ — N requests → exactly N records, fields correct.
+2. **Accounted overflow** ⧗ — drive faster than drain → dropped records increment a **drop counter**, never silently lost.
+3. **Field-fidelity cross-check** ⧗ — streamed values match probe #1's counts.
+4. **Multi-field record** ▶⧗ — emit ≥2 fields; drained layout matches the declared schema.
+
+### debug — ad-hoc introspection, re-pointable, no rebuild/restart
+1. **Named-field dump** ⧗ — operator names a field at demo time; live value matches an independent read.
+2. **Re-point without restart** ⧗ — load bytecode A (field X), then B (field Y) into the same slot; both work, zero rebuild.
+3. **Arbitrary attach** ▶⧗ — attach to a function with **no iRule event**; it arms and reads.
+4. **Portability** ▶ — same debug bytecode vs **two builds** with different offsets; both read the right field (CO-RE payoff; shown for `http_observe`).
+
+### shield — a verdict changes execution (enforcement; the CVE story, held last)
+1. **Verdict gates the body** ⧗⚠ — condition true → `SAFE_RETURN` → body skipped (a probe on the body confirms zero entries); false → fall through.
+2. **Fail-dark on bad load** ▶ — a program that fails relocation/verify is **refused**, never partially armed.
+3. **Monitor vs enforce** ⧗⚠ — MONITOR records but doesn't gate; ENFORCE gates; mode-ceiling honored.
+4. **Disarm restores original** ⧗⚠ — arm then disarm; original behavior returns, no residual, no restart.
+
+### Bytecode-only vs structural change
+- **Application timing** (durations between internal events, via `bpf_ktime_get_ns` id 5 + maps): **bytecode-only, precise, no TMM change.**
+- **Mechanism's own per-call overhead:** **not** measurable precisely from bytecode (the program runs
+  after the trampoline already paid its cost; `ktime` can't resolve ~10 ns). Precise measurement needs
+  **5b's rdtsc pair in `ls_tramp.c`** — the single structural change, in code we own, not F5 source.
+- **"iRules can't" for probe/trace/debug demo claims** still depends on the iRules-boundary
+  verification (in progress) — the *tests* assert substrate behavior and need no iRules; the
+  *comparison narrative* needs the cited boundary.
