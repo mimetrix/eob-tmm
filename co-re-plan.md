@@ -243,6 +243,28 @@ process and loaded over the socket. Two-step load then arm: `ls-load.py load <sl
 puts the (relocated, verified, JIT'd) program in the slot; `ls-load.py arm <slot> <hook>` patches the
 function entry. Per-call cost NOT claimed here (the `cycles` counter is preemption-dominated — probe #5).
 
+## Loose ends closed (2026-08-26)
+
+- **#1 negative test** — `substrate/shields/reject_memory.bpf.c` (generic-ctx, dereferences a raw
+  `arg[0]`): PREVAIL refuses it (verdict FAIL). Restores the verifier self-check the typed `reject_*`
+  removal lost.
+- **#4 live** — **re-point** proven (`ls_vm: RELOADED slot=0`: probe→shield swapped in one slot,
+  no restart) and **trace end-to-end** proven (`trace_stream` armed → `ls_drain --segment` streamed
+  one JSON record per request). Honest finding: at an `fentry` hook the read fields are 0 because the
+  hook fires at function *entry*, before `http_parse_client_headers` populates `state`/`version_num`
+  (`arg[0]` IS `http_parse_ctx *`, confirmed in `signatures.tsv`); a probe wanting parsed values
+  attaches at the exit or a downstream function.
+- **#3 loader ergonomics** — MEASURED live (build `80aff243`): the loader now takes the entry
+  function FROM the object (`ls_function_in_section`) instead of the fixed `shield`. A program named
+  `probe_parser` loads and the log shows `function=probe_parser` derived — the same program was
+  *refused* by the old loader (`'shield' does not live in section`).
+- **#2 armed cost floor** — MEASURED live: added `cycles_min` to the per-slot timing. Over 80 fires:
+  `cycles_min=1484`, mean ≈ 15k, `cycles_max=578370` — the mean/max are preemption-dominated (our
+  recorded caveat), so **1484 cycles (≈ 570 ns @ 2.6 GHz) is the floor**. Scope: the rdtsc pair
+  brackets the VM exec + the range-checked `probe_read` helper inside `ls_vm_call`; it EXCLUDES the
+  trampoline register save/restore. The full armed-path floor (probe #5 5b) needs the rdtsc bracket
+  moved into `ls_tramp_dispatch` — a further refinement, not this number.
+
 ## Surface test matrix (surfaces not shields)
 
 Four surfaces the substrate serves — **shield · probe · trace · debug** — each with tests that
