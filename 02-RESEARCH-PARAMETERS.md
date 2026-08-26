@@ -237,7 +237,11 @@ Both candidate hook targets are present (`http_parse_client_headers @ 0xccc600`,
 `ssl_alpn_match @ 0x101f940`). **Verdict:** the return-address-hijack + shadow-stack design is sound
 for the data-path targets; the residual guard is per-target — a future hook placed on a frame that a
 NEEDED C++ library could unwind through would need re-checking, but no such throw/catch chain exists
-in TMM code today. MEASURED, tool-witnessed (`readelf`).
+in TMM code today. MEASURED, tool-witnessed (`readelf`). **How the residual is covered (design):** a `longjmp` is handled for
+free by keying the shadow stack to the stack pointer and reclaiming skipped frames (`kretprobes`
+precedent); a C++ exception is handled by **refusing exit hooks on unwind-traversable targets** at arm
+time (offline reachability), since overwriting a return address that the unwinder walks would corrupt
+the unwind itself. Both fold into the fexit build, not a new open question.
 
 ---
 

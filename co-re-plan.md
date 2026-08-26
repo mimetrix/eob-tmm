@@ -347,8 +347,10 @@ frame, runs the VM with an exit context, restores `rax`, and jumps to the real c
 nesting/recursion.
 
 **Checklist.** (1) a `(kind, slot)` dispatch split — a hook carries entry-vs-exit, arming an exit
-hook still patches the *entry* pad but dispatches differently; (2) a per-core shadow stack, bounded
-depth, overflow → fall through (never crash); (3) the asm exit stub + the `[rsp+8]` swap in
+hook still patches the *entry* pad but dispatches differently; (2) a per-core shadow stack **keyed by the
+stack pointer at hijack time**, bounded depth, overflow → fall through (never crash) — and on each
+exit, reclaim any frame *newer* than the current one, so a skipped return (the `kretprobes`
+technique) self-heals rather than desyncing; (3) the asm exit stub + the `[rsp+8]` swap in
 `ls_tramp_asm.c` / `trampoline_x86_64.S` (kept mirrored); (4) an exit ctx shape — the generic ctx
 gains the **return value** (+ saved entry args): a `ctx_abi` version bump (already versioned); (5) a
 `fexit/<fn>` program type PREVAIL admits. Everything else — the VM, ctx assembly, `ls_vm_call`,
@@ -359,5 +361,11 @@ stack desyncs and the next exit jumps somewhere wrong. **Whether TMM uses `longj
 under a hookable function decides feasibility** — and the P8 survey (2026-08-26, build box) settled it
 **CLEAR**: TMM dynamically links glibc and imports no `longjmp`/`setjmp` and no C++ unwind machinery
 (`_Unwind_*`/`__cxa_*`), so no non-local exit can bypass a hooked frame's `ret`. The pre-registered
-falsifier survived. Tail calls and
+falsifier survived. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
+through): the SP-keyed reclaim above handles a `longjmp` for free (it bypasses the return slot), but a
+C++ exception *walks* the frames via the unwind tables and would read our stub address as the return —
+corrupting the unwind, not just the shadow stack. So the primary guard is **arm-time exclusion**:
+refuse an exit hook on any target an unwind can traverse, an offline reachability check like the
+displacement index. Cheap and total because P8 showed the throwing surface is tiny — TMM code itself
+throws and catches nothing, so only functions calling down into a throwing C++ `NEEDED` library qualify. Tail calls and
 shadow-stack depth are secondary guards.
