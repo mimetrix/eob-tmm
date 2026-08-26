@@ -9,7 +9,7 @@ static long (*bpf_probe_read)(void *, __u32, const void *) = (void *)4;
 struct ssl_ctx { void *cf; } __attribute__((preserve_access_index));
 struct ls_ctx_generic { __u64 arg[5]; };
 __attribute__((section("fentry/ssl_alpn_match"), used))
-__u64 debug_field(struct ls_ctx_generic *c)
+__u64 shield(struct ls_ctx_generic *c)
 {
     struct ssl_ctx *sc = (struct ssl_ctx *)c->arg[0];
     __u64 v = 0;

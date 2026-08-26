@@ -9,7 +9,7 @@ struct ls_ctx_generic { __u64 arg[5]; };
 #define LS_SAFE_RETURN  1ull
 #define LS_FALLTHROUGH  0ull
 __attribute__((section("fentry/http_parse_client_headers"), used))
-__u64 shield_nullguard(struct ls_ctx_generic *c)
+__u64 shield(struct ls_ctx_generic *c)
 {
     struct http_parse_ctx *h = (struct http_parse_ctx *)c->arg[0];
     void *p = 0;
