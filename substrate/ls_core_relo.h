@@ -29,6 +29,14 @@ struct btf {
 int ls_core_btf_open(struct btf *b, const uint8_t *blob, uint32_t len);
 void ls_core_btf_free(struct btf *b);
 
+/* Find the `.BTF` section span inside an ELF64 blob (bounds-checked). On success
+ * sets *btf and *btf_sz to point into `elf` and returns 0; returns <0 if the ELF is
+ * malformed or has no `.BTF` section. Used to read the running binary's own BTF
+ * from /proc/self/exe --- the kernel's "embed .BTF in vmlinux" model for a
+ * userspace process. */
+int ls_core_btf_find_in_elf(const uint8_t *elf, uint32_t elf_len,
+                            const uint8_t **btf, uint32_t *btf_sz);
+
 /* Relocate `elf` (an eBPF program object, MUTABLE) in place against `target`.
  * Parses the program's own .BTF/.BTF.ext, resolves every FIELD_BYTE_OFFSET record
  * by field name against `target`, and patches the instruction immediates.

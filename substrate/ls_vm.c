@@ -529,36 +529,45 @@ ls_vm_bench(int slot, uint32_t iters)
             (unsigned long long)(total / iters), (unsigned long long)worst);
 }
 
-/* ---- CO-RE target BTF: THIS build's type info, an artifact baked into the image ---- */
-#ifndef LS_BTF_PATH
-#define LS_BTF_PATH "/usr/share/ls/tmm.btf"
-#endif
+/* ---- CO-RE target BTF: THIS build's type info, embedded in the binary ----
+ * The kernel embeds BTF in vmlinux as a `.BTF` section (pahole at build; see
+ * evidence/cache/kernel-btf.html) and re-exposes it via /sys/kernel/btf/vmlinux
+ * only because userspace cannot read kernel memory. TMM is a userspace process,
+ * so its equivalent is to read its OWN `.BTF` section from /proc/self/exe --- the
+ * same model minus the sysfs indirection. Packaging embeds `.BTF` into the binary
+ * (pahole + objcopy --add-section); this reads it back. The BTF therefore cannot
+ * mismatch the binary: it IS the binary's own section. */
+
 /* One fact, one whitelist entry: the parsed target BTF and its load state
  * (0 unset, 1 ok, -1 failed). Folded into a struct rather than two globals so the
  * mutable-state manifest gains one name, not two --- see ls_audit's lesson. */
 static struct { struct btf b; int state; } g_ls_btf;
 
-/* Load and parse the baked BTF once, lazily, on the TMM thread (malloc is legal
- * here; this is reached only via ls_prep_run_pending). The mmap outlives the
+/* Load and parse the binary's own `.BTF` once, lazily, on the TMM thread (malloc
+ * is legal here; reached only via ls_prep_run_pending). The mmap outlives the
  * parse deliberately --- ls_core_btf_open does not copy the blob. */
 static const struct btf *
 ls_vm_target_btf(void)
 {
     if (g_ls_btf.state == 0) {
         g_ls_btf.state = -1;                          /* pessimistic until proven */
-        int fd = open(LS_BTF_PATH, O_RDONLY);
+        int fd = open("/proc/self/exe", O_RDONLY);
         if (fd >= 0) {
             off_t sz = lseek(fd, 0, SEEK_END);
-            void *mem = (sz > 0 && sz < (off_t)0x40000000)
+            void *mem = (sz > 0 && sz < (off_t)0x80000000)
                           ? mmap(NULL, (size_t)sz, PROT_READ, MAP_PRIVATE, fd, 0)
                           : MAP_FAILED;
             close(fd);
-            if (mem != MAP_FAILED && ls_core_btf_open(&g_ls_btf.b, mem, (uint32_t)sz) == 0)
-                g_ls_btf.state = 1;
+            if (mem != MAP_FAILED) {
+                const uint8_t *btf = 0; uint32_t btf_sz = 0;
+                if (ls_core_btf_find_in_elf(mem, (uint32_t)sz, &btf, &btf_sz) == 0 &&
+                    ls_core_btf_open(&g_ls_btf.b, btf, btf_sz) == 0)
+                    g_ls_btf.state = 1;
+            }
         }
         if (g_ls_btf.state != 1)
-            fprintf(stderr, "ls_vm: no usable CO-RE BTF at %s --- programs cannot be "
-                            "relocated and will be refused\n", LS_BTF_PATH);
+            fprintf(stderr, "ls_vm: no usable `.BTF` section in /proc/self/exe --- programs "
+                            "cannot be relocated and will be refused\n");
     }
     return g_ls_btf.state == 1 ? &g_ls_btf.b : NULL;
 }

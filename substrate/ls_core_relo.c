@@ -102,6 +102,30 @@ int ls_core_btf_open(struct btf *b, const uint8_t *blob, uint32_t len) {
 }
 void ls_core_btf_free(struct btf *b) { if (b && b->idx) { free(b->idx); b->idx = NULL; b->nids = 0; } }
 
+/* Find the `.BTF` ELF section span, bounds-checked against elf_len. */
+int ls_core_btf_find_in_elf(const uint8_t *elf, uint32_t elf_len,
+                            const uint8_t **btf, uint32_t *btf_sz) {
+    if (elf_len < 64) return -1;
+    uint64_t shoff = rd64(elf + 0x28);
+    uint16_t shentsize = rd16(elf + 0x3a), shnum = rd16(elf + 0x3c), shstrndx = rd16(elf + 0x3e);
+    if (shentsize < 64 || shnum == 0 || shstrndx >= shnum) return -1;
+    if (shoff > elf_len || (uint64_t)shnum * shentsize > elf_len - shoff) return -1;
+    const uint8_t *she = elf + shoff + (uint64_t)shstrndx * shentsize;
+    uint64_t str_off = rd64(she + 0x18), str_size = rd64(she + 0x20);
+    if (str_off > elf_len || str_size > elf_len - str_off) return -1;
+    const char *shstr = (const char *)(elf + str_off);
+    for (uint16_t i = 0; i < shnum; i++) {
+        const uint8_t *e = elf + shoff + (uint64_t)i * shentsize;
+        uint32_t nameo = rd32(e);
+        if (nameo >= str_size) continue;
+        if (strcmp(shstr + nameo, ".BTF")) continue;   /* only the section we want --- do */
+        uint64_t off = rd64(e + 0x18), sz = rd64(e + 0x20); /* NOT bounds-abort on NOBITS */
+        if (off > elf_len || sz > elf_len - off) return -1; /* sections like .bss */
+        *btf = elf + off; *btf_sz = (uint32_t)sz; return 0;
+    }
+    return -1;   /* no .BTF section */
+}
+
 /* skip const/volatile/restrict/typedef/type_tag qualifiers to the real type */
 static const struct btf_type *btf_skip_mods(const struct btf *b, uint32_t *id) {
     const struct btf_type *t = btf_type_by_id(b, *id);
@@ -224,12 +248,13 @@ int ls_core_relocate(void *elf_v, uint32_t elf_len, const struct btf *target,
     for (uint16_t i = 0; i < shnum; i++) {
         const uint8_t *e = elf + shoff + (uint64_t)i * shentsize;
         uint32_t nameo = rd32(e);
-        uint64_t off = rd64(e + 0x18), sz = rd64(e + 0x20);
         if (nameo >= shstr_size) continue;
-        if (off > elf_len || sz > elf_len - off) return -LS_RELO_EBADELF;
         const char *nm = shstr + nameo;
-        if      (!strcmp(nm, ".BTF"))     { btf_d = elf + off; btf_sz = sz; }
-        else if (!strcmp(nm, ".BTF.ext")) { ext_d = elf + off; ext_sz = sz; }
+        int isbtf = !strcmp(nm, ".BTF"), isext = !strcmp(nm, ".BTF.ext");
+        if (!isbtf && !isext) continue;   /* skip; do NOT bounds-abort on NOBITS (.bss) */
+        uint64_t off = rd64(e + 0x18), sz = rd64(e + 0x20);
+        if (off > elf_len || sz > elf_len - off) return -LS_RELO_EBADELF;
+        if (isbtf) { btf_d = elf + off; btf_sz = sz; } else { ext_d = elf + off; ext_sz = sz; }
     }
     if (!btf_d || !ext_d) return -LS_RELO_ENOBTF;
 
@@ -260,7 +285,9 @@ int ls_core_relocate(void *elf_v, uint32_t elf_len, const struct btf *target,
             const uint8_t *e = elf + shoff + (uint64_t)i * shentsize;
             uint32_t nameo = rd32(e);
             if (nameo < shstr_size && !strcmp(shstr + nameo, secname)) {
-                psec = elf + rd64(e + 0x18); psec_sz = rd64(e + 0x20); break;
+                uint64_t off = rd64(e + 0x18), sz = rd64(e + 0x20);
+                if (off <= elf_len && sz <= elf_len - off) { psec = elf + off; psec_sz = sz; }
+                break;
             }
         }
         for (uint32_t r = 0; r < num; r++) {

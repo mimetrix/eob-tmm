@@ -150,6 +150,77 @@ build-coupled detour in CONTESTED-PREMISES.md.
 
 ---
 
+## BTF as a build artifact (embedded in the binary — the kernel's model)
+
+Resolved 2026-08-26, grounded in the cached kernel docs (SOURCES.md): the kernel embeds its BTF as a
+`.BTF` ELF section in `vmlinux` (pahole at build) and only re-exposes it via `/sys/kernel/btf/vmlinux`
+because userspace cannot read kernel memory. TMM is one userspace process, so its equivalent is to
+read its **own** `.BTF` section from `/proc/self/exe` — the same model minus the sysfs indirection,
+and the BTF cannot mismatch the binary because it *is* the binary's section.
+
+- **Loader (DONE, validated):** `ls_vm_target_btf()` mmaps `/proc/self/exe`, `ls_core_btf_find_in_elf`
+  locates the `.BTF` section (bounds-checked; skips NOBITS like `.bss` — a bug the round-trip test
+  caught), `ls_core_btf_open` parses it. Round-trip proven on the build box: `objcopy` a `.BTF` onto
+  the stripped runtime binary → the loader reads its own section (6.7 MB, 116,690 types) → relocates
+  a surface **rc=0**.
+- **Toolchain (DONE):** `substrate/toolchain/build-pahole.sh` builds the patched pahole reproducibly
+  (dwarves v1.29 + the atomic→volatile patch), idempotent, to `~/.cache/ls-pahole`.
+- **Packaging (PENDING — wire + validate with a real bake):** in `bnk-bake-tools.sh`, after the DEB
+  extract, generate the BTF from the build's debuginfo and embed it into the runtime binary:
+  ```
+  PAHOLE=$(substrate/toolchain/build-pahole.sh)
+  "$PAHOLE" --lang_exclude=c++ --btf_encode_detached="$CTX/tmm.btf" <extracted tmm64.no_pgo.debug>
+  objcopy --add-section .BTF="$CTX/tmm.btf" --set-section-flags .BTF=readonly,data           "$RT/usr/bin/tmm64.no_pgo" "$CTX/tmm64.no_pgo"    # build box has binutils; image may not
+  readelf -SW "$CTX/tmm64.no_pgo" | grep -q '\.BTF'        # verify before shipping
+  ```
+  then `Dockerfile.ls-tools` COPYs `$CTX/tmm64.no_pgo` over the image's binary. Left unwired here
+  rather than committing an unvalidated edit to the working bake script; wire it when we run the
+  bake for the first live arm.
+
+## Assumptions about TMM's normal build (factored into the design)
+
+The design is a standard `make tmm-gdb` plus our adjustments (substrate sources in `filelist`, the
+globals-whitelist entries, the `-fpatchable-function-entry` pad flag, and the BTF-embed packaging
+step). What it assumes about that build:
+
+*Verified — safe to rely on:*
+- **`objcopy --add-section .BTF` preserves the GNU build-id** (checked: 244673ff… identical before/
+  after). So embedding BTF is invisible to the arming build-id gate; embed order vs hook-index
+  stamping does not matter.
+- **Struct layout is DWARF-exact and ABI-stable** across PGO/`-O` variants (relocator offsets matched
+  the `pahole -C` oracle). BTF from one variant describes another's layout.
+
+*Real dependencies the design is built around:*
+1. **The build must emit DWARF** (`tmm-debuginfo`, via `make tmm-gdb`/`GDB_INCLUDE`). A stripped
+   release build with no debug info yields no BTF → no CO-RE. CO-RE targets a debuginfo-emitting build.
+2. **BTF, entry pads, and arming must all land on the SAME binary variant.** TMM ships several
+   (`tmm64.no_pgo`, `tmm64.debug`, PGO). Arming needs the **padded** binary; the Dockerfile already
+   repoints `/usr/bin/tmm` to it (the `tmm.debug`-has-no-pads bug shipped 4×). The `.BTF` must be
+   embedded in *that* binary. Embedding in the binary (vs a loose file) makes this self-consistent:
+   the BTF travels with whatever was armed.
+3. **BTF generation is pinned-toolchain-sensitive.** pahole choked on `_Atomic` (patched) and C++
+   reference types (`--lang_exclude=c++`). A clang/toolchain bump can surface new DWARF forms —
+   re-validate BTF generation on any toolchain change, same discipline as PREVAIL/clang (rule 5).
+4. **The embed runs on the build box, not in the image.** `objcopy`/binutils live on the build box; a
+   data-plane container may not have them. Generate+embed in the bake; ship the embedded binary.
+5. **We add a post-build step, not change F5's build.** BTF generation is our packaging step over the
+   debuginfo; no F5 source or Makefile is touched.
+
+*Risk to watch (not currently triggered):* **LTO / aggressive optimization could drop or merge
+types.** The `no_pgo` debug build keeps all surface structs (verified present); revisit if a build
+ever enables LTO.
+
+## The 5-byte entry pad is still required (orthogonal to CO-RE)
+
+Attaching and field-reading are separate mechanisms. `-fpatchable-function-entry=5,0` leaves a 5-byte
+nop sled at every function entry so the trampoline can overwrite it with a `JMP rel32` (5 bytes) at
+runtime — this is what makes "arm any function on a running TMM, no restart" possible, and it is the
+core of the probe/debug value. CO-RE only resolves field offsets in the loaded bytecode; it does not
+touch attachment. Retiring the bespoke ctx layer left `ls_tramp`/`ls_arm`/`ls_swap` intact and the
+pads present in the binary (`__patchable_function_entries` section confirmed). Dropping the pad would
+mean a different, worse attach mechanism (breakpoint/trap, or bpftime-style inline rewriting) — not
+worth 5 nops per function, the standard kernel-ftrace approach.
+
 ## Surface test matrix (surfaces not shields)
 
 Four surfaces the substrate serves — **shield · probe · trace · debug** — each with tests that
