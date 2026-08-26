@@ -65,6 +65,10 @@
 #include "vm_stack_policy.h"
 #include "ls_map.h"
 #include "ls_map_glue.h"
+#include "ls_core_relo.h"
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include <elf.h>
 #include <stdio.h>
@@ -525,6 +529,40 @@ ls_vm_bench(int slot, uint32_t iters)
             (unsigned long long)(total / iters), (unsigned long long)worst);
 }
 
+/* ---- CO-RE target BTF: THIS build's type info, an artifact baked into the image ---- */
+#ifndef LS_BTF_PATH
+#define LS_BTF_PATH "/usr/share/ls/tmm.btf"
+#endif
+/* One fact, one whitelist entry: the parsed target BTF and its load state
+ * (0 unset, 1 ok, -1 failed). Folded into a struct rather than two globals so the
+ * mutable-state manifest gains one name, not two --- see ls_audit's lesson. */
+static struct { struct btf b; int state; } g_ls_btf;
+
+/* Load and parse the baked BTF once, lazily, on the TMM thread (malloc is legal
+ * here; this is reached only via ls_prep_run_pending). The mmap outlives the
+ * parse deliberately --- ls_core_btf_open does not copy the blob. */
+static const struct btf *
+ls_vm_target_btf(void)
+{
+    if (g_ls_btf.state == 0) {
+        g_ls_btf.state = -1;                          /* pessimistic until proven */
+        int fd = open(LS_BTF_PATH, O_RDONLY);
+        if (fd >= 0) {
+            off_t sz = lseek(fd, 0, SEEK_END);
+            void *mem = (sz > 0 && sz < (off_t)0x40000000)
+                          ? mmap(NULL, (size_t)sz, PROT_READ, MAP_PRIVATE, fd, 0)
+                          : MAP_FAILED;
+            close(fd);
+            if (mem != MAP_FAILED && ls_core_btf_open(&g_ls_btf.b, mem, (uint32_t)sz) == 0)
+                g_ls_btf.state = 1;
+        }
+        if (g_ls_btf.state != 1)
+            fprintf(stderr, "ls_vm: no usable CO-RE BTF at %s --- programs cannot be "
+                            "relocated and will be refused\n", LS_BTF_PATH);
+    }
+    return g_ls_btf.state == 1 ? &g_ls_btf.b : NULL;
+}
+
 int
 ls_vm_arm(const void *elf, size_t elf_len,
           const char *section, const char *function, enum ls_mode m)
@@ -567,6 +605,30 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * always empty. That is exactly the state this build was in. */
     if (ls_map_glue_install(vm) != 0)
         goto fail;
+
+    /* CO-RE RELOCATION --- before verify+JIT. A portable program names TMM fields
+     * by struct+field name and carries .BTF.ext records; here each is resolved to
+     * THIS build's byte offset (from the baked BTF) and the instruction immediate
+     * is patched, so one bytecode runs on any build with no baked offset and no
+     * rebuild. `elf` is the caller's private, mutable prep buffer, so patching in
+     * place is sound. FAIL-DARK: a program we cannot fully relocate is refused,
+     * never run against a stale offset; a program with no .BTF.ext (nothing to
+     * relocate) proceeds. Reached on the TMM thread, where malloc is legal. */
+    {
+        const struct btf *tb = ls_vm_target_btf();
+        if (tb == NULL) {
+            fprintf(stderr, "ls_vm: refusing --- no target BTF to relocate against\n");
+            goto fail;
+        }
+        unsigned nrel = 0;
+        int rrc = ls_core_relocate((void *)elf, (uint32_t)elf_len, tb, &nrel);
+        if (rrc != LS_RELO_OK && rrc != -LS_RELO_ENOBTF) {
+            fprintf(stderr, "ls_vm: refusing --- CO-RE relocation failed (rc=%d)\n", rrc);
+            goto fail;
+        }
+        if (g_cfg.verbose && nrel)
+            fprintf(stderr, "ls_vm: CO-RE relocated %u field offset(s)\n", nrel);
+    }
 
     /* Interpreter by default. The JIT is reachable by env var so its cost can be
      * MEASURED without a rebuild --- not because it is safe to run (O6: fuel has
