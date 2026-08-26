@@ -30,7 +30,7 @@
 set -e
 
 REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
-BUILD_BOX="${BUILD_BOX:-starin@10.145.42.119}"
+BUILD_BOX="${BUILD_BOX:-starin@10.145.37.36}"   # eob-bnk-build-01; .42.119 retired (SSH refused 2026-08-26)
 TREE="${TREE:-code/tmm/src}"
 DRY=""
 [ "$1" = "--dry-run" ] && DRY=1
@@ -131,11 +131,9 @@ else
     # base/ would need every -I that module has, which is the build-config guessing the
     # STDINC split exists to avoid. Their HEADERS stay in base/ and are reached as
     # <local/base/...>, so only the .c moves.
-    for f in ls_ctx_alpn.c ls_ctx_alpn.h ls_h_alpn.c ls_ssl_cookie.c; do
-        [ -f "$SRC/$f" ] || { echo "  *** $SRC/$f missing"; exit 1; }
-        $SCP -q "$SRC/$f" "$BUILD_BOX:$TREE/modules/hudfilter/ssl/$f"
-    done
-    echo "  copied (base/ + 3 ssl-module files)"
+    # No ls_* files live in modules/hudfilter/ssl/ any more: the ctx-layer retirement
+    # (2026-08-26) removed ls_ctx_alpn.* and ls_ssl_cookie.c. base/ is the whole delta.
+    echo "  copied (base/ only --- ssl-module ctx files retired)"
     # STAMP THE COMMIT THE STAGED COPY CAME FROM. The staged tree is a tar extract with no
     # .git, so packaging cannot work this out for itself --- it recorded "unknown" on its
     # first real run. Writing it here, from the machine that actually has the repo, is the

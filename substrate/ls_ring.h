@@ -80,7 +80,7 @@ struct ls_rec {
      *
      * A real TMM instance id would be worth having and is NOT available here: `tid`
      * lives in TMM's -nostdinc include world and this file is STDINC. It would need the
-     * same kind of crossing ls_flow_cookie.c uses. Left undone rather than approximated. */
+     * same kind of cross-include-world crossing the retired cookie helpers used. */
     uint32_t slot;
     uint32_t len;                    /* payload bytes following this header         */
     uint64_t ts_ns;                  /* CLOCK_REALTIME at capture, ns since epoch   */

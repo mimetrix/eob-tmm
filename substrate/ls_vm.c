@@ -26,6 +26,9 @@
  *              struct fw_log_profile_protocol_transfer *ptlp =
  *                  flow_get_listener(cf)->prot_transfer_log_profile;
  *
+ *     [SUPERSEDED --- illustrates the RETIRED typed-ctx model. Today the trampoline hands
+ *      every program the generic register ctx and a CO-RE program reads fields by relocation;
+ *      no per-hook ctx type is built in the host. Kept as the design record of why.]
  *     +        struct ls_ctx_http_psm c = {                  // per-core scratch
  *     +            .ptlp      = (uint64_t)(uintptr_t)ptlp,
  *     +            .ptlp_name = ptlp ? (uint64_t)(uintptr_t)ptlp->name : 0,
@@ -62,8 +65,6 @@
 #include "vm_stack_policy.h"
 #include "ls_map.h"
 #include "ls_map_glue.h"
-#include "ls_ctx_reg.h"   /* the hook name decides the ctx builder, not the slot */
-#include "ls_ctx_http_psm.h"  /* the self-test feeds the REAL ctx type, never a copy of it */
 
 #include <elf.h>
 #include <stdio.h>
@@ -610,8 +611,6 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * program expects to be handed. NULL --- no registered builder --- means the generic
      * five registers and no dereference. ls_slots.h records what went wrong when the slot
      * number decided this. */
-    g_slots[slot].ctx_reg =
-        ls_ctx_reg_lookup(strncmp(section, "fentry/", 7) == 0 ? section + 7 : section);
     g_slots[slot].armed = true;
 
     if (g_cfg.verbose)
@@ -661,25 +660,13 @@ fail:
 static void
 ls_vm_selftest(int slot, unsigned level)
 {
-    /* Exactly the ctx the call site builds when the listener has no profile --- and it is the
-     * REAL TYPE, not a local struct that happens to match today.
-     *
-     * This was an anonymous `struct { uint64_t ptlp, ptlp_name; uint32_t key, name_len; }`,
-     * duplicating the layout of struct ls_ctx_http_psm by hand. It matched --- 24 bytes, same
-     * order, same widths --- and nothing enforced it. Add a field to the real ctx and this
-     * self-test would go on feeding the program a different shape while printing a confident
-     * verdict, which is worse than failing. ls_ctx_rst has already grown once; the ctx ABI
-     * version exists because that happens.
-     *
-     * Asked on 2026-08-24 how we know the synthesised ctx is identical to the one a real hook
-     * would produce. By inspection was the honest answer, and by inspection is not good enough
-     * for the input to the only demonstration this shield has. */
-    struct ls_ctx_http_psm c;
-    _Static_assert(sizeof(struct ls_ctx_http_psm) == 24,
-                   "the http_psm ctx changed shape --- the self-test's input is no longer the "
-                   "ctx the call site builds, and the demonstration is invalid until this is "
-                   "reconciled (see cve-selftest.md on where the simulation boundary sits)");
-    memset(&c, 0, sizeof c);          /* ptlp == NULL --- the CVE condition */
+    /* The generic five-register context, exactly what the trampoline now hands every
+     * program: arg[0] is the first argument register. There are no typed ctx builders any
+     * more --- a CO-RE program reads the fields it needs by relocation, so the self-test's
+     * job is only to feed the mechanism the CVE condition (a null source pointer) and see
+     * whether the loaded program returns SAFE_RETURN. */
+    struct { uint64_t arg[5]; } c;
+    memset(&c, 0, sizeof c);          /* arg[0] == NULL --- the CVE condition (source pointer null) */
 
     enum ls_verdict v = ls_vm_call(slot, &c, sizeof c);
 
@@ -705,8 +692,8 @@ ls_vm_selftest(int slot, unsigned level)
                     "this is expected to be fatal\n");
     fflush(stderr);
     {
-        volatile const char *const *pp = (volatile const char *const *)(uintptr_t)c.ptlp;
-        volatile char sink = *(*pp);      /* ptlp->name, with ptlp == NULL */
+        volatile const char *const *pp = (volatile const char *const *)(uintptr_t)c.arg[0];
+        volatile char sink = *(*pp);      /* the source pointer, with arg[0] == NULL */
         (void)sink;
     }
     fprintf(stderr, "ls_vm: SELFTEST did NOT crash --- unexpected; the platform "
@@ -776,13 +763,6 @@ ls_vm_sig_enforce(void)
 }
 
 
-const struct ls_ctx_reg *
-ls_vm_ctx_reg(int slot)
-{
-    if (slot < 0 || slot >= LS_MAX_SLOTS)
-        return 0;
-    return __atomic_load_n(&g_slots[slot].ctx_reg, __ATOMIC_ACQUIRE);
-}
 
 
 enum ls_verdict
@@ -931,13 +911,6 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->vm, new->vm, __ATOMIC_RELEASE);   /* old VM leaked */
     __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
-    /* CARRY THE BUILDER ACROSS THE SWAP. ls_vm_arm resolved it for the staging slot; the
-     * live slot keeps its OLD builder unless this is copied, so reloading a slot with a
-     * program for a different function would run the new program under the previous
-     * function's ctx --- the same wrong-meaning-right-length failure, reintroduced by a
-     * reload. Same class as the jit_fn/vm pairing above: two fields that are one fact.
-     * Published before `armed`, for the same reason the pointers are. */
-    __atomic_store_n(&live->ctx_reg, new->ctx_reg, __ATOMIC_RELEASE);
     live->armed = true;
     live->gen++;              /* so STATUS can distinguish residue from result */
 

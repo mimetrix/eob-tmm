@@ -53,23 +53,74 @@ verdict, so relocating to any build's offset stays verifiable. ubpf running the 
 is the same as running any shield (15 already run in TMM), so that half is covered by existing
 evidence rather than re-proven here. **Gate cleared.**
 
-**Phase 2 — TMM's BTF.**
-`pahole -J` on TMM's debuginfo → BTF; dump → `tmm.h`. Verify it carries `ssl_ctx`,
-`http_parse_info`, `ssl_extension`. Cross-check a few offsets against our existing DWARF derivation.
+**Phase 2 — TMM's BTF. — PASSED 2026-08-25 (build box, build id 005835f9).**
+`pahole` on TMM's debuginfo (`tmm64.no_pgo.debug`) → detached BTF; dump → `tmm.h`. Verify it carries
+`ssl_ctx`, `http_parse_info`, `ssl_extension`. Cross-check offsets against our DWARF derivation.
 *Falsifier:* DWARF→BTF fails or key types absent.
 
-**Phase 3 — relocator in the loader (the one substantial new component).**
-Port libbpf's `bpf_core_apply_relo` into ls_vm_load.c: read the program's `.BTF.ext` relocations,
-resolve against TMM's BTF, patch the offset immediates, THEN verify + JIT. No libbpf/kernel runtime
-deps — just the relocation math. Runs on the prepare thread (like the signature check; no malloc on
-foreign TMM threads).
-*Falsifier:* relocated offsets must equal what our DWARF derivation says for the same fields — that
-derivation becomes the oracle.
+*Result (MEASURED, tool-witnessed — pahole/bpftool on the pinned debuginfo):*
+- Stock **pahole v1.25 FAILS** — dies at the first of **43 `_Atomic`-qualified types**
+  (`Unsupported DW_TAG_atomic_type`), emitting a 0-byte BTF. `--btf_encode_force` does not help
+  (it ignores invalid *symbols*, not unsupported *types*).
+- **Fix:** built **pahole v1.29** from source on the build box (needed `libdw-dev`/`libelf-dev`/`zlib1g-dev`)
+  and added a one-line encoder case mapping `DW_TAG_atomic_type` → `BTF_KIND_VOLATILE` — layout-identical
+  and skipped by CO-RE modifier resolution, so field offsets relocate correctly. Patch pinned at
+  `substrate/toolchain/pahole-atomic-qualifier.patch`. **This patched pahole is now a toolchain pin**
+  (like the uBPF/PREVAIL pins) — the BTF is a TMM-build artifact only with it.
+- Patched pahole: **exit 0**, valid **6.5 MB** detached BTF (`bpftool ... format raw` parses clean,
+  335,645 lines). Surface structs present with **byte-exact** offsets vs the DWARF oracle
+  (`pahole -C`): `ssl_extension` 0/2/4; `http_parse_ctx` incl. bitfields `state`@10, `reqresp`/`output_header`@13;
+  `ssl_ctx` hn/cf/sp @8/16/24; `connflow` present. The two `_Atomic`-bearing structs (both **ours** —
+  `ls_ring`, `ls_tp_seg`; TMM core uses no atomic members) are restored and byte-exact
+  (`0 8 12 16 20 24 32 40 48` / `0 8 12 16 20 24 28`).
+- *Open (Phase 4, not a gate blocker):* `bpftool btf dump format c` (the human `tmm.h`) FPEs on
+  **C++ STL / Tcl** types in the debuginfo (`_Rb_tree_node_base`, `Tcl_Obj` — TMM embeds Tcl for iRules).
+  The **binary BTF the loader consumes is unaffected**; `tmm.h` will be generated filtered to the C
+  surface types (pahole per-type emits them fine). File a filtered-header generator in Phase 4.
 
-**Phase 4 — one shield as portable CO-RE bytecode.**
-Rewrite ALPN with `BPF_CORE_READ` against `tmm.h` — no bespoke helper, no baked offset. Load via the
-CO-RE path onto the EXISTING image (no TMM rebuild).
-*Falsifier:* it arms ssl_alpn_match, reads the real ALPN bytes, acts.
+**Phase 3 — relocator (the one substantial new component). — CORE MATH PASSED 2026-08-26; integration into `ls_vm.c` pending review.**
+Read the program's `.BTF.ext` relocations, resolve against TMM's BTF, patch the offset immediates,
+THEN verify + JIT. No libbpf/kernel runtime deps — just the relocation math. Will run on the prepare
+thread (like the signature check; mind the no-malloc-on-foreign-TMM-threads rule).
+*Falsifier:* relocated offsets must equal what our DWARF derivation says for the same fields — that
+derivation is the oracle.
+
+*Result (MEASURED, tool-witnessed — build box, TMM BTF from build 005835f9):* wrote a self-contained
+relocator `substrate/ls_core_relo.c` (240 lines, no libbpf): parses BTF (local + target), skips
+mods/typedefs, resolves `FIELD_BYTE_OFFSET` records by field NAME per access level, patches the insn
+immediate; rejects every other relo kind loudly. Real emitted record shape confirmed
+(`record_size=16`; one record per field read: `insn_off,type_id,access_str,kind`). **Falsifier test is
+decisive:** a CO-RE program with a *deliberately wrong* local layout (`http_parse_ctx.pt`@8,
+`data`@16) relocated against TMM's real BTF (116,755 types) to `pt`→**16**, `data`→**32** — byte-exact
+vs the `pahole -C` oracle (`pt`@16, `data`@32) — and the instruction immediates flipped `8→16`,
+`16→32`. 2 relos, 0 failed. Self-test travels with the file (`-DLS_CORE_RELO_TEST`); library-only
+`gcc -c` compiles clean.
+*Remaining (the review-gated step):* wire `core_field_offset` into `ls_vm.c:ls_vm_reload` before
+`ubpf_load_elf_ex`; harden ELF/BTF bounds (untrusted-ish input in a security appliance); expose the
+API via a small header (drops the static/unused warnings); confirm the prep thread's allocation
+policy. This is the integration the reviewer wanted tightest — do it as its own reviewed change.
+
+**Phase 4 — one *surface* as portable CO-RE bytecode. — PASSED (off load path) 2026-08-26.**
+Author a real surface with `preserve_access_index` field reads against real TMM structs — no bespoke
+helper, no baked offset, no rebuild.
+*Off-load-path falsifier (met):* real-struct CO-RE bytecode relocates to the running build's real
+offsets (oracle) AND PREVAIL admits the relocated bytecode.
+*Live falsifier (deferred to 3b + cluster):* it arms the hook, reads the real bytes, acts.
+
+*Surface choice — ALPN reframed (honest):* the plan named ALPN, but TMM exposes ALPN only through its
+extension parser (`ssl_ext_get_by_type`) — a **helper call**, i.e. the bespoke, build-coupled
+anti-pattern this whole pivot rejects. So the first *pure* CO-RE surface is a field-read one:
+`substrate/surfaces/http_observe.bpf.c`, per-request HTTP logic reading the parser's `state` and
+`version_num` — the kind of mid-parse decision iRules can't express. ALPN is reclassified as a
+**helper-class consumer** (its own decoupling track), not the first pure-CO-RE surface.
+
+*Result (MEASURED, tool-witnessed — build box, pinned clang-18 + PREVAIL, TMM BTF build 005835f9):*
+surface compiled portable with deliberately-wrong local offsets (`state`@0, `version_num`@2);
+`ls_core_relo` relocated against TMM BTF to `state`→**10** (a byte-aligned bitfield — resolved
+correctly) and `version_num`→**12**, byte-exact vs the `pahole -C` oracle (`state` 8:16=byte10,
+`version_num`@12); instruction immediates flipped 0→10, 2→12. **PREVAIL PASS on both the unrelocated
+and the relocated object** under `--termination --no-division-by-zero --strict` — so verify-after-
+relocate is sound. 2 relos, 0 failed.
 
 **Phase 5 — prove portability (the payoff).**
 Run the IDENTICAL CO-RE bytecode against TWO TMM builds with different offsets, relocating against
@@ -91,4 +142,5 @@ build-coupled detour in CONTESTED-PREMISES.md.
 - **PREVAIL + relocated CO-RE** (Phase 1) — make-or-break; de-risked first, off TMM.
 - **Relocator port** (Phase 3) — the real work; bounded by libbpf's existing implementation, checked
   against our DWARF oracle.
-- **DWARF→BTF cleanliness** (Phase 2) — TMM's DWARF is large and old-toolchain; pahole may need coaxing.
+- **DWARF→BTF cleanliness** (Phase 2) — *FIRED & RESOLVED 2026-08-25:* stock pahole died on `_Atomic`
+  types; fixed with pahole v1.29 + a one-line atomic→volatile encoder patch (now a toolchain pin). See Phase 2.

@@ -41,7 +41,6 @@
 #include "ls_vm.h"
 #include "ls_sig.h"
 #include "ls_audit.h"
-#include "ls_ctx_reg.h"
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
  * define this; a second one fails the link on a duplicate symbol. */
@@ -729,16 +728,6 @@ ls_vm_bootstrap(void)
 {
     if (!ls_vm_init())
         return;   /* VM down; TMM behaves exactly as shipped */
-
-    /* Say how many ctx builders linked, BEFORE anything is armed.
-     *
-     * A zero count means the linker discarded the ls_ctx_regs section, and then every typed
-     * hook silently falls back to the generic five-register context: nothing crashes, programs
-     * still run, and the reset and TLS record feeds simply produce nothing. Safe and silent is
-     * the pairing that costs days here, so it goes in the log next to the init line where
-     * anyone reading a startup log will see it. substrate/check_ctx_reg.c is what fails the
-     * build; this is what explains a running system. */
-    ls_ctx_reg_report();
 
     /* SAY WHETHER THIS BUILD CAN VERIFY, at startup, before anything tries to load.
      * A keyless build refuses every load --- correct, and confusing to meet for the first time

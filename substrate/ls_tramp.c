@@ -16,16 +16,6 @@
 
 #include "ls_vm.h"
 #include "ls_arm.h"
-#include "ls_slots.h"
-#include "ls_ctx_reg.h"
-#include "ls_ctx_parse.h"
-#include "ls_ctx_alpn_abi.h"
-#include "ls_ctx_rst.h"
-#include "ls_ctx_h2abort.h"
-#include "ls_ctx_sslerr.h"
-#include "ls_flow_cookie.h"
-#include "ls_ssl_cookie.h"
-#include "ls_tp.h"
 
 /* Slot numbers live in ls_slots.h, checked for collisions by the compiler. They
  * were here as a bare macro whose value (0, the shield slot) contradicted the
@@ -74,7 +64,7 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
      * regs is NULL only if something other than the trampoline called this. Guard
      * rather than trust: a fall-through is always a safe answer.
      */
-    uint64_t a0, a1, a2, a3, a4, a5;
+    uint64_t a0, a1, a2, a3, a4;
 
     if (regs == 0)
         return r;
@@ -84,7 +74,6 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
     a2 = LS_ARG2(regs);
     a3 = LS_ARG3(regs);
     a4 = LS_ARG4(regs);
-    a5 = LS_ARG5(regs);
     /*
      * The ctx is a per-invocation stack copy, never a view onto the argument
      * registers or onto TMM state. PREVAIL cannot express a read-only region,
@@ -100,13 +89,6 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         uint64_t arg[5];
     } ctx;
 
-    /* SIX ARGUMENTS FOR A BUILDER, assembled from the NAMED accessors and not by indexing
-     * regs. The saved block is in STACK order, which is the reverse of ABI order, so
-     * indexing it by argument position silently swaps arguments rather than failing --- which
-     * is exactly what ls_arm.h's accessors exist to prevent. Building the array here keeps
-     * every builder from having to know that, and keeps the knowledge in one place. */
-    const unsigned long long args[6] = { a0, a1, a2, a3, a4, a5 };
-
     ctx.arg[0] = a0;
     ctx.arg[1] = a1;
     ctx.arg[2] = a2;
@@ -114,71 +96,16 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
     ctx.arg[4] = a4;
 
     /*
-     * PER-HOOK CTX, LOOKED UP RATHER THAN SWITCHED ON.
-     *
-     * The generic five-register form above is what an untyped program sees. It is useless for
-     * a hook whose interesting fields are behind pointers, because a verified program cannot
-     * chase one --- so the dereferencing happens HERE, in the host, and the program receives
-     * flat scalars, which is the case PREVAIL already proves.
-     *
-     * WHAT THIS REPLACED, and why it had to go. This was an if-chain on the SLOT NUMBER:
-     * slot 7 got the parse builder, slots 2/3/5/6 the reset builder, and so on. That is
-     * correct only while every armed function is one of the handful with a builder. It stops
-     * being correct the moment a probe is generated for an arbitrary function, because the
-     * generated program lands in whichever slot is free. On 2026-08-19,
-     * mrhttp_setup_new_serverside armed in slot 2 had its registers read as rst_why's
-     * arguments: the count was exact, every field was fiction, and a1 was dereferenced as a
-     * string for up to 256 bytes. mrhttp's a1 happened to be a readable pointer.
-     *
-     * The builder now comes from the slot, resolved AT ARM TIME from the hook the program
-     * declared in its own ELF section --- so a function nobody wrote a builder for gets the
-     * register block and no dereference, which is what mk_probe.py generates against. See
-     * ls_ctx_reg.h.
-     *
-     * ONE INDIRECT CALL on the data path, not a search: the pointer was resolved when the
-     * slot was armed. A string compare over the registration set per invocation would be a
-     * real cost on a hook that fires per request.
+     * ONE PATH: the generic five-register context. There are no typed, per-hook ctx builders
+     * any more. A program reads whatever fields it needs from the argument pointers via CO-RE
+     * relocations resolved at load against this build's own BTF (ls_core_relo.c), so the host
+     * never learns any hook's layout --- which is what removed the "burns a build per data
+     * source" coupling: adding a data source is writing bytecode now, not editing TMM. An
+     * arbitrary armed function therefore gets exactly this: the register block, nothing
+     * dereferenced.
      */
-    {
-        const struct ls_ctx_reg *reg = ls_vm_ctx_reg(slot);
-
-        if (reg == 0) {
-            /* No typed builder. The generic ctx, and nothing is dereferenced. */
-            if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN)
-                return r;
-        } else {
-            /* One buffer for every builder, bounded by LS_CTX_OUT_MAX. Sized from the
-             * registration rather than from a per-hook struct so this file does not need to
-             * know any hook's layout --- it did, and that coupling is what made the if-chain
-             * grow a branch per hook. */
-            unsigned char out[LS_CTX_OUT_MAX];
-            unsigned long n;
-
-            /* A builder may write at most LS_CTX_OUT_MAX. The registration asserts its own
-             * size at compile time, so this is a belt-and-braces bound against a builder
-             * whose struct grew without its _Static_assert being updated. Refusing is right:
-             * a truncated record is a record with wrong fields. */
-            if (reg->size > sizeof out)
-                return r;
-
-            n = reg->build(out, args);
-            if (n == 0)
-                return r;              /* the builder declined --- see ls_ctx_reg_alpn.c */
-
-            if (reg->hook_id == 0u) {
-                /* No ring identity, so run the program without publishing. ALPN is the case:
-                 * its record is a verdict input, not telemetry. Publishing under a zero
-                 * hook id would give the consumer a record it cannot decode. */
-                if (ls_vm_call(slot, out, n) != LS_SAFE_RETURN)
-                    return r;
-            } else if (ls_tp_dispatch(slot, out, n, reg->hook_id) != LS_SAFE_RETURN) {
-                /* ls_tp_dispatch runs the program AND publishes to the shared-memory ring,
-                 * so an entry-armed hook produces a stream and not only counters. The ring
-                 * is off unless LS_TP_RING names a segment. */
-                return r;
-            }
-        }
-    }
+    if (ls_vm_call(slot, &ctx, sizeof ctx) != LS_SAFE_RETURN)
+        return r;
 
     /*
      * TODO(f5): the safe value belongs to the slot, from the safe-return policy

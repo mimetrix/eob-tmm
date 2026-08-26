@@ -625,19 +625,6 @@ ls_h_probe_read(uint64_t dst, uint64_t size, uint64_t src, uint64_t d, uint64_t 
     return 0;
 }
 
-/* id 112 --- the ssl-ALPN accessor. DEFINED FOR REAL in ls_h_alpn.c (which calls TMM's
- * ssl_ext_get_by_type and is compiled into TMM). This WEAK no-op default lets the standalone glue
- * tests, which do not link the TMM-integrated helper, resolve the symbol; the strong definition in
- * ls_h_alpn.c overrides it in the real build. A weak accessor that refuses everything is the safe
- * default --- a program armed against it simply never gets ALPN bytes. */
-uint64_t ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc, uint64_t d, uint64_t e);
-__attribute__((weak)) uint64_t
-ls_h_alpn_get(uint64_t dst, uint64_t len, uint64_t sc, uint64_t d, uint64_t e)
-{
-    (void)dst; (void)len; (void)sc; (void)d; (void)e;
-    return (uint64_t)-1;
-}
-
 /* Assert the helper signatures really match uBPF's, so a future edit that adds a
  * parameter fails the build rather than corrupting arguments at run time. */
 static inline void
@@ -713,13 +700,8 @@ ls_map_glue_install(struct ubpf_vm *vm)
         ubpf_register(vm, 5, "bpf_ktime_get_ns",
                       (external_function_t)ls_h_ktime_get_ns) != 0 ||
         ubpf_register(vm, 25, "bpf_perf_event_output",
-                      (external_function_t)ls_h_perf_event_output) != 0 ||
-        /* id 112: the ssl-ALPN accessor (ls_h_alpn.c). Repurposes bpf_probe_read_user's
-         * prototype (dst, len, src) --- the ONLY way the stock pinned PREVAIL admits a call
-         * that copies a bounded region, since a genuinely custom id is refused. */
-        ubpf_register(vm, 112, "ls_alpn_get",
-                      (external_function_t)ls_h_alpn_get) != 0) {
-        fprintf(stderr, "ls_map: probe-read/clock/event-output/alpn registration refused\n");
+                      (external_function_t)ls_h_perf_event_output) != 0) {
+        fprintf(stderr, "ls_map: probe-read/clock/event-output registration refused\n");
         return -1;
     }
 

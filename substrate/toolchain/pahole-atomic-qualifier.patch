@@ -1,0 +1,15 @@
+diff --git a/btf_encoder.c b/btf_encoder.c
+index 511c1ea..1f8d511 100644
+--- a/btf_encoder.c
++++ b/btf_encoder.c
+@@ -1528,6 +1528,10 @@ static int btf_encoder__encode_tag(struct btf_encoder *encoder, struct tag *tag,
+ 		return btf_encoder__add_ref_type(encoder, BTF_KIND_RESTRICT, ref_type_id, NULL, false);
+ 	case DW_TAG_volatile_type:
+ 		return btf_encoder__add_ref_type(encoder, BTF_KIND_VOLATILE, ref_type_id, NULL, false);
++	case DW_TAG_atomic_type:
++		/* BTF has no atomic kind; encode as VOLATILE: layout-identical and
++		 * skipped by CO-RE modifier resolution, so field offsets relocate correctly. */
++		return btf_encoder__add_ref_type(encoder, BTF_KIND_VOLATILE, ref_type_id, NULL, false);
+ 	case DW_TAG_typedef:
+ 		name = namespace__name(tag__namespace(tag));
+ 		return btf_encoder__add_ref_type(encoder, BTF_KIND_TYPEDEF, ref_type_id, name, false);
