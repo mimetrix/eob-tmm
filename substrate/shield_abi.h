@@ -16,7 +16,6 @@
  *
  * SCOPE — this is a candidate ABI for review, not TMM source. The uBPF types it
  * names are real; every f5_* / tmm_* touchpoint it declares is a stub. See
- * ../../development-scope-code.md for the per-item skeletons that use it, and
  * README.md in this directory for what is real vs. illustrative here.
  */
 #ifndef SHIELD_ABI_H
@@ -46,7 +45,7 @@
 
 /* Loader operations (walkthrough step 10). The canon spells these bare —
  * LOAD · SET_MODE · STATUS · REVOKE — prefixed here to keep the C namespace
- * clean; see the naming-reconciliation table in development-scope-code.md. */
+ * clean. */
 enum shield_op {
     SHIELD_OP_LOAD     = 1, /* verify sig -> load -> JIT -> arm dark, then monitor */
     SHIELD_OP_SET_MODE = 2, /* promote/demote within the binding's mode_ceiling    */
@@ -294,7 +293,7 @@ typedef uint64_t (*shield_jit_fn)(void *mem, size_t mem_len,
 /* One armable patchable entry, resolved from this build's signed hook map.
  * `fired` is indexed by core: TMM is core-pinned, so each core increments only
  * its own slot — no atomics needed, but pad to a cache line in a real build to
- * avoid false sharing (see item 1's note in development-scope-code.md).
+ * avoid false sharing (see development-scope.md item 1).
  *
  * ONE PROGRAM PER HOOK, AND THAT IS A DECISION, NOT AN ACCIDENT OF THIS STRUCT.
  * There is a single `fn`, so a second LOAD naming an armed hook must be REFUSED

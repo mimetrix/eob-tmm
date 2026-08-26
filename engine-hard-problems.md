@@ -592,7 +592,7 @@ first shippable form.
   `ctx` derived from the source signature would be wrong. Three consequences to state before
   anyone promises reach: the hook map must be generated from the **emitted** symbols and must reject
   or disambiguate folded ones (the generator's `DW_AT_low_pc` test silently drops inlined statics —
-  see `development-scope-code.md` item 5); the hookable set is knowable **per build** but is not the
+  see `development-scope.md` item 5); the hookable set is knowable **per build** but is not the
   set of functions an engineer can name from reading the code; and guaranteeing a *specific* function
   stays hookable across releases means marking it `noinline`, which is a **source change** with a
   perf cost — so "no source modification" holds for the mechanism, not for a guarantee about any

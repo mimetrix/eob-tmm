@@ -7,7 +7,7 @@
 #   ./bootstrap.sh --from=DIR   clone from a local mirror --- for a host with no internet route
 #
 # WHY THIS EXISTS, measured 2026-08-20. A fresh clone of this repository does NOT pass its own
-# checks. `make -C substrate check` fails four targets --- check-skeletons, check-vm, check-map,
+# checks. `make -C substrate check` fails three targets --- check-vm, check-map,
 # check-glue --- every one on `fatal error: ubpf.h: No such file or directory`, three screens down
 # in the output of a target that had already printed forty "ok" lines. REPRODUCING.md said the
 # checks run "on any Linux host with a C compiler, Python 3 and clang". That was false, and it was

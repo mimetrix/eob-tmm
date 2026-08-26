@@ -51,8 +51,8 @@ make -C substrate check
 ```
 
 **Why there is a step one.** This section used to say the checks run "on any Linux host with a C
-compiler, Python 3 and clang". Measured on a fresh clone on 2026-08-20, that was **false**: four
-targets — `check-skeletons`, `check-vm`, `check-map`, `check-glue` — failed on `fatal error:
+compiler, Python 3 and clang". Measured on a fresh clone on 2026-08-20, that was **false**: three
+targets — `check-vm`, `check-map`, `check-glue` — failed on `fatal error:
 ubpf.h: No such file or directory`, three screens below forty passing lines. uBPF and PREVAIL are
 vendored and **gitignored**, so they are present on every machine this work was done on and absent
 from every machine it would be reproduced on, and nothing in the repository could notice because

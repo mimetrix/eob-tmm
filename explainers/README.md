@@ -59,7 +59,6 @@ claim has not been shown.
 ## Elsewhere in the repo
 
 - `../development-scope.md` — what F5 builds, item by item, with a per-item status column. uBPF is **no longer reused as-is**: F5 carries a patch (`../substrate/ubpf-patches/`).
-- `../development-scope-code.md` — a candidate code skeleton per item, with real/stubbed/TODO marked.
 - [`../design-review-findings.md`](../design-review-findings.md) — the author's own adversarial review and its dispositions, including the findings that changed the design.
 - [`../engine-hard-problems.md`](../engine-hard-problems.md) · [`../embedded-ebpf-substrate.md`](../embedded-ebpf-substrate.md) · [`../big-ip-live-surface-design.md`](../big-ip-live-surface-design.md) — the long-form docs these pages are distilled from.
 - [`../substrate/`](../substrate/) — the candidate ABI artifacts and their checkers: a header whose `_Static_assert`s pin the loader message's wire layout, a hook-map schema, an admission-time budget pass with a self-test, and a check that fails the build if the safe-return two-gate rule regresses. **These check themselves** (`make -C substrate check`). The same sources are compiled into TMM, where the mechanism has run: loaded over a socket into an already-running process, armed while traffic flowed, disarmed. That part is not reproducible from this repo alone — it needs the TMM build tree and the cluster.

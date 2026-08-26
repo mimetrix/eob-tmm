@@ -294,7 +294,7 @@ PREVAIL's table.
 `fentry/` selects `tracing` — 96 bytes, **no pointer slots** — which is an honest description of
 an entry hook receiving argument values. All four verdicts held under it, which is what makes
 them worth quoting. `check_shields.py` now fails the build if a section name stops matching a
-real prefix. **The repo already said this** at `development-scope-code.md:94`; it was written
+real prefix. **The repo already said this** in the now-retired `development-scope-code.md`; it was written
 and then not consulted.
 
 ### 5.2 A hypothesis the measurement killed

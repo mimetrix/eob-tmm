@@ -4,14 +4,13 @@
 #   make check    syntax-check shield_abi.h (incl. its wire-layout asserts) and
 #                 validate hook-point-map.json against the schema.
 #
-# See README.md for what is real vs. illustrative, and ../development-scope-code.md
-# for the per-item skeletons that use this ABI.
+# See README.md for what is real vs. illustrative.
 
 CC     ?= cc
 PYTHON ?= python3
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
-        check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
+        check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
         check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-prereqs check-sig check-audit shield-blob gate clean
 
 # THE FIRST THING `check` DOES IS SAY WHETHER IT CAN RUN. Measured on a fresh clone 2026-08-20:
@@ -25,7 +24,7 @@ PYTHON ?= python3
 # runs. It does not attempt to fetch anything: a check that silently mutates the tree it is
 # checking is worse than a check that fails.
 # WHERE ubpf_config.h IS, cmake decides; FINDING it is this Makefile's job. check-glue always
-# located it with `find`; check-vm and check_skeletons.py hardcoded ../ubpf/vm and worked here
+# located it with `find`; check-vm hardcoded ../ubpf/vm and worked here
 # only because this tree had once been configured in-source, leaving a second copy at that path.
 # On a clean clone `cmake -S . -B build` writes only build/vm, so the hardcoded path was wrong and
 # the error --- "ubpf_config.h: No such file or directory" --- read as a missing dependency rather
@@ -38,7 +37,7 @@ check-prereqs:
 	   echo "ok    vendored prerequisites present (uBPF headers + generated config)"; \
 	 else \
 	   echo ""; \
-	   echo "*** This clone cannot run four of its own checks: check-skeletons, check-vm,"; \
+	   echo "*** This clone cannot run three of its own checks: check-vm,"; \
 	   echo "    check-map and check-glue compile against uBPF's real API, and uBPF is"; \
 	   echo "    vendored and gitignored --- so a fresh clone does not have it."; \
 	   echo ""; \
@@ -51,7 +50,7 @@ check-prereqs:
 	 fi
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
-       check-skeletons check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
+       check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get
 
 # The header must compile standalone, be include-guard clean, and its
@@ -84,15 +83,6 @@ check-budget:
 # ../../design-review-findings.md for the review that caught the inverted model.
 check-gates:
 	@$(CC) -I. -o .gates.out check_sr_gates.c && ./.gates.out; rc=$$?; rm -f .gates.out; exit $$rc
-
-# The skeletons in ../development-scope-code.md, actually handed to a compiler.
-# They are the exemplar an engineer reads for the shape of each item, and until
-# this target existed no compiler had read them — which is how the JIT typedef
-# came to be the 2-arg basic form while the design needs the 4-arg extended one.
-# A block may opt out with a `not-compiled:` reason, and opting out is reported,
-# never silent.
-check-skeletons:
-	@$(PYTHON) ./check_skeletons.py
 
 # Item 6a: does the verifier's model of the runtime match the runtime? Parsed
 # from the two vendored trees at run time rather than transcribed. Reports;
