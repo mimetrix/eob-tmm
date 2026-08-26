@@ -42,8 +42,6 @@
 | Page | What it covers | Read |
 |---|---|---|
 | [`programmable-dataplane-engine.html`](programmable-dataplane-engine.html) | The engine as a general capability — hooks, the `ctx` model, safety, form-factor coverage | 15 min |
-| [`cve-mitigation.html`](cve-mitigation.html) | The CVE-mitigation case in plain language, with the perimeter argument and coverage limits | 8 min |
-| [`cve-shield-walkthrough.html`](cve-shield-walkthrough.html) | A real TMM NULL-deref crash class end to end: 4 build steps, 9 runtime steps, the eBPF program line by line | 20 min |
 | [`substrate-as-built.html`](substrate-as-built.html) | **What exists and what it measures** — the only page in this set that is a record rather than a proposal: the five-byte patch with real bytes either side, reach counted from the binary, the seven-stage pipeline with what each stage checks, the perimeter's honest edge, and every claim tiered including the ones that are not claims | 8 min |
 | [`engine-hard-problems.html`](engine-hard-problems.html) | The engineering register — time safety, the `ctx` ABI, shared state, the trust surface, thirteen further concerns, day-one vs. deferred sequencing, honest scope | 20 min |
 

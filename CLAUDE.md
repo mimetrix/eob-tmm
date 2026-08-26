@@ -107,8 +107,9 @@ The audience is a skeptical engineering + security review; credibility comes fro
 
 The visual explainers in `explainers/` use the `explainer` skill's design system — self-contained,
 theme-aware HTML. **One job per page**; keep each single-purpose and cross-linked only when it
-helps. Current set: the programmable-data-plane **engine**, **CVE mitigation** (the shield), and the
-**engine hard-problems** register. Companion design docs live at the repo root
+helps. Current set: the programmable-data-plane **engine** and the **engine hard-problems**
+register, plus the **live-surface** product one-pager. (Shield is one of the four surfaces; a
+dedicated shield/CVE explainer is deferred until that story is demonstrated end to end.) Companion design docs live at the repo root
 (`engine-hard-problems.md`, `data-plane-egress-primitives.md`, `embedded-ebpf-substrate.md`,
 `big-ip-live-surface-design.md`, `tmm-usdt-tracepoints.md`).
 

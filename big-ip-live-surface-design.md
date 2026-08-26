@@ -808,7 +808,7 @@ in a lab TMM with core dumps still readable.
 ## 14. Appendix — worked example
 
 > *This example is deliberately **not** attached to a CVE identifier.* The bug is real and the shield
-> is the one worked end to end in [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html);
+> is the one worked end to end in `explainers/cve-shield-walkthrough.html`;
 > what is missing is a published advisory to anchor it to. **This example is not anchored to a
 > published advisory, and anchoring it is outstanding work** — rework it against a specific published,
 > closed F5 advisory and its actual patch diff — which is the same

@@ -2,7 +2,7 @@
 
 ### A proposed set of designed-in hook points for TMM — USDT-style (userland statically defined tracing) tracepoints plus filter-capable decision points — consumed by the embedded userspace-eBPF VM. Observability, debug & RCA (root-cause analysis) are the primary lens here; CVE shields, steering, and self-tuning are **peer consumers of the same hooks**. The engine is generic; the shield is one application.
 
-**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (the Live Surface), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked CVE example, end to end), [`substrate/`](substrate/) (candidate ABI artifacts + checkers — **not** a running prototype)
+**Status:** Proposal / engineering menu · **Companion:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (the Live Surface), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (how a record leaves the box), `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end), [`substrate/`](substrate/) (candidate ABI artifacts + checkers — **not** a running prototype)
 **Audience:** TMM core engineering, F5 SIRT, observability & support
 
 ---

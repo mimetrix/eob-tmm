@@ -2,7 +2,7 @@
 
 ### The problems the explainers gloss — real-time, interface & scope, distributed state, security, certification, operations. What building this entails, surfaced up front: what's day-one vs. deferred, and the honest mitigations
 
-**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), `development-scope.md` (what F5 actually builds), [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) (the worked example)
+**Status:** Proposal / engineering rigor · **Companions:** [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) (the substrate + security model), [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) (lifecycle, signing, OSS posture), [`data-plane-egress-primitives.md`](data-plane-egress-primitives.md) (the SPSC egress ring), `development-scope.md` (what F5 actually builds), `explainers/cve-shield-walkthrough.html` (the worked example)
 **Audience:** TMM core engineering, architecture, F5 SIRT / security review, product & certification
 
 ---

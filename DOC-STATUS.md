@@ -100,8 +100,6 @@ and that note is the authority for which of its claims have since been built.
 | [`explainers/substrate-as-built.html`](explainers/substrate-as-built.html) | **CURRENT** — written after the mechanism ran, so it is a record and not a proposal. Needs no accuracy note: every number in it is dated and tiered inline, and what is not established says so in the same table |
 | [`explainers/programmable-dataplane-engine.html`](explainers/programmable-dataplane-engine.html) | design, mechanism since built | mechanism runs live; signature verification and the per-build hook index built since; data-path per-call cost unmeasured, floor only |
 | [`explainers/engine-hard-problems.html`](explainers/engine-hard-problems.html) | design | same note; several register entries now have measurements rather than estimates |
-| [`explainers/cve-mitigation.html`](explainers/cve-mitigation.html) | design, and the **least** demonstrated case | of the three safeguards it names, only signature verification exists; safe-return table and budget guard do not, and both bear on enforcement |
-| [`explainers/cve-shield-walkthrough.html`](explainers/cve-shield-walkthrough.html) | design exercise, **not a record** | the CVE is unreachable on this platform; the signature step is no longer conditional; the mitigation has never been performed |
 
 **They were omitted from this page for a week.** DOC-STATUS exists so a reader knows which era a
 document belongs to before acting on it, and the four most *circulated* documents in the repo were
