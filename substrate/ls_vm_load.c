@@ -520,8 +520,15 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
          * ran --- the call site emits to its own slot, which stayed empty. The
          * comment under STATUS below already claimed LOAD did this; it did not.
          * Same reasoning for SET_MODE and REVOKE. */
+        /* Take the entry function FROM the object --- the single STT_FUNC in
+         * fentry/<hook> --- rather than assuming a fixed name. Falls back to
+         * "shield" for older objects, so nothing that worked stops working. */
+        char fnbuf[64];
+        const char *fn = "shield";
+        if (ls_function_in_section(m->prog, m->prog_len, section, fnbuf, sizeof fnbuf) > 0)
+            fn = fnbuf;
         int slot = ls_prep_submit(LS_PREP_OP_RELOAD, (int)m->epoch, m->prog, m->prog_len,
-                                  section, "shield",
+                                  section, fn,
                                   m->mode, 0u, &m->binding, m->sig, NULL, &why);
         if (slot < 0)
             reply(fd, "ERR load refused (%s)\n", why);
@@ -548,11 +555,11 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
         int qslot = (int)m->epoch;
         if (!ls_vm_stats(qslot, &st)) { reply(fd, "ERR no such slot %d\n", qslot); break; }
         reply(fd, "OK armed=%d mode=%d gen=%u fired=%llu safe_returns=%llu errors=%llu "
-                  "cycles=%llu cycles_max=%llu\n",
+                  "cycles=%llu cycles_max=%llu cycles_min=%llu\n",
               (int)st.armed, st.mode, st.gen,
               (unsigned long long)st.fired, (unsigned long long)st.safe_returns,
               (unsigned long long)st.errors, (unsigned long long)st.cycles,
-              (unsigned long long)st.cycles_max);
+              (unsigned long long)st.cycles_max, (unsigned long long)st.cycles_min);
         break;
     }
     /* Ops beyond the ABI's four. shield_msg.op is a uint32 and the enum uses the

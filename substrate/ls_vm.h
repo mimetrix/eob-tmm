@@ -90,6 +90,7 @@ struct ls_slot {
     uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
     uint64_t     cycles;        /* only when timing is enabled          */
     uint64_t     cycles_max;    /* the tail is what bounds a hot hook   */
+    uint64_t     cycles_min;    /* the floor: least preemption-polluted */
     uint32_t     gen;           /* bumped per reload. Counters above are
                                  * per SLOT and SURVIVE a program swap ---
                                  * on 2026-08-17 a safe_returns=246 left by
@@ -114,6 +115,7 @@ struct ls_stats {
     uint64_t errors;
     uint64_t cycles;
     uint64_t cycles_max;
+    uint64_t cycles_min;
 };
 
 /* The form TMM actually calls. Applies the environment overrides --- program
@@ -127,6 +129,12 @@ int ls_vm_arm_configured(const void *blob, size_t blob_len,
                          const char *section, const char *function);
 
 /* Off the data path. Returns false for an out-of-range slot. */
+/* The single STT_FUNC symbol defined in `section` of `elf`, copied into out[outlen].
+ * Returns its length, or 0 if none/ambiguous. Lets the loader take a program's entry
+ * function FROM the object it verified, instead of assuming a fixed name. */
+size_t ls_function_in_section(const void *elf, size_t elf_len, const char *section,
+                              char *out, size_t outlen);
+
 bool ls_vm_stats(int slot, struct ls_stats *out);
 
 /* Copy out the recent ctx samples. Off the data path. Returns how many were

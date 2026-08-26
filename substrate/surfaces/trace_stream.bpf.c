@@ -19,7 +19,7 @@ struct ls_ctx_generic { __u64 arg[5]; };
 struct trace_rec { __u32 version; __u32 state; };
 
 __attribute__((section("fentry/http_parse_client_headers"), used))
-__u64 shield(struct ls_ctx_generic *c)
+__u64 trace_stream(struct ls_ctx_generic *c)
 {
     struct http_parse_ctx *h = (struct http_parse_ctx *)c->arg[0];
     struct trace_rec rec = { 0, 0 };

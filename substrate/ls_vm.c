@@ -281,6 +281,50 @@ ls_symbol_is_in_section(const void *elf, size_t elf_len,
     return 0;                               /* no such function: refuse */
 }
 
+/* The single STT_FUNC symbol defined in `section` --- the program's entry, taken FROM the
+ * object we verified rather than assumed to be a fixed name. Same bounds discipline as
+ * ls_symbol_is_in_section. Returns the name length (copied into out), or 0 if none. */
+size_t
+ls_function_in_section(const void *elf, size_t elf_len, const char *section,
+                       char *out, size_t outlen)
+{
+    const unsigned char *base = elf;
+    if (elf == NULL || section == NULL || out == NULL || outlen == 0) return 0;
+    if (elf_len < sizeof(Elf64_Ehdr)) return 0;
+    Elf64_Ehdr eh; memcpy(&eh, base, sizeof eh);
+    if (eh.e_shentsize != sizeof(Elf64_Shdr) || eh.e_shnum == 0) return 0;
+    if (eh.e_shoff > elf_len || (size_t)eh.e_shnum * sizeof(Elf64_Shdr) > elf_len - eh.e_shoff) return 0;
+    const Elf64_Shdr *sh = (const Elf64_Shdr *)(const void *)(base + eh.e_shoff);
+    if (eh.e_shstrndx >= eh.e_shnum) return 0;
+    const Elf64_Shdr *shstr = &sh[eh.e_shstrndx];
+    if (shstr->sh_offset > elf_len || shstr->sh_size > elf_len - shstr->sh_offset) return 0;
+    const char *shstrtab = (const char *)(base + shstr->sh_offset);
+    const Elf64_Shdr *symtab = NULL;
+    for (unsigned i = 0; i < eh.e_shnum; i++)
+        if (sh[i].sh_type == SHT_SYMTAB) { symtab = &sh[i]; break; }
+    if (symtab == NULL || symtab->sh_entsize != sizeof(Elf64_Sym)) return 0;
+    if (symtab->sh_offset > elf_len || symtab->sh_size > elf_len - symtab->sh_offset) return 0;
+    if (symtab->sh_link >= eh.e_shnum) return 0;
+    const Elf64_Shdr *strh = &sh[symtab->sh_link];
+    if (strh->sh_offset > elf_len || strh->sh_size > elf_len - strh->sh_offset) return 0;
+    const char *strtab = (const char *)(base + strh->sh_offset);
+    const Elf64_Sym *sym = (const Elf64_Sym *)(const void *)(base + symtab->sh_offset);
+    size_t nsyms = (size_t)(symtab->sh_size / sizeof(Elf64_Sym));
+    for (size_t i = 0; i < nsyms; i++) {
+        if (ELF64_ST_TYPE(sym[i].st_info) != STT_FUNC) continue;
+        if (sym[i].st_shndx >= eh.e_shnum || sym[i].st_name >= strh->sh_size) continue;
+        const Elf64_Shdr *owner = &sh[sym[i].st_shndx];
+        if (owner->sh_name >= shstr->sh_size) continue;
+        if (strcmp(shstrtab + owner->sh_name, section) != 0) continue;
+        const char *nm = strtab + sym[i].st_name;
+        size_t n = strlen(nm);
+        if (n == 0 || n >= outlen) return 0;
+        memcpy(out, nm, n + 1);
+        return n;
+    }
+    return 0;
+}
+
 bool
 ls_vm_init(void)
 {
@@ -322,6 +366,7 @@ ls_vm_stats(int slot, struct ls_stats *out)
     out->errors = s->errors;
     out->cycles = s->cycles;
     out->cycles_max = s->cycles_max;
+    out->cycles_min = s->cycles_min;
     return true;
 }
 
@@ -881,8 +926,8 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;
         s->cycles += d;
-        if (d > s->cycles_max)
-            s->cycles_max = d;
+        if (d > s->cycles_max) s->cycles_max = d;
+        if (s->cycles_min == 0 || d < s->cycles_min) s->cycles_min = d;
     }
     if (rc != 0) {
         s->errors++;

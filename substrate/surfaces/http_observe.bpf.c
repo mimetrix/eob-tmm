@@ -26,7 +26,7 @@ struct http_parse_ctx {
 struct ls_ctx_generic { __u64 arg[5]; };
 
 __attribute__((section("fentry/http_parse_client_headers"), used))
-__u64 shield(struct ls_ctx_generic *c)
+__u64 http_observe(struct ls_ctx_generic *c)
 {
     struct http_parse_ctx *h = (struct http_parse_ctx *)c->arg[0];
     __u8 st = 0, ver = 0;
