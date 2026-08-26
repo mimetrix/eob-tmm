@@ -92,7 +92,6 @@ echo "  BTF: $(du -h "$CTX/tmm.btf" | cut -f1) embedded into tmm64.no_pgo; build
 
 echo
 echo "=== 2. generate the index (mk_hook_map.py checks the pair's build ids agree)"
-mkdir -p "$CTX/shields"
 python3 "$REPO/substrate/mk_hook_map.py" --debs "$DEBS" \
         -o "$CTX/hook-map.json" --index "$CTX/hook-index.tsv"
 BID=$(awk -F'\t' '/^#build_id/{print $2}' "$CTX/hook-index.tsv")
@@ -216,21 +215,9 @@ gcc -O2 -Wall -Wextra -Werror -static -I"$REPO/substrate" \
     -o "$CTX/ls_drain" "$DRAIN_SRC" || fail "ls_drain failed to build --- refusing to bake
     an image around a consumer that does not compile."
 echo "  ls_drain  : rebuilt from source ($(stat -c%s "$CTX/ls_drain") bytes, static)"
-# EVERY BAKED PROGRAM MUST HAVE ITS SIGNATURE. A program without one is refused at load, so
-# baking it produces an image whose own programs do not work --- which looks like a broken
-# signature check rather than a missing file.
-_no_sig=0
-for _o in "$CTX"/shields/*.bpf.o; do
-    [ -f "$_o" ] || continue
-    [ -f "${_o%.o}.sig" ] || { echo "  *** ${_o##*/} has no signature"; _no_sig=$((_no_sig + 1)); }
-done
-[ "$_no_sig" -eq 0 ] || fail "$_no_sig baked program(s) have no signature. Every load is
-    signature-verified now, so an unsigned program in the image is refused by the TMM that
-    ships with it. Re-run bnk-build-programs.sh with SIGN_KEY set."
-echo "  programs  : $(ls "$CTX"/shields/*.bpf.o | wc -l) objects, $(ls "$CTX"/shields/*.bpf.sig 2>/dev/null | wc -l) signatures"
-
-ls "$CTX"/shields/*.bpf.o >/dev/null 2>&1 || fail "no verified programs in $CTX/shields.
-    Compile with clang -O2 -target bpf and run PREVAIL over each before baking one in."
+# NO bytecode is baked. Compiling bytecode is a completely independent process
+# (bnk-build-programs.sh); its signed output is loaded over the socket at runtime and relocated
+# against the binary's embedded .BTF. The image carries only build artifacts.
 # ALL THREE docker files, and then CHECK the Dockerfile is the one we think.
 #
 # On 2026-08-18 a bake used a STALE Dockerfile: an older copy had been staged under $REPO
@@ -255,7 +242,7 @@ grep -q "ln -sf /usr/bin/tmm.default" "$CTX/Dockerfile" || fail "the Dockerfile 
     repoint /usr/bin/tmm at the padded binary. Dockerfile.runtime points it at tmm.debug
     whenever a debug binary is present, and that build has NO entry pads --- nothing can
     be armed. Four images have shipped that way." 
-echo "  context   : $CTX  ($(ls "$CTX"/shields/*.bpf.o | wc -l) programs, ls_drain $(stat -c%s "$CTX/ls_drain") B)"
+echo "  context   : $CTX  (ls_drain $(stat -c%s "$CTX/ls_drain") B)"
 
 echo
 echo "=== 4. build the layer"
@@ -301,7 +288,6 @@ PY
     exit 1
   fi
   echo "  signatures      : $(grep -vc "^#" /usr/share/ls/signatures.tsv) functions, build id matches"
-  echo "  programs        : $(ls /usr/share/ls/*.bpf.o 2>/dev/null | wc -l)"
 '
 
 echo
@@ -332,7 +318,7 @@ n = b.count(k)
 print('  trusted key present in the binary: %d' % n)
 sys.exit(0 if n > 0 else 1)
 PYEOF" \
-          && echo "  MATCH --- this image's loader will accept the programs this image ships" \
+          && echo "  MATCH --- this image's loader will accept programs signed with this key (loaded at runtime)" \
           || fail "the binary does NOT contain the public half of $SIGN_KEY.
     Every program in this image would be refused, and the error would talk about invalid
     signatures rather than about a mismatched key. Regenerate the header ON THE BUILD BOX
@@ -348,8 +334,7 @@ fi
 
 echo
 echo "=== 6. record what this stage produced"
-sh "$REPO/env/scripts/bnk-receipt.sh" write bake "build_id=$BID" "tag=$OUT" \
-                                      "programs=$(ls "$CTX"/shields/*.bpf.o | wc -l)"
+sh "$REPO/env/scripts/bnk-receipt.sh" write bake "build_id=$BID" "tag=$OUT" "bytecode=decoupled"
 
 echo
 echo "  Next: bnk-ship-image.sh verify $OUT 'shape disagrees with the'"

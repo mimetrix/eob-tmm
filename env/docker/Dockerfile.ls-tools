@@ -32,7 +32,7 @@
 #   ls-load.py       the loader client, versioned. Every live result before it existed
 #                    was produced by a client typed inline and thrown away.
 #   ls_drain         reads the shared-memory ring and emits JSON records.
-#   *.bpf.o          verified shield/watch programs, so a demo loads a program that
+#   (no bytecode)    programs are NOT baked --- bytecode is compiled independently and
 #                    shipped with the image rather than one carried in.
 ARG BASE=tmm:local
 FROM ${BASE}
@@ -44,9 +44,10 @@ COPY --chmod=0644 hook-index.tsv /usr/share/ls/hook-index.tsv
 COPY --chmod=0644 signatures.tsv /usr/share/ls/signatures.tsv
 COPY --chmod=0755 ls-load.py     /usr/bin/ls-load.py
 COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
-# shields/ carries BOTH the objects and their .bpf.sig signatures. A program without its
-# signature beside it is refused at load, so they travel together or not at all.
-COPY --chmod=0644 shields/       /usr/share/ls/
+# NO bytecode is baked into the image. Compiling bytecode is a COMPLETELY INDEPENDENT process
+# (bnk-build-programs.sh: clang -> PREVAIL -> sign, run on its own against any build's BTF); the
+# signed .bpf.o is loaded over the socket at runtime and relocated against this binary's embedded
+# .BTF. The image carries only build artifacts (binary+VM+.BTF, hook-index, signatures, tools).
 
 # Replace the runtime binary with the .BTF-embedded one built on the build box (same
 # build-id; objcopy --add-section only appends a section). The loader reads its OWN .BTF
