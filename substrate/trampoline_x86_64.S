@@ -395,4 +395,135 @@ ls_trampoline_slot_count:
  * pipeline proves the program touches no FP state, or the trampoline pays for
  * it.  Choosing silently is how a rare, data-dependent corruption gets shipped.
  */
+/* ===================================================================
+ *  THE FUNCTION-EXIT TRAMPOLINE --- one per slot, plus a shared stub
+ * ===================================================================
+ *
+ * Arming an EXIT hook patches the SAME entry pad (same `call rel32`, same
+ * ls_arm), but points it at ls_fexit_slot<n> instead of ls_trampoline_slot<n>.
+ * There is no pad at a function's exit --- a `ret` is one byte --- so exit is
+ * done by HIJACKING THE RETURN ADDRESS, the way kretprobes/frida/bpftime do it.
+ *
+ * On entry (reached by the pad's `call`):
+ *     [rsp]    = body-return    (into the hooked fn body)
+ *     [rsp+8]  = caller-return   <-- the slot ls_fexit_enter overwrites
+ * ls_fexit_enter records {slot address, real caller-return, args, THIS slot} on
+ * the shadow stack (ls_fexit.c) and writes &ls_fexit_stub over [rsp+8]. We ret
+ * into the body; the body's own `ret` then lands in the stub, which reads the
+ * return value, pops the matching shadow frame (reclaiming any a non-local exit
+ * skipped), and returns to the real caller. Proven in check_fexit.c.
+ *
+ * The slot is ASSEMBLED IN (movl $n), exactly as the entry trampoline does it,
+ * so a second arm cannot corrupt a shared immediate (the 2026-08-17 bug).
+ * IBT: this is a `call` target, so endbr64; the STUB is a `ret` target and needs
+ * none, and must return via `push;ret` (a post-call address has no endbranch).
+ */
+    .macro LS_FEXIT n
+    .globl  ls_fexit_slot\n
+    .type   ls_fexit_slot\n, @function
+ls_fexit_slot\n:
+    .cfi_startproc
+    endbr64
+    pushq   %r9
+    .cfi_adjust_cfa_offset 8
+    pushq   %r8
+    .cfi_adjust_cfa_offset 8
+    pushq   %rcx
+    .cfi_adjust_cfa_offset 8
+    pushq   %rdx
+    .cfi_adjust_cfa_offset 8
+    pushq   %rsi
+    .cfi_adjust_cfa_offset 8
+    pushq   %rdi
+    .cfi_adjust_cfa_offset 8
+    /* [rsp+0..40] = rdi,rsi,rdx,rcx,r8,r9 ; [rsp+48]=body-return ;
+     * [rsp+56]=caller-return. rsp%16==0 (entry 0, +48). */
+    movl    $\n, %edi                /* arg0: slot (assembled in)             */
+    leaq    56(%rsp), %rsi           /* arg1: uint64_t *slot (caller-ret addr)*/
+    leaq    0(%rsp),  %rdx           /* arg2: const uint64_t *args (rdi..r9)  */
+    call    ls_fexit_enter
+    popq    %rdi
+    .cfi_adjust_cfa_offset -8
+    popq    %rsi
+    .cfi_adjust_cfa_offset -8
+    popq    %rdx
+    .cfi_adjust_cfa_offset -8
+    popq    %rcx
+    .cfi_adjust_cfa_offset -8
+    popq    %r8
+    .cfi_adjust_cfa_offset -8
+    popq    %r9
+    .cfi_adjust_cfa_offset -8
+    ret                             /* -> body-return, into the hooked fn body */
+    .cfi_endproc
+    .size   ls_fexit_slot\n, .-ls_fexit_slot\n
+    .endm
+
+    LS_FEXIT 0
+    LS_FEXIT 1
+    LS_FEXIT 2
+    LS_FEXIT 3
+    LS_FEXIT 4
+    LS_FEXIT 5
+    LS_FEXIT 6
+    LS_FEXIT 7
+    LS_FEXIT 8
+    LS_FEXIT 9
+    LS_FEXIT 10
+    LS_FEXIT 11
+
+/* Alias so a stand-in armed at slot 0 (and anything grepping for it) resolves,
+ * mirroring ls_trampoline_entry. */
+    .globl  ls_fexit_entry
+    .set    ls_fexit_entry, ls_fexit_slot0
+
+/* The shared stub every exit slot installs. Reached by the body's `ret`:
+ *     rax(:rdx) = return value ; rsp = (hijacked slot)+8 ; rsp%16==0.
+ * Preserve the return value across the C call; return to the real caller via
+ * push;ret (IBT-safe). Punts on FP return registers, like the entry path. */
+    .globl  ls_fexit_stub
+    .type   ls_fexit_stub, @function
+ls_fexit_stub:
+    .cfi_startproc
+    pushq   %rax                    /* save return value (low)                */
+    pushq   %rdx                    /* save return value (high)               */
+    leaq    16(%rsp), %rdi          /* arg0: cur = SP just after the body ret  */
+    movq    8(%rsp),  %rsi          /* arg1: retval                            */
+    call    ls_fexit_leave          /* -> real caller-return in rax            */
+    movq    %rax, %r11
+    popq    %rdx
+    popq    %rax
+    pushq   %r11
+    ret                             /* -> real caller, rax:rdx intact          */
+    .cfi_endproc
+    .size   ls_fexit_stub, .-ls_fexit_stub
+
+/* Exit-slot address table + count, mirroring ls_trampoline_table --- so C indexes
+ * by slot and can range-check against what this file actually built. */
+    .section .rodata
+    .globl  ls_fexit_table
+    .type   ls_fexit_table, @object
+    .align  8
+ls_fexit_table:
+    .quad   ls_fexit_slot0
+    .quad   ls_fexit_slot1
+    .quad   ls_fexit_slot2
+    .quad   ls_fexit_slot3
+    .quad   ls_fexit_slot4
+    .quad   ls_fexit_slot5
+    .quad   ls_fexit_slot6
+    .quad   ls_fexit_slot7
+    .quad   ls_fexit_slot8
+    .quad   ls_fexit_slot9
+    .quad   ls_fexit_slot10
+    .quad   ls_fexit_slot11
+    .size   ls_fexit_table, .-ls_fexit_table
+    .globl  ls_fexit_slot_count
+    .type   ls_fexit_slot_count, @object
+    .align  8
+ls_fexit_slot_count:
+    .quad   12
+    .size   ls_fexit_slot_count, .-ls_fexit_slot_count
+    .text
+
     .section .note.GNU-stack,"",@progbits

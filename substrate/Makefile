@@ -121,7 +121,7 @@ check-tramp:
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_tramp.c \
 	  && echo "ok    ls_tramp.c  (the per-hook C half; arch-generic)"
 	@if [ "$$(uname -m)" = "x86_64" ]; then \
-	  $(CC) -O1 -I. -o .tramp.out check_tramp.c ls_tramp.c trampoline_x86_64.S victim.S 2>/dev/null && \
+	  $(CC) -O1 -I. -o .tramp.out check_tramp.c ls_tramp.c ls_fexit.c trampoline_x86_64.S victim.S 2>/dev/null && \
 	  ./.tramp.out >/dev/null && \
 	  echo "ok    trampoline_x86_64.S  (patched a stand-in entry; body runs on fall-through, skipped on safe return)" && \
 	  rm -f .tramp.out; \
@@ -137,7 +137,7 @@ check-fexit:
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_fexit.c \
 	  && echo "ok    ls_fexit.c  (the shadow stack; arch-generic C half)"
 	@if [ "$$(uname -m)" = "x86_64" ]; then \
-	  $(CC) -O2 -fcf-protection=branch -I. -o .fexit.out check_fexit.c ls_fexit.c ls_fexit_x86_64.S fexit_victims.S 2>/dev/null && \
+	  $(CC) -O2 -fcf-protection=branch -I. -o .fexit.out check_fexit.c ls_fexit.c ls_tramp.c trampoline_x86_64.S fexit_victims.S 2>/dev/null && \
 	  ./.fexit.out >/dev/null && \
 	  echo "ok    ls_fexit_x86_64.S  (armed a stand-in exit; return captured, caller transparent, nesting/recursion synced, skipped return reclaimed)" && \
 	  rm -f .fexit.out; \

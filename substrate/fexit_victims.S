@@ -24,7 +24,7 @@
 xv_leaf:
     .cfi_startproc
     endbr64
-    call    ls_fexit_entry          /* the 5-byte pad */
+    call    ls_fexit_slot1          /* the 5-byte pad --- armed at slot 1 (distinct) */
     movq    $0x1EAF, %rax
     ret                             /* -> ls_fexit_stub (caller-ret was hijacked) */
     .cfi_endproc
