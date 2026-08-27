@@ -141,3 +141,24 @@ shield-shaped candidates in it. The gate to a *demonstrable* one is now narrow a
 that is (a) in a reachable function, (b) recent enough that `df2e3a63` predates its fix, (c) triggerable
 by traffic we can craft. Confirming (a)/(b) needs the authenticated advisories + the GitSwarm fix —
 the next concrete step, and a different kind of access than the survey needed.
+
+
+## A candidate that clears the whole funnel — DTLS `dtls_tx` overflow (2026-08-27)
+
+The reverse search (git history of the reachable files, no advisory access) found a **live**
+memory-safety bug in a **reachable** function:
+
+- **Bug:** `dtls_tx()` in `ssl.c` clamps the DTLS `fraglen` to data-left but **not to the record
+  buffer capacity** (`SSL_SZ_RDATA - DTLS_MSGHDR_SZ`) — an oversized fragment overflows on write.
+- **Fix:** commit `401743ff1d` (2026-08-27, *internal — no CVE/BZ id*) adds the missing clamp.
+- **Live in our build:** `git merge-base --is-ancestor 401743ff1d e2104734a9` → **false**; `df2e3a63`
+  predates the fix, so the overflow is present in the deployed TMM.
+- **Reachable (MEASURED):** armed `dtls_tx` in monitor; `openssl s_client -dtls1_2` handshake traffic
+  fired it **80×** (and `dtls_frag_input` 670×). DTLS engages on this config despite no DTLS gateway.
+- **Class E** in the capability matrix → **shieldable today**: a shield at `dtls_tx` detects the
+  over-length `fraglen` and fails closed.
+
+**Funnel status:** live ✅ · reachable ✅ · shieldable-class ✅ · triggerable ✅. **Remaining:** it's a
+*transmit*-path bug, so crafting the input that makes TMM emit an over-length fragment (to trigger +
+then shield the overflow) is the next step; and it carries **no CVE id** (internal finding) — a strong
+*mechanism* demo, not a public-CVE business claim (per the non-CVE-shield-claims rule).

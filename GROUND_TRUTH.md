@@ -70,7 +70,8 @@ weaker evidence than something an independent tool observed, and conflating the 
 | **debug** surface: read a named field + RE-POINT live | MEASURED | KERNEL | datkube `df2e3a63`: loaded a program naming `state` into slot 2, armed, fired; then loaded a program naming `version_num` into the **same slot** and re-armed — `gen` 0→1, both fired, no rebuild, no restart. With the two-build CO-RE portability already shown, debug's distinctive moves are demonstrated. Entry-timing value caveat as above |## Watchpoints (prototyped outside TMM, 2026-08-20)
 
 | claim | tier | witness | anchor |
-|---|---|---|---|
+
+| A **live, reachable** memory-safety bug exists in the deployed build | MEASURED | KERNEL | `dtls_tx` (DTLS fragment-length overflow, fixed `401743ff1d` 2026-08-27 — NOT in our build `e2104734a9`/`df2e3a63`) armed in monitor; `openssl -dtls` handshakes fired it **80×** on datkube. Class E (shieldable). First candidate to clear live+reachable+triggerable; overflow-trigger + shield still to build. Internal finding, no CVE id ||---|---|---|---|
 | Delivery needs no signal handler — samples land in a ring another thread drains | MEASURED | KERNEL | `wp_probe.c`; samples present with nothing installed to catch a signal |
 | Requires `CAP_SYS_ADMIN`; `CAP_PERFMON` is refused at `perf_event_paranoid=4` | MEASURED | KERNEL | `EACCES` under `setpriv --ambient-caps=+perfmon`; permitted under `+sys_admin` |
 | Exactly four concurrent | MEASURED | KERNEL | `ENOSPC` on the fifth, both architectures |
