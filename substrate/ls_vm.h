@@ -65,7 +65,9 @@ enum ls_mode {
  * is per-core shared memory with a consumer ABI. Sized to answer one question,
  * not to be that. */
 #define LS_CTX_SAMPLES 8
-#define LS_CTX_SAMPLE_BYTES 32
+#define LS_CTX_SAMPLE_BYTES 48   /* fits the fexit exit ctx (arg[5] + ret = 48B), so a
+                                  * sample captures the RETURN VALUE at offset 40, not
+                                  * just the first four args. Was 32 (entry ctx only). */
 
 struct ls_ctx_sample {
     uint64_t seq;                              /* which invocation this was  */

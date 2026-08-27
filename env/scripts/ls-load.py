@@ -42,6 +42,8 @@ Two real failures this closes, both of which reported success at the time:
     because it asks what is running instead of what is installed.
   load  <slot> <file> [mode]  1  load an ELF (default mode 2 = enforce)
   status <slot>               3  armed/mode/gen/fired/safe_returns
+  samples <slot>         0x1002  recent ctx values the hook saw (fexit: args + return
+                                 value); needs LS_VM_SAMPLES set in TMM
   mode  <slot> <mode>         2  0 disable, 1 monitor, 2 enforce
   revoke <slot>               4
 
@@ -80,6 +82,7 @@ OP_LOAD, OP_SET_MODE, OP_STATUS, OP_REVOKE = 1, 2, 3, 4
 # DEVELOPMENT ops, deliberately far from the real ones. A control plane would not expose
 # "benchmark this program" on the load path, and the numbering says so.
 OP_BENCH = 0x1001
+OP_SAMPLES = 0x1002
 OP_ARM, OP_DISARM = 0x1003, 0x1004
 
 HOOK_INDEX = os.environ.get("LS_HOOK_INDEX", "/usr/share/ls/hook-index.tsv")
@@ -656,6 +659,10 @@ def main():
                        binding=binding, sig=sig)))
     elif cmd == "status":
         print(send(msg(OP_STATUS, slot=int(a[1]))))
+    elif cmd == "samples":
+        # The last few ctx values the hook actually saw --- for a fexit hook the
+        # exit context (entry args + return value). Needs LS_VM_SAMPLES set in TMM.
+        print(send(msg(OP_SAMPLES, slot=int(a[1]))))
     elif cmd == "mode":
         print(send(msg(OP_SET_MODE, slot=int(a[1]), mode=int(a[2]))))
     elif cmd == "revoke":
