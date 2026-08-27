@@ -313,6 +313,7 @@ Attach points/fields below are real — present in the build BTF (`http_parse_ct
 4. **Portability** ▶ — same debug bytecode vs **two builds** with different offsets; both read the right field (CO-RE payoff; shown for `http_observe`).
 
 ### shield — a verdict changes execution (enforcement; the CVE story, held last)
+**Live-traffic demo DEFERRED (2026-08-27)** to a real, benign-to-skip target chosen under the TMA. A contrived deterministic-trigger demo (e.g. skip-if-`version_num==0`) was declined as unrepresentative. The mechanism is proven (the harness, and the synthesised crash-prevention — real program/VM/dereference, ctx built directly); the other three surfaces (probe/trace/debug) are demonstrated live. What remains for shield is a reachable trigger + observed body-skip on live traffic, which is a TMA-gated effort, not a plumbing gap.
 1. **Verdict gates the body** ⧗⚠ — condition true → `SAFE_RETURN` → body skipped (a probe on the body confirms zero entries); false → fall through.
 2. **Fail-dark on bad load** ▶ — a program that fails relocation/verify is **refused**, never partially armed.
 3. **Monitor vs enforce** ⧗⚠ — MONITOR records but doesn't gate; ENFORCE gates; mode-ceiling honored.
