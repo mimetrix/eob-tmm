@@ -50,3 +50,17 @@ the repository was written, so absence of a row is not yet proof that no uncited
 survives somewhere. Sweeping for that is unfinished work and is recorded as such rather than
 declared complete.
 | bpftime latency (arXiv 2311.07923) | https://arxiv.org/abs/2311.07923 | 2026-08-25T16:49:24Z | `evidence/cache/bpftime-arxiv-2311.07923-latency.md` | ae368a303e7455b332e51ca834245edad7c6cdd5f9c41b7843711be3fc408405 | CITED-FROM-ABSTRACT — full PDF not byte-cached |
+
+## F5 CVE advisories (reachability-survey CVE candidates, 2026-08-27) — NOT_RETRIEVED
+
+The my.f5.com advisory pages render via JavaScript and return only a loading shell to automated
+fetch; NVD returned its home shell. Marked NOT_RETRIEVED — descriptions in `reachability-survey.md`
+are from search-result snippets, not cached full text. Retrieve via authenticated my.f5.com when
+matching a specific candidate.
+
+| CVE | advisory URL | status |
+|---|---|---|
+| CVE-2017-6151 | https://my.f5.com/manage/s/article/K07369970 | NOT_RETRIEVED (JS-gated) |
+| CVE-2023-44487 | https://my.f5.com/manage/s/article/K000137106 | NOT_RETRIEVED (JS-gated) |
+| CVE-2023-22323 | https://my.f5.com/manage/s/article/K56412001 | NOT_RETRIEVED (JS-gated) |
+| CVE-2025-61951 | https://my.f5.com/manage/s/article/K000151309 | NOT_RETRIEVED (JS-gated) |

@@ -107,3 +107,37 @@ The reachable surface above is the target set. Matching requires **external** F5
 (memory-safety CVEs in HTTP/HTTP2/TLS parsing) retrieved and cached under the evidence rules
 (`SOURCES.md`), then mapped to a reachable area — the fix commit (via GitSwarm) names the function.
 No CVE→function claim is asserted from memory.
+
+## CVE candidates — matched to the reachable surface (2026-08-27)
+
+F5 TMM CVEs have the shield shape almost by definition — *"undisclosed traffic can cause the Traffic
+Management Microkernel (TMM) to terminate."* Cross-referencing that shape against the **reachable**
+parsing areas above (via F5 advisory search; the advisory *pages* are JS-gated and returned only a
+loading shell to automated fetch — marked **NOT_RETRIEVED**, so the descriptions below are from search
+result snippets, not cached full text):
+
+| CVE | area (reachable fn) | shape | advisory |
+|---|---|---|---|
+| CVE-2017-6151 | **HTTP/2** (`http2_parse_*`) | HTTP/2-profile requests disrupt TMM | K07369970 |
+| CVE-2023-44487 | **HTTP/2** (`http2_parse_frame_header`) | HTTP/2 Rapid Reset | K000137106 |
+| CVE-2023-22323 | **TLS** (`ssl_*`, OCSP) | SSL OCSP-auth profile | K56412001 |
+| CVE-2025-61951 | **TLS/DTLS** (`ssl_codec_parse`?) | DTLS 1.2 traffic terminates TMM | K000151309 |
+
+**Two filters this exposes — and they are the real work now, not more surveying:**
+
+1. **Reproducible on the deployed build?** Our TMM is `df2e3a63` / version `10.207` (BIG-IP **Next**),
+   a different version scheme from the classic-BIG-IP advisories (13.0.0, 17.5.1). An **old** CVE
+   (2017) is almost certainly already fixed in current TMM → the crash won't reproduce → not
+   demonstrable without reverting the fix (the set-aside vulnerable-build path). The **recent** ones
+   (2025) are the candidates worth checking — *if* the build predates their fix. So each candidate
+   needs: is `df2e3a63` before or after the fix?
+2. **Exact function.** Advisory → *area* is solid; area → *exact function* needs the fix commit. F5
+   tags fixes by internal ID (`BZ-`/`MBIP-`), so the bridge is: advisory's internal ID → GitSwarm
+   commit → the function it changed → intersect with the reachable set. The advisories' full content
+   (behind my.f5.com auth) carries that ID.
+
+**Net:** the reachable surface is rich and CVE-relevant (HTTP/2 + TLS parsing), and there are
+shield-shaped candidates in it. The gate to a *demonstrable* one is now narrow and specific: a CVE
+that is (a) in a reachable function, (b) recent enough that `df2e3a63` predates its fix, (c) triggerable
+by traffic we can craft. Confirming (a)/(b) needs the authenticated advisories + the GitSwarm fix —
+the next concrete step, and a different kind of access than the survey needed.
