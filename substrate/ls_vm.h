@@ -85,6 +85,9 @@ struct ls_slot {
                              * the only route to it. */
     enum ls_mode mode;
     bool         armed;
+    bool         is_exit;       /* fexit hook: arm via ls_fexit_table, not the
+                                 * entry table. Set at load from the program's
+                                 * fexit/ vs fentry/ section; read at arm. */
     uint64_t     fired;         /* per-instance; a box-wide sum is wrong */
     uint64_t     safe_returns;
     uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
@@ -108,6 +111,7 @@ struct ls_slot {
  * see development-scope.md item 14. Until then, logging. */
 struct ls_stats {
     bool     armed;
+    bool     is_exit;        /* fexit hook (armed via ls_fexit_table) */
     int      mode;
     uint64_t fired;
     uint64_t safe_returns;

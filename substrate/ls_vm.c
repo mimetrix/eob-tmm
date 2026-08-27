@@ -355,6 +355,7 @@ ls_vm_stats(int slot, struct ls_stats *out)
         return false;
     const struct ls_slot *s = &g_slots[slot];
     out->armed = s->armed;
+    out->is_exit = s->is_exit;
     out->mode = (int)s->mode;
     out->fired = s->fired;
     out->safe_returns = s->safe_returns;
@@ -641,6 +642,11 @@ ls_vm_arm(const void *elf, size_t elf_len,
     }
     if (slot < 0)
         return -1;
+
+    /* The hook KIND rides on the verified section: a program compiled for
+     * fexit/<fn> is armed at the function's RETURN (ls_fexit_table), one for
+     * fentry/<hook> at its ENTRY. Recorded now, read at arm --- see ls_arm_live. */
+    g_slots[slot].is_exit = (strncmp(section, "fexit/", 6) == 0);
 
     struct ubpf_vm *vm = ubpf_create();
     if (vm == NULL)
@@ -1028,6 +1034,7 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->armed = true;
+    live->is_exit = new->is_exit;   /* the kind rides with the program on the swap */
     live->gen++;              /* so STATUS can distinguish residue from result */
 
     new->armed = false;                   /* the staging slot goes back */

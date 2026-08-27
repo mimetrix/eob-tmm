@@ -59,7 +59,7 @@ int ls_arm(void *fn, void *trampoline);
 int ls_disarm(void *fn);
 
 /* LIVE forms --- safe while other cores are executing the target */
-int ls_arm_live(void *fn, void *trampoline, int slot);
+int ls_arm_live(void *fn, void *trampoline, int slot, int is_exit);
 int ls_disarm_live(void *fn);
 
 /* the safe swap: rewrite 5 bytes of executed code under contention */

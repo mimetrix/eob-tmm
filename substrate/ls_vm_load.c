@@ -440,8 +440,22 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
      * ls_vm_arm is verifying the program against names this loader made up
      * rather than against names an authority asserted. The binding needs both
      * fields. Until it has them, this is the gap, not a detail. */
+    /* The hook name comes from the binding; the KIND (entry vs exit) comes from
+     * the OBJECT --- a program compiled for fexit/<fn> carries that section, and
+     * the .o's SHA-256 (which the signature commits to) includes it, so the kind
+     * cannot be re-pointed without invalidating the signature. Probe the object
+     * for fexit/<hook> first; fall back to fentry/<hook>. (For ops with no program
+     * attached --- ARM/STATUS/REVOKE --- this reads fentry/ and is unused; those
+     * paths read the slot's recorded kind instead.) */
     char section[96];
-    snprintf(section, sizeof section, "fentry/%.63s", m->binding.hook);
+    {
+        char probe[96], tmp[64];
+        snprintf(probe, sizeof probe, "fexit/%.63s", m->binding.hook);
+        int is_exit = (m->prog_len > 0 &&
+                       ls_function_in_section(m->prog, m->prog_len, probe, tmp, sizeof tmp) > 0);
+        snprintf(section, sizeof section, "%s/%.63s",
+                 is_exit ? "fexit" : "fentry", m->binding.hook);
+    }
 
     /*
      * THE CTX ABI GATE. Checked for every op that loads or arms, before anything
@@ -649,6 +663,7 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
          * trampolines, not about slots holding programs. Structurally it belongs where
          * the two are joined.
          */
+        int is_exit = 0;
         {
             struct ls_stats st;
             if (!ls_vm_stats(slot, &st)) {
@@ -661,13 +676,16 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
                           "refused, fix that rather than arming over it.\n", slot);
                 break;
             }
+            is_exit = st.is_exit;   /* fexit -> arm at the RETURN via ls_fexit_table */
         }
         /* ls_arm_live rewrites the five pad bytes with the kernel's text_poke_bp
-         * protocol, so the poll threads may be executing this function right now. */
-        if (ls_arm_live((void *)(uintptr_t)addr, (void *)ls_trampoline_entry, slot) != 0)
+         * protocol, so the poll threads may be executing this function right now.
+         * is_exit selects the entry vs exit trampoline for this slot's program. */
+        if (ls_arm_live((void *)(uintptr_t)addr, (void *)ls_trampoline_entry, slot, is_exit) != 0)
             reply(fd, "ERR arm 0x%llx failed (no pad, out of rel32 range, or swap refused)\n", addr);
         else
-            reply(fd, "OK ARMED LIVE entry=0x%llx slot=%d (no restart)\n", addr, slot);
+            reply(fd, "OK ARMED LIVE entry=0x%llx slot=%d kind=%s (no restart)\n",
+                  addr, slot, is_exit ? "fexit" : "fentry");
         break;
     }
     case 0x1004: {   /* DISARM LIVE --- restore the nops, equally live */

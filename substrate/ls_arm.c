@@ -283,8 +283,14 @@ extern void *const ls_trampoline_table[LS_TRAMP_SLOTS];
  */
 extern const unsigned long ls_trampoline_slot_count;
 
+/* The EXIT trampolines, the parallel table to the entry ones (trampoline_x86_64.S).
+ * Same slot count, same .rodata discipline; an exit hook arms at ls_fexit_slot<n>
+ * so the function's RETURN reaches the stub, not its entry. */
+extern void *const ls_fexit_table[LS_TRAMP_SLOTS];
+extern const unsigned long ls_fexit_slot_count;
+
 int
-ls_arm_live(void *fn, void *trampoline, int slot)
+ls_arm_live(void *fn, void *trampoline, int slot, int is_exit)
 {
     uint8_t *pad = ls_find_pad(fn);
     if (pad == NULL) {
@@ -293,9 +299,16 @@ ls_arm_live(void *fn, void *trampoline, int slot)
         return -1;
     }
     /* The caller's `trampoline` argument is vestigial: which trampoline to use is
-     * now determined by the slot, and using the passed one would reintroduce the
-     * possibility of a mismatch between the code jumped to and the slot it assumes. */
+     * determined by the slot AND `is_exit`, and using the passed one would
+     * reintroduce the possibility of a mismatch between the code jumped to and the
+     * slot it assumes. */
     (void)trampoline;
+
+    /* Entry vs exit selects the table; both are per-slot with the slot assembled
+     * in, so the pad is patched to call the right kind of trampoline for this hook. */
+    void *const       *table = is_exit ? ls_fexit_table      : ls_trampoline_table;
+    const unsigned long count = is_exit ? ls_fexit_slot_count : ls_trampoline_slot_count;
+    const char         *which = is_exit ? "fexit" : "entry";
 
     if (slot < 0 || slot >= LS_TRAMP_SLOTS) {
         fprintf(stderr, "ls_arm: slot %d out of range (0..%d) --- refusing. Adding a "
@@ -308,17 +321,17 @@ ls_arm_live(void *fn, void *trampoline, int slot)
      * once at init: arming is rare and off the data path, and a check that runs only
      * at startup is a check that a mid-life reload can walk past. Refusing is right ---
      * indexing past the table writes an arbitrary address into live .text. */
-    if (ls_trampoline_slot_count < (unsigned long)LS_TRAMP_SLOTS) {
-        fprintf(stderr, "ls_arm: trampoline table has %lu slots but this build expects "
+    if (count < (unsigned long)LS_TRAMP_SLOTS) {
+        fprintf(stderr, "ls_arm: %s trampoline table has %lu slots but this build expects "
                         "%d --- REFUSING. trampoline_x86_64.S and LS_TRAMP_SLOTS "
                         "disagree; indexing past the table would arm a wild address.\n",
-                ls_trampoline_slot_count, LS_TRAMP_SLOTS);
+                which, count, LS_TRAMP_SLOTS);
         return -1;
     }
 
-    void *tramp = ls_trampoline_table[slot];
+    void *tramp = table[slot];
     if (tramp == NULL) {
-        fprintf(stderr, "ls_arm: slot %d has no trampoline --- refusing\n", slot);
+        fprintf(stderr, "ls_arm: %s slot %d has no trampoline --- refusing\n", which, slot);
         return -1;
     }
 
