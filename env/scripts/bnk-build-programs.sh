@@ -86,6 +86,12 @@ mkdir -p "$OUT"
 rm -f "$OUT"/*.bpf.o "$OUT"/*.bpf.sig
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
+# The fexit exit-admission gate checks return type + unwind against the TARGET
+# build's binary; located from this DEB dir, extracted lazily on the first fexit
+# program. ADMIT_STATE: '' = not yet located, 'ready' = extracted, 'none' = no DEB.
+ADMIT_DEBS="${LS_TARGET_DEBS:-$HOME/code/tmm/docker_build/DEBS/amd64}"
+ADMIT_STATE=""
+
 echo "  clang    : $($CLANG --version | head -1)"
 echo "  prevail  : $PREVAIL"
 echo "  out      : $OUT"
@@ -131,6 +137,40 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
         echo "  refused  $b  ($sec)  --- as intended"
         nreject=$((nreject + 1)); continue
     fi
+
+    # EXIT-ADMISSION GATE (fexit only). An exit hook reads the return value and
+    # hijacks the return address, so the target function must have an rax-representable
+    # return (#5) and no non-local exit that unwinds through its frame (#4). Both are
+    # properties of the TARGET BUILD's binary --- exit_admit.py checks them against the
+    # DEB pair. Refused here, before signing, so an unsafe exit surface is never vouched
+    # for. Skipped LOUDLY on a compile-only clone that has no target build to check.
+    case "$sec" in
+    fexit/*)
+        if [ -z "$ADMIT_STATE" ]; then
+            _DDEB=$(find "$ADMIT_DEBS" -name 'tmm-debuginfo_*.deb' 2>/dev/null | head -1)
+            _RDEB=$(ls "$ADMIT_DEBS"/tmm_*.deb 2>/dev/null | head -1)
+            if [ -n "$_DDEB" ] && [ -n "$_RDEB" ]; then
+                mkdir -p "$TMP/admit/rt" "$TMP/admit/db"
+                dpkg-deb -x "$_RDEB" "$TMP/admit/rt" 2>/dev/null
+                dpkg-deb -x "$_DDEB" "$TMP/admit/db" 2>/dev/null
+                ADMIT_RT=$(find "$TMP/admit/rt" -name tmm64.no_pgo ! -name '*.debug' | head -1)
+                ADMIT_DB=$(find "$TMP/admit/db" -name tmm64.no_pgo.debug | head -1)
+                ADMIT_STATE=ready
+                [ -n "$ADMIT_RT" ] && [ -n "$ADMIT_DB" ] || ADMIT_STATE=none
+            else
+                ADMIT_STATE=none
+            fi
+        fi
+        if [ "$ADMIT_STATE" = none ]; then
+            echo "  WARN $b  ($sec)  --- exit-admit SKIPPED (no target DEB in $ADMIT_DEBS); return-type/unwind safety UNVERIFIED"
+        elif python3 "$REPO/substrate/exit_admit.py" "$ADMIT_DB" "$ADMIT_RT" "${sec#*/}" >"$TMP/a" 2>&1; then
+            echo "  admit    $b  ($sec)  --- fexit safe (rax-return + unwind-clear)"
+        else
+            echo "  *** $b: fexit REFUSED by exit-admit ---"; sed 's/^/        /' "$TMP/a" | grep -E 'REFUSE|#4|#5' | head -3
+            nbad=$((nbad + 1)); continue
+        fi
+        ;;
+    esac
 
     # The cycle budget, on the SAME object that verified. Advisory today: it reports an
     # estimate and this script does not gate on it, because the per-call cost that would
