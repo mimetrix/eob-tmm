@@ -65,7 +65,9 @@ weaker evidence than something an independent tool observed, and conflating the 
 | …and FIRES LIVE at a function's RETURN on real traffic | MEASURED | KERNEL | datkube, image `fd74821b`: `exit_probe` signed + loaded (signature verified, CO-RE relocated, JIT'd), armed **kind=fexit** at `http_parse_client_headers`'s entry pad; **fired 200/200** requests (once per return), reading the parser's `ERR_*` enum return value (a value the entry hook cannot see). Disarmed clean, live; `fired` frozen at 200 through 100 further requests || Hardware watchpoints reach any address | MEASURED, outside TMM | KERNEL | `prototype/watchpoint/`, `perf_event_open` |
 
 | …and the exit program is observably handed the RETURN VALUE | MEASURED | KERNEL | datkube `df2e3a63`, `LS_VM_SAMPLES=1`, `ls-load.py samples`: the 48-byte exit ctx shows the 3 pointer args at bytes 0–23 and **`ret=ERR_OK` (0) at bytes 40–47** — the parser's return value the entry hook cannot see. Needed `LS_CTX_SAMPLE_BYTES` 32→48 to reach offset 40 |
-## Watchpoints (prototyped outside TMM, 2026-08-20)
+
+| **trace** surface streams records off-box, live | MEASURED | KERNEL | datkube `df2e3a63`: `trace_stream` armed at `http_parse_client_headers`, fired 1:1 with traffic; `ls_drain -s /tmp/ls_tp_ring` emitted one JSON line per event (`slot`, `schema`, `len`, `data`). Ring has a drop counter (`ls_ring.h`, STREAM mode). **Values are entry-time** (parser-output fields read 0 at entry) — the streaming mechanism is what's shown; populated values need an exit hook |
+| **debug** surface: read a named field + RE-POINT live | MEASURED | KERNEL | datkube `df2e3a63`: loaded a program naming `state` into slot 2, armed, fired; then loaded a program naming `version_num` into the **same slot** and re-armed — `gen` 0→1, both fired, no rebuild, no restart. With the two-build CO-RE portability already shown, debug's distinctive moves are demonstrated. Entry-timing value caveat as above |## Watchpoints (prototyped outside TMM, 2026-08-20)
 
 | claim | tier | witness | anchor |
 |---|---|---|---|
