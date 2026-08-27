@@ -109,8 +109,8 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # The section name IS the hook, read from the object rather than from a table beside it.
     # bnk-deliver-program.py derives the hook the same way, so a program cannot be loaded
     # against a different function than the one it was compiled for.
-    sec=$($READELF "$o" 2>/dev/null | grep -o 'fentry/[^ ]*' | head -1)
-    [ -n "$sec" ] || { echo "  *** $b: no fentry/<hook> section --- nothing says what it attaches to"
+    sec=$($READELF "$o" 2>/dev/null | grep -oE 'f(entry|exit)/[^ ]*' | head -1)
+    [ -n "$sec" ] || { echo "  *** $b: no fentry/ or fexit/ section --- nothing says what it attaches to"
                        nbad=$((nbad + 1)); continue; }
 
     if "$PREVAIL" "$o" "$sec" --termination --strict --no-division-by-zero \
@@ -144,7 +144,7 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     #
     # This is the natural place and not a convenience: the signature asserts "this key vouches
     # for this exact program at this exact hook", and the only moment both facts are established
-    # is immediately after PREVAIL accepted the object and its fentry/ section was read from it.
+    # is immediately after PREVAIL accepted the object and its fentry/ or fexit/ section was read from it.
     # Signing earlier would vouch for something unverified; signing later would need the hook
     # rediscovered, and a rediscovered hook is a second answer to a question already answered.
     #
@@ -154,7 +154,7 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # the missing key actually matters, which is load.
     if [ -n "$SIGN_KEY" ] && [ -f "$SIGN_KEY" ]; then
         if python3 "$REPO/substrate/sign_shield.py" --key "$SIGN_KEY" --prog "$o" \
-               --hook "${sec#fentry/}" --mode-ceiling "${SIGN_CEILING:-monitor}" \
+               --hook "${sec#*/}" --mode-ceiling "${SIGN_CEILING:-monitor}" \
                -o "$OUT/$b.bpf.sig" >/dev/null 2>&1; then
             echo "  verified $b  ($sec)${est:+  budget ~$est}  SIGNED"
         else
