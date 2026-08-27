@@ -23,10 +23,23 @@
 
 #include "ls_fexit.h"
 
-/* Linking the whole trampoline_x86_64.S pulls in the ENTRY slots' call to
- * ls_tramp_dispatch (ls_tramp.c), which references ls_vm_call. The fexit path
- * never reaches it; this stub only satisfies the linker. */
-int ls_vm_call(int slot, void *ctx, unsigned long n) { (void)slot; (void)ctx; (void)n; return 0; }
+/* The exit program's stand-in. ls_fexit_leave now RUNS the program (step #2) via
+ * ls_vm_call, handing it struct ls_ctx_exit; in TMM this is the real VM. Here it
+ * records exactly what it was handed, so the test can assert the program receives
+ * the right slot and exit context (entry args + return value). It also satisfies
+ * the linker for the ENTRY slots' ls_tramp_dispatch, which never runs here. */
+struct { int slot; uint64_t ret; uint64_t arg[5]; unsigned calls; } g_vm;
+int ls_vm_call(int slot, void *ctx, unsigned long n)
+{
+    const struct ls_ctx_exit *c = ctx;
+    if (n >= sizeof *c) {
+        g_vm.slot = slot;
+        g_vm.ret  = c->ret;
+        for (int i = 0; i < 5; i++) g_vm.arg[i] = c->arg[i];
+        g_vm.calls++;
+    }
+    return 0;   /* verdict ignored at exit */
+}
 
 extern uint64_t xv_leaf(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 extern uint64_t xv_mid (uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -65,8 +78,9 @@ main(void)
 {
     uint64_t r;
 
-    puts("A --- leaf: return capture + transparency + entry args");
+    puts("A --- leaf: return capture + transparency + entry args + exit program runs");
     ls_fexit_reset();
+    g_vm.calls = 0;
     r = xv_leaf(0xA1, 0xB2, 0xC3, 0xD4, 0xE5);
     printf("    ret=%#llx exits=%llu reclaimed=%llu desync=%llu\n",
            (unsigned long long)r, (unsigned long long)g_ls_fexit_exits,
@@ -78,6 +92,9 @@ main(void)
           "A entry arguments captured and carried to the exit");
     CHECK(g_ls_fexit_log[0].slot == 1, "A the exit-program slot is carried (leaf armed at 1)");
     CHECK(g_ls_fexit_reclaimed == 0 && g_ls_fexit_desync == 0, "A no reclaim, no desync");
+    CHECK(g_vm.calls == 1, "A the exit PROGRAM ran once (ls_vm_call)");
+    CHECK(g_vm.slot == 1 && g_vm.ret == 0x1EAF, "A program got the right slot + return value");
+    CHECK(g_vm.arg[0] == 0xA1 && g_vm.arg[4] == 0xE5, "A program got the entry args in the exit ctx");
 
     puts("B --- nested: xv_mid calls xv_leaf, both armed");
     ls_fexit_reset();

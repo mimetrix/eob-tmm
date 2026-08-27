@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "ls_fexit.h"
+#include "ls_vm.h"       /* ls_vm_call --- run the exit program on struct ls_ctx_exit */
 
 /* Bounded: overflow degrades to "do not hijack" (a plain return), never grows or
  * crashes. 512 is far past any real depth under a single hooked chain. */
@@ -128,13 +129,26 @@ ls_fexit_leave(uint64_t cur, uint64_t retval)
     struct ls_fexit_frame *f = &g_ls_fexit_stack[--g_ls_fexit_top];
 
     /*
-     * THE EXIT PROGRAM RUNS HERE in the wired system (fexit step #2):
-     *     struct ls_ctx_exit ctx;
-     *     memcpy(ctx.arg, f->args, sizeof ctx.arg);   ctx.ret = retval;
-     *     ls_vm_call(f->prog_slot, &ctx, sizeof ctx);
-     * The harness records the event instead, so the test can assert the program
-     * would have seen the right slot, arguments, return value, and ordering.
+     * Run the exit program on the EXIT CONTEXT (fexit step #2): the entry
+     * arguments plus the return value. arg[0..4] are rdi..r8, matching the entry
+     * ctx; arg[5]/r9 is captured but not exposed (the entry ctx is five wide).
+     *
+     * The verdict is IGNORED --- the body has already run, so there is no
+     * SAFE_RETURN to apply; an exit program is observe-only (read post-execution
+     * state, stream, count). ls_vm_call fails open, exactly like the entry path:
+     * a program that cannot run must not take TMM down with it.
      */
+    struct ls_ctx_exit ctx;
+    ctx.arg[0] = f->args[0];
+    ctx.arg[1] = f->args[1];
+    ctx.arg[2] = f->args[2];
+    ctx.arg[3] = f->args[3];
+    ctx.arg[4] = f->args[4];
+    ctx.ret    = retval;
+    (void)ls_vm_call(f->prog_slot, &ctx, sizeof ctx);
+
+    /* Record for `status` and the harness --- recent exits, like ls_vm.h's ctx
+     * samples: a small per-instance ring, not the program's job. */
     g_ls_fexit_exits++;
     if (g_ls_fexit_log_n < LS_FEXIT_LOG) {
         struct ls_fexit_event *e = &g_ls_fexit_log[g_ls_fexit_log_n++];
