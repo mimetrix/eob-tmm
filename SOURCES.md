@@ -64,3 +64,21 @@ matching a specific candidate.
 | CVE-2023-44487 | https://my.f5.com/manage/s/article/K000137106 | NOT_RETRIEVED (JS-gated) |
 | CVE-2023-22323 | https://my.f5.com/manage/s/article/K56412001 | NOT_RETRIEVED (JS-gated) |
 | CVE-2025-61951 | https://my.f5.com/manage/s/article/K000151309 | NOT_RETRIEVED (JS-gated) |
+
+## F5 Bugzilla — reachable-parser CVE landscape (RETRIEVED via REST API, 2026-08-27)
+
+Retrieved from `https://bugzilla.olympus.f5net.com/rest/bug/<id>` (authenticated, F5-internal — not
+publicly retrievable, but reproducible by anyone with F5 Bugzilla access + the BZ id). Fields used:
+`cf_cve_number`, `cf_cwe`, `cf_cvss_score`, `cf_conditions`, `cf_affectedversions`, `cf_fixeddate`,
+`component`, `status`. Search: `cf_type=Vulnerability` + `cf_affectedversions substring Neptune`.
+
+| BZ | CVE | component | fixed |
+|---|---|---|---|
+| 1496457 | CVE-2025-41414 | LTM_HTTP2 | 2024-04-24 |
+| 1357309 | CVE-2025-36557 | LTM_HTTP/fsm | 2023-10-06 |
+| 1783773 | CVE-2025-60016 | TLS/SSL | 2025-03-04 |
+| 1552933 | CVE-2024-28889 | LTM_SSL | 2024-03-19 |
+| 1361169 | CVE-2023-40534 | LTM_HTTP2 | 2023-10-09 |
+
+Superseded the earlier NOT_RETRIEVED my.f5.com rows for these CVEs: Bugzilla carries the full detail
+(CWE, conditions, CVSS, affected versions incl. Neptune) the JS-gated K-articles hid.
