@@ -64,6 +64,7 @@ weaker evidence than something an independent tool observed, and conflating the 
 | …and is now **compiled into TMM**: the exit trampoline + shadow stack build and link into the binary | MEASURED | KERNEL | build `01680045`, `nm`: `ls_fexit_slot0`/`ls_fexit_stub`/`ls_fexit_table` + all 9 `g_ls_fexit_*` present; `diff-globals` (globals whitelist) passed `no_pgo` and `debug`. Not yet armed/run on traffic |
 | …and FIRES LIVE at a function's RETURN on real traffic | MEASURED | KERNEL | datkube, image `fd74821b`: `exit_probe` signed + loaded (signature verified, CO-RE relocated, JIT'd), armed **kind=fexit** at `http_parse_client_headers`'s entry pad; **fired 200/200** requests (once per return), reading the parser's `ERR_*` enum return value (a value the entry hook cannot see). Disarmed clean, live; `fired` frozen at 200 through 100 further requests || Hardware watchpoints reach any address | MEASURED, outside TMM | KERNEL | `prototype/watchpoint/`, `perf_event_open` |
 
+| …and the exit program is observably handed the RETURN VALUE | MEASURED | KERNEL | datkube `df2e3a63`, `LS_VM_SAMPLES=1`, `ls-load.py samples`: the 48-byte exit ctx shows the 3 pointer args at bytes 0–23 and **`ret=ERR_OK` (0) at bytes 40–47** — the parser's return value the entry hook cannot see. Needed `LS_CTX_SAMPLE_BYTES` 32→48 to reach offset 40 |
 ## Watchpoints (prototyped outside TMM, 2026-08-20)
 
 | claim | tier | witness | anchor |

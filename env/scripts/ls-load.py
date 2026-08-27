@@ -538,6 +538,7 @@ _ARGS = {
                       "               Needs <file>.sig beside it --- the hook comes from the\n"
                       "               signed binding, not from an argument"),
     "status":  (1, 1, "status <slot>"),
+    "samples": (1, 1, "samples <slot>"),
     "mode":    (2, 2, "mode <slot> <1|2>"),
     "revoke":  (1, 1, "revoke <slot>"),
     "bench":   (1, 3, "bench <file.bpf.o> [iters] [hook]   # measure, discard, touch no slot;\n"
