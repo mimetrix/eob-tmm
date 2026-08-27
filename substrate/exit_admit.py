@@ -37,9 +37,68 @@ UNWIND_INITIATORS = (
     "__cxa_throw", "__cxa_begin_catch", "__cxa_rethrow",
 )
 
+DWARFDUMP = ("llvm-dwarfdump", "/usr/lib/llvm-18/bin/llvm-dwarfdump", "llvm-dwarfdump-18")
+
+
+class _Miss:
+    returncode = 127
+    stdout = ""
+    stderr = ""
+
 
 def sh(*argv):
-    return subprocess.run(argv, capture_output=True, text=True)
+    """Run a command; a missing executable is a non-zero result, not an exception."""
+    try:
+        return subprocess.run(argv, capture_output=True, text=True)
+    except (FileNotFoundError, OSError):
+        return _Miss()
+
+
+def which_dwarfdump():
+    for d in DWARFDUMP:
+        if sh(d, "--version").returncode == 0:
+            return d
+    return None
+
+
+def func_addr(debug_bin, fn):
+    """The function's load address, from the (unstripped) debug companion's symtab."""
+    r = sh("nm", debug_bin)
+    for line in r.stdout.splitlines():
+        p = line.split()
+        if len(p) == 3 and p[2] == fn and p[1] in ("T", "t", "W", "w"):
+            try:
+                return int(p[0], 16)
+            except ValueError:
+                return None
+    return None
+
+
+def frame_has_lsda(runtime_bin, addr):
+    """(has_lsda, decided) --- does the .eh_frame FDE covering `addr` carry a C++
+    exception LSDA (a cleanup/landing-pad site the unwinder would process)? An
+    unwind through such a frame is exactly what the return-address hijack corrupts.
+    Only a handful of frames have one (the C++ TUs); a plain C data-path function
+    does not. `decided` is False if the tool is unavailable."""
+    dd = which_dwarfdump()
+    if dd is None or addr is None:
+        return (False, False)
+    r = sh(dd, "--eh-frame", runtime_bin)
+    lo = hi = None
+    cur_lsda = False
+    fde = re.compile(r"FDE .*pc=([0-9a-f]+)\.\.\.([0-9a-f]+)")
+    for line in r.stdout.splitlines():
+        m = fde.search(line)
+        if m:
+            if lo is not None and lo <= addr < hi:
+                return (cur_lsda, True)          # the FDE that covers addr closed
+            lo, hi = int(m.group(1), 16), int(m.group(2), 16)
+            cur_lsda = False
+        elif "LSDA Address" in line:
+            cur_lsda = True
+    if lo is not None and lo <= addr < hi:
+        return (cur_lsda, True)
+    return (False, True)   # no FDE covers addr -> no unwind info -> nothing to traverse
 
 
 def return_type(debug_bin, fn):
@@ -107,16 +166,25 @@ def main(argv):
     rt = return_type(debug_bin, fn)
     safe_ret, why_ret = classify_return(rt)
 
-    clear, found = unwind_clear(runtime_bin)
+    clear, found = unwind_clear(runtime_bin)                       # #4a binary-wide (P8)
+    addr = func_addr(debug_bin, fn)
+    lsda, lsda_decided = frame_has_lsda(runtime_bin, addr)         # #4b per-target
 
     print("exit-admit: %s" % fn)
     print("  #5 return type : %s --- %s" % (rt if rt else "?", why_ret))
     if clear:
-        print("  #4 unwind      : clear --- TMM imports no unwind initiator (P8 holds)")
+        print("  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)")
     else:
-        print("  #4 unwind      : VIOLATED --- binary imports %s" % ", ".join(found))
+        print("  #4a unwind     : VIOLATED --- binary imports %s" % ", ".join(found))
+    if not lsda_decided:
+        print("  #4b frame      : UNCHECKED --- no llvm-dwarfdump; per-target LSDA not verified")
+    elif lsda:
+        print("  #4b frame      : has a C++ exception LSDA --- an unwind would process this frame")
+    else:
+        print("  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here")
 
-    ok = safe_ret and clear
+    safe_unwind = clear and not lsda
+    ok = safe_ret and safe_unwind
     if ok:
         print("  VERDICT        : ADMIT")
         return 0
@@ -128,6 +196,10 @@ def main(argv):
                          "    argument (P8) no longer holds. A per-target unwind-reachability\n"
                          "    analysis is owed before any exit hook is admitted.\n"
                          % ", ".join(found))
+    if lsda:
+        sys.stderr.write("*** REFUSE %s: the target frame carries a C++ exception landing pad\n"
+                         "    (LSDA); a stack unwind would process it, and the return-address\n"
+                         "    hijack corrupts an unwind that walks the frame.\n" % fn)
     print("  VERDICT        : REFUSE")
     return 1
 
