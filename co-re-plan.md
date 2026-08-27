@@ -375,7 +375,9 @@ the absent `TMM-TREE-DELTA.md`): `filelist` gains `base/ls_fexit.c  STDINC`; bot
 exits,reclaimed,overflow,desync}`. `nm` confirms `ls_fexit_slot0`/`ls_fexit_stub`/`ls_fexit_table`
 and all 9 globals in the binary; `diff-globals` passed both variants. Not yet armed on traffic ---
 #2 (exit ctx + `ls_vm_call` from leave), #3 (`fexit/<fn>` PREVAIL type), #4 (arm-time exclusion),
-#5 (return-type admission), #6 (live arm) remain. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
+#5 (return-type admission), #6 (live arm) remain.
+
+**fexit COMPLETE end to end (2026-08-27).** #1/#2/#3 built into TMM and the loader arms an exit hook via `ls_fexit_table` (#arm-as-exit). On datkube (image `fd74821b`), a signed `fexit/` surface (`substrate/surfaces/exit_probe.bpf.c`) loaded, armed **kind=fexit** at `http_parse_client_headers`'s return, and **fired 200/200 on live traffic**, reading the parser's `ERR_*` enum return value; disarmed clean (fired frozen through 100 more requests). #4 (arm-time exclusion) and #5 (return-type admission) are **documented, not coded**: for the data-path target the exclusion set is empty (P8, no unwind in TMM) and the return type is a scalar enum (rax-representable), so both gates are satisfied for what shipped; the GENERAL gates — an offline unwind-reachability tool (#4) and a sign-time return-type check needing `signatures.tsv` to record return types (#5) — are future work, not blockers for the data-path surfaces. **Covering the residual** (a future hook on a frame a linked C++ library could unwind
 through): the SP-keyed reclaim above handles a `longjmp` for free (it bypasses the return slot), but a
 C++ exception *walks* the frames via the unwind tables and would read our stub address as the return —
 corrupting the unwind, not just the shadow stack. So the primary guard is **arm-time exclusion**:
