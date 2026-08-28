@@ -383,7 +383,10 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
   document.getElementById('next').onclick = function(){ show(i+1); };
   document.getElementById('prev').onclick = function(){ show(i-1); };
   document.getElementById('deck').addEventListener('click', function(e){
-    if(e.target.closest('.chrome')||e.target.closest('a')) return;
+    // don't advance while text is selected (cut-n-paste), or when clicking
+    // inside a code / command / data block you might want to select from.
+    if(window.getSelection && String(window.getSelection()).length) return;
+    if(e.target.closest('.chrome, a, pre, code, .fields, .verdicts, .win')) return;
     show(i+1);
   });
   show(0);
