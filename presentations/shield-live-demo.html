@@ -267,7 +267,7 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
       <div class="v bad"><span class="vt">REFUSED</span> <b>reject_memory</b> <span class="d">chases a raw pointer</span> <span class="vb">— as intended</span></div>
     </div>
     <ul>
-      <li><b>budget ~N cycles</b> <span class="d">— proven bounded termination; a ceiling on the poll loop.</span></li>
+      <li><b><code>budget_pass.py</code> sets the ~N-cycle ceiling</b> <span class="d">— an admission-time pass that walks the <em>verified</em> bytecode's control-flow graph for its longest path → a worst-case cycle estimate. PREVAIL proves the program <em>halts</em>; the budget pass bounds <em>how long</em> — the number that lets it ride the poll loop. (Runtime fuel is the hard backstop.)</span></li>
       <li><b class="c-bad">refused reject_memory</b> <span class="d">— a program that chases a raw pointer, rejected <em>on purpose</em>. The gate is real, not decorative.</span></li>
     </ul>
   </section>
