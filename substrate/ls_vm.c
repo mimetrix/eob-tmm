@@ -62,6 +62,7 @@
 
 #include "ls_vm.h"
 #include "ls_vm_config.h"
+#include "ls_tp.h"          /* ls_tp_emit_shield --- the enforcement-evidence event */
 #include "vm_stack_policy.h"
 #include "ls_map.h"
 #include "ls_map_glue.h"
@@ -371,6 +372,14 @@ ls_vm_stats(int slot, struct ls_stats *out)
     return true;
 }
 
+uint64_t
+ls_vm_safe_value(int slot)
+{
+    if (slot < 0 || slot >= LS_MAX_SLOTS)
+        return 0;
+    return g_slots[slot].safe_value;
+}
+
 unsigned
 ls_vm_samples(int slot, struct ls_ctx_sample *out, unsigned max)
 {
@@ -647,6 +656,17 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * fexit/<fn> is armed at the function's RETURN (ls_fexit_table), one for
      * fentry/<hook> at its ENTRY. Recorded now, read at arm --- see ls_arm_live. */
     g_slots[slot].is_exit = (strncmp(section, "fexit/", 6) == 0);
+
+    /* The safe-return value for THIS slot (item 7, v1: one configured value via
+     * env, not yet the per-return-type policy table). Read here, off the data
+     * path, and delivered by ls_tramp_dispatch. Default 0 is correct for a
+     * pointer/BOOL hook and WRONG for an err_t one --- dtls_tx wants ERR_BUF(2),
+     * set with LS_SHIELD_SAFE_VALUE=2 at arm. */
+    {
+        const char *sv = getenv("LS_SHIELD_SAFE_VALUE");
+        g_slots[slot].safe_value = (sv != NULL && *sv != '\0')
+                                 ? (uint64_t)strtoull(sv, NULL, 0) : 0;
+    }
 
     struct ubpf_vm *vm = ubpf_create();
     if (vm == NULL)
@@ -964,6 +984,14 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
 
     s->safe_returns++;
 
+    /* THE EVIDENCE EVENT. A counter answers "how many"; this answers "show me the
+     * one it stopped". Emitted in BOTH modes --- enforce (blocked) and monitor
+     * (WOULD have blocked) --- so a shield validated in monitor still produces the
+     * record a reviewer needs, tagged with which mode it was. Rate-limited and
+     * ring-gated inside ls_tp_emit_shield; a no-op on the shipped default. Off the
+     * common path: SAFE_RETURN fires only when the exploit precondition holds. */
+    ls_tp_emit_shield(slot, s->gen, (unsigned)mode, (unsigned)ret, ctx, ctx_len);
+
     /* Monitor mode counts the selection and applies nothing. The counters above
      * are what make a monitor-mode hit distinguishable from a miss. */
     return (mode == LS_MODE_ENFORCE) ? LS_SAFE_RETURN : LS_FALLTHROUGH;
@@ -1035,6 +1063,7 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->armed = true;
     live->is_exit = new->is_exit;   /* the kind rides with the program on the swap */
+    live->safe_value = new->safe_value; /* and its safe-return value (item 7) */
     live->gen++;              /* so STATUS can distinguish residue from result */
 
     new->armed = false;                   /* the staging slot goes back */

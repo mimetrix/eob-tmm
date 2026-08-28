@@ -53,6 +53,7 @@
 ?? src/base/ls_tp.h
 ?? src/base/ls_tp_emit.c
 ?? src/base/ls_tp_ring.h
+?? src/base/ls_tp_shield.h
 ?? src/base/ls_tramp.c
 ?? src/base/ls_tramp_asm.c
 ?? src/base/ls_fexit.c

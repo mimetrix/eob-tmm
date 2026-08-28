@@ -38,6 +38,8 @@ weaker evidence than something an independent tool observed, and conflating the 
 | …corroborated independently | MEASURED | INDEPENDENT | packet capture carried the same cause string and line number as the record, via code sharing nothing with the hook |
 | Arming by name is gated on build identity | MEASURED | KERNEL | build ID read from `/proc/<pid>/exe`; mismatch refused. `rst_why` occupied 4 distinct addresses across 4 builds of identical source |
 | Records identify the function that produced them | MEASURED | SELF | was FALSIFIED before 2026-08-19 — see `CONTESTED-PREMISES.md` #1 |
+| The host emits a structured **evidence event** when a shield selects SAFE_RETURN | MEASURED | SELF | 2026-08-28, datkube (build `a78c1dd0`, `tmm:shieldev`): a monitor-mode shield armed live at `http_parse_client_headers` fired **5/5** on `curl`, each SAFE_RETURN producing one `tmm:shield:safe_return` record (schema 6) drained as JSON through `ls_tp_ring`→`ls_drain` — `ts_ns`, hook, mode, `gen`, `seq`, ctx. Rate-limited (first 8, then 1/64), off the data path. The event answers "show me the one it stopped", which the `safe_returns` counter cannot. **Caveat:** the demo shield trips *unconditionally* (a pipeline proof, not exploit detection); traffic unaffected (all 200, monitor). See `dtls-tx-shield-demo.md` |
+| A shield returns a per-hook **safe value** (item 7, v1) on SAFE_RETURN | SHIPPED-UNVALIDATED | SELF | `ls_slot.safe_value`, set from `LS_SHIELD_SAFE_VALUE` at arm, delivered by `ls_tramp_dispatch` (was hardcoded 0 — the `0==ERR_OK` footgun for `dtls_tx`). In the binary; not yet exercised on an enforce-mode live arm |
 
 ## Cost
 

@@ -315,6 +315,47 @@ emit_http(const struct ls_rec *h, const struct http_rec *r)
            r->status_code, r->invalid_flags, r->body_pos, r->hdr_bytes);
 }
 
+/* struct ls_tp_shield_ev --- substrate/ls_tp_shield.h. The enforcement-evidence
+ * record: which shield selected SAFE_RETURN, in which mode, and the flat context
+ * it saw. For the dtls_tx shield arg[3] = sz, the message size --- an oversized
+ * sz beside a SAFE_RETURN is the fragment that would have overflowed the stack. */
+struct shield_rec {
+    unsigned int       mode;
+    unsigned int       gen;
+    unsigned int       verdict;
+    unsigned int       ctx_len;
+    unsigned long long arg[5];
+};
+_Static_assert(sizeof(struct shield_rec) == 56,
+               "shield_rec must match struct ls_tp_shield_ev (56)");
+
+static const char *
+shield_mode_name(unsigned int m)
+{
+    switch (m) {
+    case 1:  return "monitor";   /* WOULD have blocked --- body still ran */
+    case 2:  return "enforce";   /* blocked --- body skipped, safe value returned */
+    default: return "?";
+    }
+}
+
+static void
+emit_shield(const struct ls_rec *h, const struct shield_rec *r)
+{
+    /* `sz` is surfaced by name because it is the evidence; the full arg vector
+     * follows for anyone who wants the rest of the context the shield saw. */
+    printf("{\"ts_ns\":%llu,\"seq\":%llu,\"slot\":%u,\"hook\":\"shield\","
+           "\"schema\":%u,\"mode\":\"%s\",\"gen\":%u,\"verdict\":%u,"
+           "\"ctx_len\":%u,\"sz\":%llu,"
+           "\"arg\":[%llu,%llu,%llu,%llu,%llu]}\n",
+           (unsigned long long)h->ts_ns, (unsigned long long)h->seq, h->slot,
+           h->schema_id, shield_mode_name(r->mode), r->gen, r->verdict,
+           r->ctx_len, (unsigned long long)r->arg[3],
+           (unsigned long long)r->arg[0], (unsigned long long)r->arg[1],
+           (unsigned long long)r->arg[2], (unsigned long long)r->arg[3],
+           (unsigned long long)r->arg[4]);
+}
+
 static void
 emit_raw(const struct ls_rec *h, const unsigned char *p, int n)
 {
@@ -436,6 +477,10 @@ main(int argc, char **argv)
                     emit_sslerr(&h, (const struct sslerr_rec *)buf);
                 else if (h.schema_id == LS_TP_SCHEMA_H2ABORT && n == (int)sizeof(struct h2abort_rec))
                     emit_h2abort(&h, (const struct h2abort_rec *)buf);
+                /* Shield enforcement evidence --- length-checked like every typed
+                 * schema, so a 56-byte claim over the wrong size falls to raw. */
+                else if (h.schema_id == LS_TP_SCHEMA_SHIELD && n == (int)sizeof(struct shield_rec))
+                    emit_shield(&h, (const struct shield_rec *)buf);
                 /* Program-emitted: NO length check against a struct, because there is no
                  * struct. Any length the producer accepted is valid here by construction. */
                 else if (h.schema_id == LS_TP_SCHEMA_PROG)

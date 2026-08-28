@@ -90,6 +90,14 @@ struct ls_slot {
     bool         is_exit;       /* fexit hook: arm via ls_fexit_table, not the
                                  * entry table. Set at load from the program's
                                  * fexit/ vs fentry/ section; read at arm. */
+    uint64_t     safe_value;    /* what the CALLER receives when SAFE_RETURN skips
+                                 * the body (item 7). ZERO IS NOT UNIVERSALLY SAFE:
+                                 * for an err_t-returning hook 0 is ERR_OK ---
+                                 * "succeeded" --- so a shield that skips dtls_tx
+                                 * must return ERR_BUF(2), not 0, or it converts a
+                                 * crash into silent misbehaviour. Set per arm
+                                 * (LS_SHIELD_SAFE_VALUE); delivered by
+                                 * ls_tramp_dispatch. */
     uint64_t     fired;         /* per-instance; a box-wide sum is wrong */
     uint64_t     safe_returns;
     uint64_t     errors;        /* exec faults: fuel exhausted, bounds  */
@@ -142,6 +150,13 @@ size_t ls_function_in_section(const void *elf, size_t elf_len, const char *secti
                               char *out, size_t outlen);
 
 bool ls_vm_stats(int slot, struct ls_stats *out);
+
+/* The value the trampoline hands the hooked function's caller on SAFE_RETURN for
+ * this slot (item 7). Off the data path only in that it is read once per skipped
+ * call; returns 0 for an out-of-range or unarmed slot, which is the fail-safe for
+ * a pointer/BOOL return and the documented wrong answer for an err_t one --- which
+ * is why it is configurable. */
+uint64_t ls_vm_safe_value(int slot);
 
 /* Copy out the recent ctx samples. Off the data path. Returns how many were
  * written, up to LS_CTX_SAMPLES. */

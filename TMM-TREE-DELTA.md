@@ -63,6 +63,12 @@ g_ls_shapes                # ls_vm.c
 They sort between the base tree's `g_loader_running` and `g_origin`; the nine `g_ls_fexit_*` sit
 between `g_ls_btf` and `g_ls_names`.
 
+The tracepoint-emit unit (`ls_tp_emit.c`) also owns `g_tp_seg`, `g_tp_seg_tried`, `g_tp_seq`, and
+— added 2026-08-27 — **`g_shield_ev_seen`**, the rate-limit counter for the shield
+enforcement-evidence event (`tmm:shield:safe_return`). It sorts between `g_ready` and `g_slots`.
+The link check is both-ways, so a new file-scope global (even `static`) fails the build until it is
+listed here and in both whitelist files — which is how it was caught the first time.
+
 ## 3. Compiler flag — `Makefile.overrides`
 
 ```make

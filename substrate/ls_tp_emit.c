@@ -24,6 +24,7 @@
  */
 #include "ls_tp.h"
 #include "ls_tp_ring.h"
+#include "ls_tp_shield.h"
 #include "ls_vm.h"
 
 #include <stdlib.h>
@@ -149,4 +150,57 @@ ls_tp_publish_raw(int slot, const void *rec, unsigned long len)
                               (unsigned long long)ts.tv_sec * 1000000000ull
                                   + (unsigned long long)ts.tv_nsec,
                               rec, (unsigned int)len) == 0 ? 0 : -1;
+}
+
+/*
+ * Shield enforcement-evidence emit. See ls_tp.h for the contract.
+ *
+ * RATE-LIMITED, and the shape is deliberate: the first LS_TP_SHIELD_BURST events
+ * always publish --- a first strike, or a demo, must be SEEN --- then 1 in
+ * LS_TP_SHIELD_EVERY thereafter. A flood of SAFE_RETURNs is exactly what an
+ * attack looks like once a shield enforces, so it must cost a bounded trickle of
+ * records, not one per packet; the ring's own drop counter bounds it a second
+ * time if even the trickle outruns the drain. The counter is atomic because two
+ * TMM threads reach this path --- the same reason g_tp_seq is.
+ */
+#define LS_TP_SHIELD_BURST  8ull
+#define LS_TP_SHIELD_EVERY  64ull
+static _Atomic unsigned long long g_shield_ev_seen;
+
+int
+ls_tp_emit_shield(int slot, unsigned int gen, unsigned int mode,
+                  unsigned int verdict, const void *ctx, unsigned long ctx_len)
+{
+    struct ls_tp_shield_ev ev;
+    struct timespec        ts;
+    unsigned long long     n;
+    unsigned long          i, ncopy;
+
+    ls_tp_seg_bootstrap();
+    if (g_tp_seg == NULL)
+        return -1;                       /* ring off --- the shipped default */
+
+    n = atomic_fetch_add_explicit(&g_shield_ev_seen, 1, memory_order_relaxed) + 1;
+    if (n > LS_TP_SHIELD_BURST && (n % LS_TP_SHIELD_EVERY) != 0)
+        return -1;                       /* rate-limited; the drop is intentional */
+
+    ev.mode    = mode;
+    ev.gen     = gen;
+    ev.verdict = verdict;
+    ev.ctx_len = (unsigned int)ctx_len;
+    ev.arg[0] = ev.arg[1] = ev.arg[2] = ev.arg[3] = ev.arg[4] = 0;
+    /* Byte copy so a short ctx zero-fills its tail and a long one truncates ---
+     * no <string.h> pulled into this bridge file for one memcpy. */
+    ncopy = ctx_len < sizeof ev.arg ? ctx_len : sizeof ev.arg;
+    for (i = 0; i < ncopy; i++)
+        ((unsigned char *)ev.arg)[i] = ((const unsigned char *)ctx)[i];
+
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ls_tp_ring_publish(g_tp_seg, LS_TP_HOOK_SHIELD, LS_TP_SCHEMA_SHIELD,
+                              (unsigned)slot,
+                              atomic_fetch_add_explicit(&g_tp_seq, 1,
+                                                        memory_order_relaxed),
+                              (unsigned long long)ts.tv_sec * 1000000000ull
+                                  + (unsigned long long)ts.tv_nsec,
+                              &ev, (unsigned int)sizeof ev) == 0 ? 0 : -1;
 }

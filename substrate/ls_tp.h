@@ -65,6 +65,13 @@
  * aborted" from "the CONNECTION was reset" and from "TLS failed". Three questions, three
  * owners. */
 #define LS_TP_HOOK_H2ABORT     9u      /* http2_stream_abort --- 36 call sites   */
+/* SHIELD ENFORCEMENT. Not a place in TMM's parse logic --- an event from the
+ * substrate itself, emitted when an armed shield selects SAFE_RETURN (or, in
+ * monitor mode, would). Its own `hook` string ("shield") because it answers a
+ * different question from every hook above: not "what did TMM parse" but "what
+ * did a shield PREVENT". The armed function is identified by the slot, not by a
+ * dedicated id here --- a shield arms arbitrary functions that have no LS_TP_HOOK_*. */
+#define LS_TP_HOOK_SHIELD     10u      /* a shield selected SAFE_RETURN          */
 /*
  * PROGRAM-EMITTED. Not a hook at all --- the record was published by a program calling
  * bpf_ringbuf_output(), so no hook fired and the host does not know the byte layout.
@@ -90,6 +97,10 @@
 /* struct ls_ctx_h2abort, 48 bytes. Distinct from 3 and 4 because the layout shares
  * nothing with either --- no file, no line, no alert, no cookie. */
 #define LS_TP_SCHEMA_H2ABORT   5u
+/* struct ls_tp_shield_ev, 56 bytes --- the enforcement-evidence record
+ * (ls_tp_shield.h). Distinct from all above: it shares no field with a parse
+ * record, and a consumer must not decode one as the other. */
+#define LS_TP_SCHEMA_SHIELD    6u
 /* Program-chosen bytes. The host validated the LENGTH and nothing else, so the drain
  * reports len and hex rather than naming fields it cannot vouch for. */
 #define LS_TP_SCHEMA_PROG    100u
@@ -126,6 +137,18 @@ int ls_tp_dispatch(int slot, const void *rec, unsigned long len,
  * the slot's program first, and calling it from a helper the program invoked would
  * re-enter the VM from inside itself. Returns 0, or -1 when the ring is off. */
 int ls_tp_publish_raw(int slot, const void *rec, unsigned long len);
+
+/*
+ * Publish a SHIELD ENFORCEMENT-EVIDENCE record (tmm:shield:safe_return). Called
+ * by ls_vm_call the moment a program selects SAFE_RETURN, in monitor or enforce.
+ * `ctx`/`ctx_len` are the flat register context the program was handed --- the
+ * evidence. Rate-limited internally so an attack flood cannot turn the audit
+ * trail into a self-inflicted denial of service; the ring's own drop counter is
+ * the second bound. No-ops when the ring is off (LS_TP_RING unset), like every
+ * path here. Types are ABI-stable across the two include worlds --- see the top
+ * of this header. Returns 0 on publish, -1 when dropped, rate-limited or ring off. */
+int ls_tp_emit_shield(int slot, unsigned int gen, unsigned int mode,
+                      unsigned int verdict, const void *ctx, unsigned long ctx_len);
 
 /*
  * Slot assignment. Slot 0 is the shield --- the built-in program compiled into
@@ -165,6 +188,8 @@ ls_tp_schema_for(unsigned int hook_id)
         return LS_TP_SCHEMA_SSLERR;
     case LS_TP_HOOK_H2ABORT:
         return LS_TP_SCHEMA_H2ABORT;
+    case LS_TP_HOOK_SHIELD:
+        return LS_TP_SCHEMA_SHIELD;
     case LS_TP_HOOK_PROG:
         return LS_TP_SCHEMA_PROG;
     default:

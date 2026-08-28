@@ -108,14 +108,14 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
         return r;
 
     /*
-     * TODO(f5): the safe value belongs to the slot, from the safe-return policy
-     * table. Zero is right for a pointer-returning or BOOL-returning hook and
-     * wrong for one whose caller treats 0 as success --- which is exactly why
-     * item 7 exists and why v1 is restricted to trivial returns. Returning a
-     * wrong "safe" value is worse than not shielding: it converts a crash into
-     * silent misbehaviour.
+     * The safe value belongs to the SLOT (item 7). v1 carries one configured
+     * value per slot (ls_vm_safe_value, set from LS_SHIELD_SAFE_VALUE at arm) ---
+     * not yet the full per-return-type policy table, but enough that an err_t
+     * hook returns ERR_BUF instead of 0. Zero was right for a pointer/BOOL hook
+     * and wrong for one whose caller treats 0 as success, which converts a crash
+     * into silent misbehaviour: dtls_tx is precisely that case (0 == ERR_OK).
      */
     r.verdict    = LS_TRAMP_SAFE_RETURN;
-    r.safe_value = 0;
+    r.safe_value = ls_vm_safe_value(slot);
     return r;
 }
