@@ -85,6 +85,10 @@
   pre.evjson{white-space:pre; overflow-wrap:normal; max-width:none; overflow-x:auto;
              font-size:clamp(10.5px,1.25vw,15px); line-height:1.6}
 
+  /* code listing: use the full slide width so no line is clipped */
+  pre.bpf{max-width:none; white-space:pre; overflow-x:auto;
+          font-size:clamp(11px,1.28vw,15px); line-height:1.55}
+
   /* field reference: key -> meaning, two columns */
   .fields{display:grid; grid-template-columns:1fr 1fr; gap:7px 32px; margin-top:20px; max-width:none}
   .fields > div{display:grid; grid-template-columns:auto 1fr; gap:13px; align-items:baseline; padding:5px 0;
@@ -242,7 +246,7 @@
     <p class="kicker">The bytecode</p>
     <h1>What a real shield looks like — <span class="em">dtls_tx</span></h1>
     <p class="lead">Target: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b>, live in this build (no CVE; an internal finding). The shield reads that precondition at entry:</p>
-    <pre><span class="c-com">/* arm at the entry of dtls_tx — the string IS the attach identity */</span>
+    <pre class="bpf"><span class="c-com">/* arm at the entry of dtls_tx — the string IS the attach identity */</span>
 SEC(<span class="c-str">"fentry/dtls_tx"</span>)
 <span class="c-key">__u64</span> <span class="c-fn">dtls_txguard</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
     <span class="c-key">struct</span> ssl_ctx  *sc = (<span class="c-key">void</span>*)c->arg[0];   <span class="c-com">// a COPY of the args</span>
