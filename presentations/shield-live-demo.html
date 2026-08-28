@@ -276,8 +276,11 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
   <section class="slide">
     <p class="kicker">Live — drop to the terminals</p>
     <h1>Watch it run on a <span class="em">running</span> pod</h1>
-    <p class="lead">Set the armed pod once per window, then paste:</p>
-    <pre class="cmd"><span class="c-com"># find the armed pod automatically (run once per window)</span>
+    <p class="lead">First reset to one fresh pod — the script prints the two commands below, with the pod filled in:</p>
+    <pre class="cmd"><span class="c-com"># on the datkube box — fresh pod, armed, ring warmed. Run before EACH take.</span>
+bash ~/demo/demo-reset.sh
+
+<span class="c-com"># (or resolve the pod yourself, once per window)</span>
 POD=$(for p in $(kubectl get pods -l app=f5-tmm --no-headers | awk '{print $1}'); do kubectl exec $p -c f5-tmm -- /usr/bin/ls-load.py status 1 2>/dev/null | grep -q armed=1 && echo $p; done)
 
 <span class="c-com"># Window A — evidence stream (leave running)</span>
