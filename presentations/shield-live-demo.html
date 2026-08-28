@@ -81,6 +81,10 @@
           font-size:clamp(11.5px,1.3vw,15px); line-height:1.75}
   pre.cmd .c-com{color:var(--accent); font-weight:600}
 
+  /* display JSON: never wrap mid-object; scale to fit, scroll only if forced */
+  pre.evjson{white-space:pre; overflow-wrap:normal; max-width:none; overflow-x:auto;
+             font-size:clamp(10.5px,1.25vw,15px); line-height:1.6}
+
   /* field reference: key -> meaning, two columns */
   .fields{display:grid; grid-template-columns:1fr 1fr; gap:7px 32px; margin-top:20px; max-width:none}
   .fields > div{display:grid; grid-template-columns:auto 1fr; gap:13px; align-items:baseline; padding:5px 0;
@@ -309,7 +313,7 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
   <section class="slide">
     <p class="kicker">The evidence — decoded</p>
     <h1>The event, <span class="em">field by field</span></h1>
-    <pre class="cmd">{"ts_ns":1787879287096021076,"seq":0,"slot":1,"hook":"shield","schema":6,
+    <pre class="evjson">{"ts_ns":1787879287096021076,"seq":0,"slot":1,"hook":"shield","schema":6,
  "mode":"monitor","gen":1,"verdict":1,"ctx_len":40,"sz":0,"arg":[…]}</pre>
     <div class="fields">
       <div><code>ts_ns</code><span>wall-clock time it fired (ns) — correlates with any other log</span></div>
