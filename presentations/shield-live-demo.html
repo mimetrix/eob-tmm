@@ -83,7 +83,7 @@
 
   /* display JSON: never wrap mid-object; scale to fit, scroll only if forced */
   pre.evjson{white-space:pre; overflow-wrap:normal; max-width:none; overflow-x:auto;
-             font-size:clamp(10.5px,1.25vw,15px); line-height:1.6}
+             font-size:clamp(10px,1.15vw,14px); line-height:1.6}
 
   /* code listing: use the full slide width so no line is clipped */
   pre.bpf{max-width:none; white-space:pre; overflow-x:auto;
@@ -317,8 +317,7 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
   <section class="slide">
     <p class="kicker">The evidence — decoded</p>
     <h1>The event, <span class="em">field by field</span></h1>
-    <pre class="evjson">{"ts_ns":1787879287…, "seq":0, "slot":1, "hook":"shield",
- "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
+    <pre class="evjson">{"ts_ns":…, "seq":0, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
       <div><code>ts_ns</code><span>wall-clock time it fired (ns) — correlates with any other log</span></div>
       <div><code>hook</code><span>event category — <b>shield</b> = an enforcement decision</span></div>
