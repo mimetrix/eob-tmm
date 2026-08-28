@@ -317,8 +317,8 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
   <section class="slide">
     <p class="kicker">The evidence — decoded</p>
     <h1>The event, <span class="em">field by field</span></h1>
-    <pre class="evjson">{"ts_ns":1787879287096021076,"seq":0,"slot":1,"hook":"shield","schema":6,
- "mode":"monitor","gen":1,"verdict":1,"ctx_len":40,"sz":0,"arg":[…]}</pre>
+    <pre class="evjson">{"ts_ns":1787879287…, "seq":0, "slot":1, "hook":"shield",
+ "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
       <div><code>ts_ns</code><span>wall-clock time it fired (ns) — correlates with any other log</span></div>
       <div><code>hook</code><span>event category — <b>shield</b> = an enforcement decision</span></div>
