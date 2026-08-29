@@ -1,0 +1,75 @@
+#!/bin/sh
+# tmmtrace --- the trace DSL on the command line, end to end. RUNS ON THE BUILD BOX.
+#
+#   tmmtrace verify '<expr>'          gen -> clang -> PREVAIL (pinned toolchain)
+#   tmmtrace run    '<expr>' [nreq]   verify -> sign -> arm on datkube -> observe -> disarm
+#   tmmtrace gen    '<expr>'          print the generated CO-RE .bpf.c
+#   tmmtrace list   '<glob>'          list hooks in the build's map
+#
+# WHY THE BUILD BOX. The pipeline splits by design: compile+verify in dev, sign at
+# the F5 key, load on the target. The build box is the one host that holds the
+# pinned clang + PREVAIL AND the signing key AND reaches datkube --- so it is where
+# `run` orchestrates all three. The target (datkube) deliberately carries no
+# toolchain and no key; use tmmtrace-run.sh there for a pre-built probe by name.
+#
+# NOTE: `run` arms on SLOT 2 and FORCE-disarms whatever is at the hook first (a
+# function entry holds one probe). If the shield shares that hook, it is replaced
+# for the run. Probes are monitor-mode observe --- traffic is unaffected.
+set -e
+
+TT="$HOME/eob-tmm-staged/substrate/tmmtrace.py"
+SIGN="$HOME/eob-tmm-staged/substrate/sign_shield.py"
+SK="${SK:-$HOME/.ls-signing/shield_sk.pem}"
+DK="${DK:-10.145.40.193}"
+KEY="${KEY:-$HOME/.ssh/id_datpush}"
+VS="${VS:-http://11.11.11.99/}"
+export CLANG="${CLANG:-clang}"
+export PREVAIL="${PREVAIL:-$HOME/eob-tmm-staged/ebpf-verifier/bin/prevail}"
+export LS_SIGS="${LS_SIGS:-$HOME/lstools/signatures.tsv}"
+export LS_TYPES="${LS_TYPES:-$HOME/lstools/types.json}"
+export LS_HOOKMAP="${LS_HOOKMAP:-$HOME/lstools/hook-map.json}"
+
+cmd="$1"; expr="$2"; nreq="${3:-40}"
+case "$cmd" in
+  gen|verify|list) exec python3 "$TT" "$cmd" "$expr" ;;
+  run) : ;;
+  *) sed -n '2,15p' "$0"; exit 1 ;;
+esac
+
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+python3 "$TT" build "$expr" "$tmp" | sed 's/^/  /'      # gen -> clang -> PREVAIL (verifies)
+o=$(ls "$tmp"/*.bpf.o); fn=$(basename "$o" .bpf.o); meta="$tmp/$fn.meta.json"
+hook=$(python3 -c "import json;print(json.load(open('$meta'))['hook'])")
+kind=$(python3 -c "import json;print(json.load(open('$meta'))['kind'])")
+python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling monitor \
+    -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
+
+scp -i "$KEY" -o StrictHostKeyChecking=no "$o" "$tmp/$fn.bpf.sig" starin@"$DK":/tmp/ >/dev/null
+ssh -i "$KEY" -o StrictHostKeyChecking=no starin@"$DK" \
+    "EXPR='$expr' HOOK='$hook' KIND='$kind' FN='$fn' NREQ='$nreq' VS='$VS' bash -s" <<'REMOTE'
+set -e
+POD=$(kubectl get pods -l app=f5-tmm --no-headers | grep Running | head -1 | awk '{print $1}')
+echo "probe : $EXPR"
+echo "hook  : $HOOK   pod: $POD   slot: 2"
+kubectl cp /tmp/$FN.bpf.o  "$POD":/tmp/$FN.bpf.o  -c f5-tmm
+kubectl cp /tmp/$FN.bpf.sig "$POD":/tmp/$FN.bpf.sig -c f5-tmm
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load 2 /tmp/$FN.bpf.o 1 >/dev/null
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$HOOK" >/dev/null 2>&1 || true
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm 2 "$HOOK" >/dev/null
+echo "armed. driving $NREQ requests ..."
+kubectl exec client -- sh -c "for i in \$(seq $NREQ); do curl -so /dev/null $VS; done" || true
+S=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status 2)
+F=$(echo "$S" | grep -o 'fired=[0-9]*' | cut -d= -f2)
+M=$(echo "$S" | grep -o 'safe_returns=[0-9]*' | cut -d= -f2)
+echo "----------------------------------------"
+if [ "$KIND" = count ]; then
+  echo "  fired (hook hits) : ${F:-0}"
+  echo "  matched (count)   : ${M:-0}"
+  [ "${F:-0}" -gt 0 ] 2>/dev/null && echo "  match rate        : $(awk "BEGIN{printf \"%.1f%%\",100*${M:-0}/$F}")"
+else
+  echo "  fired (hook hits) : ${F:-0}   ($KIND: per-value egress not wired --- use count()/predicate)"
+fi
+echo "----------------------------------------"
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$HOOK" >/dev/null 2>&1 || true
+echo "disarmed slot 2."
+REMOTE
