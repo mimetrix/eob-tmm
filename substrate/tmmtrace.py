@@ -243,6 +243,35 @@ def verify(expr):
         return 0 if ok else 1
 
 
+def build_prog(expr, outdir):
+    """gen -> verify(PREVAIL) -> clang -> <outdir>/<fn>.bpf.o + <fn>.meta.json.
+    Signing is a separate F5-key step (sign_shield.py); this is the dev/CI half."""
+    src, fn, section, hook = codegen(expr)
+    os.makedirs(outdir, exist_ok=True)
+    c = os.path.join(outdir, fn + ".bpf.c")
+    o = os.path.join(outdir, fn + ".bpf.o")
+    open(c, "w").write(src)
+    cc = subprocess.run([CLANG, "-O2", "-g", "-target", "bpf", "-c", c, "-o", o],
+                        capture_output=True, text=True)
+    if cc.returncode != 0:
+        sys.exit("*** clang failed:\n" + cc.stderr)
+    sec = "%s/%s" % (section, hook)
+    if os.path.exists(PREVAIL):
+        pv = subprocess.run([PREVAIL, o, sec, "--termination", "--allow-division-by-zero"],
+                            capture_output=True, text=True)
+        if pv.returncode != 0:
+            sys.exit("*** PREVAIL REFUSED %s:\n%s" % (fn, pv.stdout or pv.stderr))
+        verified = True
+    else:
+        verified = False
+    is_count = bool(_COUNT.match(parse(expr)[3]))
+    json.dump({"expr": expr, "fn": fn, "section": sec, "hook": hook,
+               "kind": "count" if is_count else "value", "verified": verified},
+              open(os.path.join(outdir, fn + ".meta.json"), "w"))
+    print("built %s  (%s)  section %s  verified=%s" % (o, "count" if is_count else "value", sec, verified))
+    return o, fn, sec, hook
+
+
 def hist_stdin():
     """bpftrace-style log2 histogram of whitespace-separated integers on stdin."""
     vals = [int(x) for x in sys.stdin.read().split() if x.lstrip("-").isdigit()]
@@ -286,6 +315,8 @@ def main(argv):
             sys.stdout.write(codegen(argv[2])[0]); return 0
         if cmd == "verify":
             return verify(argv[2])
+        if cmd == "build":
+            build_prog(argv[2], argv[3] if len(argv) > 3 else "."); return 0
         if cmd == "hist":
             return hist_stdin()
         if cmd == "list":
