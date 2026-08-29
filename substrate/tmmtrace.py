@@ -195,6 +195,15 @@ def codegen(expr):
         cond = "%s %s %s" % (take(lhs), op, rhs)
 
     if _COUNT.match(action):
+        # A zero-relocation program is refused by the CO-RE relocator (rc=-3), so an
+        # unpredicated count() would not load. Add a harmless canary field read of
+        # arg0's struct so the object carries a relocation; the value is ignored.
+        if not cond and not code:
+            for i, (pn, kind, struct, _d) in enumerate(hook_params(hook) or []):
+                if kind == "blob" and struct and _types().get(struct):
+                    take("%s(arg%d).%s:%s" % (struct, i, next(iter(_types()[struct])),
+                                              _types()[struct][next(iter(_types()[struct]))]))
+                    break
         ret = ("    return (%s) ? 1ull : 0ull;   /* SAFE_RETURN on match; safe_returns = count */" % cond
                if cond else
                "    return 1ull;                 /* count every invocation (safe_returns) */")
