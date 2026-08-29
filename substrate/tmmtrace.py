@@ -163,7 +163,7 @@ def _read(val, k):
 
 def codegen(expr):
     section, hook, pred, action = parse(expr)
-    fn = _ident(section, hook, action)
+    fn = _ident(expr, hook, action)
     ctx = "ls_ctx_exit" if section == "fexit" else "ls_ctx_generic"
     ctxdef = ("struct ls_ctx_exit { __u64 arg[5]; __u64 ret; };" if section == "fexit"
               else "struct ls_ctx_generic { __u64 arg[5]; };")
@@ -214,9 +214,11 @@ def codegen(expr):
     return "\n".join(l for l in lines if l is not None), fn, section, hook
 
 
-def _ident(section, hook, action):
-    tag = re.sub(r"[^A-Za-z0-9_]", "_", action)[:24].strip("_") or "probe"
-    return "tt_%s_%s" % (hook, tag)
+def _ident(expr, hook, action):
+    import hashlib
+    tag = re.sub(r"[^A-Za-z0-9_]", "_", action)[:12].strip("_") or "probe"
+    h = hashlib.sha1(expr.encode()).hexdigest()[:6]     # unique per full expr (section+pred+action)
+    return "tt_%s_%s_%s" % (hook, tag, h)
 
 
 def verify(expr):
