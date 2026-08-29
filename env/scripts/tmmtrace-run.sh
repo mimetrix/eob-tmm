@@ -35,7 +35,16 @@ echo "hook  : $HOOK   pod: $POD   slot: $SLOT"
 kubectl cp "$DIR/$NAME.bpf.o"  "$POD":/tmp/$NAME.bpf.o  -c f5-tmm
 kubectl cp "$DIR/$NAME.bpf.sig" "$POD":/tmp/$NAME.bpf.sig -c f5-tmm
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load $SLOT /tmp/$NAME.bpf.o 1 >/dev/null
-kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm  $SLOT "$HOOK" >/dev/null
+# A function entry holds ONE probe. If something (the shield, a prior run) is armed
+# at this hook, FORCE=1 disarms it first; otherwise we stop with guidance.
+[ "${FORCE:-0}" = 1 ] && kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$HOOK" >/dev/null 2>&1
+if ! kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm $SLOT "$HOOK" >/dev/null 2>&1; then
+    echo "*** $HOOK is already armed (the shield, or a prior run) --- a function entry"
+    echo "    holds only one probe. Either:"
+    echo "      disarm it:  kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py disarm $HOOK"
+    echo "      or re-run:  FORCE=1 bash ~/demo/tmmtrace-run.sh $NAME"
+    exit 1
+fi
 echo "armed. driving $NREQ requests ..."
 kubectl exec client -- sh -c "for i in \$(seq $NREQ); do curl -so /dev/null $VS; done" || true
 
