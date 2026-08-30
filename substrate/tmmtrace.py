@@ -201,8 +201,17 @@ def codegen(expr):
         if not cond and not code:
             for i, (pn, kind, struct, _d) in enumerate(hook_params(hook) or []):
                 if kind == "blob" and struct and _types().get(struct):
-                    take("%s(arg%d).%s:%s" % (struct, i, next(iter(_types()[struct])),
-                                              _types()[struct][next(iter(_types()[struct]))]))
+                    fld = next(iter(_types()[struct]))
+                    ct = CTYPE[_types()[struct][fld]]
+                    sd = "struct %s { %s %s; } __attribute__((preserve_access_index));" % (struct, ct, fld)
+                    if sd not in structs:
+                        structs.append(sd)
+                    # relocation-only canary: read it, DO NOT gate on the result, so
+                    # count() returns 1 on every invocation regardless of the read.
+                    code.append("    struct %s *pc = (struct %s *)c->arg[%d];\n"
+                                "    %s vc = 0;\n"
+                                "    (void)bpf_probe_read(&vc, sizeof vc, &pc->%s);  /* canary: relocation only */\n"
+                                % (struct, struct, i, ct, fld))
                     break
         ret = ("    return (%s) ? 1ull : 0ull;   /* SAFE_RETURN on match; safe_returns = count */" % cond
                if cond else
