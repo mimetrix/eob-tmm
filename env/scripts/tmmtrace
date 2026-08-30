@@ -57,11 +57,14 @@ L=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load 2 /tmp/$FN.bpf.o 1
 echo "$L" | grep -q 'OK loaded' || { echo "*** load failed (slot 2 unchanged): $L"; exit 1; }
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$HOOK" >/dev/null 2>&1 || true
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm 2 "$HOOK" >/dev/null
+# counters are per-slot and survive reloads, so baseline after arm and show the delta
+B=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status 2)
+BF=$(echo "$B" | grep -o 'fired=[0-9]*' | cut -d= -f2); BM=$(echo "$B" | grep -o 'safe_returns=[0-9]*' | cut -d= -f2)
 echo "armed. driving $NREQ requests ..."
 kubectl exec client -- sh -c "for i in \$(seq $NREQ); do curl -so /dev/null $VS; done" || true
-S=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status 2)
-F=$(echo "$S" | grep -o 'fired=[0-9]*' | cut -d= -f2)
-M=$(echo "$S" | grep -o 'safe_returns=[0-9]*' | cut -d= -f2)
+A=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status 2)
+AF=$(echo "$A" | grep -o 'fired=[0-9]*' | cut -d= -f2); AM=$(echo "$A" | grep -o 'safe_returns=[0-9]*' | cut -d= -f2)
+F=$((AF-BF)); M=$((AM-BM))
 echo "----------------------------------------"
 if [ "$KIND" = count ]; then
   echo "  fired (hook hits) : ${F:-0}"
