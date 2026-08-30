@@ -1,0 +1,68 @@
+#!/bin/sh
+# tmmtrace --- in the TMM toolbox pod. The whole DSL pipeline, in-cluster:
+# gen -> clang -> PREVAIL -> sign, then load into the f5-tmm pod over kubectl and
+# observe. This is what an engineer runs after `kubectl exec -it <toolbox>`.
+#
+#   tmmtrace run    '<expr>' [nreq]
+#   tmmtrace verify '<expr>' | gen '<expr>' | list '<glob>'
+#
+# NOTE the signing key is mounted from a Secret here for the demo; in production it
+# lives in a sign service and the toolbox calls out to it --- the pod never holds it.
+set -e
+export CLANG="${CLANG:-clang}"
+export PREVAIL="${PREVAIL:-/opt/tmmtrace/prevail}"
+export LS_SIGS="${LS_SIGS:-/opt/tmmtrace/signatures.tsv}"
+export LS_TYPES="${LS_TYPES:-/opt/tmmtrace/types.json}"
+export LS_HOOKMAP="${LS_HOOKMAP:-/opt/tmmtrace/hook-map.json}"
+TT=/opt/tmmtrace/tmmtrace.py
+SIGN=/opt/tmmtrace/sign_shield.py
+SK="${SK:-/etc/tmmtrace-key/shield_sk.pem}"
+VS="${VS:-http://11.11.11.99/}"
+SLOT="${SLOT:-2}"
+
+cmd="$1"; expr="$2"; nreq="${3:-40}"
+case "$cmd" in
+  verify|gen|list) exec python3 "$TT" "$cmd" "$expr" ;;
+  run) : ;;
+  *) sed -n '2,11p' "$0"; exit 1 ;;
+esac
+
+echo "probe : $expr"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+python3 "$TT" build "$expr" "$tmp" | sed 's/^/  /'            # gen -> clang -> PREVAIL
+o=$(ls "$tmp"/*.bpf.o); fn=$(basename "$o" .bpf.o)
+hook=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json'))['hook'])")
+kind=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json'))['kind'])")
+python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling monitor \
+    -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
+
+POD=$(kubectl get pods -l app=f5-tmm --no-headers | grep Running | head -1 | awk '{print $1}')
+[ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
+echo "hook  : $hook   pod: $POD   slot: $SLOT"
+kubectl cp "$o"  "$POD":/tmp/$fn.bpf.o  -c f5-tmm
+kubectl cp "$tmp/$fn.bpf.sig" "$POD":/tmp/$fn.bpf.sig -c f5-tmm
+L=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load $SLOT /tmp/$fn.bpf.o 1 2>&1)
+echo "$L" | grep -q 'OK loaded' || { echo "*** load failed: $L"; exit 1; }
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm $SLOT "$hook" >/dev/null
+
+# per-slot counters accumulate; baseline after arm, show this run's delta
+b=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status $SLOT)
+bf=$(echo "$b"|grep -o 'fired=[0-9]*'|cut -d= -f2); bm=$(echo "$b"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
+echo "armed. driving $nreq requests ..."
+kubectl exec client -- sh -c "for i in \$(seq $nreq); do curl -so /dev/null $VS; done" || true
+a=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status $SLOT)
+af=$(echo "$a"|grep -o 'fired=[0-9]*'|cut -d= -f2); am=$(echo "$a"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
+F=$((af-bf)); M=$((am-bm))
+
+echo "----------------------------------------"
+if [ "$kind" = count ]; then
+  echo "  fired (hook hits) : $F"
+  echo "  matched (count)   : $M"
+  [ "$F" -gt 0 ] 2>/dev/null && echo "  match rate        : $(awk "BEGIN{printf \"%.1f%%\",100*$M/$F}")"
+else
+  echo "  fired (hook hits) : $F   ($kind: per-value egress not wired --- use count()/predicate)"
+fi
+echo "----------------------------------------"
+kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
+echo "disarmed slot $SLOT."

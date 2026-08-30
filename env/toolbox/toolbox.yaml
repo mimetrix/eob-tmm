@@ -1,0 +1,68 @@
+# The TMM trace toolbox: a pod an engineer execs into to run the trace DSL.
+# ServiceAccount + Role grant just enough to read pods and exec into them (to
+# reach the f5-tmm loader and drive the client). The signing key is a Secret,
+# created separately (see env/scripts/deploy-toolbox.sh).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tmmtrace-toolbox
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tmmtrace-toolbox
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tmmtrace-toolbox
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tmmtrace-toolbox
+subjects:
+  - kind: ServiceAccount
+    name: tmmtrace-toolbox
+    namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tmmtrace-toolbox
+  namespace: default
+  labels:
+    app: tmmtrace-toolbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tmmtrace-toolbox
+  template:
+    metadata:
+      labels:
+        app: tmmtrace-toolbox
+    spec:
+      serviceAccountName: tmmtrace-toolbox
+      containers:
+        - name: toolbox
+          image: docker.io/library/tmmtrace-toolbox:latest
+          imagePullPolicy: Never
+          command: ["sleep", "infinity"]
+          volumeMounts:
+            - name: signkey
+              mountPath: /etc/tmmtrace-key
+              readOnly: true
+      volumes:
+        - name: signkey
+          secret:
+            secretName: tmmtrace-signkey
