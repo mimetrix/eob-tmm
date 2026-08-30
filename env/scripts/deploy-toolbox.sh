@@ -16,7 +16,8 @@ STAGE="${STAGE:-$HOME/eob-tmm-staged}"
 echo "== 1. assemble context + build image =="
 ctx=$(mktemp -d); trap 'rm -rf "$ctx"' EXIT
 cp "$STAGE/ebpf-verifier/bin/prevail" "$STAGE/substrate/tmmtrace.py" \
-   "$STAGE/substrate/gen_type_catalog.py" "$STAGE/substrate/sign_shield.py" "$ctx/"
+   "$STAGE/substrate/gen_type_catalog.py" "$STAGE/substrate/sign_shield.py" \
+   "$STAGE/substrate/shield_abi.h" "$ctx/"
 cp "$HOME/lstools/signatures.tsv" "$HOME/lstools/types.json" "$HOME/lstools/hook-map.json" "$ctx/"
 cp "$STAGE/env/toolbox/tmmtrace" "$ctx/tmmtrace"
 cp "$STAGE/env/toolbox/Dockerfile" "$ctx/Dockerfile"
@@ -38,6 +39,7 @@ ssh -i "$KEY" -o StrictHostKeyChecking=no starin@"$DK" '
   kubectl create secret generic tmmtrace-signkey \
     --from-file=shield_sk.pem=/tmp/shield_sk.pem --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   kubectl apply -f /tmp/toolbox.yaml
+  kubectl rollout restart deploy/tmmtrace-toolbox    # pick up a freshly re-imported image
   kubectl rollout status deploy/tmmtrace-toolbox --timeout=120s | tail -1
   rm -f /tmp/shield_sk.pem /tmp/tmmtrace-toolbox.tar
   kubectl get pods -l app=tmmtrace-toolbox --no-headers | awk "{print \"  pod \"\$1\" \"\$3}"
