@@ -357,6 +357,26 @@ kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_h
     <p class="punch">tmmtrace <span class="em">instruments</span> — it arms the probe and reads TMM's own counter. The traffic is <span class="em">yours</span>; the number is <span class="em">TMM's</span>.</p>
   </section>
 
+  <!-- 10b OBSERVE — READ A FIELD -->
+  <section class="slide">
+    <p class="kicker">Observe — read a field, not just count</p>
+    <h1>Count requests <span class="em">by size</span> — real data out of the call</h1>
+    <p class="lead">A predicate reads a live argument — here <code>args.len</code>, the incoming request buffer size (from the <code>xbuf</code> arg) — so <b>matched</b> tracks only the calls that meet it. This is the observe mission: reading TMM's internal state, live.</p>
+    <pre class="cmd"><span class="c-com"># Window 1 (toolbox) — count only requests whose buffer is &gt; 200 bytes</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- \
+  tmmtrace arm 'fentry/http_parse_client_headers /args.len &gt; 200/ { count() }'
+<span class="c-com"># Window 3 (watch) — START FIRST, leave running</span>
+watch -n1 kubectl exec deploy/tmmtrace-toolbox -- tmmtrace status 2
+<span class="c-com"># Window 2 (client) — drive SMALL requests: matched stays 0</span>
+kubectl exec -it client -- sh -c 'for i in $(seq 8); do curl -s "http://11.11.11.99/?s=$i"; done'
+<span class="c-com"># Window 2 (client) — drive LARGE requests (~300-byte header): matched climbs</span>
+kubectl exec -it client -- sh -c 'H=$(head -c 300 &lt;/dev/zero | tr "\0" A); for i in $(seq 8); do curl -s "http://11.11.11.99/?l=$i" -H "X-Pad: $H"; done'
+<span class="c-com"># Window 1 (toolbox) — disarm when done (Ctrl-C the Window 3 watch)</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_headers'</pre>
+    <pre class="bpf">  fired (hook hits) = 16    matched (count) = <span class="c-good">8</span>    &lt;- only the requests &gt; 200 bytes</pre>
+    <p class="punch"><b>fired</b> = every parse; <b>matched</b> = the ones the field test picked. The surface read <code>xbuf-&gt;len</code> out of each live call.</p>
+  </section>
+
   <!-- 10 COST — THE POLL LOOP -->
   <section class="slide">
     <p class="kicker">The question everyone asks: "in the poll loop?"</p>
@@ -466,7 +486,7 @@ kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_h
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 16</span>
+  <span id="count">1 / 17</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
