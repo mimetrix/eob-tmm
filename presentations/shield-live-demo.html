@@ -349,7 +349,7 @@ watch -n1 kubectl exec deploy/tmmtrace-toolbox -- tmmtrace status 2
 <span class="c-com"># Window 2 (client) — NOW drive; fired/matched climb live in Window 3</span>
 kubectl exec -it client -- sh -c 'for i in $(seq 40); do curl -s http://11.11.11.99/; done'
 <span class="c-com"># status counts SINCE ARM (cumulative). To drive again from 0, in Window 1:  tmmtrace reset 2</span>
-<span class="c-com"># Window 1 (toolbox) — disarm when done (Ctrl-C the Window 3 watch)</span>
+<span class="c-com"># Window 1 — disarm when done — OR skip it and go to the next beat (its arm swaps this probe)</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_headers'</pre>
     <pre class="bpf">  armed : http_parse_client_headers   slot 2 (monitor)
   slot 2  since arm:   fired (hook hits) = <span class="c-good">40</span>    matched (count) = <span class="c-good">40</span>   (<span class="c-good">100.0%</span>)
@@ -362,10 +362,11 @@ kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_h
     <p class="kicker">Observe — read a field, not just count</p>
     <h1>Count requests <span class="em">by size</span> — real data out of the call</h1>
     <p class="lead">A predicate reads a live argument — here <code>args.len</code>, the incoming request buffer size (from the <code>xbuf</code> arg) — so <b>matched</b> tracks only the calls that meet it. This is the observe mission: reading TMM's internal state, live.</p>
-    <pre class="cmd"><span class="c-com"># Window 1 (toolbox) — count only requests whose buffer is &gt; 200 bytes</span>
+    <pre class="cmd"><span class="c-com"># Window 1 (toolbox) — transition from the last beat: this arm SWAPS the probe in place</span>
+<span class="c-com">#   (no disarm needed, counter resets to 0). Count only requests whose buffer is &gt; 200 bytes:</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- \
   tmmtrace arm 'fentry/http_parse_client_headers /args.len &gt; 200/ { count() }'
-<span class="c-com"># Window 3 (watch) — START FIRST, leave running</span>
+<span class="c-com"># Window 3 (watch) — already running from the last beat; just leave it up</span>
 watch -n1 kubectl exec deploy/tmmtrace-toolbox -- tmmtrace status 2
 <span class="c-com"># Window 2 (client) — drive SMALL requests: matched stays 0</span>
 kubectl exec -it client -- sh -c 'for i in $(seq 8); do curl -s "http://11.11.11.99/?s=$i"; done'
