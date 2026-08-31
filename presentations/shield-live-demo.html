@@ -313,7 +313,7 @@
     <pre class="bpf"><span class="c-com">grammar:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
 
 <span class="c-com">observe:</span>  fentry/http_parse_client_headers { <span class="c-good">count()</span> }
-<span class="c-com">enforce:</span>  fentry/dtls_tx /args.sz &gt; 16384/ { <span class="c-good">shield(2)</span> }
+<span class="c-com">enforce:</span>  fentry/dtls_tx /args.sz &gt; 16384/ { <span class="c-good">shield(2)</span> }   <span class="c-com">// 2 = the safe value to return (ERR_BUF)</span>
 
 <span class="c-com">pipeline:</span> gen → clang → <span class="c-key">PREVAIL</span> → F5-sign → arm(slot)</pre>
     <p class="punch">The same DSL authors all three: <span style="color:var(--good)">observe</span>, cost, <span style="color:var(--accent)">enforce</span>.</p>
@@ -382,7 +382,7 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = 
         <span class="c-key">return</span> <span class="c-good">1</span>;   <span class="c-com">// MATCH → SAFE_RETURN: host puts ERR_BUF (2) in rax, body never runs</span>
     <span class="c-key">return</span> 0;  <span class="c-com">// FALLTHROUGH → the real dtls_tx runs, untouched</span>
 }</pre>
-    <p class="lead" style="margin-top:8px"><b>Reading it:</b> <code>c</code> is the <b>ctx</b> — the snapshot the trampoline handed in: a <em>copy</em> of <code>dtls_tx</code>'s argument registers, never live TMM memory, so the program can read the inputs but can't corrupt anything. <code>arg[3]</code> is the fragment size; over the buffer it returns <code>1</code> (SAFE_RETURN → the caller gets <code>ERR_BUF</code> and the crashing body is skipped), else <code>0</code> (the function runs normally).</p>
+    <p class="lead" style="margin-top:8px"><b>Reading it:</b> <code>c</code> is the <b>ctx</b> — the snapshot the trampoline handed in: a <em>copy</em> of <code>dtls_tx</code>'s argument registers, never live TMM memory, so the program can read the inputs but can't corrupt anything. <code>arg[3]</code> is the fragment size. Over the buffer, the program's <code>return 1</code> is just the SAFE_RETURN <em>signal</em>; the host then hands the caller the value from <code>shield(2)</code> — <code>ERR_BUF</code> (<b>2</b>), the error <code>dtls_tx</code> already returns on a bad fragment — so the crashing body is skipped and the caller sees a value it knows. Otherwise <code>return 0</code> and the real function runs. <em>(The <code>2</code> is the safe value; the <code>1</code> is "a match happened" — two different things.)</em></p>
     <p class="punch">Temporary, surgical, reversible — it <span class="em">retires when the patch lands</span>. A bridge to the fix, armed in minutes rather than a release.</p>
   </section>
 
