@@ -1,13 +1,19 @@
 #!/bin/sh
-# tmmtrace --- in the TMM toolbox pod. The whole DSL pipeline, in-cluster:
-# gen -> clang -> PREVAIL -> sign, then load into the f5-tmm pod over kubectl and
-# observe. This is what an engineer runs after `kubectl exec -it <toolbox>`.
+# tmmtrace --- in the TMM toolbox pod. A utility for INSTRUMENTING a running TMM:
+# author a probe (gen -> clang -> PREVAIL -> F5-sign), arm it over the socket, read
+# TMM's own counters and evidence ring, disarm. This is what an engineer runs after
+# `kubectl exec -it <toolbox>`.
 #
-#   tmmtrace run    '<expr>' [nreq]   observe: arm (monitor), drive, show the delta
-#   tmmtrace cost   '<expr>'          poll-loop cost: budget-pass ceiling + bench floor
-#   tmmtrace verify '<expr>' | gen '<expr>' | list '<glob>'
+# It does NOT generate traffic. Load comes from real traffic or from the operator,
+# visibly --- never from a hidden script inside this tool.
 #
-# A shield expr ---  fentry/<hook> /pred/ { shield(<safe value>) }  --- run through `run`
+#   tmmtrace arm    '<expr>'      author + verify + sign + arm (monitor), then HOLD
+#   tmmtrace status [slot]        read TMM's counters: fired / matched since arm
+#   tmmtrace disarm '<hook>'      remove the probe (a NAME, e.g. http_parse_client_headers)
+#   tmmtrace cost   '<expr>'      poll-loop cost: budget-pass ceiling + measured floor
+#   tmmtrace verify '<expr>' | gen '<expr>' | list '<glob>' [--no-noise ...]
+#
+# A shield expr ---  fentry/<hook> /pred/ { shield(<safe value>) }  --- run through `arm`
 # is authored + PREVAIL-verified + signed at mode-ceiling=enforce, then STOPS. Arming
 # enforce on live traffic is a separate, gated step (the tool prints the exact commands).
 #
@@ -25,11 +31,35 @@ SK="${SK:-/etc/tmmtrace-key/shield_sk.pem}"
 VS="${VS:-http://11.11.11.99/}"
 SLOT="${SLOT:-2}"
 
-cmd="$1"; expr="$2"; nreq="${3:-40}"
+f5pod() { kubectl get pods -l app=f5-tmm --no-headers | grep Running | head -1 | awk '{print $1}'; }
+
+cmd="$1"
 case "$cmd" in
   verify|gen|list) shift; exec python3 "$TT" "$cmd" "$@" ;;   # pass ALL args (list takes --flags)
-  run|cost) : ;;
-  *) sed -n '2,11p' "$0"; exit 1 ;;
+  arm|cost) expr="$2" ;;
+
+  status)                                                      # read TMM's counters; no probe change
+    s="${2:-$SLOT}"; POD=$(f5pod)
+    [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
+    cur=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status "$s")
+    cf=$(echo "$cur" | grep -o 'fired=[0-9]*'        | cut -d= -f2)
+    cm=$(echo "$cur" | grep -o 'safe_returns=[0-9]*' | cut -d= -f2)
+    base=$(kubectl exec "$POD" -c f5-tmm -- cat /tmp/tt-slot$s.base 2>/dev/null || echo "0 0")
+    bf=$(echo "$base" | awk '{print $1}'); bm=$(echo "$base" | awk '{print $2}')
+    F=$((cf-bf)); M=$((cm-bm))
+    echo "slot $s  since arm:   fired (hook hits) = $F    matched (count) = $M"
+    [ "$F" -gt 0 ] 2>/dev/null && echo "                    match rate = $(awk "BEGIN{printf \"%.1f%%\",100*$M/$F}")"
+    echo "  (TMM's own tally --- drive more traffic and run status again to watch it move)"
+    exit 0 ;;
+
+  disarm)                                                      # remove a probe by hook NAME
+    h="$2"; [ -n "$h" ] || { echo "usage: tmmtrace disarm '<hook>'"; exit 1; }
+    POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
+    kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$h" >/dev/null 2>&1 \
+      && echo "disarmed $h" || echo "disarm $h: nothing armed there"
+    exit 0 ;;
+
+  *) sed -n '2,20p' "$0"; exit 1 ;;
 esac
 
 echo "probe : $expr"
@@ -74,36 +104,23 @@ if [ "$kind" = shield ]; then
   echo "  at arm time (read by ls_vm_arm, per-slot); confirm it is set before arming."
   exit 0
 fi
+
+# OBSERVE: sign (monitor), load, arm, record a baseline, then HOLD. No traffic is driven ---
+# tmmtrace instruments; load comes from real traffic or the operator, read via `status`.
 python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling monitor \
     -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
-
-POD=$(kubectl get pods -l app=f5-tmm --no-headers | grep Running | head -1 | awk '{print $1}')
-[ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
-echo "hook  : $hook   pod: $POD   slot: $SLOT"
+POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
 kubectl cp "$o"  "$POD":/tmp/$fn.bpf.o  -c f5-tmm
-kubectl cp "$tmp/$fn.bpf.sig" "$POD":/tmp/$fn.bpf.sig -c f5-tmm
 L=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load $SLOT /tmp/$fn.bpf.o 1 2>&1)
 echo "$L" | grep -q 'OK loaded' || { echo "*** load failed: $L"; exit 1; }
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm $SLOT "$hook" >/dev/null
-
-# per-slot counters accumulate; baseline after arm, show this run's delta
 b=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status $SLOT)
 bf=$(echo "$b"|grep -o 'fired=[0-9]*'|cut -d= -f2); bm=$(echo "$b"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
-echo "armed. driving $nreq requests ..."
-kubectl exec client -- sh -c "for i in \$(seq $nreq); do curl -so /dev/null $VS; done" || true
-a=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status $SLOT)
-af=$(echo "$a"|grep -o 'fired=[0-9]*'|cut -d= -f2); am=$(echo "$a"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
-F=$((af-bf)); M=$((am-bm))
-
-echo "----------------------------------------"
-if [ "$kind" = count ]; then
-  echo "  fired (hook hits) : $F"
-  echo "  matched (count)   : $M"
-  [ "$F" -gt 0 ] 2>/dev/null && echo "  match rate        : $(awk "BEGIN{printf \"%.1f%%\",100*$M/$F}")"
-else
-  echo "  fired (hook hits) : $F   ($kind: per-value egress not wired --- use count()/predicate)"
-fi
-echo "----------------------------------------"
-kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
-echo "disarmed slot $SLOT."
+kubectl exec "$POD" -c f5-tmm -- sh -c "echo '$bf $bm' > /tmp/tt-slot$SLOT.base"
+echo "armed : $hook   slot $SLOT (monitor)   pod $POD"
+echo "  tmmtrace reads TMM's own counters --- it does NOT generate traffic."
+echo "  drive load yourself (real traffic, or e.g.):"
+echo "     kubectl exec -it client -- sh -c 'curl -s $VS'"
+echo "  then read it:   tmmtrace status $SLOT        # fired / matched since arm"
+echo "  and remove it:  tmmtrace disarm '$hook'"

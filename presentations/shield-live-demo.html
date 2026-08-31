@@ -168,7 +168,7 @@
     <p class="lead">A small, sandboxed program that runs at a chosen point in a host's execution — a function's entry or exit, a network event, a tracepoint — each time that point is reached. Three properties matter here:</p>
     <ul>
       <li><b>A verifier proves it safe</b> <span class="d">— before it ever runs.</span></li>
-      <li><b>It attaches without changing the host's code</b> <span class="d">— no recompile of the thing it watches.</span></li>
+      <li><b>It attaches by <em>naming</em> the point, not patching code</b> <span class="d">— the program carries an ELF <b>section</b> string (its <code>SEC("…")</code>, e.g. <code>fentry/dtls_tx</code>); the loader reads that name to know <em>where</em> and <em>how</em> to hook. No recompile of the thing it watches.</span></li>
       <li><b>It's fast</b> <span class="d">— compiled to native machine code (JIT), not interpreted.</span></li>
     </ul>
     <p class="punch">Think <span class="em">iRules</span> — but for TMM's <em>internal C functions</em>, and mathematically proven safe.</p>
@@ -183,6 +183,7 @@
       <li><b>Memory safety</b> <span class="d">— every read and write is bounds-checked; no wild pointers.</span></li>
       <li><b>Bounded termination</b> <span class="d">— a fixed instruction ceiling; it cannot loop forever.</span></li>
     </ul>
+    <p class="lead" style="margin-top:8px"><b>The gate bites, in-cluster.</b> PREVAIL runs in the toolbox pod on the pinned toolchain, so every probe is proven before it's signed — and a program that chases a raw pointer (<code>reject_memory</code> in our set) is <span style="color:var(--bad)">REFUSED</span> outright, not warned.</p>
     <p class="punch">So a buggy — or hostile — program <span class="em">cannot crash or hang TMM</span>. That is what earns it a place in the poll loop.</p>
   </section>
 
@@ -320,19 +321,18 @@
   <section class="slide">
     <p class="kicker">Observe — live, on a running pod</p>
     <h1>Count a real TMM function, <span class="em">per request</span></h1>
-    <pre class="cmd"><span class="c-com"># from the toolbox pod — author, verify, sign, arm, drive, read, disarm</span>
+    <pre class="cmd"><span class="c-com"># 1. INSTRUMENT — author → verify → sign → arm, then hold. tmmtrace drives NO traffic.</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- \
-  tmmtrace run 'fentry/http_parse_client_headers { count() }'</pre>
-    <pre class="bpf">  built ... <span class="c-good">verified=True</span>
-  signed prog sha256 : 74e9194a87ef...
-  hook : http_parse_client_headers   pod: f5-tmm-...   slot: 2
-  armed. driving 40 requests ...
-  ----------------------------------------
-    fired (hook hits) : <span class="c-good">40</span>
-    matched (count)   : <span class="c-good">40</span>    match rate : <span class="c-good">100.0%</span>
-  ----------------------------------------
-  disarmed slot 2.</pre>
-    <p class="punch">A verified program, armed at a real TMM function on a live pod, one verdict <span class="em">per request</span> — then gone.</p>
+  tmmtrace arm 'fentry/http_parse_client_headers { count() }'
+<span class="c-com"># 2. YOU drive the load — real traffic, or a visible loop:</span>
+kubectl exec -it client -- sh -c 'for i in $(seq 40); do curl -s http://11.11.11.99/; done'
+<span class="c-com"># 3. read TMM's own counter, then remove the probe</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace status 2
+kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_headers'</pre>
+    <pre class="bpf">  armed : http_parse_client_headers   slot 2 (monitor)
+  slot 2  since arm:   fired (hook hits) = <span class="c-good">40</span>    matched (count) = <span class="c-good">40</span>   (<span class="c-good">100.0%</span>)
+  disarmed http_parse_client_headers</pre>
+    <p class="punch">tmmtrace <span class="em">instruments</span> — it arms the probe and reads TMM's own counter. The traffic is <span class="em">yours</span>; the number is <span class="em">TMM's</span>.</p>
   </section>
 
   <!-- 10 COST — THE POLL LOOP -->
@@ -357,10 +357,10 @@ kubectl exec -it deploy/tmmtrace-toolbox -- \
     <p class="kicker">Enforce, applied — the shield</p>
     <h1>Enforce's first job is a <span class="em">shield</span>: return a safe value, skip the vulnerable body</h1>
     <p class="lead">A <b>shield</b> is <span style="color:var(--accent)">enforce</span> aimed at one bug — the same SAFE_RETURN mechanism, pointed at a vulnerable function. Target here: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). At its entry, the program recognizes the precondition and returns a safe value <em>instead of</em> running the crashing body:</p>
-    <pre class="bpf"><span class="c-com">/* authored in tmmtrace:  fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) } */</span>
-SEC(<span class="c-str">"fentry/dtls_tx"</span>)
+    <pre class="bpf"><span class="c-com">// you write ONE line; tmmtrace generates this C:  fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) }</span>
+SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = ELF section; its NAME is the attach point (PREVAIL proves it, the loader arms dtls_tx entry)</span>
 <span class="c-key">__u64</span> <span class="c-fn">tt_dtls_tx_shield</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
-    <span class="c-key">__u64</span> sz = c->arg[3];                    <span class="c-com">// args read from a COPY, not live state</span>
+    <span class="c-key">__u64</span> sz = c->arg[3];                    <span class="c-com">// arg registers, read from a COPY — never live state</span>
     <span class="c-key">if</span> (sz &gt; 16384)                          <span class="c-com">// the exploit precondition</span>
         <span class="c-key">return</span> <span class="c-good">1</span>;   <span class="c-com">// MATCH → SAFE_RETURN: host returns ERR_BUF (2), body never runs</span>
     <span class="c-key">return</span> 0;  <span class="c-com">// FALLTHROUGH</span>
@@ -382,21 +382,6 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
       <li><b>The safe value is a return the caller already handles</b> <span class="d">— <code>dtls_tx</code> returns <code>ERR_BUF</code> itself; the caller knows that path.</span></li>
       <li><b>Skipping is a clean early-return</b> <span class="d">— no half-updated state left behind.</span></li>
       <li><b>The predicate reads a field available at entry</b> <span class="d">— <code>fentry</code> runs <em>before</em> the body, so it sees inputs, not parsed results.</span></li>
-    </ul>
-  </section>
-
-  <!-- 13 VERIFIED -->
-  <section class="slide">
-    <p class="kicker">Proof, before anything runs</p>
-    <h1>The verifier's <span class="em">verdict</span> — and its refusals</h1>
-    <div class="verdicts">
-      <div class="v ok"><span class="vt">VERIFIED</span> <b>tt_dtls_tx_shield</b> <span class="d">fentry/dtls_tx</span> <span class="vb">signed enforce</span></div>
-      <div class="v ok"><span class="vt">VERIFIED</span> <b>http count()</b> <span class="d">fentry/http_parse_client_headers · ~22 cyc ceiling</span> <span class="vb">fired 40/40</span></div>
-      <div class="v bad"><span class="vt">REFUSED</span> <b>reject_memory</b> <span class="d">chases a raw pointer</span> <span class="vb">— as intended</span></div>
-    </div>
-    <ul>
-      <li><b>PREVAIL runs in-cluster, in the toolbox pod</b> <span class="d">— every program is proven on the pinned toolchain before it is signed. The verdicts above are the real in-pod output.</span></li>
-      <li><b class="c-bad">refused reject_memory</b> <span class="d">— a program that chases a raw pointer, rejected <em>on purpose</em>. The gate is real, not decorative.</span></li>
     </ul>
   </section>
 
@@ -452,7 +437,7 @@ kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 16</span>
+  <span id="count">1 / 15</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
