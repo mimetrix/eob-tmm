@@ -111,6 +111,7 @@ python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling monitor \
     -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
 POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
 kubectl cp "$o"  "$POD":/tmp/$fn.bpf.o  -c f5-tmm
+kubectl cp "$tmp/$fn.bpf.sig" "$POD":/tmp/$fn.bpf.sig -c f5-tmm   # load verifies the sig beside the .o
 L=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load $SLOT /tmp/$fn.bpf.o 1 2>&1)
 echo "$L" | grep -q 'OK loaded' || { echo "*** load failed: $L"; exit 1; }
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
