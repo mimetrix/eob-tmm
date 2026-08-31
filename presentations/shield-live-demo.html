@@ -438,14 +438,13 @@ kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_h
   <section class="slide">
     <p class="kicker">What this is — and isn't</p>
     <h1>Honest scope</h1>
-    <ul>
-      <li><b class="c-good">Boots with nothing armed:</b> <span class="d">no hardcoded shield — TMM comes up with the VM ready and <em>nothing running</em>. Its own boot log says so: <code>no built-in shield armed — socket load is the only arming path</code>. Every shield arrives <b>signed, over the socket</b>, into a running TMM.</span></li>
-      <li><b class="c-good">Proven live:</b> <span class="d">observe (count, fired 40/40), cost (ceiling + floor), and the mechanism — verified program, live arm, per-request verdict, pushed evidence in <em>monitor</em>.</span></li>
-      <li><b>Enforce is authored, verified, and signed at the enforce ceiling</b> <span class="d">— but <em>not yet armed on live traffic</em>. That is the gated step, deliberately not taken until the three properties are vetted for a given hook.</span></li>
-      <li><b><code>SAFE_RETURN</code> is the one decision outcome wired end-to-end</b> <span class="d">— DROP / RESET / STEER / SAMPLE are authorable, but nothing host-side acts on them yet.</span></li>
-      <li><b>Captured bytes are a separate tool</b> <span class="d">— <code>tmmdump</code>, by design; tmmtrace does summaries, not packet windows.</span></li>
-      <li><b>Per-instance, data plane only:</b> <span class="d">arm every TMM to cover all traffic; control-plane CVE mitigation is a <em>separate exercise</em>, not addressed here.</span></li>
-    </ul>
+    <div class="cols">
+      <div class="col"><h3 style="color:var(--good)">Proven live</h3>
+        <p class="lead"><b>Boots with nothing armed</b> — every shield arrives signed, over the socket, into a running TMM. <b>Observe and cost run end to end</b>: verified, armed, one verdict per request, pushed evidence — all in <em>monitor</em>, all reproducible on the pod you just saw.</p></div>
+      <div class="col"><h3>Not yet — by design</h3>
+        <p class="lead"><b>Enforce is authored, verified, and signed</b> — arming it on live traffic is the one gated step, held until a hook is vetted. <code>SAFE_RETURN</code> is the outcome that's wired; <b>DROP / RESET / STEER</b>, byte capture (<code>tmmdump</code>), and the <b>control plane</b> are the next moves — data plane, per-instance, first.</p></div>
+    </div>
+    <p class="punch">Nothing here is further along than the demo says — and the demo is on a real pod.</p>
   </section>
 
   <!-- 16 THE MAP -->
