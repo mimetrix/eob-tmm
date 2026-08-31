@@ -26,29 +26,30 @@ Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, b
 
 ---
 
-## 1. New source files
+## 1. New source files — by function (current tree, verified 2026-08-31)
 
-Copy from this directory into `src/base/`:
+Authoritative source: `git status --porcelain src/` on the build box. The tree adds **35 files**
+(33 under `src/base/`, 2 whitelist snapshots under `src/compile/`) and edits **3** F5 files. Of the
+33 `base/` files, **13 `.c` are compiled into `tmm`** (they appear in `filelist` — §2); the rest are
+headers pulled in by those, one build-box-only harness, and one data blob. Grouped by what they do:
 
-| this repo | TMM tree |
-|---|---|
-| `substrate/ls_vm.c`, `ls_vm.h` | `base/` |
-| `substrate/ls_vm_load.c` | `base/` |
-| `substrate/ls_vm_config.c`, `ls_vm_config.h` | `base/` |
-| `substrate/ls_ctx_reg.h` | `base/` — the registration type and the linker-set macro; no hook names |
-| `substrate/ls_ctx_reg.c` | `base/` — the lookup over the set, and the count that proves it linked |
-| `substrate/ls_ctx_reg_rst.c` | `base/` — the four reset functions register their two builders |
-| `substrate/ls_ctx_reg_sslerr.c` | `base/` — `ssl__err` |
-| `substrate/ls_ctx_reg_h2abort.c` | `base/` — `http2_stream_abort` |
-| `substrate/ls_ctx_reg_parse.c` | `base/` — `http_parse_client_headers` |
-| `substrate/ls_ctx_reg_alpn.c` | `base/` — `ssl_alpn_match`, the one builder that can decline |
-| `substrate/ls_tramp.c` | `base/` |
-| `substrate/trampoline_x86_64.S` | `base/ls_tramp_asm.c` (assembled via the `.c` entry — see filelist) |
-| `substrate/ls_swap.c` | `base/` |
-| `substrate/ls_arm.c`, `ls_arm.h` | `base/` |
-| `substrate/ls_prep.c` | `base/` |
-| `substrate/ls_sig.c`, `ls_sig.h` | `base/` — Ed25519 verification; needs `-lcrypto`, already linked |
-| `substrate/ls_audit.c`, `ls_audit.h` | `base/` — one record per control-plane operation |
+| function | files (`base/`) | in `tmm`? |
+|---|---|---|
+| **VM / bytecode engine** — embed uBPF, load the ELF, JIT, the env knobs, per-core stack | `ls_vm.c` `ls_vm.h` · `ls_vm_load.c` · `ls_vm_config.c` `ls_vm_config.h` · `vm_stack_policy.h` | yes (`.c`) |
+| **CO-RE relocation** — rewrite a program's field offsets to this build's layout | `ls_core_relo.c` `ls_core_relo.h` | yes |
+| **Arm / trampoline** — patch & restore the 5-byte entry pad; build `ctx`, apply the verdict; INIT_FUNC startup | `ls_arm.c` `ls_arm.h` · `ls_prep.c` · `ls_tramp.c` · `ls_tramp_asm.c` (from `trampoline_x86_64.S`) | yes (`.c`) |
+| **Function-exit hooks** — return-hijack + per-instance shadow stack | `ls_fexit.c` `ls_fexit.h` | yes |
+| **Evidence ring** — shared-memory egress off the poll loop + event schemas | `ls_tp_emit.c` · `ls_tp.h` `ls_tp_ring.h` `ls_ring.h` `ls_tp_http.h` `ls_tp_shield.h` | yes (`ls_tp_emit.c`) |
+| **Signing** — Ed25519 admission + baked-in public key | `ls_sig.c` `ls_sig.h` · `ls_sig_pubkey.h` (generated) | yes (`.c`) |
+| **Audit** — one record per control-plane op + JSON emit | `ls_audit.c` `ls_audit.h` · `ls_json.h` | yes (`.c`) |
+| **Maps / helper glue** — BPF-map support and host-side glue | `ls_map.h` `ls_map_glue.h` | header-only |
+| **Utility / ABI** — byte-swap; the loader/trampoline/binding wire ABI | `ls_swap.c` · `shield_abi.h` | yes (`ls_swap.c`) |
+| **Built-in program (data)** — a compiled shield as bytes, armed only if `LS_SHIELD_BUILTIN=1` (default **off** since 2026-08-31) — a boot self-test, *not* the delivery path | `ls_shield_blob.h` | compiled in via `ls_vm_load.c`, armed opt-in |
+| **Test harness — build-box only, NOT in `tmm`** (absent from `filelist`) | `harness.c` | no |
+
+Plus 2 whitelist snapshots under `src/compile/` (`{debug,default}_whitelist_x86_64.pre-ubpf`).
+The `ls_ctx_reg*` per-hook ctx-builder registry that earlier versions of this section listed has
+been **superseded** by CO-RE + the generic ctx and is gone from the tree.
 
 **And one line in each of `src/compile/{debug,default}_whitelist_x86_64`:** `g_ls_audit`. That
 file is TMM's exact manifest of mutable global state and the link fails on any difference in
