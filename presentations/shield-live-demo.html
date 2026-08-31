@@ -417,7 +417,9 @@ kubectl exec -it deploy/tmmtrace-toolbox -- \
 <span class="c-com"># Window 3 (drain) — START THIS FIRST and leave it running, BEFORE any traffic</span>
 kubectl exec deploy/f5-tmm -c f5-tmm -- ls_drain --segment /dev/shm/ls_tp_ring --no-stats
 <span class="c-com"># Window 2 (client) — NOW drive; each match appears live in Window 3 (first ~8, then sampled)</span>
-kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
+kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'
+<span class="c-com"># Window 1 (toolbox) — clean up: disarm (and Ctrl-C the drain in Window 3)</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_headers'</pre>
     <pre class="evjson">{"ts_ns":…, "seq":2, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
       <div><code>hook</code><span><b>shield</b> = an enforcement decision  ·  <code>verdict</code> <b>1 = SAFE_RETURN</b></span></div>
