@@ -373,15 +373,16 @@ kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_h
   <section class="slide">
     <p class="kicker">Enforce, applied — the shield</p>
     <h1>Enforce's first job is a <span class="em">shield</span>: return a safe value, skip the vulnerable body</h1>
-    <p class="lead">A <b>shield</b> is <span style="color:var(--accent)">enforce</span> aimed at one bug — the same SAFE_RETURN mechanism, pointed at a vulnerable function. Target here: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). At its entry, the program recognizes the precondition and returns a safe value <em>instead of</em> running the crashing body:</p>
+    <p class="lead">A <b>shield</b> is <span style="color:var(--accent)">enforce</span> aimed at one bug — the same SAFE_RETURN mechanism, pointed at a vulnerable function. Target: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). The generated program:</p>
     <pre class="bpf"><span class="c-com">// you write ONE line; tmmtrace generates this C:  fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) }</span>
 SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = ELF section; its NAME is the attach point (PREVAIL proves it, the loader arms dtls_tx entry)</span>
-<span class="c-key">__u64</span> <span class="c-fn">tt_dtls_tx_shield</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
-    <span class="c-key">__u64</span> sz = c->arg[3];                    <span class="c-com">// arg registers, read from a COPY — never live state</span>
-    <span class="c-key">if</span> (sz &gt; 16384)                          <span class="c-com">// the exploit precondition</span>
-        <span class="c-key">return</span> <span class="c-good">1</span>;   <span class="c-com">// MATCH → SAFE_RETURN: host returns ERR_BUF (2), body never runs</span>
-    <span class="c-key">return</span> 0;  <span class="c-com">// FALLTHROUGH</span>
+<span class="c-key">__u64</span> <span class="c-fn">tt_dtls_tx_shield</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {   <span class="c-com">// c = the CTX: a snapshot the trampoline built</span>
+    <span class="c-key">__u64</span> sz = c->arg[3];                    <span class="c-com">// arg[3] = dtls_tx's 4th argument (the size), from a COPY — not live memory</span>
+    <span class="c-key">if</span> (sz &gt; 16384)                          <span class="c-com">// the exploit precondition (size past the on-stack buffer)</span>
+        <span class="c-key">return</span> <span class="c-good">1</span>;   <span class="c-com">// MATCH → SAFE_RETURN: host puts ERR_BUF (2) in rax, body never runs</span>
+    <span class="c-key">return</span> 0;  <span class="c-com">// FALLTHROUGH → the real dtls_tx runs, untouched</span>
 }</pre>
+    <p class="lead" style="margin-top:8px"><b>Reading it:</b> <code>c</code> is the <b>ctx</b> — the snapshot the trampoline handed in: a <em>copy</em> of <code>dtls_tx</code>'s argument registers, never live TMM memory, so the program can read the inputs but can't corrupt anything. <code>arg[3]</code> is the fragment size; over the buffer it returns <code>1</code> (SAFE_RETURN → the caller gets <code>ERR_BUF</code> and the crashing body is skipped), else <code>0</code> (the function runs normally).</p>
     <p class="punch">Temporary, surgical, reversible — it <span class="em">retires when the patch lands</span>. A bridge to the fix, armed in minutes rather than a release.</p>
   </section>
 
