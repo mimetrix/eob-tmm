@@ -217,10 +217,11 @@
   <section class="slide">
     <p class="kicker">How we got here</p>
     <h1>Two compiles, <span class="em">one surface</span></h1>
-    <svg id="dcompile" viewBox="0 0 1000 470" width="100%" style="max-width:1000px;margin-top:10px" role="img"
+    <svg id="dcompile" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"
+         style="width:100%;max-width:1000px;height:auto;aspect-ratio:1000/470;flex:0 0 auto;margin-top:10px" role="img"
          aria-label="Two compile paths: the substrate compiled into TMM at build time, and each program compiled, verified and signed at runtime, meeting at the running TMM.">
       <style>
-        /* scoped to #dcompile: an inline-SVG <style> is otherwise document-global */
+        /* scoped to #dcompile: an inline-SVG style block is otherwise document-global */
         #dcompile .box{fill:var(--bg2); stroke:var(--line); stroke-width:1.5; rx:8}
         #dcompile .box.add{stroke:var(--accent); stroke-width:2}
         #dcompile .box.key{stroke:var(--good); stroke-width:2}
