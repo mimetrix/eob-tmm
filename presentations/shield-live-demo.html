@@ -429,6 +429,7 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
     <p class="kicker">What this is — and isn't</p>
     <h1>Honest scope</h1>
     <ul>
+      <li><b class="c-good">Boots with nothing armed:</b> <span class="d">no hardcoded shield — TMM comes up with the VM ready and <em>nothing running</em>. Its own boot log says so: <code>no built-in shield armed — socket load is the only arming path</code>. Every shield arrives <b>signed, over the socket</b>, into a running TMM.</span></li>
       <li><b class="c-good">Proven live:</b> <span class="d">observe (count, fired 40/40), cost (ceiling + floor), and the mechanism — verified program, live arm, per-request verdict, pushed evidence in <em>monitor</em>.</span></li>
       <li><b>Enforce is authored, verified, and signed at the enforce ceiling</b> <span class="d">— but <em>not yet armed on live traffic</em>. That is the gated step, deliberately not taken until the three properties are vetted for a given hook.</span></li>
       <li><b><code>SAFE_RETURN</code> is the one decision outcome wired end-to-end</b> <span class="d">— DROP / RESET / STEER / SAMPLE are authorable, but nothing host-side acts on them yet.</span></li>
