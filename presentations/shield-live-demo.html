@@ -303,13 +303,19 @@
 
   <!-- 8 TMMTRACE — THE CONSOLE -->
   <section class="slide">
-    <p class="kicker">The console</p>
-    <h1>One line of DSL, to a <span class="em">verified probe</span> on a live function</h1>
-    <p class="lead"><b>tmmtrace</b> is bpftrace, but for TMM's data plane. You write the intent; it compiles to CO-RE bytecode, runs it through PREVAIL, F5-signs it, and arms it on a running pod — from a toolbox pod you <code>kubectl exec</code> into, the way engineers already work.</p>
-    <pre class="bpf"><span class="c-com">grammar:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
-<span class="c-com">pipeline:</span> gen → clang → <span class="c-key">PREVAIL</span> → F5-sign → arm(slot)</pre>
-    <p class="lead" style="margin-top:12px"><b><span style="color:var(--good)">Observe</span> and <span style="color:var(--accent)">Enforce</span> are the surface's <span class="em">first two</span> consumers — not its whole;</b> the same VM, verifier, and entry pads carry further missions as they're built.</p>
-    <p class="punch">The <span class="em">same tool</span> authors all three: <span class="em">observe</span>, <span class="em">cost</span>, <span class="em">enforce</span>.</p>
+    <p class="kicker">The console — the demo starts here</p>
+    <h1>First, ask a running TMM <span class="em">what it can see</span></h1>
+    <p class="lead"><b>tmmtrace</b> is bpftrace for TMM's data plane. From a toolbox pod you <code>kubectl exec</code> into, it lists the internal functions it can attach to — then turns one line of intent into a verified, signed probe.</p>
+    <pre class="cmd">kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace list '*http_p*'</pre>
+    <pre class="bpf"><span class="c-com"># 192 hook(s) match '*http_p*'</span>
+  http_parse_build
+  <span class="c-good">http_parse_client_headers</span>        <span class="c-com">// the request parser — our observe target</span>
+  http_parse_compare
+  http_parse_cookies
+  <span class="c-com">...</span>                              <span class="c-good">71,309</span> functions visible in this build</pre>
+    <pre class="bpf"><span class="c-com">then one line becomes a probe:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
+<span class="c-com">                           gen → clang → PREVAIL → F5-sign → arm</span></pre>
+    <p class="lead" style="margin-top:10px"><b><span style="color:var(--good)">Observe</span> and <span style="color:var(--accent)">Enforce</span> are the surface's <span class="em">first two</span> consumers — not its whole.</b></p>
   </section>
 
   <!-- 9 OBSERVE — LIVE -->
