@@ -414,9 +414,9 @@ kubectl exec -it deploy/tmmtrace-toolbox -- \
     <pre class="cmd"><span class="c-com"># Window 1 (toolbox) — arm a monitor probe; each SAFE_RETURN match emits an evidence record</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- \
   tmmtrace arm 'fentry/http_parse_client_headers { count() }'
-<span class="c-com"># Window 3 (drain) — stream the evidence ring, leave running (already enabled: LS_TP_RING)</span>
+<span class="c-com"># Window 3 (drain) — START THIS FIRST and leave it running, BEFORE any traffic</span>
 kubectl exec deploy/f5-tmm -c f5-tmm -- ls_drain --segment /dev/shm/ls_tp_ring --no-stats
-<span class="c-com"># Window 2 (client) — drive traffic; each match pushes a record (first ~8, then sampled)</span>
+<span class="c-com"># Window 2 (client) — NOW drive; each match appears live in Window 3 (first ~8, then sampled)</span>
 kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
     <pre class="evjson">{"ts_ns":…, "seq":2, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
