@@ -9,6 +9,7 @@
 #
 #   tmmtrace arm    '<expr>'      author + verify + sign + arm (monitor), then HOLD
 #   tmmtrace status [slot]        read TMM's counters: fired / matched since arm
+#   tmmtrace reset  [slot]        zero the 'since arm' counter, no re-arm (per-batch counts)
 #   tmmtrace disarm '<hook>'      remove the probe (a NAME, e.g. http_parse_client_headers)
 #   tmmtrace cost   '<expr>'      poll-loop cost: budget-pass ceiling + measured floor
 #   tmmtrace verify '<expr>' | gen '<expr>' | list '<glob>' [--no-noise ...]
@@ -57,6 +58,14 @@ case "$cmd" in
     POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
     kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$h" >/dev/null 2>&1 \
       && echo "disarmed $h" || echo "disarm $h: nothing armed there"
+    exit 0 ;;
+
+  reset)                                                       # zero the "since arm" delta WITHOUT re-arming
+    s="${2:-$SLOT}"; POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
+    cur=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status "$s")
+    cf=$(echo "$cur"|grep -o 'fired=[0-9]*'|cut -d= -f2); cm=$(echo "$cur"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
+    kubectl exec "$POD" -c f5-tmm -- sh -c "echo '$cf $cm' > /tmp/tt-slot$s.base"
+    echo "slot $s counter zeroed --- drive traffic to watch it climb from 0 again"
     exit 0 ;;
 
   *) sed -n '2,20p' "$0"; exit 1 ;;
@@ -115,13 +124,20 @@ kubectl cp "$tmp/$fn.bpf.sig" "$POD":/tmp/$fn.bpf.sig -c f5-tmm   # load verifie
 L=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py load $SLOT /tmp/$fn.bpf.o 1 2>&1)
 echo "$L" | grep -q 'OK loaded' || { echo "*** load failed: $L"; exit 1; }
 kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py disarm "$hook" >/dev/null 2>&1 || true
-kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm $SLOT "$hook" >/dev/null
+A=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py arm $SLOT "$hook" 2>&1)
+pad=$(echo "$A" | grep -oE '0x[0-9a-f]+' | head -1)
 b=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py status $SLOT)
 bf=$(echo "$b"|grep -o 'fired=[0-9]*'|cut -d= -f2); bm=$(echo "$b"|grep -o 'safe_returns=[0-9]*'|cut -d= -f2)
 kubectl exec "$POD" -c f5-tmm -- sh -c "echo '$bf $bm' > /tmp/tt-slot$SLOT.base"
-echo "armed : $hook   slot $SLOT (monitor)   pod $POD"
-echo "  tmmtrace reads TMM's own counters --- it does NOT generate traffic."
-echo "  drive load yourself (real traffic, or e.g.):"
-echo "     kubectl exec -it client -- sh -c 'curl -s $VS'"
-echo "  then read it:   tmmtrace status $SLOT        # fired / matched since arm"
-echo "  and remove it:  tmmtrace disarm '$hook'"
+echo
+echo "  ---- what tmmtrace just did:  author -> armed, over a socket, no restart ----"
+echo "    VERIFIED   PREVAIL proved it memory-safe + bounded --- it cannot crash or hang TMM"
+echo "    SIGNED     with the F5 key --- the loader refuses anything unsigned"
+echo "    ARMED      rewrote the 5-byte entry pad${pad:+ at $pad} to call the probe"
+echo "    HOLDING    live on slot $SLOT in MONITOR --- records the verdict, never blocks traffic"
+echo
+echo "  armed : $hook   slot $SLOT (monitor)   pod $POD"
+echo "  tmmtrace reads TMM's OWN counters --- it does NOT generate traffic."
+echo "  drive load, then:   tmmtrace status $SLOT     # fired/matched SINCE ARM (cumulative)"
+echo "                      tmmtrace reset  $SLOT     # zero it between batches, no re-arm"
+echo "  remove it:          tmmtrace disarm '$hook'"
