@@ -301,21 +301,6 @@
     <p class="punch" style="margin-top:14px">Two clang runs, two artifacts: the substrate is compiled <span class="em">in once</span> — off the data path; each program is compiled, <span class="em">proven</span>, and signed <span class="em">before</span> it loads.</p>
   </section>
 
-  <!-- 8 THE LIVE SURFACE -->
-  <section class="slide">
-    <p class="kicker">The capability</p>
-    <h1>The <span class="em">Live Surface</span> — one substrate, two missions</h1>
-    <p class="lead">The same embedded VM and entry-pad machinery serves both — differing only in whether the host <em>acts</em> on the program's return value:</p>
-    <div class="cols">
-      <div class="col"><h3>Observe</h3>
-        <p class="lead">Read a running TMM's <b>internal state</b> at any function — parser state, pool pressure, error branches, per-request outcomes. The verdict is <b>FALLTHROUGH</b>: it reads and steps aside. Reaches what no iRule event exposes and no affordable kernel probe can.</p></div>
-      <div class="col"><h3>Enforce</h3>
-        <p class="lead">Act on the verdict — <b>SAFE_RETURN</b> a safe value, skip a vulnerable body. Same substrate, one extra step: the host applies the answer.</p></div>
-    </div>
-    <p class="lead" style="margin-top:14px"><b>Observe and enforce are the surface's <span class="em">first two</span> consumers — not its whole.</b> The same VM, verifier, and entry pads carry further missions as they're built.</p>
-    <p class="punch">This lives in <span class="em">TMM's data plane</span> — the proxy's poll loop, at connection and request scope — <span class="em">not</span> the control plane.</p>
-  </section>
-
   <!-- 8 TMMTRACE — THE CONSOLE -->
   <section class="slide">
     <p class="kicker">The console</p>
@@ -323,6 +308,7 @@
     <p class="lead"><b>tmmtrace</b> is bpftrace, but for TMM's data plane. You write the intent; it compiles to CO-RE bytecode, runs it through PREVAIL, F5-signs it, and arms it on a running pod — from a toolbox pod you <code>kubectl exec</code> into, the way engineers already work.</p>
     <pre class="bpf"><span class="c-com">grammar:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
 <span class="c-com">pipeline:</span> gen → clang → <span class="c-key">PREVAIL</span> → F5-sign → arm(slot)</pre>
+    <p class="lead" style="margin-top:12px"><b><span style="color:var(--good)">Observe</span> and <span style="color:var(--accent)">Enforce</span> are the surface's <span class="em">first two</span> consumers — not its whole;</b> the same VM, verifier, and entry pads carry further missions as they're built.</p>
     <p class="punch">The <span class="em">same tool</span> authors all three: <span class="em">observe</span>, <span class="em">cost</span>, <span class="em">enforce</span>.</p>
   </section>
 
@@ -458,7 +444,7 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 17</span>
+  <span id="count">1 / 16</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
