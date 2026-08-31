@@ -372,6 +372,8 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
   <section class="slide">
     <p class="kicker">Enforce — authored in the same tool, armed deliberately</p>
     <h1><code>shield()</code> — verified &amp; signed for enforce, <span class="em">arming is gated</span></h1>
+    <pre class="cmd">kubectl exec -it deploy/tmmtrace-toolbox -- \
+  tmmtrace run 'fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) }'</pre>
     <pre class="bpf">  built (<span class="c-good">shield</span>) verified=True
   signed prog sha256 : cb491dc30679...   <span class="c-good">mode-ceiling=enforce</span>
   <span class="c-good">VERIFIED + SIGNED</span> at mode-ceiling=enforce.   NOT armed — enforce is gated.</pre>
@@ -400,19 +402,21 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
 
   <!-- 14 EVIDENCE EVENT -->
   <section class="slide">
-    <p class="kicker">The evidence — when enforce fires, it leaves proof</p>
-    <h1>The event, <span class="em">field by field</span></h1>
-    <pre class="evjson">{"ts_ns":…, "seq":0, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
+    <p class="kicker">The evidence — run it, then read it</p>
+    <h1>When enforce fires, it leaves <span class="em">proof</span></h1>
+    <pre class="cmd"><span class="c-com"># arm a signed shield (monitor) on slot 1 + warm the ring — leaves it ARMED</span>
+bash ~/demo/demo-reset.sh
+<span class="c-com"># Window A — stream the evidence ring (leave running)</span>
+kubectl exec deploy/f5-tmm -c f5-tmm -- ls_drain --segment /dev/shm/ls_tp_ring --no-stats
+<span class="c-com"># Window B — drive traffic live; each hit pushes one record (first ~8, then sampled)</span>
+kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
+    <pre class="evjson">{"ts_ns":…, "seq":2, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
-      <div><code>ts_ns</code><span>wall-clock time it fired (ns) — correlates with any other log</span></div>
-      <div><code>hook</code><span>event category — <b>shield</b> = an enforcement decision</span></div>
-      <div><code>mode</code><span><b>monitor</b> = would-block (body ran) · <b>enforce</b> = blocked</span></div>
-      <div><code>verdict</code><span>the program's return — <b>1 = SAFE_RETURN</b></span></div>
-      <div><code>slot · gen</code><span>which program, and which load of it (<code>gen</code> tells result from residue)</span></div>
-      <div><code>sz</code><span>surfaced evidence field — here 0; for <code>dtls_tx</code>, the oversized fragment size</span></div>
-      <div><code>arg[]</code><span>the context the program saw — the function's argument registers</span></div>
+      <div><code>hook</code><span><b>shield</b> = an enforcement decision  ·  <code>verdict</code> <b>1 = SAFE_RETURN</b></span></div>
+      <div><code>mode</code><span><b>monitor</b> = would-block (body still ran) · <b>enforce</b> = blocked</span></div>
+      <div><code>sz</code><span>surfaced evidence field — for <code>dtls_tx</code>, the oversized fragment size</span></div>
+      <div><code>slot · gen</code><span>which program, which load  ·  <code>ts_ns</code> correlates with any other log</span></div>
     </div>
-    <p class="lead" style="margin-top:16px">Pushed through a shared-memory ring, off the data path, and rate-limited (first few, then sampled) so an attack flood can't turn your audit log into a self-inflicted DoS.</p>
   </section>
 
   <!-- 15 HONEST SCOPE -->
