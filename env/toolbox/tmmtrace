@@ -27,7 +27,7 @@ SLOT="${SLOT:-2}"
 
 cmd="$1"; expr="$2"; nreq="${3:-40}"
 case "$cmd" in
-  verify|gen|list) exec python3 "$TT" "$cmd" "$expr" ;;
+  verify|gen|list) shift; exec python3 "$TT" "$cmd" "$@" ;;   # pass ALL args (list takes --flags)
   run|cost) : ;;
   *) sed -n '2,11p' "$0"; exit 1 ;;
 esac
