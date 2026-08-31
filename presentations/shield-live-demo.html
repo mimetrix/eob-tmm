@@ -354,9 +354,9 @@ kubectl exec -it deploy/tmmtrace-toolbox -- \
 
   <!-- 11 ENFORCE — THE SHIELD -->
   <section class="slide">
-    <p class="kicker">Enforce — the first hard consumer</p>
-    <h1>A <span class="em">shield</span>: return a safe value, skip the vulnerable body</h1>
-    <p class="lead">Target: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). At its entry, the program recognizes the precondition and returns a safe value <em>instead of</em> running the crashing body:</p>
+    <p class="kicker">Enforce, applied — the shield</p>
+    <h1>Enforce's first job is a <span class="em">shield</span>: return a safe value, skip the vulnerable body</h1>
+    <p class="lead">A <b>shield</b> is <span style="color:var(--accent)">enforce</span> aimed at one bug — the same SAFE_RETURN mechanism, pointed at a vulnerable function. Target here: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). At its entry, the program recognizes the precondition and returns a safe value <em>instead of</em> running the crashing body:</p>
     <pre class="bpf"><span class="c-com">/* authored in tmmtrace:  fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) } */</span>
 SEC(<span class="c-str">"fentry/dtls_tx"</span>)
 <span class="c-key">__u64</span> <span class="c-fn">tt_dtls_tx_shield</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
