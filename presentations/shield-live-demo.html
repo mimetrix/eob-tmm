@@ -213,7 +213,93 @@
     <p class="punch">Per-slot, so arming one hook never disturbs another — and the register save is the measured <span class="em">~8.8 ns</span> the mechanism costs.</p>
   </section>
 
-  <!-- 7 THE LIVE SURFACE -->
+  <!-- 7 DUAL COMPILE -->
+  <section class="slide">
+    <p class="kicker">How we got here</p>
+    <h1>Two compiles, <span class="em">one surface</span></h1>
+    <svg id="dcompile" viewBox="0 0 1000 470" width="100%" style="max-width:1000px;margin-top:10px" role="img"
+         aria-label="Two compile paths: the substrate compiled into TMM at build time, and each program compiled, verified and signed at runtime, meeting at the running TMM.">
+      <style>
+        /* scoped to #dcompile: an inline-SVG <style> is otherwise document-global */
+        #dcompile .box{fill:var(--bg2); stroke:var(--line); stroke-width:1.5; rx:8}
+        #dcompile .box.add{stroke:var(--accent); stroke-width:2}
+        #dcompile .box.key{stroke:var(--good); stroke-width:2}
+        #dcompile .t{fill:var(--ink); font:600 14px var(--mono); text-anchor:middle}
+        #dcompile .d{fill:var(--muted); font:400 11.5px var(--mono); text-anchor:middle}
+        #dcompile .zone{fill:var(--accent); font:700 14px var(--mono); letter-spacing:.06em}
+        #dcompile .zsub{fill:var(--faint); font:400 12px var(--mono)}
+        #dcompile .arw{stroke:var(--muted); stroke-width:1.7; fill:none; marker-end:url(#ah)}
+        #dcompile .lbl{fill:var(--muted); font:italic 400 11.5px var(--mono)}
+      </style>
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+
+      <!-- BUILD TIME band -->
+      <text class="zone" x="26" y="28">① BUILD TIME</text>
+      <text class="zsub" x="182" y="28">— once per release · amortized, off the data path</text>
+
+      <rect class="box" x="26" y="52" width="176" height="44"/>
+      <text class="t" x="114" y="79">TMM C source</text>
+
+      <rect class="box add" x="26" y="112" width="176" height="60"/>
+      <text class="t" x="114" y="136">+ substrate/ (ours)</text>
+      <text class="d" x="114" y="156">46 files · ~7.8k lines</text>
+
+      <rect class="box" x="286" y="74" width="248" height="76"/>
+      <text class="t" x="410" y="104">clang — TMM build</text>
+      <text class="d" x="410" y="126">-fpatchable-</text>
+      <text class="d" x="410" y="142">function-entry=5,0</text>
+
+      <rect class="box key" x="616" y="60" width="358" height="104"/>
+      <text class="t" x="795" y="88">TMM binary</text>
+      <text class="d" x="795" y="110">embeds uBPF VM + PREVAIL</text>
+      <text class="d" x="795" y="128">+ per-slot trampolines</text>
+      <text class="d" x="795" y="146">every fn: a 5-byte entry pad</text>
+
+      <path class="arw" d="M202,74 L286,100"/>
+      <path class="arw" d="M202,142 L286,124"/>
+      <path class="arw" d="M534,112 L616,112"/>
+
+      <!-- RUNTIME band -->
+      <text class="zone" x="26" y="242">② RUNTIME</text>
+      <text class="zsub" x="150" y="242">— per program · on a running TMM, no rebuild</text>
+
+      <rect class="box add" x="26" y="266" width="158" height="60"/>
+      <text class="t" x="105" y="290">tmmtrace DSL</text>
+      <text class="d" x="105" y="310">count() · shield(v)</text>
+
+      <rect class="box" x="212" y="274" width="118" height="44"/>
+      <text class="t" x="271" y="292">clang</text>
+      <text class="d" x="271" y="309">-target bpf</text>
+
+      <rect class="box key" x="356" y="274" width="118" height="44"/>
+      <text class="t" x="415" y="292">PREVAIL</text>
+      <text class="d" x="415" y="309">verify</text>
+
+      <rect class="box" x="500" y="274" width="96" height="44"/>
+      <text class="t" x="548" y="300">F5 sign</text>
+
+      <rect class="box" x="622" y="274" width="176" height="44"/>
+      <text class="t" x="710" y="292">load · JIT</text>
+      <text class="d" x="710" y="309">arm at a pad</text>
+
+      <path class="arw" d="M184,296 L212,296"/>
+      <path class="arw" d="M330,296 L356,296"/>
+      <path class="arw" d="M474,296 L500,296"/>
+      <path class="arw" d="M596,296 L622,296"/>
+
+      <!-- converge: runtime program loads INTO the built TMM -->
+      <path class="arw" d="M710,274 C710,220 795,220 795,164"/>
+      <text class="lbl" x="724" y="212">loaded into the running TMM,</text>
+      <text class="lbl" x="724" y="228">armed at one of its entry pads</text>
+    </svg>
+    <p class="punch" style="margin-top:14px">Two clang runs, two artifacts: the substrate is compiled <span class="em">in once</span> — off the data path; each program is compiled, <span class="em">proven</span>, and signed <span class="em">before</span> it loads.</p>
+  </section>
+
+  <!-- 8 THE LIVE SURFACE -->
   <section class="slide">
     <p class="kicker">The capability</p>
     <h1>The <span class="em">Live Surface</span> — one substrate, two missions</h1>
@@ -368,7 +454,7 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 16</span>
+  <span id="count">1 / 17</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
