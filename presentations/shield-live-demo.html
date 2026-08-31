@@ -302,11 +302,25 @@
     <p class="punch" style="margin-top:14px">Two clang runs, two artifacts: the substrate is compiled <span class="em">in once</span> — off the data path; each program is compiled, <span class="em">proven</span>, and signed <span class="em">before</span> it loads.</p>
   </section>
 
-  <!-- 8 TMMTRACE — THE CONSOLE -->
+  <!-- 8 TMMTRACE — THE DSL -->
   <section class="slide">
-    <p class="kicker">The console — the demo starts here</p>
-    <h1>First, ask a running TMM <span class="em">what it can see</span></h1>
-    <p class="lead"><b>tmmtrace</b> is bpftrace for TMM's data plane, run from a toolbox pod you <code>kubectl exec</code> into. It lists the functions it can attach to — filter by name, or <code>--no-noise</code> to drop ~9k compiler clones and Tcl constructors (<span class="c-good">71,309 → 62,019</span> real) — then turns one line of intent into a verified, signed probe.</p>
+    <p class="kicker">The console — meet the tool</p>
+    <h1>tmmtrace — one line of <span class="em">DSL</span>, to a verified probe</h1>
+    <p class="lead"><b>tmmtrace</b> is bpftrace, but for TMM's data plane. You write the intent as <em>one line</em>; it compiles to CO-RE bytecode, runs it through <b>PREVAIL</b>, F5-signs it, and arms it on a running pod — all from a toolbox pod you <code>kubectl exec</code> into, the way engineers already work.</p>
+    <pre class="bpf"><span class="c-com">grammar:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
+
+<span class="c-com">observe:</span>  fentry/http_parse_client_headers { <span class="c-good">count()</span> }
+<span class="c-com">enforce:</span>  fentry/dtls_tx /args.sz &gt; 16384/ { <span class="c-good">shield(2)</span> }
+
+<span class="c-com">pipeline:</span> gen → clang → <span class="c-key">PREVAIL</span> → F5-sign → arm(slot)</pre>
+    <p class="punch">The same DSL authors all three: <span style="color:var(--good)">observe</span>, cost, <span style="color:var(--accent)">enforce</span>.</p>
+  </section>
+
+  <!-- 8b WHAT IT CAN SEE -->
+  <section class="slide">
+    <p class="kicker">The console — what it can see</p>
+    <h1>First, ask a running TMM <span class="em">what it can attach to</span></h1>
+    <p class="lead">Before writing a probe, ask what's reachable. <code>list</code> shows the build's functions by name — filter with a glob, or <code>--no-noise</code> to drop ~9k compiler clones and Tcl constructors (<span class="c-good">71,309 → 62,019</span> real).</p>
     <pre class="cmd">kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace list '*http_p*' --no-noise</pre>
     <pre class="bpf"><span class="c-com"># 158 hook(s) match '*http_p*' · de-noised   (of 71,309 in the build)</span>
   http_parse_build
@@ -437,7 +451,7 @@ kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 15</span>
+  <span id="count">1 / 16</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
