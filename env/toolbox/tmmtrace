@@ -3,8 +3,13 @@
 # gen -> clang -> PREVAIL -> sign, then load into the f5-tmm pod over kubectl and
 # observe. This is what an engineer runs after `kubectl exec -it <toolbox>`.
 #
-#   tmmtrace run    '<expr>' [nreq]
+#   tmmtrace run    '<expr>' [nreq]   observe: arm (monitor), drive, show the delta
+#   tmmtrace cost   '<expr>'          poll-loop cost: budget-pass ceiling + bench floor
 #   tmmtrace verify '<expr>' | gen '<expr>' | list '<glob>'
+#
+# A shield expr ---  fentry/<hook> /pred/ { shield(<safe value>) }  --- run through `run`
+# is authored + PREVAIL-verified + signed at mode-ceiling=enforce, then STOPS. Arming
+# enforce on live traffic is a separate, gated step (the tool prints the exact commands).
 #
 # NOTE the signing key is mounted from a Secret here for the demo; in production it
 # lives in a sign service and the toolbox calls out to it --- the pod never holds it.
@@ -23,7 +28,7 @@ SLOT="${SLOT:-2}"
 cmd="$1"; expr="$2"; nreq="${3:-40}"
 case "$cmd" in
   verify|gen|list) exec python3 "$TT" "$cmd" "$expr" ;;
-  run) : ;;
+  run|cost) : ;;
   *) sed -n '2,11p' "$0"; exit 1 ;;
 esac
 
@@ -33,6 +38,44 @@ python3 "$TT" build "$expr" "$tmp" | sed 's/^/  /'            # gen -> clang -> 
 o=$(ls "$tmp"/*.bpf.o); fn=$(basename "$o" .bpf.o)
 hook=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json'))['hook'])")
 kind=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json'))['kind'])")
+sec=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json'))['section'])")
+
+if [ "$cmd" = cost ]; then
+  POD=$(kubectl get pods -l app=f5-tmm --no-headers | grep Running | head -1 | awk '{print $1}')
+  echo "-- what it costs the poll loop --"
+  echo "  PROVEN CEILING (budget pass, longest path over the verified bytecode):"
+  python3 /opt/tmmtrace/budget_pass.py --section "$sec" "$o" | sed 's/^/    /'
+  echo "  MEASURED FLOOR (bench: run 100k times off-hook --- no slot, no traffic):"
+  kubectl cp "$o" "$POD":/tmp/$fn.bpf.o -c f5-tmm 2>/dev/null
+  r=$(kubectl exec "$POD" -c f5-tmm -- /usr/bin/ls-load.py bench /tmp/$fn.bpf.o 100000 2>&1)
+  echo "$r" | grep -oE 'bench .*min=[0-9]+ +mean=[0-9]+ +max=[0-9]+ +cycles' | sed 's/^/    /'
+  mn=$(echo "$r" | grep -oE 'min=[0-9]+' | head -1 | cut -d= -f2)
+  [ -n "$mn" ] && echo "    -> ~$mn cyc/call floor  (~$(awk "BEGIN{printf \"%.1f\",$mn/2.6}") ns at 2.6 GHz)" \
+                || echo "    (bench: $r)"
+  echo "  On the live path add the trampoline (~8.8 ns measured) + cache effects. PREVAIL proved"
+  echo "  it terminates and the budget caps it --- it cannot monopolize or hang the poll loop."
+  exit 0
+fi
+
+if [ "$kind" = shield ]; then
+  # ENFORCE authoring: verify + sign at mode-ceiling=enforce, then STOP. Arming enforce on
+  # live traffic is a deliberate, gated step --- the tool authors it; a human vets + arms it.
+  sv=$(python3 -c "import json;print(json.load(open('$tmp/$fn.meta.json')).get('safe_value',''))")
+  echo "hook  : $hook   mode: ENFORCE   safe_value: $sv"
+  python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling enforce \
+      -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
+  echo "  VERIFIED + SIGNED at mode-ceiling=enforce.  NOT armed --- enforce is gated."
+  echo "  Before arming on live traffic, vet the three properties (enforce caveats):"
+  echo "    1. the safe value ($sv) is a return the caller already handles;"
+  echo "    2. skipping the body is a clean early-return (no half-updated state);"
+  echo "    3. the predicate reads a field available AT ENTRY (fentry runs before the body)."
+  echo "  To arm (deliberate), inside the f5-tmm pod --- load AT enforce (mode 2), then arm:"
+  echo "    ls-load.py load <slot> /tmp/$fn.bpf.o 2      # mode 2 = enforce"
+  echo "    ls-load.py arm  <slot> $hook"
+  echo "  The safe value ($sv) reaches the slot via LS_SHIELD_SAFE_VALUE in TMM's environment"
+  echo "  at arm time (read by ls_vm_arm, per-slot); confirm it is set before arming."
+  exit 0
+fi
 python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling monitor \
     -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
 

@@ -16,7 +16,7 @@ STAGE="${STAGE:-$HOME/eob-tmm-staged}"
 echo "== 1. assemble context + build image =="
 ctx=$(mktemp -d); trap 'rm -rf "$ctx"' EXIT
 cp "$STAGE/ebpf-verifier/bin/prevail" "$STAGE/substrate/tmmtrace.py" \
-   "$STAGE/substrate/gen_type_catalog.py" "$STAGE/substrate/sign_shield.py" \
+   "$STAGE/substrate/gen_type_catalog.py" "$STAGE/substrate/sign_shield.py" "$STAGE/substrate/budget_pass.py" \
    "$STAGE/substrate/shield_abi.h" "$ctx/"
 cp "$HOME/lstools/signatures.tsv" "$HOME/lstools/types.json" "$HOME/lstools/hook-map.json" "$ctx/"
 cp "$STAGE/env/toolbox/tmmtrace" "$ctx/tmmtrace"

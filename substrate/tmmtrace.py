@@ -13,8 +13,10 @@ GRAMMAR
     <pred>   := <value> <op> <int>              # op: == != < > <= >=   (gates count())
     <action> := 'count' | 'count()'             # -> SAFE_RETURN on match; host safe_returns
               | 'hist' '(' <value> ')'          # -> returns the value; tmmtrace buckets it
+              | 'shield' '(' <safe value> ')'   # ENFORCE: MATCH -> SAFE_RETURN, host skips the
+                                                #   body and returns <safe value>. Predicate REQUIRED.
+                                                #   Signed mode-ceiling=enforce; arming is a gated step.
               | <value>                          # raw: return the value/field
-              | 'count'                          # count every invocation
     <value>  := 'args.' <field>                  # resolved via signatures.tsv + BTF catalog
               | 'arg' <N> [ '.' <field> ]        # arg N, or a field of the struct at arg N
               | <struct> '(' 'arg' <N> ')' '.' <field> [':'<ty>]   # explicit (no catalog)
@@ -62,6 +64,7 @@ _ARGSDOT = re.compile(r"^args\.([A-Za-z_]\w*)$")
 _ARGNDOT = re.compile(r"^arg([0-4])\.([A-Za-z_]\w*)$")
 _COUNT = re.compile(r"^(?:@\w+\s*=\s*)?count(?:\(\))?$")
 _HIST = re.compile(r"^(?:@\w+\s*=\s*)?hist\(\s*(.+?)\s*\)$")
+_SHIELD = re.compile(r"^shield\(\s*(.+?)\s*\)$")   # enforce: MATCH -> SAFE_RETURN(safe value)
 _PRED = re.compile(r"^(.+?)\s*(==|!=|<=|>=|<|>)\s*(-?\d+)$")
 
 
@@ -194,11 +197,16 @@ def codegen(expr):
         lhs, op, rhs = pm.group(1).strip(), pm.group(2), pm.group(3)
         cond = "%s %s %s" % (take(lhs), op, rhs)
 
-    if _COUNT.match(action):
-        # A zero-relocation program is refused by the CO-RE relocator (rc=-3), so an
-        # unpredicated count() would not load. Add a harmless canary field read of
-        # arg0's struct so the object carries a relocation; the value is ignored.
-        if not cond and not code:
+    is_shield = bool(_SHIELD.match(action))
+    if _COUNT.match(action) or is_shield:
+        if is_shield and not cond:
+            raise DslError("shield(...) needs a predicate to gate the SAFE_RETURN: "
+                           "fentry/<hook> /field op N/ { shield(<safe value>) }")
+        # A zero-relocation program is refused by the CO-RE relocator (rc=-3). Add a
+        # harmless canary field read of arg0's struct so the object carries a relocation
+        # whenever none was emitted --- an unpredicated count(), or a predicate on a scalar
+        # arg (c->arg[N], no bpf_probe_read). The value is ignored either way.
+        if not code:
             for i, (pn, kind, struct, _d) in enumerate(hook_params(hook) or []):
                 if kind == "blob" and struct and _types().get(struct):
                     fld = next(iter(_types()[struct]))
@@ -213,9 +221,13 @@ def codegen(expr):
                                 "    (void)bpf_probe_read(&vc, sizeof vc, &pc->%s);  /* canary: relocation only */\n"
                                 % (struct, struct, i, ct, fld))
                     break
-        ret = ("    return (%s) ? 1ull : 0ull;   /* SAFE_RETURN on match; safe_returns = count */" % cond
-               if cond else
-               "    return 1ull;                 /* count every invocation (safe_returns) */")
+        if is_shield:
+            ret = ("    return (%s) ? 1ull : 0ull;   /* MATCH -> SAFE_RETURN; under ENFORCE the host "
+                   "skips the body and returns the arm-time safe value */" % cond)
+        else:
+            ret = ("    return (%s) ? 1ull : 0ull;   /* SAFE_RETURN on match; safe_returns = count */" % cond
+                   if cond else
+                   "    return 1ull;                 /* count every invocation (safe_returns) */")
     else:
         hm = _HIST.match(action)
         vtok = hm.group(1) if hm else action     # hist(<value>) or a bare <value>
@@ -284,11 +296,15 @@ def build_prog(expr, outdir):
         verified = True
     else:
         verified = False
-    is_count = bool(_COUNT.match(parse(expr)[3]))
-    json.dump({"expr": expr, "fn": fn, "section": sec, "hook": hook,
-               "kind": "count" if is_count else "value", "verified": verified},
-              open(os.path.join(outdir, fn + ".meta.json"), "w"))
-    print("built %s  (%s)  section %s  verified=%s" % (o, "count" if is_count else "value", sec, verified))
+    act = parse(expr)[3]
+    sm = _SHIELD.match(act)
+    kind = "shield" if sm else ("count" if _COUNT.match(act) else "value")
+    meta = {"expr": expr, "fn": fn, "section": sec, "hook": hook,
+            "kind": kind, "verified": verified}
+    if sm:
+        meta["safe_value"] = sm.group(1)     # arm-time LS_SHIELD_SAFE_VALUE, not baked in the program
+    json.dump(meta, open(os.path.join(outdir, fn + ".meta.json"), "w"))
+    print("built %s  (%s)  section %s  verified=%s" % (o, kind, sec, verified))
     return o, fn, sec, hook
 
 

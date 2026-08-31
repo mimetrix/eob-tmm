@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         https://dl.k8s.io/release/v1.30.5/bin/linux/amd64/kubectl \
     && chmod +x /usr/local/bin/kubectl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-COPY prevail tmmtrace.py gen_type_catalog.py sign_shield.py shield_abi.h \
+COPY prevail tmmtrace.py gen_type_catalog.py sign_shield.py budget_pass.py shield_abi.h \
      signatures.tsv types.json hook-map.json /opt/tmmtrace/
 COPY tmmtrace /usr/local/bin/tmmtrace
 RUN chmod +x /opt/tmmtrace/prevail /usr/local/bin/tmmtrace \
