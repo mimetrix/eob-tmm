@@ -67,6 +67,7 @@ ls_vm_config_load(struct ls_vm_config *c)
         return;
     memset(c, 0, sizeof *c);
     c->enable       = env_bool("LS_SHIELD_ENABLE", true);
+    c->builtin      = env_bool("LS_SHIELD_BUILTIN", false);  /* compiled-in blob OFF by default */
     c->mode         = env_mode("LS_SHIELD_MODE", 2 /* enforce */);
     c->path         = env_str ("LS_SHIELD_PATH", NULL);
     c->section      = env_str ("LS_SHIELD_SECTION", NULL);

@@ -852,6 +852,18 @@ ls_vm_arm_configured(const void *blob, size_t blob_len,
     if (!g_ready)
         return -1;
 
+    /* The compiled-in blob is OPT-IN. A hardcoded, auto-armed shield is exactly what
+     * the socket load path exists to remove, so unless the operator explicitly asked
+     * for the built-in (LS_SHIELD_BUILTIN=1) or named a program to run in its place
+     * (LS_SHIELD_PATH / LS_SHIELD_SECTION), arm nothing here and let the socket loader
+     * be the only way a program arrives. */
+    if (!g_cfg.builtin && !g_cfg.path && !g_cfg.section) {
+        if (g_cfg.verbose)
+            fprintf(stderr, "ls_vm: no built-in shield armed (LS_SHIELD_BUILTIN=0) --- "
+                            "socket load is the only arming path\n");
+        return -1;
+    }
+
     /* A program on disk replaces the compiled-in one. Refusing on a bad path
      * rather than silently falling back to the built-in matters: an operator who
      * pointed at a file and got the old shield, with no error, would have no way

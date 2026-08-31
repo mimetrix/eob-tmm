@@ -36,6 +36,12 @@ struct ls_vm_config {
                              * shield can be turned off without a rebuild and
                              * without reverting the integration */
     int      mode;          /* LS_SHIELD_MODE = disable|monitor|enforce        */
+    bool     builtin;       /* LS_SHIELD_BUILTIN=1 arms the COMPILED-IN blob at
+                             * boot. DEFAULT OFF: a hardcoded, auto-armed program
+                             * is exactly what the socket load path exists to
+                             * avoid, so out of the box nothing is armed until a
+                             * signed program arrives. On only as a boot self-test
+                             * (or implied when PATH/SECTION name a program).    */
     const char *path;       /* LS_SHIELD_PATH: load the program from a FILE
                              * instead of the compiled-in blob. This is what
                              * makes changing a shield a restart rather than a
