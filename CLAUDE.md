@@ -9,8 +9,13 @@ a live TMM on BNK/datkube: a shield is loaded over a socket into an already-runn
 a function entry while traffic flows, and disarmed again — no rebuild, no restart. A hook armed on
 `http_parse_client_headers` fired exactly once per request across 16,000 requests through the proxy.
 The substrate splices **nothing into TMM's own logic** (startup registers through `INIT_FUNC`), but the
-tree does change: 46 files and ~7,800 lines added, three build-configuration files edited, and one
-compiler flag.
+tree does change. In the **substrate-only** tree: 35 files added (33 under `src/base/` — 14 `.c`,
+19 `.h` — and 2 whitelist config under `src/compile/`), three build-configuration files edited
+(`default_whitelist`, `debug_whitelist`, `filelist`), one compiler flag, ~8,300 lines. Authoritative
+count is `git status --porcelain src/` on the build-box TMM tree, verified 2026-08-31. The larger
+"46 files / ~7,800 lines" figure elsewhere counts a **different tree state** — one that also carries
+the vulnerable-SSL demo overlay under `src/modules/hudfilter/ssl/` plus the `ssl.c` revert
+(`VULNERABLE-BUILD.md`); that overlay is **not** applied in the current tree.
 
 That is not licence to claim more than was shown. Three lines still hold:
 

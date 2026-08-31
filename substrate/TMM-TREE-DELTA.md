@@ -4,10 +4,14 @@ This repo holds the substrate **sources**; they are compiled into TMM **elsewher
 build tree. That split is the reason someone can read every file here and still not be able to
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
-**The headline property — and read the scope carefully, because it changed.** The **shield**
-adds 46 files and ~7,800 lines into `src/base/` and `src/modules/hudfilter/ssl/`, edits three
-build-configuration files (`filelist` and the two globals whitelists), and adds a
-`Makefile.overrides`. **No existing F5 function BODY is edited** --- that is the accurate form of
+**The headline property — and read the scope carefully, because it depends on tree state.** In the
+**substrate-only** tree (no vulnerable-SSL overlay) the substrate adds **35 files and ~8,300 lines**
+into `src/base/` (33) and `src/compile/` (2 whitelist config), edits three build-configuration files
+(`filelist` and the two globals whitelists), and adds a `Makefile.overrides` — verified 2026-08-31 by
+`git status --porcelain src/` on the build box. The larger **46 files / ~7,800 lines** figure counts a
+tree that **also** has the vulnerable-SSL demo overlay under `src/modules/hudfilter/ssl/` plus the
+`ssl.c` revert (`VULNERABLE-BUILD.md`), which is not applied in the current tree. **No existing F5
+function BODY is edited** --- that is the accurate form of
 the claim, and it is smaller than "modifies no F5 source file", which this file used to say: nothing
 is spliced into TMM's own logic, because startup registers through the `INIT_FUNC` linker set. That
 constraint is real and load-bearing, because the shield targets a TMM that is *already running*.

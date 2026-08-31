@@ -72,7 +72,7 @@ the integration, so the actual delta is set out below.
 
 | change | scale |
 |---|---|
-| **New files added into `src/base/` and `src/modules/hudfilter/ssl/`** | **46 files, 7,780 lines**, compiled into `tmm` — counted as the untracked files under those two directories, which is one `git status` |
+| **New files added into `src/base/` (± the vulnerable-SSL overlay)** | **substrate-only: 35 files, ~8,300 lines** (33 `src/base/` + 2 whitelist config), verified 2026-08-31. **With the vulnerable-SSL demo overlay** (`src/modules/hudfilter/ssl/` + `ssl.c` revert): the older count was 46 files, 7,780 lines. Both are one `git status --porcelain src/` — on different tree states |
 | `src/compile/filelist` | +13 lines — those translation units, plus a `UBPF` cflags variable |
 | `src/compile/default_whitelist_x86_64` | +33 lines — the mutable globals introduced |
 | `src/compile/debug_whitelist_x86_64` | +33 lines — the same set |
