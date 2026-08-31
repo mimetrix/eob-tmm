@@ -142,7 +142,7 @@
   <section class="slide on">
     <p class="kicker">The Live Surface · BIG-IP Next data plane</p>
     <h1>A <span class="em">verified, programmable surface</span> inside TMM</h1>
-    <p class="sub">Today's demo works its first consumer — a runtime CVE <b>shield</b>, armed on a <b>running</b> TMM. No rebuild. No restart.</p>
+    <p class="sub">Two jobs on a <b>running</b> TMM — no rebuild, no restart. <b>Observe</b> its internals live, and <b>enforce</b> a safe verdict at a vulnerable function. Both authored from one tool: <b>tmmtrace</b>.</p>
     <div class="chips">
       <span class="chip acc">data plane</span>
       <span class="chip good">PREVAIL-verified</span>
@@ -150,16 +150,15 @@
     </div>
   </section>
 
-  <!-- 2 THE PAIN -->
+  <!-- 2 THE GAP -->
   <section class="slide">
-    <p class="kicker">The problem</p>
-    <h1>A CVE drops: <span class="em">“undisclosed traffic terminates TMM.”</span></h1>
+    <p class="kicker">The gap</p>
+    <h1>You can't <span class="em">see inside</span> a running TMM — or <span class="em">act on it</span> in place</h1>
     <ul>
-      <li><b>Today's answer:</b> <span class="d">fix in source → rebuild → re-qualify → redeploy. Weeks.</span></li>
-      <li><b>Meanwhile</b> <span class="d">the running fleet stays exposed the entire time.</span></li>
-      <li><b>And nothing</b> <span class="d">can act on a TMM that is already running, in place.</span></li>
+      <li><b>Observe</b> <span class="d">— iRules don't expose parser state, pool pressure, or which error branch a request took. A kernel uprobe that could costs ~1,000+ ns per hit — far too much for the poll loop.</span></li>
+      <li><b>Enforce</b> <span class="d">— a CVE means fix in source → rebuild → re-qualify → redeploy. Weeks. The running fleet stays exposed the whole time, and nothing can act on a TMM that is already running.</span></li>
     </ul>
-    <p class="punch">What if you could neutralize it on a <span class="em">live</span> TMM in minutes — and prove it did?</p>
+    <p class="punch">What if a <span class="em">verified</span> program could ride the poll loop — read what it needs, or return a safe value — armed in <span class="em">minutes</span>, and prove what it did?</p>
   </section>
 
   <!-- 3 WHAT IS EBPF -->
@@ -200,34 +199,7 @@
     </ul>
   </section>
 
-  <!-- 6 THE LIVE SURFACE -->
-  <section class="slide">
-    <p class="kicker">The capability</p>
-    <h1>The <span class="em">Live Surface</span> — one substrate, two missions</h1>
-    <p class="lead">The same embedded VM and entry-pad machinery serves both — differing only in whether the host <em>acts</em> on the program's return value:</p>
-    <div class="cols">
-      <div class="col"><h3>Observe</h3>
-        <p class="lead">Read a running TMM's <b>internal state</b> at any function — parser state, pool pressure, error branches, per-request outcomes. Reaches what no iRule event exposes and no affordable kernel probe can.</p></div>
-      <div class="col"><h3>Enforce</h3>
-        <p class="lead">Act on the verdict — return a <b>safe value</b>, skip a vulnerable body. Same substrate, one extra step: the host applies the answer.</p></div>
-    </div>
-    <p class="punch">This lives in <span class="em">TMM's data plane</span> — the proxy's poll loop, at connection and request scope — <span class="em">not</span> the control plane. And shielding is only its <span class="em">first consumer</span>.</p>
-  </section>
-
-  <!-- 7 SHIELD IDEA -->
-  <section class="slide">
-    <p class="kicker">The first consumer</p>
-    <h1>A <span class="em">“shield”</span> mitigates a CVE without patching</h1>
-    <p class="lead">At the vulnerable function's entry, the program:</p>
-    <ul>
-      <li><b>Reads the inputs</b> <span class="d">— the fields that decide whether the exploit fires.</span></li>
-      <li><b>Recognizes the exploit condition</b> <span class="d">— the same precondition a real fix would check.</span></li>
-      <li><b>Returns a safe value</b> <span class="d">— skipping the crashing body. Fail closed, don't fall over.</span></li>
-    </ul>
-    <p class="punch">Temporary, surgical, reversible — it <span class="em">retires when the patch lands</span>. Not a replacement for the fix; a bridge to it, armed in minutes rather than a release.</p>
-  </section>
-
-  <!-- 8 THE TRAMPOLINE -->
+  <!-- 6 THE TRAMPOLINE -->
   <section class="slide">
     <p class="kicker">The mechanism, one level down</p>
     <h1>What runs your program — the <span class="em">trampoline</span></h1>
@@ -235,87 +207,121 @@
       <li><b>Arm rewrites the 5-byte pad</b> <span class="d">into a <code>call</code> to a per-slot trampoline stub. The pad is reserved dead space — so <em>no real instruction is displaced or relocated</em>.</span></li>
       <li><b>On every entry</b> <span class="d">the stub saves the argument registers and builds the <code>ctx</code> — a copy of the args, never live state — then calls the VM (JIT).</span></li>
       <li><b>The program returns a verdict:</b></li>
-      <li style="padding-left:52px"><b class="c-good">FALLTHROUGH</b> <span class="d">→ restore registers, continue into the untouched body.</span></li>
-      <li style="padding-left:52px"><b>SAFE_RETURN</b> <span class="d">→ the safe value goes in <code>rax</code>, and it returns straight to the <em>caller</em> — the body never runs.</span></li>
+      <li style="padding-left:52px"><b class="c-good">FALLTHROUGH</b> <span class="d">→ restore registers, continue into the untouched body. (Observe lives here — it reads, and steps aside.)</span></li>
+      <li style="padding-left:52px"><b>SAFE_RETURN</b> <span class="d">→ the safe value goes in <code>rax</code>, and it returns straight to the <em>caller</em> — the body never runs. (This is enforce.)</span></li>
     </ul>
     <p class="punch">Per-slot, so arming one hook never disturbs another — and the register save is the measured <span class="em">~8.8 ns</span> the mechanism costs.</p>
   </section>
 
-  <!-- 9 THE BYTECODE -->
+  <!-- 7 THE LIVE SURFACE -->
   <section class="slide">
-    <p class="kicker">The bytecode</p>
-    <h1>What a real shield looks like — <span class="em">dtls_tx</span></h1>
-    <p class="lead">Target: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b>, live in this build (no CVE; an internal finding). The shield reads that precondition at entry:</p>
-    <pre class="bpf"><span class="c-com">/* arm at the entry of dtls_tx — the string IS the attach identity */</span>
-SEC(<span class="c-str">"fentry/dtls_tx"</span>)
-<span class="c-key">__u64</span> <span class="c-fn">dtls_txguard</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
-    <span class="c-key">struct</span> ssl_ctx  *sc = (<span class="c-key">void</span>*)c->arg[0];   <span class="c-com">// a COPY of the args</span>
-    <span class="c-key">__u64</span> sz = c->arg[3];
-    <span class="c-fn">bpf_probe_read</span>(&cf,  ..., &sc->cf);          <span class="c-com">// bounds-checked read —</span>
-    <span class="c-fn">bpf_probe_read</span>(&mss, ..., &cf->mss);         <span class="c-com">// never a raw dereference</span>
-
-    <span class="c-key">if</span> (mss &gt; SSL_SZ_RDATA &amp;&amp; sz &gt; buffer_max)  <span class="c-com">// F5's OWN fix precondition</span>
-        <span class="c-key">return</span> <span class="c-good">SAFE_RETURN</span>;                    <span class="c-com">// skip the overflow, return ERR_BUF</span>
-    <span class="c-key">return</span> FALLTHROUGH;
-}</pre>
-    <div class="chips">
-      <span class="chip acc">section = attach point</span>
-      <span class="chip">probe_read = bounds-checked</span>
-      <span class="chip good">the check = the vendor's fix</span>
+    <p class="kicker">The capability</p>
+    <h1>The <span class="em">Live Surface</span> — one substrate, two missions</h1>
+    <p class="lead">The same embedded VM and entry-pad machinery serves both — differing only in whether the host <em>acts</em> on the program's return value:</p>
+    <div class="cols">
+      <div class="col"><h3>Observe</h3>
+        <p class="lead">Read a running TMM's <b>internal state</b> at any function — parser state, pool pressure, error branches, per-request outcomes. The verdict is <b>FALLTHROUGH</b>: it reads and steps aside. Reaches what no iRule event exposes and no affordable kernel probe can.</p></div>
+      <div class="col"><h3>Enforce</h3>
+        <p class="lead">Act on the verdict — <b>SAFE_RETURN</b> a safe value, skip a vulnerable body. Same substrate, one extra step: the host applies the answer.</p></div>
     </div>
+    <p class="punch">This lives in <span class="em">TMM's data plane</span> — the proxy's poll loop, at connection and request scope — <span class="em">not</span> the control plane.</p>
   </section>
 
-  <!-- 10 VERIFIED -->
+  <!-- 8 TMMTRACE — THE CONSOLE -->
+  <section class="slide">
+    <p class="kicker">The console</p>
+    <h1>One line of DSL, to a <span class="em">verified probe</span> on a live function</h1>
+    <p class="lead"><b>tmmtrace</b> is bpftrace, but for TMM's data plane. You write the intent; it compiles to CO-RE bytecode, runs it through PREVAIL, F5-signs it, and arms it on a running pod — from a toolbox pod you <code>kubectl exec</code> into, the way engineers already work.</p>
+    <pre class="bpf"><span class="c-com">grammar:</span>  &lt;fentry|fexit&gt;/&lt;hook&gt; [/pred/] { <span class="c-good">count()</span> | <span class="c-good">hist(x)</span> | <span class="c-good">shield(v)</span> }
+<span class="c-com">pipeline:</span> gen → clang → <span class="c-key">PREVAIL</span> → F5-sign → arm(slot)</pre>
+    <p class="punch">The <span class="em">same tool</span> authors all three: <span class="em">observe</span>, <span class="em">cost</span>, <span class="em">enforce</span>.</p>
+  </section>
+
+  <!-- 9 OBSERVE — LIVE -->
+  <section class="slide">
+    <p class="kicker">Observe — live, on a running pod</p>
+    <h1>Count a real TMM function, <span class="em">per request</span></h1>
+    <pre class="cmd"><span class="c-com"># from the toolbox pod — author, verify, sign, arm, drive, read, disarm</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- \
+  tmmtrace run 'fentry/http_parse_client_headers { count() }'</pre>
+    <pre class="bpf">  built ... <span class="c-good">verified=True</span>
+  signed prog sha256 : 74e9194a87ef...
+  hook : http_parse_client_headers   pod: f5-tmm-...   slot: 2
+  armed. driving 40 requests ...
+  ----------------------------------------
+    fired (hook hits) : <span class="c-good">40</span>
+    matched (count)   : <span class="c-good">40</span>    match rate : <span class="c-good">100.0%</span>
+  ----------------------------------------
+  disarmed slot 2.</pre>
+    <p class="punch">A verified program, armed at a real TMM function on a live pod, one verdict <span class="em">per request</span> — then gone.</p>
+  </section>
+
+  <!-- 10 COST — THE POLL LOOP -->
+  <section class="slide">
+    <p class="kicker">The question everyone asks: "in the poll loop?"</p>
+    <h1>Proven <span class="em">ceiling</span>, measured <span class="em">floor</span></h1>
+    <pre class="cmd">kubectl exec -it deploy/tmmtrace-toolbox -- \
+  tmmtrace cost 'fentry/http_parse_client_headers { count() }'</pre>
+    <pre class="bpf">  PROVEN CEILING <span class="c-com">(live, from THIS verified bytecode)</span>
+    11 insn · longest path <span class="c-good">~22 cycles</span>   (budget 800)
+  MEASURED FLOOR <span class="c-com">(recorded microbenchmark)</span>
+    trampoline <span class="c-good">~8.76 ns</span>/call · + a small program <span class="c-good">~13.8 ns</span> total</pre>
+    <ul>
+      <li><b>Ceiling</b> <span class="d">— <code>budget_pass</code> walks the <em>verified</em> bytecode's control-flow graph for its longest path → a worst-case cycle count. PREVAIL proves it <em>halts</em>; this bounds <em>how long</em>.</span></li>
+      <li><b>Floor</b> <span class="d">— the trampoline's register save + dispatch, measured. A kernel uprobe is ~1,000+ ns — two orders of magnitude more.</span></li>
+    </ul>
+    <p class="punch">Bounded above by <span class="em">proof</span>, measured below by the <span class="em">mechanism</span> — it cannot monopolize the poll loop.</p>
+  </section>
+
+  <!-- 11 ENFORCE — THE SHIELD -->
+  <section class="slide">
+    <p class="kicker">Enforce — the first hard consumer</p>
+    <h1>A <span class="em">shield</span>: return a safe value, skip the vulnerable body</h1>
+    <p class="lead">Target: <code>dtls_tx</code>, TMM's DTLS transmit path — a real, un-clamped fragment-length <b>stack overflow</b> live in this build (an internal finding; no CVE). At its entry, the program recognizes the precondition and returns a safe value <em>instead of</em> running the crashing body:</p>
+    <pre class="bpf"><span class="c-com">/* authored in tmmtrace:  fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) } */</span>
+SEC(<span class="c-str">"fentry/dtls_tx"</span>)
+<span class="c-key">__u64</span> <span class="c-fn">tt_dtls_tx_shield</span>(<span class="c-key">struct</span> ls_ctx_generic *c) {
+    <span class="c-key">__u64</span> sz = c->arg[3];                    <span class="c-com">// args read from a COPY, not live state</span>
+    <span class="c-key">if</span> (sz &gt; 16384)                          <span class="c-com">// the exploit precondition</span>
+        <span class="c-key">return</span> <span class="c-good">1</span>;   <span class="c-com">// MATCH → SAFE_RETURN: host returns ERR_BUF (2), body never runs</span>
+    <span class="c-key">return</span> 0;  <span class="c-com">// FALLTHROUGH</span>
+}</pre>
+    <p class="punch">Temporary, surgical, reversible — it <span class="em">retires when the patch lands</span>. A bridge to the fix, armed in minutes rather than a release.</p>
+  </section>
+
+  <!-- 12 ENFORCE — AUTHORED + GATED -->
+  <section class="slide">
+    <p class="kicker">Enforce — authored in the same tool, armed deliberately</p>
+    <h1><code>shield()</code> — verified &amp; signed for enforce, <span class="em">arming is gated</span></h1>
+    <pre class="bpf">  built (<span class="c-good">shield</span>) verified=True
+  signed prog sha256 : cb491dc30679...   <span class="c-good">mode-ceiling=enforce</span>
+  <span class="c-good">VERIFIED + SIGNED</span> at mode-ceiling=enforce.   NOT armed — enforce is gated.</pre>
+    <p class="lead">The tool authors and <em>proves</em> enforce; arming it on live traffic stays the one human step, because SAFE_RETURN skips a real function. Before arming, three properties are vetted:</p>
+    <ul>
+      <li><b>The safe value is a return the caller already handles</b> <span class="d">— <code>dtls_tx</code> returns <code>ERR_BUF</code> itself; the caller knows that path.</span></li>
+      <li><b>Skipping is a clean early-return</b> <span class="d">— no half-updated state left behind.</span></li>
+      <li><b>The predicate reads a field available at entry</b> <span class="d">— <code>fentry</code> runs <em>before</em> the body, so it sees inputs, not parsed results.</span></li>
+    </ul>
+  </section>
+
+  <!-- 13 VERIFIED -->
   <section class="slide">
     <p class="kicker">Proof, before anything runs</p>
-    <h1>The verifier's <span class="em">verdict</span></h1>
+    <h1>The verifier's <span class="em">verdict</span> — and its refusals</h1>
     <div class="verdicts">
-      <div class="v ok"><span class="vt">VERIFIED</span> <b>dtls_txguard</b> <span class="d">fentry/dtls_tx</span> <span class="vb">budget ~66 cyc</span></div>
-      <div class="v ok"><span class="vt">VERIFIED</span> <b>evidence_demo</b> <span class="d">fentry/http_parse_client_headers</span> <span class="vb">budget ~26 cyc</span></div>
+      <div class="v ok"><span class="vt">VERIFIED</span> <b>tt_dtls_tx_shield</b> <span class="d">fentry/dtls_tx</span> <span class="vb">signed enforce</span></div>
+      <div class="v ok"><span class="vt">VERIFIED</span> <b>http count()</b> <span class="d">fentry/http_parse_client_headers · ~22 cyc ceiling</span> <span class="vb">fired 40/40</span></div>
       <div class="v bad"><span class="vt">REFUSED</span> <b>reject_memory</b> <span class="d">chases a raw pointer</span> <span class="vb">— as intended</span></div>
     </div>
     <ul>
-      <li><b><code>budget_pass.py</code> sets the ~N-cycle ceiling</b> <span class="d">— an admission-time pass that walks the <em>verified</em> bytecode's control-flow graph for its longest path → a worst-case cycle estimate. PREVAIL proves the program <em>halts</em>; the budget pass bounds <em>how long</em> — the number that lets it ride the poll loop. (Runtime fuel is the hard backstop.)</span></li>
+      <li><b>PREVAIL runs in-cluster, in the toolbox pod</b> <span class="d">— every program is proven on the pinned toolchain before it is signed. The verdicts above are the real in-pod output.</span></li>
       <li><b class="c-bad">refused reject_memory</b> <span class="d">— a program that chases a raw pointer, rejected <em>on purpose</em>. The gate is real, not decorative.</span></li>
     </ul>
   </section>
 
-  <!-- 11 LIVE DEMO -->
+  <!-- 14 EVIDENCE EVENT -->
   <section class="slide">
-    <p class="kicker">Live — drop to the terminals</p>
-    <h1>Watch it run on a <span class="em">running</span> pod</h1>
-    <p class="lead">First reset to one fresh pod — the script prints the two commands below, with the pod filled in:</p>
-    <pre class="cmd"><span class="c-com"># on the datkube box — fresh pod, armed, ring warmed. Run before EACH take.</span>
-bash ~/demo/demo-reset.sh
-
-<span class="c-com"># (or resolve the pod yourself, once per window)</span>
-POD=$(for p in $(kubectl get pods -l app=f5-tmm --no-headers | awk '{print $1}'); do kubectl exec $p -c f5-tmm -- /usr/bin/ls-load.py status 1 2>/dev/null | grep -q armed=1 && echo $p; done)
-
-<span class="c-com"># Window A — evidence stream (leave running)</span>
-kubectl exec $POD -c f5-tmm -- /usr/bin/ls_drain --segment /dev/shm/ls_tp_ring --no-stats
-
-<span class="c-com"># Window B — drive traffic, then read the counters</span>
-kubectl exec client -- sh -c 'for i in $(seq 40); do curl -so /dev/null http://11.11.11.99/; done'
-kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
-    <p class="punch">A verified program, armed at a real TMM function on a live pod, deciding a verdict per request.</p>
-  </section>
-
-  <!-- 12 EVIDENCE EVENT -->
-  <section class="slide">
-    <p class="kicker">The evidence</p>
-    <h1>When it fires, it leaves <span class="em">proof</span></h1>
-    <div class="cols">
-      <div class="col"><h3>The counter</h3>
-        <p class="lead"><code>status</code> → <b>every</b> hit on this instance. TMM's own tally. Answers <em>“how many.”</em></p></div>
-      <div class="col"><h3>The event stream</h3>
-        <p class="lead">A <b>pushed</b> record — hook, mode, time, the context it saw — through a shared-memory ring, off the data path. Answers <em>“show me the one it stopped.”</em></p></div>
-    </div>
-    <p class="punch">Rate-limited (first few, then sampled) so an attack flood <span class="em">can't turn your audit log into a self-inflicted DoS.</span></p>
-  </section>
-
-  <!-- 13 THE EVENT FIELDS -->
-  <section class="slide">
-    <p class="kicker">The evidence — decoded</p>
+    <p class="kicker">The evidence — when enforce fires, it leaves proof</p>
     <h1>The event, <span class="em">field by field</span></h1>
     <pre class="evjson">{"ts_ns":…, "seq":0, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
@@ -324,26 +330,26 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
       <div><code>mode</code><span><b>monitor</b> = would-block (body ran) · <b>enforce</b> = blocked</span></div>
       <div><code>verdict</code><span>the program's return — <b>1 = SAFE_RETURN</b></span></div>
       <div><code>slot · gen</code><span>which program, and which load of it (<code>gen</code> tells result from residue)</span></div>
-      <div><code>seq</code><span>monotonic id — with <code>slot</code>, uniquely names this event</span></div>
       <div><code>sz</code><span>surfaced evidence field — here 0; for <code>dtls_tx</code>, the oversized fragment size</span></div>
       <div><code>arg[]</code><span>the context the program saw — the function's argument registers</span></div>
     </div>
+    <p class="lead" style="margin-top:16px">Pushed through a shared-memory ring, off the data path, and rate-limited (first few, then sampled) so an attack flood can't turn your audit log into a self-inflicted DoS.</p>
   </section>
 
-  <!-- 14 HONEST SCOPE -->
+  <!-- 15 HONEST SCOPE -->
   <section class="slide">
     <p class="kicker">What this is — and isn't</p>
     <h1>Honest scope</h1>
     <ul>
-      <li><b class="c-good">Proven:</b> <span class="d">the mechanism — verified program, live arm, per-request verdict, pushed evidence.</span></li>
-      <li><b>Today's demo is MONITOR:</b> <span class="d">it recognizes and records; the body still ran (traffic was 200). Enforce would skip it.</span></li>
-      <li><b>The live-armed program is trivial</b> <span class="d">— it trips unconditionally, to exercise the evidence path. The real <code>dtls_tx</code> shield is verified but blocked on one CO-RE relocator fix.</span></li>
-      <li><b>Per-instance:</b> <span class="d">arm every TMM to cover all traffic; counters are per-instance, never a box-wide sum.</span></li>
-      <li><b>Data plane only:</b> <span class="d">this lives in TMM's poll loop — the data path. Control-plane CVE mitigation (config daemons, management, BNK microservices) is a <em>separate exercise</em>, not addressed here.</span></li>
+      <li><b class="c-good">Proven live:</b> <span class="d">observe (count, fired 40/40), cost (ceiling + floor), and the mechanism — verified program, live arm, per-request verdict, pushed evidence in <em>monitor</em>.</span></li>
+      <li><b>Enforce is authored, verified, and signed at the enforce ceiling</b> <span class="d">— but <em>not yet armed on live traffic</em>. That is the gated step, deliberately not taken until the three properties are vetted for a given hook.</span></li>
+      <li><b><code>SAFE_RETURN</code> is the one decision outcome wired end-to-end</b> <span class="d">— DROP / RESET / STEER / SAMPLE are authorable, but nothing host-side acts on them yet.</span></li>
+      <li><b>Captured bytes are a separate tool</b> <span class="d">— <code>tmmdump</code>, by design; tmmtrace does summaries, not packet windows.</span></li>
+      <li><b>Per-instance, data plane only:</b> <span class="d">arm every TMM to cover all traffic; control-plane CVE mitigation is a <em>separate exercise</em>, not addressed here.</span></li>
     </ul>
   </section>
 
-  <!-- 15 THE MAP -->
+  <!-- 16 THE MAP -->
   <section class="slide">
     <p class="kicker">The roadmap</p>
     <h1>What's shieldable — <span class="em">the map</span></h1>
@@ -362,7 +368,7 @@ kubectl exec $POD -c f5-tmm -- /usr/bin/ls-load.py status 1</pre>
 <div class="hint">← → or space to navigate · T for theme</div>
 <div class="chrome">
   <button id="prev" aria-label="Previous slide">◀</button>
-  <span id="count">1 / 12</span>
+  <span id="count">1 / 16</span>
   <button id="next" aria-label="Next slide">▶</button>
 </div>
 
