@@ -346,6 +346,7 @@ kubectl exec -it deploy/tmmtrace-toolbox -- \
 watch -n1 kubectl exec deploy/tmmtrace-toolbox -- tmmtrace status 2
 <span class="c-com"># Window 2 (client) — NOW drive; fired/matched climb live in Window 3</span>
 kubectl exec -it client -- sh -c 'for i in $(seq 40); do curl -s http://11.11.11.99/; done'
+<span class="c-com"># status counts SINCE ARM (cumulative). To drive again from 0, in Window 1:  tmmtrace reset 2</span>
 <span class="c-com"># Window 1 (toolbox) — disarm when done (Ctrl-C the Window 3 watch)</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace disarm 'http_parse_client_headers'</pre>
     <pre class="bpf">  armed : http_parse_client_headers   slot 2 (monitor)
