@@ -27,7 +27,7 @@ SUBCOMMANDS
     tmmtrace.py gen    '<expr>'          # print the generated CO-RE .bpf.c
     tmmtrace.py verify '<expr>'          # gen -> clang -> PREVAIL, report the verdict
     tmmtrace.py hist                     # read values on stdin -> a log2 histogram
-    tmmtrace.py list   '<glob>'          # list hooks in the build's map matching <glob>
+    tmmtrace.py list '<glob>' [--mode observe|enforce] [--path hot|cold] [--armable] [--no-noise]
 
 EXAMPLES
     tmmtrace.py verify 'fentry/http_parse_client_headers /args.version_num == 1/ { count() }'
@@ -329,16 +329,39 @@ def hist_stdin():
     return 0
 
 
-def list_hooks(glob):
+_NOISE = ('.isra.', '.part.', '.constprop.', '.cold', '.lto_priv')
+
+def _is_noise(n):
+    return (any(s in n for s in _NOISE) or n.startswith(('TCL_', '_ZN', '_ZL'))
+            or '_setentry_' in n or n.startswith('__'))
+
+def list_hooks(glob, mode=None, path=None, armable=False, no_noise=False):
+    """Focus the build's hook catalog. Beyond the name <glob>, the hook map carries
+    per-hook metadata (attach_mode, path_class, relocatable) --- filter on it to show
+    the subset you'd actually probe rather than every symbol in the binary."""
     try:
         d = json.load(open(HOOKMAP))
     except Exception:
         sys.exit("*** hook map not found at %s (set $LS_HOOKMAP)" % HOOKMAP)
     hp = d.get("hook_points", d if isinstance(d, list) else [])
-    names = sorted(h["name"] for h in hp if fnmatch.fnmatch(h.get("name", ""), glob))
-    for n in names:
+
+    def keep(h):
+        n = h.get("name", "")
+        if not fnmatch.fnmatch(n, glob):                     return False
+        if mode    and h.get("attach_mode") != mode:         return False
+        if path    and h.get("path_class")  != path:         return False
+        if armable and not h.get("relocatable", False):      return False
+        if no_noise and _is_noise(n):                        return False
+        return True
+
+    hits = sorted(h["name"] for h in hp if keep(h))
+    for n in hits:
         print(n)
-    print("# %d hook(s) match %r" % (len(names), glob), file=sys.stderr)
+    filt = " · ".join(f for f in [
+        ("mode=%s" % mode) if mode else "", ("path=%s" % path) if path else "",
+        "armable" if armable else "", "de-noised" if no_noise else ""] if f)
+    print("# %d hook(s) match %r%s   (of %d in the build)"
+          % (len(hits), glob, (" · " + filt) if filt else "", len(hp)), file=sys.stderr)
     return 0
 
 
@@ -356,7 +379,15 @@ def main(argv):
         if cmd == "hist":
             return hist_stdin()
         if cmd == "list":
-            return list_hooks(argv[2] if len(argv) > 2 else "*")
+            g, mode, path, armable, no_noise = "*", None, None, False, False
+            it = iter(argv[2:])
+            for a in it:
+                if   a == "--mode":     mode = next(it)
+                elif a == "--path":     path = next(it)
+                elif a == "--armable":  armable = True
+                elif a == "--no-noise": no_noise = True
+                elif not a.startswith("-"): g = a
+            return list_hooks(g, mode, path, armable, no_noise)
         sys.exit(__doc__)
     except DslError as e:
         sys.exit("*** DSL error: %s\n    in: %s" % (e, argv[2] if len(argv) > 2 else ""))
