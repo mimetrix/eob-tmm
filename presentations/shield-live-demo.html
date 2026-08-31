@@ -324,7 +324,9 @@
     <p class="kicker">The console — what it can see</p>
     <h1>First, ask a running TMM <span class="em">what it can attach to</span></h1>
     <p class="lead">Before writing a probe, ask what's reachable. <code>list</code> shows the build's functions by name — filter with a glob, or <code>--no-noise</code> to drop ~9k compiler clones and Tcl constructors (<span class="c-good">71,309 → 62,019</span> real).</p>
-    <pre class="cmd"><span class="c-com"># Window 1 (toolbox)</span>
+    <pre class="cmd"><span class="c-com"># Window 1 — reset to a clean pod (start here, or to re-run the whole demo)</span>
+kubectl rollout restart deploy/f5-tmm && kubectl rollout status deploy/f5-tmm --timeout=180s
+<span class="c-com"># Window 1 (toolbox) — what can it attach to?</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- tmmtrace list '*http_p*' --no-noise</pre>
     <pre class="bpf"><span class="c-com"># 158 hook(s) match '*http_p*' · de-noised   (of 71,309 in the build)</span>
   http_parse_build
