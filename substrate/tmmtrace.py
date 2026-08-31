@@ -354,6 +354,16 @@ def list_hooks(glob, mode=None, path=None, armable=False, no_noise=False):
         if no_noise and _is_noise(n):                        return False
         return True
 
+    # Honesty: --mode / --path only bite if the generator populated those fields. This
+    # build's map stamps everything observe/unclassified, so say so rather than return 0.
+    for fld, req, flag in (("attach_mode", mode, "mode"), ("path_class", path, "path")):
+        if req:
+            vals = sorted(set(str(h.get(fld)) for h in hp))
+            if len(vals) == 1:
+                print("#   note: every hook here has %s=%s --- the map generator does not classify "
+                      "%s yet, so --%s cannot narrow the set" % (fld, vals[0], fld, flag),
+                      file=sys.stderr)
+
     hits = sorted(h["name"] for h in hp if keep(h))
     for n in hits:
         print(n)
