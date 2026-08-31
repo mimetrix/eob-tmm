@@ -512,6 +512,53 @@ revocation. The safety proof bounds the blast radius from *crashes*; the canary 
 the signing key as the real perimeter (and its protection), and the interpreter-vs-JIT trade for
 high-assurance builds — with F5 SIRT sign-off gating implementation, not following it.
 
+## 4.1 The loader is a second parser — and the binary carries a map to attack it
+
+The signing gate (§4) keeps the *verifier* off-box, but two surfaces remain on the appliance, and they
+sit on opposite sides of the same artifact: the **code that parses a submitted program**, and the
+**metadata the binary must carry to parse it**.
+
+**The parser.** Even signed, a program today arrives as an **ELF carrying `.BTF` + `.BTF.ext`**, and TMM
+runs `ubpf_load_elf` plus the CO-RE relocator (`ls_core_relo.c`) over it — a second parser on the data
+plane besides the JIT. It is mitigated: `ls_sig_verify()` runs *before* the ELF is touched
+(`ls_vm_load.c`), so only signed input reaches it, and every `.BTF`/`.BTF.ext` offset is bounds-checked.
+But "signed and bounds-checked" is not "absent." **The clean fix removes it: relocate at sign time.**
+CO-RE relocation is a build-time concern — it patches field offsets to a build's struct layout — and the
+signing service already holds the target build's types. Have it emit **final, offset-patched raw bytecode**
+(no ELF container, no `.BTF`, no `.BTF.ext`) and sign *that*. TMM then verifies the signature, copies a
+fixed-format instruction array, and JITs; `ubpf_load_elf` and `ls_core_relo` leave the data plane entirely.
+The program becomes **build-pinned**, which the binding already models (`build_min`/`build_max` +
+`prog_sha256`, `shield_abi.h`) and which is *tighter*, not looser.
+
+**The disclosure.** To relocate on-box today, TMM **embeds its own `.BTF`** — the full internal type
+layout: struct field names, byte offsets, sizes — read back from `/proc/self/exe` (`ls_vm.c`). That layout
+is precisely the map an attacker wants for a memory-corruption exploit; shipping it in the reachable binary
+hands it over. The per-build **hook map** compounds it — function names plus **entry-pad addresses**, i.e.
+address-space secrecy for the shielded functions given away — and debug builds add the symbol table on top
+(`bnk-ship-image.sh` warns the runtime can resolve `/usr/bin/tmm` to `tmm.debug` when present).
+
+The two fixes are the *same* fix, which is why this is one item: **move relocation to the sign service and
+the embedded `.BTF` has no on-box consumer, so strip it.** Then —
+
+- the **type layout** is no longer in the shipped binary; it lives in the sign environment, which is already
+  the trust boundary;
+- the **address-bearing hook map** stays a build/sign artifact and is never shipped — TMM resolves its own
+  pads at arm time, by symbol, live (`http_parse_client_headers -> 0xccc604`, computed on the box, not read
+  from a shipped table);
+- **debug symbols** are stripped from the shipped image (never ship `tmm.debug`).
+
+The principle, stated for the TMA: **the appliance binary should reveal as little of its own layout and
+addressing as the mechanism allows.** BTF, the address map, and symbols are build- and sign-time material;
+none needs to be reachable from the data path, and each one that is becomes reconnaissance for the next bug.
+
+**Day-one vs. deferred:**
+
+- **Day-one:** verify-then-parse (already the order); strip debug symbols from the shipped image and never
+  resolve to `tmm.debug`; keep the address-bearing hook map off the appliance (TMM resolves pads itself).
+- **Deferred / target state:** relocate at sign time and ship raw offset-patched bytecode — one move that
+  deletes both the ELF/BTF *parser* and the embedded `.BTF` *disclosure* from the data plane, leaving a
+  loader that only verifies a signature and copies instructions.
+
 ## 5. Further TMM-specific concerns
 
 **Read this list with its severity in mind, because thirteen equal-looking bullets overstate the risk.**
