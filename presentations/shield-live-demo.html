@@ -408,11 +408,12 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = 
     <p class="kicker">The evidence — run it, then read it</p>
     <h1>When enforce fires, it leaves <span class="em">proof</span></h1>
     <p class="lead">The <code>dtls_tx</code> shield from the last slide is signed for enforce but <b>gated</b>, and its overflow can't be triggered on this lab pod. So to exercise the <em>evidence path</em> end to end, we arm a <b>monitor</b>-mode stand-in that trips on ordinary traffic — it records the decision but lets the body run, so traffic is unaffected.</p>
-    <pre class="cmd"><span class="c-com"># demo-reset: load + arm that MONITOR stand-in shield on slot 1, warm the evidence ring</span>
-bash ~/demo/demo-reset.sh
-<span class="c-com"># Window A — stream the evidence ring (leave running)</span>
+    <pre class="cmd"><span class="c-com"># 1. INSTRUMENT — arm a monitor probe; each SAFE_RETURN match emits an evidence record</span>
+kubectl exec -it deploy/tmmtrace-toolbox -- \
+  tmmtrace arm 'fentry/http_parse_client_headers { count() }'
+<span class="c-com"># 2. Window A — stream the evidence ring (already enabled: LS_TP_RING)</span>
 kubectl exec deploy/f5-tmm -c f5-tmm -- ls_drain --segment /dev/shm/ls_tp_ring --no-stats
-<span class="c-com"># Window B — drive traffic live; each hit pushes one record (first ~8, then sampled)</span>
+<span class="c-com"># 3. Window B — drive traffic; each match pushes a record (first ~8, then sampled)</span>
 kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
     <pre class="evjson">{"ts_ns":…, "seq":2, "slot":1, "hook":"shield", "mode":"monitor", "gen":1, "verdict":1, "sz":0, "arg":[…]}</pre>
     <div class="fields">
