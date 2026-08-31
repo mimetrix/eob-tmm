@@ -209,7 +209,7 @@
       <li><b>On every entry</b> <span class="d">the stub saves the argument registers and builds the <code>ctx</code> — a copy of the args, never live state — then calls the VM (JIT).</span></li>
       <li><b>The program returns a verdict:</b></li>
       <li style="padding-left:52px"><b class="c-good">FALLTHROUGH</b> <span class="d">→ restore registers, continue into the untouched body. (Observe lives here — it reads, and steps aside.)</span></li>
-      <li style="padding-left:52px"><b>SAFE_RETURN</b> <span class="d">→ the safe value goes in <code>rax</code>, and it returns straight to the <em>caller</em> — the body never runs. (This is enforce.)</span></li>
+      <li style="padding-left:52px"><b>SAFE_RETURN</b> <span class="d">→ the safe value is placed in the CPU's <b>return-value register</b> (<code>rax</code> on x86-64), so the <em>caller</em> receives it as the function's result — the body never runs. (This is enforce.)</span></li>
     </ul>
     <p class="punch">Per-slot, so arming one hook never disturbs another — and the register save is the measured <span class="em">~8.8 ns</span> the mechanism costs.</p>
   </section>

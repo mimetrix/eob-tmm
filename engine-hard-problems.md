@@ -361,6 +361,18 @@ config-sync arrival order, which is not the same on two HA peers. That is a real
 it is deferred deliberately: v1 has no chaining, and the enumerated outcome set stays a choice made
 by exactly one program.
 
+  *Two things sharpen why the plumbing is the easy half.* **Observe stacks freely; only enforce
+  arbitrates.** A program that only reads returns the null outcome (`PASS`/`FALLTHROUGH`), so
+  most-restrictive-wins is a no-op among them — any number of observe programs compose on one hook,
+  order-independent; the total order only bites when two programs both *act* (`DROP`/`RESET`/`SAFE-RETURN`).
+  And there is prior art for the dispatch itself: the Linux kernel's `bpf_trampoline` already chains
+  up to ~38 fentry/fexit programs on a single attachment through a generated dispatcher that calls
+  each in turn. So the extension here is "a per-hook list of slots in the trampoline," a known
+  pattern, not new invention — which is precisely why the deferred piece is the outcome-composition
+  **spec** (and its HA-determinism consequences), never the mechanism. Chain depth is then bounded
+  the same way §3.1-3 bounds the hook set: the poll-loop budget for that hook is the *sum* of the
+  chain, still PREVAIL-verified and admission-gated per program.
+
 **3. The budget is per hook; nothing bounds the sum — and the sum is not the interesting number
 anyway.** The admission budget pass (§1) gates a program against *its hook's* allowance. Arm sixty
 of them and every one passes while the loop's headroom is gone. Worse, the per-hook framing quietly
