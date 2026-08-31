@@ -407,7 +407,8 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = 
   <section class="slide">
     <p class="kicker">The evidence — run it, then read it</p>
     <h1>When enforce fires, it leaves <span class="em">proof</span></h1>
-    <pre class="cmd"><span class="c-com"># arm a signed shield (monitor) on slot 1 + warm the ring — leaves it ARMED</span>
+    <p class="lead">The <code>dtls_tx</code> shield from the last slide is signed for enforce but <b>gated</b>, and its overflow can't be triggered on this lab pod. So to exercise the <em>evidence path</em> end to end, we arm a <b>monitor</b>-mode stand-in that trips on ordinary traffic — it records the decision but lets the body run, so traffic is unaffected.</p>
+    <pre class="cmd"><span class="c-com"># demo-reset: load + arm that MONITOR stand-in shield on slot 1, warm the evidence ring</span>
 bash ~/demo/demo-reset.sh
 <span class="c-com"># Window A — stream the evidence ring (leave running)</span>
 kubectl exec deploy/f5-tmm -c f5-tmm -- ls_drain --segment /dev/shm/ls_tp_ring --no-stats
@@ -417,8 +418,7 @@ kubectl exec -it client -- sh -c 'curl -s http://11.11.11.99/'</pre>
     <div class="fields">
       <div><code>hook</code><span><b>shield</b> = an enforcement decision  ·  <code>verdict</code> <b>1 = SAFE_RETURN</b></span></div>
       <div><code>mode</code><span><b>monitor</b> = would-block (body still ran) · <b>enforce</b> = blocked</span></div>
-      <div><code>sz</code><span>surfaced evidence field — for <code>dtls_tx</code>, the oversized fragment size</span></div>
-      <div><code>slot · gen</code><span>which program, which load  ·  <code>ts_ns</code> correlates with any other log</span></div>
+      <div><code>sz</code><span>surfaced evidence field — for a <code>dtls_tx</code> shield, the oversized fragment size (here 0)</span></div>
     </div>
   </section>
 
