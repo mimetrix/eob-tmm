@@ -69,19 +69,54 @@ def build(btf):
             return size_of(t["ref"], depth + 1)
         return 0
 
+    def ptr_target(tid, depth=0):
+        """For a PTR field, the STRUCT it points at --- the edge a multi-hop path walks.
+
+        Without this the catalog knows `sc->sp` is 8 bytes but not that it is a
+        `struct ssl_pcb *`, so a predicate on `args.sp.hs.<field>` cannot be resolved and
+        the precondition of most real CVEs (several hops into connection state) is out of
+        reach. Peels typedef/const/volatile on both sides of the pointer.
+        """
+        if tid is None or depth > 12:
+            return None
+        t = types.get(tid)
+        if not t:
+            return None
+        if t["kind"] in ("TYPEDEF", "CONST", "VOLATILE", "RESTRICT", "TYPE_TAG"):
+            return ptr_target(t["ref"], depth + 1)
+        if t["kind"] != "PTR":
+            return None
+        # the pointee, peeled
+        pt, d = types.get(t["ref"]), 0
+        while pt is not None and pt["kind"] in ("TYPEDEF", "CONST", "VOLATILE", "RESTRICT",
+                                               "TYPE_TAG") and d < 12:
+            pt, d = types.get(pt["ref"]), d + 1
+        if pt is not None and pt["kind"] == "STRUCT" and pt["name"]:
+            return pt["name"]
+        return None
+
     W = {1: "u8", 2: "u16", 4: "u32", 8: "u64"}
     cat = {}
+    ptrs = {}
     for t in types.values():
         if t["kind"] != "STRUCT" or not t["name"]:
             continue
-        fields = {}
+        fields, edges = {}, {}
         for fname, ftid in t["members"]:
             s = size_of(ftid)
             if s in W:
                 fields[fname] = W[s]
+            tgt = ptr_target(ftid)
+            if tgt:
+                edges[fname] = tgt
         # keep the richest definition when a struct name repeats (fwd decls, dups)
         if fields and (t["name"] not in cat or len(fields) > len(cat[t["name"]])):
             cat[t["name"]] = fields
+        if edges and (t["name"] not in ptrs or len(edges) > len(ptrs[t["name"]])):
+            ptrs[t["name"]] = edges
+    # pointer edges live under a reserved key so the flat {struct: {field: width}} shape
+    # every existing consumer expects is unchanged.
+    cat["__ptr_targets__"] = ptrs
     return cat
 
 
