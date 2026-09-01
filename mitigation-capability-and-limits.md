@@ -100,6 +100,77 @@ These are limits of today's build, each with the work that lifts it.
 | **No byte capture**, and no live value/histogram egress. | You can filter-and-count on a field; you cannot stream the distribution or a packet window. | per-value egress (`tmmdump` for captures — a separate tool by design) |
 | **Per-call cost on the data path is unmeasured.** | The ~8.8 ns is a hot-cache microbenchmark floor, not a per-packet figure under real traffic. | instrumented measurement on the data path |
 
+## 4A. For the classes it cannot mitigate — what would be needed
+
+Most of §3 and §4 converge on **three** enabling capabilities. Naming them this way matters: it turns
+a list of limitations into a short, ordered build.
+
+### Unlock A — more outcomes (host acts, not just substitutes a return)
+**Unblocks:** algorithmic DoS (Rapid Reset, decompression bombs, "zombie" flow exhaustion — class G),
+and any bug at a function where **no safe return exists**.
+
+Today the only lever is `SAFE_RETURN`. For these classes the right action is not "skip this function"
+but "**kill this stream / reset this connection / drop this packet**". `DROP` / `RESET` / `STEER` /
+`SAMPLE` are already *authorable* — nothing host-side acts on them. Needed:
+- host-side **decision-point wiring** so the verdict is applied at a traffic decision point, not just
+  as a return value;
+- a defined **total order over the outcome set** (most-restrictive-wins), because once more than one
+  outcome exists, two programs can disagree (`engine-hard-problems.md` §3.1).
+
+### Unlock B — state across invocations
+**Unblocks:** everything whose precondition is a **rate or a count**, not a single input — which is
+most of class G. "Too many resets on this connection" is not visible in one invocation's arguments.
+
+Needed:
+- **maps that persist between invocations**, keyed per connection / per flow;
+- a **time base** in-program (so a rate can be computed);
+- and the hard part, stated honestly: shared mutable state is what the current design's
+  single-writer-per-core property buys its cheapness with. Adding it re-opens CMP and
+  connection-mirroring questions (`engine-hard-problems.md` §3), so this is the costliest unlock, not
+  the easiest.
+
+### Unlock C — deeper and finer reads
+**Unblocks:** the **majority of real CVEs**, whose precondition lives in connection state several
+pointer hops in; plus preconditions only visible **mid-body**.
+
+Needed, in order:
+1. **Multi-hop field access** — pointer-target types in the BTF catalog, dotted-path codegen in the
+   DSL, and prefer-defined-struct in the CO-RE relocator (or resolve at sign time, which removes the
+   on-box parser too). *This is the single highest-leverage item on the board.*
+2. **Source-placed probe points** (USDT-style) for arbitrary positions inside a function, with
+   DWARF-located arguments — the only way to reach code that is inlined or mid-body.
+3. For **enforce** mid-body: there is no clean frame to return through, so the realistic answer is to
+   restructure the target with `noinline` helpers and enforce at that boundary. Mid-body stays
+   **observe** otherwise.
+
+### The security decision — writes (repair instead of refusal)
+**Would unblock:** bugs whose correct fix is to *initialise* or *sanitise* state (the brainpool
+uninitialised-field shape), where failing closed is the only option today.
+
+This means giving a program a **write** capability — a narrow, verified "store to this field" helper,
+with the verifier proving bounds and ownership, or a host-side "zero field X before the call" action.
+It is a genuine step change in risk: it turns a read-only predicate into something that **mutates TMM
+memory**, and it would need its own TMA before anyone writes a line of it. **The cheaper alternative
+is usually to shield the *consumer* function instead** — fail closed where the bad value is used,
+rather than trying to fix it where it is created.
+
+### The genuine dead end — temporal bugs
+**Class H (use-after-free, double-free, expired pointer).** Validity is a property of *history*, not
+of the arguments at a boundary, so no entry predicate can distinguish a live pointer from a stale one.
+Mitigating this would require **object-lifetime tracking** — instrumenting the allocator and
+maintaining a liveness map consulted per dereference. That is what ASAN-class instrumentation and the
+compiler do, at a cost the poll loop cannot pay. It may be **detectable in a debug build**; it is not
+mitigatable in production by this technique, and the matrix says so rather than implying otherwise.
+
+### Out of scope by choice, not by limit
+**Control-plane CVEs** need the substrate deployed into the control-plane daemons and companion
+microservices — a different process, different constraints, no poll loop. Deferred deliberately.
+
+**Reading the four together:** Unlock C is the one that widens the *addressable* CVE set most (it is
+about *seeing* the precondition); Unlock A widens the *class* set (it is about *acting*); Unlock B is
+the expensive one and buys the rate-based classes; writes are a security decision, not a feature; and
+temporal bugs are honestly out.
+
 ## 5. The decision procedure — "is this bug shieldable?"
 
 Five questions. All yes → shieldable today. The first "no" names exactly what is needed.
