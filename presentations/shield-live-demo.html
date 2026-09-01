@@ -415,15 +415,26 @@ SEC(<span class="c-str">"fentry/dtls_tx"</span>)   <span class="c-com">// SEC = 
 
   <!-- 12 ENFORCE — AUTHORED + GATED -->
   <section class="slide">
-    <p class="kicker">Enforce — authored in the same tool, armed deliberately</p>
-    <h1><code>shield()</code> — verified &amp; signed for enforce, <span class="em">arming is gated</span></h1>
-    <pre class="cmd"><span class="c-com"># Window 1 (toolbox)</span>
+    <p class="kicker">Enforce — LIVE on real traffic</p>
+    <h1>Armed in <span class="em">enforce</span>: the bad request is blocked, normal traffic isn't</h1>
+    <pre class="cmd"><span class="c-com"># Window 1 (toolbox) — author + verify + sign at mode-ceiling=enforce, and stage it</span>
 kubectl exec -it deploy/tmmtrace-toolbox -- \
-  tmmtrace arm 'fentry/dtls_tx /args.sz &gt; 16384/ { shield(2) }'</pre>
-    <pre class="bpf">  built (<span class="c-good">shield</span>) verified=True
-  signed prog sha256 : cb491dc30679...   <span class="c-good">mode-ceiling=enforce</span>
-  <span class="c-good">VERIFIED + SIGNED</span> at mode-ceiling=enforce.   NOT armed — enforce is gated.</pre>
-    <p class="lead">The tool authors and <em>proves</em> enforce; arming it on live traffic stays the one human step, because SAFE_RETURN skips a real function. Before arming, three properties are vetted:</p>
+  tmmtrace arm 'fentry/http_parse_client_headers /args.len &gt; 2000/ { shield(2) }'
+<span class="c-com"># Window 1 — the gated step, done deliberately: load AT enforce (mode 2), then arm</span>
+kubectl exec deploy/f5-tmm -c f5-tmm -- ls-load.py load 3 /tmp/&lt;prog&gt;.bpf.o 2
+kubectl exec deploy/f5-tmm -c f5-tmm -- ls-load.py arm  3 http_parse_client_headers
+<span class="c-com"># Window 2 (client) — a normal request, then an oversized one (3 KB header)</span>
+kubectl exec -it client -- curl -s -o /dev/null -w '%{http_code}\n' http://11.11.11.99/
+kubectl exec -it client -- sh -c 'H=$(head -c 3000 &lt;/dev/zero|tr "\0" A); curl -s -o /dev/null -w "%{http_code}\n" http://11.11.11.99/ -H "X-Pad: $H"'</pre>
+    <pre class="bpf">  OK loaded slot=3 mode=2 <span class="c-good">signature=verified</span>
+  OK <span class="c-good">ARMED LIVE</span> entry=0xccc604 slot=3 kind=fentry (no restart)
+
+  normal request        -> HTTP <span class="c-good">200</span>          <span class="c-com">// FALLTHROUGH, untouched</span>
+  oversized request     -> <span class="c-bad">BLOCKED</span>            <span class="c-com">// SAFE_RETURN: parse skipped, ERR_BUF to the caller</span>
+  fired 5   safe_returns 2                <span class="c-com">// 3 normal + 2 oversized; only the 2 matched</span>
+  evidence: {"hook":"shield","<span class="c-good">mode":"enforce"</span>,"verdict":1, ...}
+  OK DISARMED LIVE          restarts=<span class="c-good">0</span>        <span class="c-com">// TMM never faltered</span></pre>
+    <p class="lead">Arming enforce is the one <em>deliberate</em> step, because SAFE_RETURN skips a real function. Three properties are vetted first — all three hold here:</p>
     <ul>
       <li><b>The safe value is a return the caller already handles</b> <span class="d">— <code>dtls_tx</code> returns <code>ERR_BUF</code> itself; the caller knows that path.</span></li>
       <li><b>Skipping is a clean early-return</b> <span class="d">— no half-updated state left behind.</span></li>
