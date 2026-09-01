@@ -101,6 +101,12 @@ if [ "$kind" = shield ]; then
   echo "hook  : $hook   mode: ENFORCE   safe_value: $sv"
   python3 "$SIGN" --key "$SK" --prog "$o" --hook "$hook" --mode-ceiling enforce \
       -o "$tmp/$fn.bpf.sig" | grep -i 'prog sha256' | sed 's/^/  signed /'
+  # Stage the artifacts into the TMM pod so the printed arm commands actually work.
+  # (Signing + staging is safe; ARMING is the gated step and still requires a human.)
+  POD=$(f5pod); [ -n "$POD" ] || { echo "*** no Running f5-tmm pod"; exit 1; }
+  kubectl cp "$o" "$POD":/tmp/$fn.bpf.o -c f5-tmm
+  kubectl cp "$tmp/$fn.bpf.sig" "$POD":/tmp/$fn.bpf.sig -c f5-tmm
+  echo "  staged into $POD:/tmp/$fn.bpf.{o,sig}"
   echo "  VERIFIED + SIGNED at mode-ceiling=enforce.  NOT armed --- enforce is gated."
   echo "  Before arming on live traffic, vet the three properties (enforce caveats):"
   echo "    1. the safe value ($sv) is a return the caller already handles;"
