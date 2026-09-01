@@ -559,6 +559,42 @@ none needs to be reachable from the data path, and each one that is becomes reco
   deletes both the ELF/BTF *parser* and the embedded `.BTF` *disclosure* from the data plane, leaving a
   loader that only verifies a signature and copies instructions.
 
+### Padding scope, and reaching inlined code
+
+The pad is a *safety property*, not a target list — but **how many** functions carry one is a design knob
+with the same two-sided character as the rest of this section: coverage vs. footprint-and-exposure.
+
+- **Whole-binary** (`-fpatchable-function-entry=5,0`, today): every function is hookable at runtime with no
+  foresight — the general "shield a CVE nobody pre-selected, no rebuild" property. Cost: 5 bytes × *every*
+  function, and a hook map that enumerates every function and pad address (the reconnaissance surface above).
+- **Per-function** (`__attribute__((patchable_function_entry(5)))` on chosen functions): minimal footprint,
+  minimal address map — but a target you did not pre-pad needs a **rebuild**, eroding "minutes not weeks"
+  for the un-anticipated case.
+- **Reachable-set — the recommended middle:** pad the functions that actually fire on traffic
+  (`reachability-survey.md`), not all ~70k. CVEs live and are triggerable there; padding that set keeps
+  "hook any realistically-attackable function without a rebuild" while cutting both footprint and
+  address-map exposure by a large factor. This is the scope a TMA is likely to prefer over "pad everything."
+
+**Inlining does not defeat this — but the two fixes are different, and split along enforce vs. observe.**
+The pad sits at a *function entry*, so a fully-inlined function has no entry and no pad. Two ways to reach it:
+
+- **`noinline` — force an out-of-line entry.** Mark the target `noinline` so it is *not* inlined; it then has
+  a real entry, gets its pad, and hooks like any other function — and `SAFE_RETURN` works, because you are at
+  a clean function boundary. This is "un-inline it," a build-side decision, and it is the right answer for an
+  **enforce** target (a shield) that must cover every call completely: §3.1's false-success is *dissolved* —
+  there are no inlined copies left to miss.
+- **Source-placed patch points ride the inlining — for observe.** A probe placed in the *source* (a
+  patchable-NOP marker — the USDT model) is emitted by the compiler at **every location the code lands,
+  including each inlined copy**, with a note section recording all of them; the loader arms them under one
+  name and patches every site at once. So an inlined function is "patchable" not by finding one entry but by
+  the pad *following the code* to all of them. The catch is the tracepoint catch: at an inline site the
+  values live wherever the compiler put them (`ctx` needs DWARF), and mid-body `SAFE_RETURN` has no clean
+  frame to return through. So this is an **observe** technique; enforcing on inlined code means `noinline`.
+
+The one-line rule: **enforce needs a boundary (`noinline` if the target is inlined); observe can ride the
+inlining (source probe points).** And the pad, in every case, is the dead space that keeps arming from
+rewriting live instructions — that requirement never goes away.
+
 ## 5. Further TMM-specific concerns
 
 **Read this list with its severity in mind, because thirteen equal-looking bullets overstate the risk.**
