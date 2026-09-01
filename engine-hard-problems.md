@@ -584,6 +584,27 @@ helpers where bounds checks live. The same day, this cost a CVE demo: the brainp
 not two.** Pick the set that must be hookable, pad it, and mark it `noinline` so coverage is by
 construction rather than by luck.
 
+**And the decision that follows (2026-09-01):** size-weighted, the gap closes — hookable functions have a
+median of 302 bytes, inlined-only a median of 25 (max 457), and coverage by size is **91% above 128 bytes,
+98% above 256, and 100% above 512**. There is no unhookable function larger than 512 bytes. So
+**entry-pad padding stays the primary mechanism — no replacement is warranted** — and the additions are
+scoped accordingly:
+
+1. **`inline_status` in the hook map — required, not optional.** Record per function whether it is
+   `out-of-line`, `inlined-only`, or `partial`. The three partials found are real HTTP processors
+   (`http_process_client_headers`, `http_process_server_headers`, `http_process_1xx`): a shield there covers
+   the out-of-line copy while an inline site runs unprotected *with the counter climbing*. Without this flag
+   an author cannot tell. This is a correctness hazard, not a statistic.
+2. **`noinline` as a tactical, per-target tool — not a standing build policy.** At CVE-relevant sizes
+   coverage is already 98–100%, so this is for the rare case where the precondition is only computable
+   inside a small inlined helper and no enclosing caller will do.
+3. **Source-placed probe points for observe** into inlined or mid-body code — valuable, and not on the
+   critical path for CVE mitigation.
+
+The fallback that actually worked in practice deserves naming too: **shield the enclosing out-of-line
+caller.** It costs precision (you fail closed for every call through that caller) and the predicate must be
+computable there, but it is available today and it is what carried the brainpool shield.
+
 - **Reachable-set — the recommended middle:** pad the functions that actually fire on traffic
   (`reachability-survey.md`), not all ~70k. CVEs live and are triggerable there; padding that set keeps
   "hook any realistically-attackable function without a rebuild" while cutting both footprint and
