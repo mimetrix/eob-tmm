@@ -555,6 +555,32 @@ none needs to be reachable from the data path, and each one that is becomes reco
 
 - **Day-one:** verify-then-parse (already the order); strip debug symbols from the shipped image and never
   resolve to `tmm.debug`; keep the address-bearing hook map off the appliance (TMM resolves pads itself).
+
+  **Done and measured (2026-09-01).** The image carried `/usr/bin/tmm64.debug` — **76 MB of symbols for a
+  binary TMM does not even run**. Two facts came out of removing it:
+  1. **`/usr/bin/tmm64.no_pgo`, the binary that actually runs, is already stripped** (`nm` finds no symbol
+     table). So the entire symbol disclosure was the *separate* debug file, not the running image.
+  2. Removing it needs a check first, not an `rm`: `docker_build/Dockerfile.runtime` does
+     `if test -f /usr/bin/tmm.debug; then ln -sf /usr/bin/tmm.debug /usr/bin/tmm; fi`, so on an image built
+     with the debug binary present **the entrypoint can resolve to it** — deleting it there leaves a
+     dangling entrypoint that looks fine until it runs.
+
+  `env/scripts/bnk-strip-debug.sh` does it safely: resolve `/usr/bin/tmm` first, refuse if it lands on a
+  debug binary, remove the artifacts in a layer, then verify 0 remain **and** the entrypoint is still
+  executable. Verified on the demo image: `debug artifacts remaining : 0`, `tmm -> tmm64.no_pgo`, intact.
+
+  **Its honest limit, and the production fix.** A layer makes the file *unreadable in the container* — the
+  reconnaissance goal — but the bytes stay in the lower layer, so image and registry **size do not shrink**.
+  For both wins the fix is one line where the file is installed, in `Dockerfile.runtime`:
+
+  ```dockerfile
+  # after the tmm binaries are installed
+  RUN rm -f /usr/bin/tmm64.debug /usr/bin/tmm.debug /usr/bin/tmm64.debug.SHA256SUM
+  ```
+
+  That is deliberately *not* applied here: it would make `Dockerfile.runtime` a **fourth modified F5 file**,
+  and this repo claims exactly three (`filelist` + the two globals whitelists) in several places. Applying
+  it is a packaging owner's call plus a sweep of that count.
 - **Deferred / target state:** relocate at sign time and ship raw offset-patched bytecode — one move that
   deletes both the ELF/BTF *parser* and the embedded `.BTF` *disclosure* from the data plane, leaving a
   loader that only verifies a signature and copies instructions.
