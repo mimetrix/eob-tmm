@@ -570,6 +570,16 @@ with the same two-sided character as the rest of this section: coverage vs. foot
 - **Per-function** (`__attribute__((patchable_function_entry(5)))` on chosen functions): minimal footprint,
   minimal address map — but a target you did not pre-pad needs a **rebuild**, eroding "minutes not weeks"
   for the un-anticipated case.
+**Measured, 2026-09-01 — the scope question is not hypothetical.** Across the five HTTP/SSL data-plane
+source files, **693 defined functions yield 473 hookable (68%) and 220 with no pad (32%)**; `http.c`
+alone is 44% unhookable. So whole-binary padding does **not** deliver universal coverage — it delivers
+universal coverage *of what survived inlining*, and the survivors exclude exactly the small `static`
+helpers where bounds checks live. The same day, this cost a CVE demo: the brainpool CVE's vulnerable
+`memcpy` lives in an inlined `static` helper with no pad, and the shield only worked because the
+*caller* happened to remain out-of-line. **Conclusion: padding scope and `noinline` are one decision,
+not two.** Pick the set that must be hookable, pad it, and mark it `noinline` so coverage is by
+construction rather than by luck.
+
 - **Reachable-set — the recommended middle:** pad the functions that actually fire on traffic
   (`reachability-survey.md`), not all ~70k. CVEs live and are triggerable there; padding that set keeps
   "hook any realistically-attackable function without a rebuild" while cutting both footprint and
