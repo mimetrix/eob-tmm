@@ -364,14 +364,33 @@ def list_hooks(glob, mode=None, path=None, armable=False, no_noise=False):
                       "%s yet, so --%s cannot narrow the set" % (fld, vals[0], fld, flag),
                       file=sys.stderr)
 
-    hits = sorted(h["name"] for h in hp if keep(h))
-    for n in hits:
-        print(n)
+    kept = sorted((h for h in hp if keep(h)), key=lambda h: h.get("name",""))
+    hits = [h.get("name","") for h in kept]
+    # inline_status (mk_inline_status.py) turns a silent hazard into a visible one: a
+    # PARTIAL hook has a pad AND inlined copies, so arming it covers the out-of-line
+    # instance and misses the rest --- while `fired` climbs, which reads as coverage.
+    npart = 0
+    for h in kept:
+        n = h.get("name","")
+        if h.get("inline_status") == "partial":
+            npart += 1
+            print("%s   [PARTIAL: %d inlined site(s) a shield here would MISS]"
+                  % (n, h.get("inline_sites", 0)))
+        else:
+            print(n)
     filt = " · ".join(f for f in [
         ("mode=%s" % mode) if mode else "", ("path=%s" % path) if path else "",
         "armable" if armable else "", "de-noised" if no_noise else ""] if f)
     print("# %d hook(s) match %r%s   (of %d in the build)"
           % (len(hits), glob, (" · " + filt) if filt else "", len(hp)), file=sys.stderr)
+    if npart:
+        print("#   *** %d PARTIALLY INLINED --- arming those does NOT cover every call site;"
+              " the counter still climbs. See engine-hard-problems.md 3.1" % npart,
+              file=sys.stderr)
+    elif not any("inline_status" in h for h in hp):
+        print("#   (no inline_status in this map --- run substrate/mk_inline_status.py against"
+              " the SHIPPED binary; without it a partially-inlined hook looks complete)",
+              file=sys.stderr)
     return 0
 
 
