@@ -72,6 +72,24 @@ three bullets above exist.
    A hint is not a finding until reproduced where it counts. When the fast check and the record
    disagree, the record wins until the authoritative environment says otherwise.
 
+   **And the step that makes this rule actually hold — `ask` first, always.** Rule 5 was written
+   before it had a mechanism, and it was bypassed twice on 2026-09-02: `runbook` §12g predicted an
+   entire `F5VirtualServer` dead end symptom-for-symptom, and `LS_VM_SELFTEST` — which
+   [`GROUND_TRUTH.md`](GROUND_TRUTH.md) records as having *already* cost four days once — sat
+   unretrieved while a CVE demonstration was called blocked. The failure is economic, not moral:
+   *"read the 1,400-line runbook"* loses to *"run one kubectl command"* every time. So:
+
+   > **Before investigating any build, cluster, loader or measurement symptom, run
+   > `env/scripts/ask '<the literal message>'` and state what it returned — including when it
+   > returned nothing.**
+
+   It searches [`SYMPTOMS.md`](SYMPTOMS.md) (keyed on literal error text), `GROUND_TRUTH`,
+   `CONTESTED-PREMISES`, the runbook and the design docs, in that order, in one command. "I ran
+   `ask` and there is no record" is a valid and *required* answer — it licenses free investigation.
+   **Then close the loop: add a row to `SYMPTOMS.md` whenever a symptom costs more than ten
+   minutes**, keyed on the string you actually had in front of you, not on the topic it belongs to.
+   Topic-organised records are what failed; a row is cheap, re-deriving is not.
+
 **Reading order across a repo that spans both eras: see [`DOC-STATUS.md`](DOC-STATUS.md).** It
 classifies every document as current, design (pre-build), record, or procedure, and lists the
 specific claims the build falsified. Older documents are kept rather than rewritten — the design

@@ -1,0 +1,68 @@
+#!/bin/sh
+# ask --- "has this repo already answered this?" in one command.
+#
+#   ask 'Waiting for one or more dependent CRs'
+#   ask rc=-5
+#   ask LS_VM_SELFTEST
+#
+# WHY THIS EXISTS. The records here are good and they do not get read. On 2026-09-02 the answer
+# to a message on screen was already written down twice --- runbook 12g predicted an entire
+# F5VirtualServer dead end symptom-for-symptom, and LS_VM_SELFTEST (which GROUND_TRUTH records as
+# having already cost four days once) sat unretrieved while a CVE demo was called blocked.
+#
+# CLAUDE.md rule 5 already says "read the record FIRST". It was bypassed anyway, and the reason is
+# economic, not moral: "read the 1,400-line runbook" loses to "run one kubectl command", every
+# time. A rule only holds when the compliant path is the CHEAP path. So: one command, ordered
+# best-source-first, and it prints something even when it finds nothing --- because "I checked and
+# there is no record" is itself the required output, not silence.
+#
+# Exits 0 when there are hits, 1 when there are none, so it can gate a workflow.
+set -u
+
+[ $# -ge 1 ] || { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+Q="$*"
+
+# repo root, whether invoked from env/scripts/ or anywhere else
+R=$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd) || R=$(pwd)
+cd "$R" 2>/dev/null || exit 2
+
+# Best source first: the symptom index is keyed on literal error text, so it answers fastest.
+ORDER="SYMPTOMS.md GROUND_TRUTH.md CONTESTED-PREMISES.md env/bnk-dev-runbook.md
+       mitigation-capability-and-limits.md cve-mitigation-milestone.md engine-hard-problems.md"
+
+hits=0
+show() {   # file, then matching lines, trimmed so the output stays readable
+    f="$1"
+    [ -f "$f" ] || return 0
+    out=$(grep -inF -- "$Q" "$f" 2>/dev/null | head -4 | cut -c1-220)
+    [ -n "$out" ] || return 0
+    printf '\n== %s ==\n' "$f"
+    printf '%s\n' "$out" | sed 's/^/  /'
+    n=$(grep -icF -- "$Q" "$f" 2>/dev/null)
+    [ "$n" -gt 4 ] && printf '  ... %s more in this file\n' "$((n - 4))"
+    hits=$((hits + 1))
+}
+
+printf 'ask: "%s"\n' "$Q"
+for f in $ORDER; do show "$f"; done
+
+# Then everything else --- other root docs, substrate notes, scripts and sources --- skipping
+# what was already searched above.
+for f in $(ls -1 ./*.md substrate/*.md env/*.md 2>/dev/null); do
+    case " $ORDER " in *" ${f#./} "*) continue ;; esac
+    case " $ORDER " in *" $f "*) continue ;; esac
+    show "$f"
+done
+
+if [ "$hits" -eq 0 ]; then
+    cat <<EOF
+
+NO RECORD for "$Q".
+
+  That is a real answer: investigate freely --- and when you find it, ADD A ROW to SYMPTOMS.md
+  keyed on this exact string. A row is cheap; re-deriving it in three weeks is not.
+EOF
+    exit 1
+fi
+printf '\n(%s file(s) matched. The record wins over a fresh convenient check --- CLAUDE.md rule 5.)\n' "$hits"
+exit 0
