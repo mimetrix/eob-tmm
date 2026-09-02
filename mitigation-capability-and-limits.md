@@ -20,6 +20,13 @@ function's arguments, and returns one of two answers — *run the function* (`FA
 and hand the caller this value instead* (`SAFE_RETURN`). It is proven safe before it loads and can be
 armed and removed on a running TMM.
 
+**And that one predicate has two uses, not one.** The hard part of a shield is deciding *whether this
+call is the exploit*. Once you can decide that, you can either **act** on it (mitigate) or merely
+**count** it (verify). Verification is the same program in monitor mode, so it is strictly cheaper and
+strictly safer — nothing is ever skipped, traffic is untouched, and no enforcement decision is taken —
+which makes it the **lowest-risk way to deploy any of this**: point it at a CVE's precondition and ask a
+live fleet *which instances are actually exposed*, instead of inferring exposure from a version number.
+
 ## 2. What it can do
 
 **Attach and detach, live**
@@ -54,6 +61,18 @@ armed and removed on a running TMM.
   simple probe, against a budget of 800). The mechanism itself measures **~8.8 ns** per call. A
   kernel uprobe is ~1,000+ ns. *MEASURED (microbenchmark).*
 - **F5-signed**; unsigned programs are refused by the in-TMM loader. *MEASURED.*
+
+**Verify — answer "is this running instance actually exposed?"**
+- A predicate on a CVE's **precondition**, armed in monitor, **distinguishes a vulnerable build from a
+  patched one on live traffic**. Measured 2026-09-01 with one variable — a four-line initialisation —
+  and identical traffic: **vulnerable `matched 6/6`, patched `matched 0/6`**, with equal `fired` counts
+  proving the probe behaved the same on both. *MEASURED.*
+- Why this matters on its own: it replaces *"we believe this version is affected"* with a **measurement
+  taken on the instance**, needs **no enforcement decision**, skips nothing, and cannot alter traffic —
+  so it can be deployed far more widely and far sooner than a shield can.
+- **Same limit as mitigation, for the same reason:** if the precondition is not visible at a boundary
+  (§3), it is no more *detectable* than it is *shieldable*. Demonstrated for one bug whose precondition
+  is a readable field; it is not a general vulnerability scanner.
 
 **Report**
 - Per-slot counters (`fired`, `safe_returns`) and **pushed evidence records** — JSON off the data
