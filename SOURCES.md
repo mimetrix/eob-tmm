@@ -97,3 +97,32 @@ general architecture page: `kubectl api-resources` shows the installed SPK famil
 networking half is SPK and the **ingress half is Gateway API**, which is why
 `env/bnk-dev-runbook.md` §12g says "BNK uses Gateway API". Anyone with Confluence access should still
 read the page and correct this row if it contradicts the cluster.
+
+## BIG-IP Next for Kubernetes — CRD reference (RETRIEVED, public, 2026-09-02)
+
+`https://clouddocs.f5.com/bigip-next-for-kubernetes/latest/custom-resource-definitions/` and the
+`bnk-bnkgateway.html` / `bnk-gateway-api-gateway.html` pages under it. Public and re-retrievable;
+fetched via tooling, **no `evidence/cache/` file stored** — so treat the quotes below as the claim and
+re-fetch to audit them.
+
+**The documented BNK CRD set:** `BNKGateway`, `BNKNetPolicy`, `BNKSecPolicy`, `CNEInstance`,
+`F5BigCneAddresslist`, `F5BigCnePortlist`, `F5BigDdosGlobal`, `F5BigFwPolicy`, `F5BigFwRulelist`,
+`F5BigLogHslpub`, `F5BigLogProfile`, `F5SPKEgress`, `F5SPKSnatpool`, `F5SPKStaticRoute`, `F5SPKVLAN`,
+`Gateway`, `GatewayClass`, `GRPCRoute`, `HTTPRoute`, `L4Route`, `F5BigCneIrule`, `F5BigGlobalOptions`.
+
+Three findings that close open questions in `cve-mitigation-milestone.md` §4B/§4C:
+
+1. **Gateway TLS is certificate-only.** Under `listeners.tls` the reference documents
+   `certificateRefs` (with `group`/`kind`/`name`/`namespace`) and *nothing else* — **no `options`
+   field is documented**, and there is no cipher, cipher-group, `dhGroups` or ECDH-curve setting.
+   Independently confirmed on the cluster: four candidate `tls.options` keys were reconciled and
+   **none honoured**. So the missing curve knob is **not** something we failed to find — BNK does not
+   expose one.
+2. **`BNKGateway` is not a TLS object.** It is IP-address management (`ipv4BaseCidr`,
+   `startAddress`/`endAddress`, `ingressConfig.defaultListenerNetworks`) — worth stating because the
+   name invites the opposite assumption.
+3. **`F5VirtualServer` and `F5BigClientsslSetting` are not BNK CRDs.** Neither appears in the BNK
+   reference; they belong to the CNF/SPK lineage. Their presence on our cluster is incidental to the
+   installed bundle, not a supported BNK path — which independently confirms §4C's conclusion that the
+   `F5VirtualServer` route can never program here, and retires the idea that a better manifest would
+   have fixed it.
