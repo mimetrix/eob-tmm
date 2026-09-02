@@ -82,3 +82,18 @@ publicly retrievable, but reproducible by anyone with F5 Bugzilla access + the B
 
 Superseded the earlier NOT_RETRIEVED my.f5.com rows for these CVEs: Bugzilla carries the full detail
 (CWE, conditions, CVSS, affected versions incl. Neptune) the JS-gated K-articles hid.
+
+## SPK Architecture (internal Confluence) — **NOT_RETRIEVED**, 2026-09-02
+
+`https://docs.f5net.com/spaces/~afreeman/pages/560987062/SPK+Architecture` — F5-internal
+Confluence, authentication-gated; the sandbox running these tools has no route to `docs.f5net.com`
+and the fetch returned empty content. **Deliberately not paraphrased from memory** (rule 1).
+
+What was needed from it — how SPK/BNK exposes a TLS listener and attaches a client-SSL profile — was
+instead answered **from the cluster itself**, which is stronger evidence for this deployment than a
+general architecture page: `kubectl api-resources` shows the installed SPK family is
+**networking-only** — `F5SPKEgress`, `F5SPKEgressSIP`, `F5SPKSnatpool`, `F5SPKStaticRoute`,
+`F5SPKVlan` — with **no SPK ingress CRD** (`F5SPKIngressTCP`/`HTTP2`/… absent). So on this build the
+networking half is SPK and the **ingress half is Gateway API**, which is why
+`env/bnk-dev-runbook.md` §12g says "BNK uses Gateway API". Anyone with Confluence access should still
+read the page and correct this row if it contradicts the cluster.
