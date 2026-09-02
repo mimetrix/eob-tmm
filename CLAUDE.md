@@ -22,9 +22,21 @@ That is not licence to claim more than was shown. Three lines still hold:
 - **This repo is not self-contained.** Its sources are built into TMM elsewhere. `make -C substrate
   check` exercises bench harnesses, not a data plane. Reproducing the live results needs the TMM
   build tree and the cluster.
-- **Mechanism proven ≠ outcome proven.** No CVE has been mitigated on live traffic. The BNK target
-  is not even reachable there (`prot_transfer_log_profile` has no Kubernetes CRD, and the caller
-  guards the null), so "it stops the crash" has never been demonstrated end to end.
+- **Mechanism proven ≠ outcome proven — and the line moved on 2026-09-02, so state it precisely.**
+  What *is* demonstrated: **crash-to-no-crash on the real binary** — one variable, opposite outcomes
+  (enforce → `SAFE_RETURN`, *"shield prevented the dereference"*, `restarts=0`; monitor →
+  `FALLTHROUGH` → `Fault address: 0`, **segfault, core dumped**) — and **enforce on live traffic**,
+  blocking a targeted request while normal traffic stayed 200, with exact counters, an
+  `"mode":"enforce"` evidence record and a clean disarm. **The limit that replaces the old one:** the
+  crash condition is **injected** (`LS_VM_SELFTEST` builds the ctx directly), not carried by a client
+  request — which is the same method the dev teams use for a fix when a path is hard to reach through
+  configuration (`src/test/standalone`; no in-tree functional HTTP/SSL suite exists and no
+  `[EMBARGO]` fix ships a repro). So **no *named CVE* has been mitigated by traffic**, and the reason
+  is now known precisely and is *not* the mechanism: the engineering side finished with predicate
+  conjunction, and what remains is **listener configuration** — every route to a Brainpool-capable
+  listener is closed or costed in `cve-mitigation-milestone.md` §4B/§4C. The older reason given here
+  for `prot_transfer_log_profile` was also incomplete: besides having no CRD, it has **no symbol at
+  `-O2`** — the compiler inlined it away, so there is no pad to arm.
 - **Per-call hook cost is unmeasured.** The counter mean is dominated by preemption artifacts and the
   bench op is FIXED as of 2026-08-19 — handed to a TMM thread like a load, and now timing the
   JIT rather than the interpreter it used to measure. So a FLOOR exists: a simple program executes in ≤ 11 ns on the JIT path (min 26–28 cycles at 2.60 GHz, build e8e854ad), bounded by the rdtsc pair that measures it rather than by the program.
