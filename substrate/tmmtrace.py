@@ -131,6 +131,35 @@ def _ptr_edges():
     return _types().get("__ptr_targets__", {})
 
 
+def _bitfields():
+    """{struct: {field: {unit, byte, shift, width}}} --- bitfields, from the BTF catalog.
+
+    Deliberately NOT merged into the scalar map. See gen_type_catalog.py: merging them is what
+    made 15,583 field reads silently wrong.
+    """
+    return _types().get("__bitfields__", {})
+
+
+def _bitfield_refusal(struct, field):
+    """The message for a path that lands on a bitfield --- or None if it is not one.
+
+    Refusing is the whole point. A bitfield at bit 0 passes ls_core_relo.c's byte-alignment
+    check (`bit_off % 8`), so the read SUCCEEDS and returns the containing storage unit with
+    every neighbouring flag in it. A predicate built on that is wrong in a way nothing reports:
+    in enforce mode it either misses the mitigation or fires on traffic it should not.
+    """
+    bf = _bitfields().get(struct, {}).get(field)
+    if not bf:
+        return None
+    return ("'%s.%s' is a BITFIELD (%d bit(s) at bit %d of a %s unit at byte %d) --- refusing "
+            "to read it as a scalar. A plain read returns the whole unit with the flags packed "
+            "beside it, and because this field is byte-aligned the relocator does NOT catch it: "
+            "the read succeeds and the value is silently wrong. Correct support needs clang's "
+            "bitfield relocation kinds (byte size + left/right shift) in ls_core_relo.c. Until "
+            "then, predicate on a non-bitfield field."
+            % (struct, field, bf["width"], bf["shift"], bf["unit"], bf["byte"]))
+
+
 def resolve_path(hook, argidx, parts):
     """Resolve args.a.b.c to a chain of reads.
 
@@ -154,6 +183,11 @@ def resolve_path(hook, argidx, parts):
             if j == len(parts) - 1:
                 ty = _types().get(cur, {}).get(f)
                 if not ty:
+                    # A bitfield is a definite answer, not a "try the next argument" --- raise
+                    # rather than fall through to the generic message.
+                    bfmsg = _bitfield_refusal(cur, f)
+                    if bfmsg:
+                        raise DslError(bfmsg)
                     tried.append("%s has no scalar '%s'" % (cur, f)); ok = False; break
                 hops.append((cur, f, "scalar", CTYPE[ty]))
             else:
@@ -197,6 +231,11 @@ def resolve_value(hook, tok):
                 continue
             if kind == "blob" and struct and name in _types().get(struct, {}):
                 return ("field", struct, i, name, _types()[struct][name])
+        for i, (pn, kind, struct, _d) in enumerate(params):
+            if (n_only is None or i == n_only) and kind == "blob" and struct:
+                bfmsg = _bitfield_refusal(struct, name)
+                if bfmsg:
+                    raise DslError(bfmsg)
         raise DslError("could not resolve '%s' at %s; params: %s" % (
             name, hook, ", ".join("%s(%s)" % (p[0], p[2] or p[1]) for p in params)))
     raise DslError("bad value '%s' (want args.<field> | arg<N>[.<field>] | <struct>(argN).<field>)" % tok)

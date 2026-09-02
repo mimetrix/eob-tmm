@@ -7,7 +7,8 @@ per-build artifacts; this produces the second from the baked BTF.
 
     gen_type_catalog.py <tmm.btf> [out.json]     default out: types.json
 
-Output: { "<struct>": { "<field>": "u8"|"u16"|"u32"|"u64", ... }, ... }
+Output: { "<struct>": { "<field>": "u8"|"u16"|"u32"|"u64", ... }, ...,
+           "__ptr_targets__": {...}, "__bitfields__": {...} }
 Only SCALAR/POINTER fields are kept --- those are what a probe reads and returns.
 Struct/union/array fields are skipped (a nested read is a future path form).
 
@@ -17,7 +18,23 @@ not confuse a brace-counting parser (they did --- the first cut lost every field
 after the first anonymous union). Member type ids are resolved through
 typedef/const/volatile to the underlying INT/PTR/ENUM to get a byte size.
 
-NOTE: bitfield members are not yet emitted (e.g. connflow.mss) --- a known gap.
+BITFIELDS --- read this before trusting a field width. The note that used to sit here
+said bitfield members "are not yet emitted (e.g. connflow.mss) --- a known gap." That was
+wrong, and wrong in the direction that costs the most: measured against this build's BTF,
+1,050 bitfields were absent but **15,583 were emitted as plain scalars**. A consumer reading
+`http_parse_info.is_trailer` as the "u32" this file advertised got the whole 32-bit word with
+~17 packed flags in it, not the one bit. `ls_core_relo.c` cannot catch it either: it refuses a
+sub-byte offset (`bit_off % 8`), so a bitfield at bit 1+ fails loudly, while one at **bit 0
+succeeds silently with a wrong-width read**. For an enforce-mode shield that is a missed
+mitigation or an outage, decided by which flags happen to share the word.
+
+So bitfields are now (a) REMOVED from the flat scalar map, so no consumer can read one by
+accident and the failure is a loud "no scalar 'x'", and (b) described under the reserved key
+`__bitfields__` as {struct: {field: {unit, byte, shift, width}}} for a consumer that handles
+them properly. Emitting them there is NOT the same as supporting them: a correct read also
+needs `ls_core_relo.c` to carry clang's bitfield relocation kinds (byte size + left/right
+shift). Until it does, the metadata here is build-pinned, and a program built on it is valid
+for THIS build only.
 """
 import json
 import re
@@ -32,7 +49,10 @@ def build(btf):
     cur = None
     hdr = re.compile(r"^\[(\d+)\]\s+(\w+)\s+'([^']*)'(.*)$")
     anon = re.compile(r"^\[(\d+)\]\s+(\w+)\s+\(anon\)(.*)$")
-    mem = re.compile(r"^\s+'([^']+)'\s+type_id=(\d+)")
+    # bitfield members carry two extra keys; capture them so a bitfield can be told apart
+    # from a scalar of the same declared type (it cannot be, from type_id alone).
+    mem = re.compile(r"^\s+'([^']+)'\s+type_id=(\d+)"
+                     r"(?:\s+bits_offset=(\d+))?(?:\s+bitfield_size=(\d+))?")
     for ln in raw.splitlines():
         m = hdr.match(ln)
         a = None if m else anon.match(ln)
@@ -52,7 +72,9 @@ def build(btf):
             continue
         mm = mem.match(ln)
         if mm and cur is not None and types[cur]["kind"] in ("STRUCT", "UNION"):
-            types[cur]["members"].append((mm.group(1), int(mm.group(2))))
+            boff = int(mm.group(3)) if mm.group(3) else 0
+            bsz = int(mm.group(4)) if mm.group(4) else 0   # 0 == not a bitfield
+            types[cur]["members"].append((mm.group(1), int(mm.group(2)), boff, bsz))
 
     def size_of(tid, depth=0):
         if tid is None or depth > 12:
@@ -98,12 +120,24 @@ def build(btf):
     W = {1: "u8", 2: "u16", 4: "u32", 8: "u64"}
     cat = {}
     ptrs = {}
+    bits = {}
     for t in types.values():
         if t["kind"] != "STRUCT" or not t["name"]:
             continue
-        fields, edges = {}, {}
-        for fname, ftid in t["members"]:
+        fields, edges, bfs = {}, {}, {}
+        for fname, ftid, boff, bsz in t["members"]:
             s = size_of(ftid)
+            if bsz:
+                # A bitfield. Describe it, but keep it OUT of `fields` --- see the module
+                # docstring: emitting it there is what made 15,583 reads silently wrong.
+                # unit = the declared type's storage unit; byte = that unit's offset;
+                # shift = the field's offset WITHIN the unit (little-endian).
+                if s in W:
+                    unit_bits = s * 8
+                    byte = (boff // unit_bits) * s
+                    bfs[fname] = {"unit": W[s], "byte": byte,
+                                  "shift": boff - byte * 8, "width": bsz}
+                continue
             if s in W:
                 fields[fname] = W[s]
             tgt = ptr_target(ftid)
@@ -114,9 +148,12 @@ def build(btf):
             cat[t["name"]] = fields
         if edges and (t["name"] not in ptrs or len(edges) > len(ptrs[t["name"]])):
             ptrs[t["name"]] = edges
+        if bfs and (t["name"] not in bits or len(bfs) > len(bits[t["name"]])):
+            bits[t["name"]] = bfs
     # pointer edges live under a reserved key so the flat {struct: {field: width}} shape
     # every existing consumer expects is unchanged.
     cat["__ptr_targets__"] = ptrs
+    cat["__bitfields__"] = bits
     return cat
 
 

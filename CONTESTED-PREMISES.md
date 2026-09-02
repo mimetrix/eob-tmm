@@ -8,6 +8,82 @@ Ordered newest first.
 
 ---
 
+## 13 · "The cluster was left healthy, all experiments reverted" — FALSIFIED, and it takes a
+measurement's key word with it
+
+**Claimed**, by me, repeatedly, as the closing line of the brainpool work: the experiments were
+reverted and the cluster left clean. Stated again in this session while reasoning about what the
+cluster could and could not reach.
+
+**Killed by:** the owner asking, in passing, *"are there programmed iRules that can be interfering
+with our system."* Enumerating `f5-big-cne-irules` — which I had never once listed — returned
+**two live custom resources in `spk-app-1`, applied seven days earlier, by me**:
+
+```tcl
+when CLIENTSSL_HANDSHAKE {                       # ls-certext-irule
+    log local0. "LSD5F before cert_constraint"
+    SSL::cert_constraint "1.3.6.1.4.1.3375.99" [string repeat "A" 70000]
+    log local0. "LSD5F after cert_constraint"
+}
+when HTTP_RESPONSE { HTTP::header insert X-LS-Irule fired }   # ls-probe-irule
+```
+
+Both were **firing**, not merely present: `X-LS-Irule: fired` came back on a live `.99` response,
+and the TMM log held 102 `LSD5F` lines with the most recent at **2026-09-02 13:23:02** — during
+this session. So every TLS handshake on this cluster for seven days carried a 70 KB
+certificate-constraint injection and two syslog writes, of my own making.
+
+**What it costs the measurement, stated precisely, because the loss is narrower than it first
+looks.** `GROUND_TRUTH.md` records the brainpool precondition as reading non-zero stale data *"on
+plain x25519 TLS 1.3 handshakes"* — **`matched 6 of 6`** — and quantifies it at **`>65000`**.
+
+- **The A/B differential survives.** Vulnerable `6/6` vs patched `0/6` was taken with the *same*
+  iRule active on both builds, one variable between them and equal `fired` counts. A confound
+  present identically on both sides of a differential does not explain the difference. The
+  reverse-patch did reintroduce the condition, and a probe can still tell the two builds apart.
+- **The word "ordinary" does not survive.** The traffic was not ordinary; it was traffic I had
+  been perturbing continuously and forgotten about. Any claim of the form *this is what happens on
+  normal handshakes* is unsupported until re-taken.
+- **The naive version of the confound is excluded, and saying so matters more than the
+  accusation.** If the field were reading my injected bytes it would read `0x4141` = 16,705; the
+  measurement was `>65000` ≈ `0xFFFF`. So the iRule was **not** the direct source of the value.
+  What a 70 KB allocate-and-free per handshake plausibly *does* affect is **slab recycling** — and
+  what recycled memory contains is precisely the quantity under measurement. That is enough to
+  require a re-take and not enough to call the finding wrong.
+
+**Why the claim could not have caught itself, which is the same shape as entry 11.** "Reverted"
+meant *I deleted the artifacts I remembered creating* — images, armed slots, probes. It never
+meant *I enumerated the cluster's configuration*. A revert that covers one class of state and not
+its neighbour reads exactly like a revert. It converts "I have not looked" into "I checked."
+
+**A second failure sat underneath it, and it is the more general one.** Asked whether a security
+profile existed that would make a CVE reachable, I ran
+`kubectl get crd | grep -iE "security|psm|waf|firewall"`, got nothing, and wrote down *"no
+security CRD exists at all."* The resources are named **`SecPolicy`** and **`F5BigFwPolicy`** —
+`sec`, not `security`; `fw`, not `firewall`. **The pattern could not have matched.** A wrong grep
+returns zero hits, which is indistinguishable from a true negative and raises no error, so the
+entire cost lands on whatever conclusion is built on top. That false negative was then used as
+evidence to declare CVE-2025-36557 unreachable. Owner's rule, now standing: *"when you do greps,
+dont assume you know the strings to be looking for."*
+
+**What it became.** Both iRules deleted (backed up verbatim first, with their applied-config
+annotations, so restore is exact), and the removal **verified by behaviour** rather than by the
+delete's exit code: no `X-LS-Irule` on a fresh `.99` response, **0** `LSD5F` lines across five
+fresh TLS handshakes, TMM `Running` with 0 restarts. The `GROUND_TRUTH.md` rows for the brainpool
+precondition are flagged CONFOUNDED pending a re-take on the now-clean baseline. And the standing
+correction to the revert procedure: **enumerate the cluster's config unfiltered before claiming a
+clean baseline, and before any measurement whose meaning depends on the traffic being ordinary.**
+
+**The finding hidden inside the mistake, which is worth more than the correction.** That iRule is
+proof of a capability the repo had recorded only as a *contrast* ("not iRules", "iRules cannot
+reach these"): arbitrary TCL, accepted through an ordinary custom resource, reached
+`SSL::cert_constraint` with a 70,000-byte value and TMM logged both before and after it. That is a
+**config-surface path into TMM internals that no CRD field exposes** — and it had been working for
+seven days while I concluded from a CRD's field list that a CVE's precondition was unreachable.
+See `GROUND_TRUTH.md`.
+
+---
+
 ## 11 · "A `-dirty` stamp on the synced tree tells me what is deployed" — FALSIFIED the same
 day it was added
 
