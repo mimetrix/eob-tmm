@@ -10,7 +10,8 @@ admission gate a hand-written surface goes through. Everything downstream
 GRAMMAR
     <probe> [ '/' <pred> '/' ] '{' <action> '}'
     <probe>  := ('fentry'|'fexit') '/' <hook>
-    <pred>   := <value> <op> <int>              # op: == != < > <= >=   (gates count())
+    <pred>   := <term> [ ('&&'|'||') <term> ]*  # all && or all || --- never mixed
+    <term>   := <value> <op> <int>              # op: == != < > <= >=   (gates count())
     <action> := 'count' | 'count()'             # -> SAFE_RETURN on match; host safe_returns
               | 'hist' '(' <value> ')'          # -> returns the value; tmmtrace buckets it
               | 'shield' '(' <safe value> ')'   # ENFORCE: MATCH -> SAFE_RETURN, host skips the
@@ -272,14 +273,38 @@ def codegen(expr):
         k += 1
         return ex
 
-    # optional predicate gates a count()
+    # Optional predicate, one or more terms joined by && or ||.
+    #
+    # WHY CONJUNCTION IS NOT A LUXURY. A real vulnerability is usually the CONJUNCTION of a
+    # state and a value, and predicating on only one half is not a weaker shield --- it is a
+    # different, wrong one. Measured case (2026-09-02): the brainpool CVE's stale size reads
+    # ~65535 on EVERY TLS connection, not only brainpool ones, so a size-only predicate at
+    # ssl_hs_compute_key would SAFE_RETURN on all TLS traffic. That is an outage, not a
+    # mitigation. The correct predicate is "negotiated curve is brainpool AND size implausible".
+    #
+    # && and || are never MIXED in one predicate --- mixing them means the reader has to know
+    # this tool's precedence, and a misread predicate on an enforce shield takes traffic down.
+    # Refuse instead, and say so.
     cond = None
     if pred:
-        pm = _PRED.match(pred)
-        if not pm:
-            raise DslError("predicate must be  <value> <op> <int>")
-        lhs, op, rhs = pm.group(1).strip(), pm.group(2), pm.group(3)
-        cond = "%s %s %s" % (take(lhs), op, rhs)
+        has_and, has_or = "&&" in pred, "||" in pred
+        if has_and and has_or:
+            raise DslError("predicate mixes '&&' and '||'; precedence is deliberately not "
+                           "guessed here --- use one or the other, or split into two probes")
+        join = "||" if has_or else "&&"
+        terms = [t.strip() for t in re.split(r"\|\||&&", pred) if t.strip()]
+        if not terms:
+            raise DslError("empty predicate")
+        parts = []
+        for t in terms:
+            pm = _PRED.match(t)
+            if not pm:
+                raise DslError("predicate term must be  <value> <op> <int>  (got %r)" % t)
+            lhs, op, rhs = pm.group(1).strip(), pm.group(2), pm.group(3)
+            parts.append("%s %s %s" % (take(lhs), op, rhs))
+        # Reads for every term are emitted before the test, so a term whose read fails
+        # declines the whole predicate --- conservative, and never a dereference.
+        cond = (" %s " % join).join("(%s)" % x for x in parts) if len(parts) > 1 else parts[0]
 
     is_shield = bool(_SHIELD.match(action))
     if _COUNT.match(action) or is_shield:
