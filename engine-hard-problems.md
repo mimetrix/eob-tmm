@@ -585,6 +585,46 @@ none needs to be reachable from the data path, and each one that is becomes reco
   deletes both the ELF/BTF *parser* and the embedded `.BTF` *disclosure* from the data plane, leaving a
   loader that only verifies a signature and copies instructions.
 
+### Status and stated intent (2026-09-02)
+
+This is **intent, not built** — recorded so the plan is reviewable before anyone writes it, and so nobody
+reads the two items already done as the whole job.
+
+| item | state |
+|---|---|
+| Debug symbols out of the shipped image | **done.** `env/scripts/bnk-strip-debug.sh` removes `tmm64.debug` (76 MB) after checking the entrypoint does not resolve to it. Bonus finding: `tmm64.no_pgo`, the binary that actually runs, is **already stripped** — the whole symbol exposure was that one extra file |
+| Address-bearing hook map off the appliance | **already true.** It lives in the toolbox pod; TMM resolves its own pads by symbol at arm time |
+| Embedded `.BTF` (full type layout) | **present, and load-bearing.** CO-RE relocation runs on-box and reads it from `/proc/self/exe` |
+| ELF + `.BTF.ext` parsing on the data path | **present.** `ubpf_load_elf` + `ls_core_relo`, behind signature verification |
+
+**What we intend to do, and why it is one move.** Relocation is a *build-time* fact — it maps field names
+to byte offsets for one build — and the signing service already holds that build's types. Moving it there:
+
+1. the sign service parses the ELF and `.BTF`/`.BTF.ext`, resolves every field (**including multi-hop
+   chains**), and emits **raw, offset-patched bytecode**;
+2. it signs *that*, so the binding commits to the final instruction bytes;
+3. TMM verifies the signature, copies a fixed-format instruction array, and JITs. `ubpf_load_elf` and
+   `ls_core_relo` **leave the appliance**;
+4. the embedded `.BTF` then has **no on-box consumer**, so packaging strips it and the type-layout
+   disclosure goes with it.
+
+**Why the trade got better, not worse, this week.** Multi-hop field access (2026-09-02) means a chain is
+now **three struct lookups resolved on-box per predicate**, so the relocator does *more* work in the data
+plane than it did, and each lookup is another chance to hit the forward-declaration bug that produced
+`rc=-5`. Sign-time relocation removes all of it at once — the parser, the disclosure, *and* a class of
+loader bug — and it moves the forward-decl fix into an environment where it is cheap to debug and cannot
+be attacked.
+
+**The cost, stated plainly.** Programs become **build-pinned**: relocated for one build, re-signed per
+build. That is already the binding model (`build_min`/`build_max` + `prog_sha256` in `shield_abi.h`), and
+for a signed enterprise artifact it is *tighter*, not looser — what is lost is "one portable CO-RE object
+runs on any build," which is not a property this deployment wanted.
+
+**Sequencing.** Nothing above blocks capability work; it is a hardening move whose value is realised at
+productisation, and it wants the TMA (§4) alongside it. The one thing not to do is ship the *product* with
+on-box relocation and call the disclosure acceptable because it is behind a signature — a signature bounds
+*who* can reach the parser, not what the binary reveals to anyone who obtains it.
+
 ### Padding scope, and reaching inlined code
 
 The pad is a *safety property*, not a target list — but **how many** functions carry one is a design knob
