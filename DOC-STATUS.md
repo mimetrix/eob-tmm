@@ -50,6 +50,8 @@ construction, kept that way on purpose, and carrying its own dated accuracy note
 
 | document | covers |
 |---|---|
+| [`cve-41414-demonstration.md`](cve-41414-demonstration.md) | **current — the evidence record.** CVE-2025-41414 crashed by one client request and prevented by a selective shield (2026-09-03). Read this before any claim about CVE mitigation; it supersedes every "no CVE has been mitigated" line elsewhere |
+| [`cve-to-shield-process.md`](cve-to-shield-process.md) | **current — procedure.** The nine steps from a CVE description to a verified shield, which two actually kill attempts, and the v0→v1→v2 predicate derivation. Read with the demonstration record |
 | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) | The entry point. Mechanism, results with evidence, limits, ranked extensions |
 | [`vm-capability-inventory.md`](vm-capability-inventory.md) | Hook types, context shapes and the measured 96-byte ceiling, maps, helpers, verdicts, egress, admission gates |
 | [`ebpf-requests-capability-map.md`](ebpf-requests-capability-map.md) | Attack-surface reduction, threat observability, defence in depth — what fits and what does not |
@@ -153,3 +155,15 @@ Documents were deleted in a cleanup: superseded planning (`*-plan`, `hook-point-
 **Correction (2026-08-26).** Two docs were **over-deleted** in that pass and have been restored: `development-scope.md` (the canonical "what F5 builds, item by item" scope — cited ~30× across the design docs by `item N`) was not obsolete. Its per-item code-skeleton companion `development-scope-code.md` **is** retired — the real substrate sources supersede the illustrative sketches — along with its `check_skeletons.py` checker, the `check-skeletons` make target, and the orphaned `platform_stub.h`. `make check` no longer runs a skeletons target.
 
 **Also restored (2026-08-27):** `substrate/example_hook_ctx.h` — a `check-offsets` oracle (declarations only, never compiled into TMM), over-deleted in the bespoke-ctx retirement; its removal had silently broken `make check-offsets`, now green again. And **`TMM-TREE-DELTA.md` was (re)created** — the symbol-level record of the substrate's filelist/whitelist/flag delta that `substrate/.tree-expected-delta` points at; it was referenced but absent from the repo.
+
+## Published artifacts diverge from the repo (2026-09-03)
+
+`explainers/cve-mitigation.html` and `presentations/cve-mitigation-demo.html` were written when the
+CVE story was **injected-condition only**. They therefore understate the result: a named CVE is now
+crashed by traffic and prevented by a selective shield. `explainers/engine-hard-problems.html` and
+`explainers/programmable-dataplane-engine.html` carried a *"No CVE has been mitigated on live
+traffic"* line and have been corrected in-repo.
+
+**Anything already published as a claude.ai Artifact still shows the old text** — editing the repo
+file does not change a published page, and republishing needs the owner's explicit per-item approval
+(convention 1). Treat the hosted copies as stale until that approval is given.

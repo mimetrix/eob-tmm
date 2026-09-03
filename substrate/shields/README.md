@@ -14,8 +14,12 @@ each — which is what makes them useful as gate tests.
 > - `reject_memory.bpf.c` and `reject_termination.bpf.c` are still exactly what they were: programs
 >   that must **fail** verification, and never run anywhere.
 >
-> Still true, and the limit that matters: **no CVE has been mitigated on live traffic.** The shield's
-> decision has only ever been exercised on a synthetic input.
+> **Updated 2026-09-03 — this no longer holds.** A named CVE **has** been mitigated on live traffic:
+> CVE-2025-41414, crashed by one client request and prevented by a selective shield (10/10 on the
+> known-positive, 0/10 false positives, 0 restarts) — `cve-41414-demonstration.md`. The shield's
+> decision is no longer exercised only on synthetic input. The limits that replace this one: the
+> predicate is an over-approximation of the true condition, and it was demonstrated on a
+> CNF-flavoured profile rather than the Gateway path.
 
 What the set demonstrates is that the *authoring chain* is real end to end, and that the verifier's
 gates fire in both directions — a rejection program that starts passing is the dangerous direction,

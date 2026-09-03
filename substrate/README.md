@@ -12,8 +12,9 @@ other line in this file:
 
 **This repo is still not self-contained.** `make check` exercises bench harnesses, not a data
 plane; reproducing the live results needs the TMM build tree and the cluster. And two limits stand
-throughout: **no CVE has been mitigated on live traffic**, and the **per-call cost of an armed hook
-is unmeasured**.
+throughout: **per-call cost of an armed hook is unmeasured**. (The companion claim that *no CVE has
+been mitigated on live traffic* was **falsified 2026-09-03** — CVE-2025-41414 is crashed by traffic
+and prevented by a selective shield; see `cve-41414-demonstration.md`.)
 
 ## Compiled into TMM
 

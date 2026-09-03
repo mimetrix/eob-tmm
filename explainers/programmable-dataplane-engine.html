@@ -371,7 +371,7 @@
       and unsigned, re-signed and altered programs are refused. The <b>hook index</b> is generated per
       build, so a hook is named rather than addressed, and arming is refused when the index and the
       running binary disagree.</p>
-      <p><b>Still genuinely unproven, and conditional throughout.</b> <b>No CVE has been mitigated on live
+      <p><b>Updated 2026-09-03 &mdash; a named CVE HAS now been mitigated on live traffic</b> (CVE-2025-41414: crashed by one client request, prevented by a selective shield, 10/10 on the known-positive with 0/10 false positives). The sentence that follows is kept as the record of what was true when this page was written. <b>No CVE had been mitigated on live
       traffic</b> <b>Demonstrated 2026-08-24, with the condition synthesised:</b> given the vulnerable input, an
       armed shield in enforce mode returns <code>SAFE_RETURN</code> and TMM survives; in monitor mode
       it falls through and the same binary dies on the dereference. Real signed program, real VM,

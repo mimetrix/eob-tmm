@@ -49,8 +49,12 @@
 >    have been corrected. Where "designed-in" refers to **USDT tracepoints**, it is still accurate and
 >    is left alone.
 >
-> Still not shown: **no CVE has been mitigated on live traffic**, and **per-call hook cost is
-> unmeasured** — see `load-path-scope.md` §7 for what was and was not established.
+> **Updated 2026-09-03 — the first half of this no longer holds.** A named CVE **has** now been
+> mitigated on live traffic: CVE-2025-41414 crashed by one client request and prevented by a
+> selective shield (`cve-41414-demonstration.md`). What remains: the predicate is an
+> over-approximation of the true condition, the demonstration ran on a CNF-flavoured profile rather
+> than the Gateway path, and **per-call hook cost is still unmeasured** — see `load-path-scope.md`
+> §7 for what was and was not established.
 **Audience:** TMOS (BIG-IP's operating system) architecture, F5 SIRT (Security Incident Response Team), BIG-IP security engineering
 **Scope:** On-box, vendor-authored runtime shields for TMOS's *own* control-plane and data-plane code paths
 **Companion:** `embedded-ebpf-substrate.md` (the broader substrate, programmability-spectrum, hook-point catalog & security model — its CVE shield is the first consumer) · `explainers/cve-shield-walkthrough.html` (the worked CVE example, end to end) · `development-scope.md` (build/reuse scoping) · `substrate/` (**candidate ABI (application binary interface) artifacts + their checkers** — shield ABI header, hook-map schema and example map, budget/offset/gate checks; **not a running prototype** — no shield executes anywhere in this repo)

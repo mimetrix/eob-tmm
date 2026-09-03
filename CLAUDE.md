@@ -28,15 +28,26 @@ That is not licence to claim more than was shown. Three lines still hold:
   `FALLTHROUGH` → `Fault address: 0`, **segfault, core dumped**) — and **enforce on live traffic**,
   blocking a targeted request while normal traffic stayed 200, with exact counters, an
   `"mode":"enforce"` evidence record and a clean disarm. **The limit that replaces the old one:** the
-  crash condition is **injected** (`LS_VM_SELFTEST` builds the ctx directly), not carried by a client
-  request — which is the same method the dev teams use for a fix when a path is hard to reach through
-  configuration (`src/test/standalone`; no in-tree functional HTTP/SSL suite exists and no
-  `[EMBARGO]` fix ships a repro). So **no *named CVE* has been mitigated by traffic**, and the reason
-  is now known precisely and is *not* the mechanism: the engineering side finished with predicate
-  conjunction, and what remains is **listener configuration** — every route to a Brainpool-capable
-  listener is closed or costed in `cve-mitigation-milestone.md` §4B/§4C. The older reason given here
-  for `prot_transfer_log_profile` was also incomplete: besides having no CRD, it has **no symbol at
-  `-O2`** — the compiler inlined it away, so there is no pad to arm.
+  crash condition WAS **injected** — and as of 2026-09-03 it no longer is. **CVE-2025-41414 is now
+  crashed by a single client request and prevented by a selective, PREVAIL-verified shield**
+  (`cve-41414-demonstration.md`): `SIGSEGV`/`CR2=0x13` in `http2_http_data_to_frames.cold`
+  reproduced twice, then `end_stream==1 && push==0 && status_code!=0` armed enforce → 10/10 on the
+  known-positive, **0/10 false positives**, 0 restarts. **The three limits that replace the old
+  one:** (a) the predicate is a deliberate *over-approximation* — it matches a bodyless response
+  framing, while the true condition is a trailer whose serialised header block is empty, a local
+  (`xb.len`) invisible at an entry hook — so `0/10` is measured, not proven-zero; (b) it was
+  demonstrated on a **CNF-flavoured profile**, not on `bnk-core`'s Gateway path, which still cannot
+  express server-side HTTP/2; (c) per-call cost on the data path remains unmeasured. The older
+  wording here read that the crash condition was not carried by a client request, and that
+  injection was the same method the dev teams use when a path is hard to reach
+  through configuration. Two further claims in this bullet were **also falsified** and are corrected
+  rather than dropped: *"no `[EMBARGO]` fix ships a repro"* — two do, and the repro is what supplied
+  the trigger vector (`81d3428d3d`, `23f4f689aa`); and the reason a CVE could not be reached was
+  attributed to **listener configuration** with Brainpool as the blocked route. The real reason was
+  broader and is now stated as a rule: **exposure = fix absent × code compiled/licensed in ×
+  precondition reachable in the deployed configuration.** Six candidates were blocked by the third
+  term, never by the mechanism — see `cve-to-shield-process.md` §4. Brainpool specifically is
+  unreachable because no TLS curve knob exists, not because a listener was mis-declared.
 - **Per-call hook cost is unmeasured.** The counter mean is dominated by preemption artifacts and the
   bench op is FIXED as of 2026-08-19 — handed to a TMM thread like a load, and now timing the
   JIT rather than the interpreter it used to measure. So a FLOOR exists: a simple program executes in ≤ 11 ns on the JIT path (min 26–28 cycles at 2.60 GHz, build e8e854ad), bounded by the rdtsc pair that measures it rather than by the program.

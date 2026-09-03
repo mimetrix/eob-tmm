@@ -68,3 +68,7 @@ hook-index.tsv
 .env
 .env.*
 *.env
+
+# build artifacts from `make -C substrate check`
+substrate/.glue.out
+substrate/check_tp_ring

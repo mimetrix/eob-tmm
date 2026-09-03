@@ -33,8 +33,10 @@
 > a different claim from a reachable attack path being closed. See
 > `../cve-selftest.md` for exactly where the boundary sits.
 >
-> Still genuinely unproven and must stay conditional: **no CVE has been mitigated on live traffic**,
-> and the **per-call cost of an armed hook on the data path is unmeasured**. A floor is now measured
+> **Falsified 2026-09-03:** a named CVE **has** now been mitigated on live traffic (CVE-2025-41414 —
+> `cve-41414-demonstration.md`), so the explainer pages below understate the result and are noted as
+> diverged. Still genuinely unproven and must stay conditional: the
+> **per-call cost of an armed hook on the data path is unmeasured**. A floor is now measured
 > — ≤ 11 ns for a small program on the compiled path — and it is bounded by the timer rather than by
 > the program, so it excludes the trampoline, the call and return, and cache effects under traffic.
 > Quote it as a floor and nothing as a per-packet cost (`../load-path-scope.md` §7).
