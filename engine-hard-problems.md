@@ -696,6 +696,50 @@ The one-line rule: **enforce needs a boundary (`noinline` if the target is inlin
 inlining (source probe points).** And the pad, in every case, is the dead space that keeps arming from
 rewriting live instructions — that requirement never goes away.
 
+## 4.2 Is this a live-patching mechanism? Half of it is, and the boundary is a choice
+
+Asked directly: *can this run a live patch of code?* The honest answer separates two halves that get
+conflated, because the answer differs for each.
+
+**The attach half already is one.** Rewriting a five-byte NOP pad at a function's entry to jump
+elsewhere is the same primitive the kernel's livepatch and kpatch use. We do the frightening part
+today: redirect a live function's entry while traffic flows, no restart, and reverse it byte-for-byte
+on disarm. If the goal were to redirect a function to a *replacement implementation*, the arming
+mechanism would not have to change at all. Nothing about the hard part of live patching is missing.
+
+**The payload half deliberately is not.** Three things stop it, and only the third is fundamental:
+
+1. **The program cannot write.** It reads a *copy* of the context through `bpf_probe_read`; it has no
+   path to mutate TMM memory. A bug whose fix is *"initialise this field"* can be failed closed, not
+   fixed.
+2. **The verdict model is binary and the return is narrow.** Fall through, or return a safe scalar in
+   `rax`. A function that fills an out-parameter, or returns a struct by value, cannot be satisfied
+   by a verdict.
+3. **The verifier is the point, and it is in direct tension with this.** A genuine replacement body
+   needs arbitrary code — unbounded loops, allocation, arbitrary helpers. That is precisely what
+   PREVAIL refuses. *"Proven memory-safe and terminating before it loads"* and *"arbitrary C"* cannot
+   both be true. This is not an implementation gap; it is the trade the whole design is built on.
+
+**CVE-2025-41414 shows the ceiling exactly.** Its real fix is *"if `frame` is NULL, allocate an empty
+DATA frame and set END_STREAM"* — which needs **allocation, in the poll loop, with failure
+handling**. The shield cannot do that, so it takes the existing failure route instead: return a
+non-OK `err_t`, and the caller releases that one stream. That is why the demonstrated mitigation is
+*fail closed*, not *repair* — and why the failure mode is one degraded stream rather than a lost
+process. See `cve-41414-demonstration.md`.
+
+**The middle path, which is the interesting design and is not yet explored.** Between a read-only
+predicate and an arbitrary replacement body sits **verified writes to a declared, bounded field
+set**: a program that states up front *"I will write only `ci.http.status_code`, a `u32`, once"*, and
+the verifier proves it writes nothing else, in bounds. That covers a real class of defects — missing
+initialisation, an unclamped length — while keeping a meaningful safety property instead of trading
+it away.
+
+**Why it is not day-one, stated as risk rather than preference.** It converts a read-only predicate
+into a mutation primitive inside a live data plane. §4 already argues that verifier soundness is a
+remote-code-execution surface when the program is read-only; a program that may *write* raises that
+from *"an unsound verifier leaks a read"* to *"an unsound verifier corrupts TMM state"*. It needs its
+own threat-model analysis before a line is written, and the TMA is the gate, not a formality.
+
 ## 5. Further TMM-specific concerns
 
 **Read this list with its severity in mind, because thirteen equal-looking bullets overstate the risk.**
