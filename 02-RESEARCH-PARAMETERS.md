@@ -300,10 +300,42 @@ bump — `SHIELD_BINDING_WIRE_MAX` is 128 and `16 + 112` is exactly 128, so the 
   begin reading neighbouring bits and PREVAIL, the signature and the arming gate all stay silent —
   the `gen_type_catalog.py` failure family. The screen for it is now part of the check.
 
-**Still open:** falsifier 1 (a program signed for build A must not load on build B) needs the
-enforcement that `CONTESTED-PREMISES.md` §15 shows is absent; falsifier 3 (PREVAIL on the relocated
-object) needs a clang+PREVAIL run on the relocated output, which the two-stage split makes awkward
-today; falsifier 4 needs the bake change itself.
+**Falsifier 1 — DISCHARGED (2026-09-04).** The enforcement §15 showed was absent now exists and is
+measured: `ls_build_gate.h`, 20 assertions off-TMM, and **9 of 9 on a live deployed TMM** (build
+`a1c314d0`) via `env/scripts/bnk-test-build-gate.sh`. A program asserting a different build is
+refused; the verdict is on the log with both ids. The pipeline additionally **refuses to sign** a
+relocated program that has no build range, which is the coupling that makes baked offsets safe.
+
+**Falsifier 3 — DOES NOT FIRE (2026-09-04).** `substrate/check_prevail_after_relo.sh`: 12 programs,
+**12 unchanged PREVAIL verdicts, 0 changed**, against this build's BTF. Both directions are treated
+as findings — a `PASS → REJECT` would mean the proof relied on the placeholder layout, and a
+`REJECT → PASS` would mean a `reject_*` negative test had stopped testing anything. `reject_memory`
+stays REJECT. **Scope:** run where PREVAIL and clang live, which *is* the pipeline's verification
+stage — but that clang is 14 and the build box is 18, and that difference has flipped a PREVAIL
+verdict before. Authoritative for this stage, not for the build box.
+
+**Falsifier 4 — HALF DISCHARGED, and the remaining half is deliberate.** The measurable half is done:
+`bnk-build-programs.sh` now runs **compile → relocate → strip → PREVAIL → sign**, and all **11
+emitted artifacts carry 0 `.BTF` sections** (verified with `readelf` and the `--has-relos` probe,
+~28% smaller); 7 of them had offsets resolved and baked. `bnk-bake-tools.sh` gained
+**`LS_EMBED_BTF=0`**, which ships a binary with no type information.
+
+**What is NOT done, and why it is a decision rather than a gap.** `LS_EMBED_BTF` still defaults to
+**1**, so the deployed ELF still carries **6,711,805 bytes** of `.BTF` — measured on the running pod,
+not assumed. The default has not been flipped because **this stage bakes no bytecode by design**, so
+it cannot verify that the programs about to ship are stripped; flipping it would break any artifact
+built without `TMM_BTF` set, and break it at **arm time on the cluster** rather than at build time.
+Given this project's record of green builds shipping stale artifacts, the sequence is: bake once with
+`LS_EMBED_BTF=0`, deploy, **arm a shield**, and only then change the default.
+
+**So the claim to make today is bounded:** the mechanism to remove the disclosure exists, is measured
+off-cluster, and is one deliberate flag away. It has **not** been shown to arm on a BTF-less binary.
+
+**One caveat that survives all of the above.** The strip needs `llvm-objcopy`; GNU `objcopy` cannot
+read a BPF ELF and fails in the way that matters least visibly — an unstripped program still loads
+and verifies perfectly, so the only casualty is the disclosure the strip exists to remove. The
+pipeline resolves the tool up front and **re-reads the object** to confirm the sections are gone
+rather than trusting an exit code.
 
 ---
 
