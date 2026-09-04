@@ -147,18 +147,32 @@ esac
 
 echo
 echo "=== 6. THE KILL SWITCH IS NOT GATED --- status and disarm answer regardless"
+# ASSERT A REAL LOADER REPLY, NOT MERELY THE ABSENCE OF A REFUSAL.
+#
+# The first version of this case ran `ls-load.py status` with no slot argument and
+# matched anything that did not say "build gate". The client refused it locally --
+# "*** status takes 1 argument, got 0" -- so the case passed GREEN without a byte
+# ever reaching the loader. A vacuous pass on the one case that exists to prove the
+# kill switch is reachable is worse than no case at all.
+#
+# So both halves now require the loader's own wording: `OK armed=` for status, and
+# for disarm either a real disarm or the loader's "not armed" -- both of which are
+# answers from past the gate. A client-side usage error no longer satisfies either.
 S=$(kubectl exec "$POD" -c f5-tmm -- env LS_LOAD_SOCKET="$SOCK" \
-      python3 /usr/bin/ls-load.py status 2>&1 | head -3 | tr '\n' ' ')
+      python3 /usr/bin/ls-load.py status 0 2>&1 | head -3 | tr '\n' ' ')
 case "$S" in
-  *"build gate"*) bad "STATUS was refused by the build gate --- it must not be gated" "$S" ;;
-  "")             bad "STATUS returned nothing" ;;
-  *)              ok "status answers: $(echo "$S" | cut -c1-60)" ;;
+  *"build gate"*)  bad "STATUS was refused by the build gate --- it must not be gated" "$S" ;;
+  *"OK armed="*)   ok "status answers FROM THE LOADER: $(echo "$S" | cut -c1-52)" ;;
+  *"takes 1 arg"*) bad "the client refused this locally --- nothing reached the loader, so this case proved nothing" "$S" ;;
+  "")              bad "STATUS returned nothing" ;;
+  *)               bad "no recognisable loader status reply" "$S" ;;
 esac
 D=$(kubectl exec "$POD" -c f5-tmm -- env LS_LOAD_SOCKET="$SOCK" \
       python3 /usr/bin/ls-load.py disarm http_parse_client_headers 2>&1 | tail -1)
 case "$D" in
-  *"build gate"*) bad "DISARM was refused by the build gate --- the kill switch must never be gated" "$D" ;;
-  *)              ok "disarm answers (armed or not, it is not gate-refused)" ;;
+  *"build gate"*)             bad "DISARM was refused by the build gate --- the kill switch must never be gated" "$D" ;;
+  *"DISARMED"*|*"not armed"*) ok "disarm reaches the loader and it answers: $(echo "$D" | cut -c1-52)" ;;
+  *)                          bad "no recognisable loader disarm reply --- did it reach the loader at all?" "$D" ;;
 esac
 
 echo

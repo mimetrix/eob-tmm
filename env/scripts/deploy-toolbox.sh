@@ -32,7 +32,11 @@ echo "  shipped ($(du -h /tmp/tmmtrace-toolbox.tar | cut -f1))"
 echo "== 3. import per node + secret + deploy =="
 ssh -i "$KEY" -o StrictHostKeyChecking=no starin@"$DK" '
   set -e
-  for n in $(docker ps --format "{{.Names}}" | grep datkube); do
+  # Nodes of the cluster kubectl POINTS AT. This used to be `grep datkube` and this
+  # host runs two kind clusters (datkube, vs); importing into the wrong one reports
+  # success and the pod then sits in ErrImageNeverPull. See bnk-ship-image.sh.
+  for n in $(kind get nodes --name "$(kubectl config current-context 2>/dev/null | sed 's/^kind-//')" 2>/dev/null \
+             || docker ps --format "{{.Names}} {{.Image}}" | awk '/kindest\/node/ {print $1}'); do
     printf "  import into %s ... " "$n"
     docker exec -i "$n" ctr -n k8s.io images import - < /tmp/tmmtrace-toolbox.tar >/dev/null && echo ok
   done

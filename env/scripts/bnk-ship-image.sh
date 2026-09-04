@@ -30,6 +30,35 @@ set -e
 MODE="${1:-verify}"
 TAG="${2:-tmm:local}"
 
+# THE NODES OF THE CLUSTER kubectl IS ACTUALLY POINTED AT --- not a name we guessed.
+#
+# THE BUG THIS EXISTS FOR, 2026-09-04. Every node loop here read
+#     docker ps --format '{{.Names}}' | grep datkube
+# and this host runs TWO kind clusters: `datkube` and `vs`. kubectl was pointed at
+# kind-vs, where the f5-tmm deployment actually runs. So the import loop visited
+# datkube-worker and datkube-control-plane, reported "imported" for both, step 1
+# reported "present" for both, and the rollout then sat in ErrImageNeverPull ---
+# because the nodes that needed the image, vs-worker and vs-control-plane, were
+# never in the list. A green check that looked at the wrong cluster.
+#
+# Same shape as the guessed grep strings that missed SecPolicy and the sync
+# wrapper that filtered away its own findings: the filter was written from what
+# the author expected to be there. Derive it instead.
+kind_nodes() {
+    _ctx=$(kubectl config current-context 2>/dev/null)
+    _cl=${_ctx#kind-}
+    if [ -n "$_cl" ] && kind get nodes --name "$_cl" 2>/dev/null | grep -q .; then
+        kind get nodes --name "$_cl" 2>/dev/null
+        return
+    fi
+    # No kind, or a non-kind context: fall back to every kindest/node container and
+    # SAY SO, rather than silently narrowing to one cluster's name.
+    echo "  (cannot derive the cluster from kubectl context '${_ctx:-none}';" >&2
+    echo "   using every kindest/node container instead)" >&2
+    docker ps --format '{{.Names}} {{.Image}}' | awk '/kindest\/node/ {print $1}'
+}
+
+
 case "$MODE" in
 verify)
     docker image inspect "$TAG" >/dev/null 2>&1 || {
@@ -132,7 +161,7 @@ deploy)
     # disagrees is fatal.
     HERE_D=$(cd "$(dirname "$0")" && pwd)
     if [ -f "${RECEIPT:-$HOME/lstools/pipeline-receipt}" ]; then
-        for n in $(docker ps --format '{{.Names}}' | grep datkube | head -1); do
+        for n in $(kind_nodes | head -1); do
             IMGID=$(docker exec "$n" ctr -n k8s.io images ls -q 2>/dev/null | grep -c "$TAG" || true)
             [ "$IMGID" -gt 0 ] || echo "  (image not yet in $n --- import first)"
         done
@@ -147,7 +176,7 @@ deploy)
 
     echo "=== 1. is the image in every kind node's containerd?"
     missing=0
-    for node in $(docker ps --format '{{.Names}}' | grep datkube); do
+    for node in $(kind_nodes); do
         printf "  %-26s " "$node"
         if docker exec "$node" ctr -n k8s.io images ls -q 2>/dev/null | grep -q "$TAG"; then
             echo "present"
@@ -160,7 +189,7 @@ deploy)
         echo
         echo "*** $missing node(s) lack the image. Import into EACH, or those nodes'"
         echo "    pods will never start:"
-        echo "      for n in \$(docker ps --format '{{.Names}}' | grep datkube); do"
+        echo "      for n in \$(kind get nodes --name \$(kubectl config current-context | sed s/^kind-//)); do"
         echo "        docker exec -i \$n ctr -n k8s.io images import - < /tmp/$TAG.tar"
         echo "      done"
         exit 1
