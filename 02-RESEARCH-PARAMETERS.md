@@ -335,8 +335,18 @@ built without `TMM_BTF` set, and break it at **arm time on the cluster** rather 
 Given this project's record of green builds shipping stale artifacts, the sequence is: bake once with
 `LS_EMBED_BTF=0`, deploy, **arm a shield**, and only then change the default.
 
-**So the claim to make today is bounded:** the mechanism to remove the disclosure exists, is measured
-off-cluster, and is one deliberate flag away. It has **not** been shown to arm on a BTF-less binary.
+**Falsifier 4 — FULLY DISCHARGED, on the cluster (2026-09-04).** `env/scripts/bnk-test-btfless.sh`,
+**6 of 6**, build `1824611c`, image `tmm:NOBTF-CVE-2025-41414-DEMO-ONLY`. The running binary's section
+headers, read inside the pod, hold **0 bytes** of `.BTF`. A stripped, relocated, signed program loads,
+arms and **runs** — `fired 145,850 → 211,836 in 3 s, errors=0`, restarts=0 — carrying a baked offset
+verified to patch `0 → 4`. And the fail-dark half holds: a program still carrying `.BTF.ext` is
+refused with the cause on the log.
+
+**One thing is still NOT shown, and it is a cluster fact rather than a phase 3 one.** No shield has
+fired on an **HTTP** path with a BTF-less binary, because this cluster has no HTTP-parsing traffic
+path up: `ltm-vs-basic` on port 80 is fastL4, so `http_parse_client_headers` is never called (10
+requests returned 200 and moved `fired` by 0), and `h2-vs` on 8080 has no h2-speaking backend.
+`device_poll` was chosen precisely to separate *does the mechanism run* from *is there traffic*.
 
 **One caveat that survives all of the above.** The strip needs `llvm-objcopy`; GNU `objcopy` cannot
 read a BPF ELF and fails in the way that matters least visibly — an unstripped program still loads

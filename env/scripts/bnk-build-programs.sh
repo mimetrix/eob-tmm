@@ -60,9 +60,26 @@ PREVAIL="${PREVAIL:-$REPO/ebpf-verifier/bin/prevail}"
 # embeds its own BTF, which is every binary until the bake stops embedding it. A
 # silent skip is what would be dangerous --- the artifact would look identical and
 # the disclosure would still be required.
+# AUTO-DISCOVERY, ANNOUNCED, WITH AN EXPLICIT OPT-OUT.
+#
+# An empty TMM_BTF falls back to $HOME/lstools/tmm.btf, so on the build box this
+# stage relocates by default --- which is what we want going forward. But that
+# means THE ARTIFACT SHAPE DEPENDS ON WHETHER A FILE EXISTS, and a stage that
+# silently produces a different artifact depending on the filesystem is exactly
+# what this project distrusts. So it is announced below, and TMM_BTF=none turns it
+# off explicitly.
+#
+# TMM_BTF=none is not only a debugging aid: it is how the negative fixture for
+# bnk-test-btfless.sh is built --- a program that still carries .BTF.ext, which a
+# binary with no .BTF must REFUSE rather than run against placeholder offsets.
 TMM_BTF="${TMM_BTF:-}"
-if [ -z "$TMM_BTF" ] && [ -s "$HOME/lstools/tmm.btf" ]; then
+if [ "$TMM_BTF" = none ]; then
+    TMM_BTF=""
+    NO_RELO_REQUESTED=1
+elif [ -z "$TMM_BTF" ] && [ -s "$HOME/lstools/tmm.btf" ]; then
     TMM_BTF="$HOME/lstools/tmm.btf"
+    echo "  NOTE: TMM_BTF was unset; auto-discovered $TMM_BTF."
+    echo "        Programs WILL be relocated and stripped. Pass TMM_BTF=none to disable."
 fi
 
 # llvm-objcopy, NOT objcopy. GNU objcopy cannot read a BPF ELF --- binutils 2.40
@@ -158,8 +175,14 @@ if [ -n "$TMM_BTF" ] && [ -s "$TMM_BTF" ]; then
         echo "  WARN sign-time relocation DISABLED --- ls_core_relo.c did not build here."
     fi
 else
-    echo "  relocate : SKIPPED (no TMM_BTF) --- programs keep .BTF.ext and will be"
-    echo "             relocated ON-BOX, which requires the binary to embed its own .BTF"
+    if [ -n "${NO_RELO_REQUESTED:-}" ]; then
+        echo "  relocate : DISABLED by TMM_BTF=none --- programs keep .BTF.ext and can only"
+        echo "             be loaded by a binary that embeds its own .BTF"
+    else
+        echo "  relocate : SKIPPED (no TMM_BTF and none discoverable) --- programs keep"
+        echo "             .BTF.ext and will be relocated ON-BOX, which requires the binary"
+        echo "             to embed its own .BTF"
+    fi
 fi
 echo
 
