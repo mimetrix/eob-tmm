@@ -79,6 +79,26 @@ except socket.timeout:
 PY
 }
 
+# CASE 0 EXISTS BECAUSE CASES 1-3 EXPECT A REFUSAL, and a refusal from the WRONG
+# gate looks identical. The ctx-abi check sits immediately before the build gate and
+# answers first; this script writes ctx_abi_version = 3 as a literal, so if
+# SHIELD_CTX_ABI_VERSION is ever bumped, every load here is refused for the abi and
+# cases 1-3 keep "passing" for a reason that has nothing to do with the build range.
+# That is a test agreeing with itself, which is the failure this whole file guards.
+# So: prove the abi gate is quiet before trusting any refusal below it.
+echo "=== 0. pre-flight: it is the BUILD gate refusing, not the ctx-abi gate"
+R=$(send 0 0)
+case "$R" in
+  *"ctx abi"*)
+    echo "  *** REFUSED for the ctx ABI, not the build range. This script writes"
+    echo "      ctx_abi_version = 3; SHIELD_CTX_ABI_VERSION has almost certainly moved."
+    echo "      Every refusal below would be the wrong gate. Fix the literal first."
+    echo "      got: $R"
+    exit 2 ;;
+  *) ok "the ctx-abi gate is satisfied, so a refusal below is the build gate" ;;
+esac
+
+echo
 echo "=== 1. a range naming a DIFFERENT build is refused"
 R=$(send 0x11111111 0x11111111)
 case "$R" in
@@ -117,6 +137,8 @@ esac
 
 echo
 echo "=== 5. an UNDECLARED range (0..0) is still accepted --- every client sends it"
+# Same message as case 0; asserted again here as a RESULT rather than a pre-flight,
+# because "the existing client keeps working" is the claim, not a precondition.
 R=$(send 0 0)
 case "$R" in
   *"build gate"*) bad "0..0 was refused --- this breaks ls_client.py, which never sets the field" "$R" ;;
