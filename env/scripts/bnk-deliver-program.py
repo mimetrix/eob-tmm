@@ -35,6 +35,7 @@ Environment: POD (default: every Running f5-tmm pod), KUBECTL (default: kubectl)
 """
 import base64
 import os
+import struct
 import subprocess
 import sys
 
@@ -51,18 +52,35 @@ OFF_CTX_ABI, CTX_ABI_VERSION = 16 + 105, 3
 # binding.build_min / build_max, at binding + 96 / +100 and the binding starts at 16.
 # Asserted against shield_abi.h's static_asserts rather than remembered.
 OFF_BUILD_MIN, OFF_BUILD_MAX = 16 + 96, 16 + 100
+OFF_BINDING, OFF_SIG, BINDING_LEN, SIG_LEN = 16, 128, 112, 64
+SIGBLOB = base64.b64decode("{sig64}")
 OP_LOAD = 1
 b = bytearray(HDR)
 struct.pack_into("<I", b, OFF_OP, OP_LOAD)
 struct.pack_into("<I", b, OFF_EPOCH, {slot})
 struct.pack_into("<I", b, OFF_MODE, {mode})
 struct.pack_into("<I", b, OFF_PROGLEN, len(PROG))
-b[OFF_CTX_ABI] = CTX_ABI_VERSION
-struct.pack_into("<I", b, OFF_BUILD_MIN, {build_min})
-struct.pack_into("<I", b, OFF_BUILD_MAX, {build_max})
-hook = {hook!r}.encode()
-if hook:
-    b[OFF_HOOK:OFF_HOOK + len(hook)] = hook
+if SIGBLOB:
+    # A SIGNED BINDING IS INSTALLED VERBATIM AND NOTHING IN IT IS TOUCHED.
+    #
+    # The .sig file is binding(112) + signature(64), and the signature covers those
+    # 112 bytes exactly. hook, build_min, build_max, ctx_abi_version and
+    # mode_ceiling are all INSIDE it. Writing any of them afterwards -- which the
+    # unsigned path below does, and which the first version of this did
+    # unconditionally -- changes the bytes the signature was taken over and turns a
+    # valid signature into "signature is INVALID for these bytes and this key". The
+    # message points at forgery; the cause is this client.
+    if len(SIGBLOB) != BINDING_LEN + SIG_LEN:
+        sys.exit("signed blob is %d bytes, expected %d" % (len(SIGBLOB), BINDING_LEN + SIG_LEN))
+    b[OFF_BINDING:OFF_BINDING + BINDING_LEN] = SIGBLOB[:BINDING_LEN]
+    b[OFF_SIG:OFF_SIG + SIG_LEN] = SIGBLOB[BINDING_LEN:]
+else:
+    b[OFF_CTX_ABI] = CTX_ABI_VERSION
+    struct.pack_into("<I", b, OFF_BUILD_MIN, {build_min})
+    struct.pack_into("<I", b, OFF_BUILD_MAX, {build_max})
+    hook = {hook!r}.encode()
+    if hook:
+        b[OFF_HOOK:OFF_HOOK + len(hook)] = hook
 # The loader appends the TMM instance number to the socket path.
 cands = sorted(glob.glob("/tmp/ls_load.sock*"))
 if not cands:
@@ -146,6 +164,35 @@ def main():
     # other half --- it asserts a flipped bit in build_min is detected.
     bmin = int(os.environ.get("LS_BUILD_MIN", "0"), 0)
     bmax = int(os.environ.get("LS_BUILD_MAX", "0"), 0)
+
+    # THE SIGNATURE, carried over the socket rather than left on the pod's disk.
+    #
+    # ls-load.py reads <prog>.sig from beside the object, and it runs INSIDE the pod
+    # --- so loading a signed program that way needs both files in the container,
+    # which means an image rebuild or a hand-copy. The hand-copy is the thing this
+    # script exists to avoid. So the signed blob travels in the generated loader,
+    # exactly like the program does, and nothing is written to the pod at any point.
+    #
+    # This is also the production shape rather than a workaround: a control plane
+    # pushes a signed program object over this same socket. Auto-discovered beside
+    # the object; LS_SIG= overrides; LS_SIG=none forces an unsigned request, which is
+    # only useful for testing what the loader does with one.
+    sigp = os.environ.get("LS_SIG")
+    if sigp == "none":
+        sig = b""
+    else:
+        if not sigp:
+            base = path[:-2] if path.endswith(".o") else path
+            for cand in (base + ".sig", path + ".sig"):
+                if os.path.exists(cand):
+                    sigp = cand
+                    break
+        sig = open(sigp, "rb").read() if sigp and os.path.exists(sigp) else b""
+        if not sig:
+            print("  WARN no signature found beside %s --- sending an UNSIGNED request."
+                  % os.path.basename(path))
+            print("       A loader with signature enforcement on will refuse it, and the")
+            print("       reply will not say the signature was MISSING. Pass LS_SIG=<path>.")
     with open(path, "rb") as f:
         prog = f.read()
 
@@ -165,15 +212,26 @@ def main():
             sys.exit("*** no fentry/ section in %s --- cannot derive the hook name, and the\n"
                      "    loader will refuse a load without one." % path)
     script = TEMPLATE.format(b64=base64.b64encode(prog).decode(),
+                             sig64=base64.b64encode(sig).decode(),
                              slot=slot, mode=mode, hook=hook,
                              build_min=bmin, build_max=bmax)
     targets = [os.environ["POD"]] if os.environ.get("POD") else pods()
     if not targets:
         sys.exit("*** no Running f5-tmm pods")
-    print("  %s --- %d bytes, slot %d, mode %d%s, build 0x%08x..0x%08x%s"
-          % (os.path.basename(path), len(prog), slot, mode,
-             ", hook=%s" % hook if hook else ", section from the object",
-             bmin, bmax, "  (UNDECLARED)" if bmin == 0 and bmax == 0 else ""))
+    if sig:
+        # Report the range from the SIGNED binding, not from the environment: the
+        # signed one is what the loader will gate on, and printing the other would
+        # be a plausible-looking lie the moment the two disagree.
+        _mn, _mx = struct.unpack_from("<II", sig, 96)
+        print("  %s --- %d bytes, slot %d, mode %d, SIGNED for build 0x%08x..0x%08x"
+              % (os.path.basename(path), len(prog), slot, mode, _mn, _mx))
+        print("       the signed binding is installed verbatim: hook, build range, ctx"
+              " abi and mode ceiling all come from it, not from this client")
+    else:
+        print("  %s --- %d bytes, slot %d, mode %d%s, build 0x%08x..0x%08x%s  UNSIGNED"
+              % (os.path.basename(path), len(prog), slot, mode,
+                 ", hook=%s" % hook if hook else ", section from the object",
+                 bmin, bmax, "  (UNDECLARED)" if bmin == 0 and bmax == 0 else ""))
     for p in targets:
         r = subprocess.run([KUBECTL, "exec", "-i", p, "-c", "f5-tmm", "--", "python3", "-"],
                            input=script, capture_output=True, text=True)
