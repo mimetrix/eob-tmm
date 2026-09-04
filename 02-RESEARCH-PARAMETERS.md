@@ -273,9 +273,37 @@ add the layout digest, and only then remove the embedded BTF. The middle step ne
 bump — `SHIELD_BINDING_WIRE_MAX` is 128 and `16 + 112` is exactly 128, so the padding trick that got
 `ctx_abi_version` in for free is spent (`shield_abi.h:33-40`).
 
-**Status:** unbuilt. The offline relocator it depends on already exists —
-`ls_core_relo.c:315-341`, behind `-DLS_CORE_RELO_TEST` — so the first falsifier above is checkable
-today, before anything ships.
+**Status (2026-09-04): two of the four falsifiers discharged, on the build box.**
+
+- **Falsifier 2 (offline ≠ on-box) is answered as a PROOF, not a sample.** The `.BTF` section
+  extracted from the binary TMM runs is **byte-identical** to the standalone `tmm.btf` the offline
+  tool reads — `0bd612b31196833c61a23a53d0317b3938ca26d3bd1e140d586456c96c021e37`, 6,711,626 bytes
+  both. Same source file (`src/base/ls_core_relo.c` in TMM, `-DLS_CORE_RELO_TEST` offline), same
+  input bytes, so the two cannot disagree. This also retires the *comparison* as the wrong test:
+  it would have compared `ls_core_relo.c` to itself.
+- **Correctness is therefore checked against an INDEPENDENT implementation instead.**
+  `substrate/check_relo_baked.py` re-implements the whole CO-RE walk in Python — BTF parse, ELF
+  section walk, `.BTF.ext` relocation records, name-based field resolution — and compares its answer
+  to the immediate `ls_core_relo.c` wrote into the object. **8 of 8 relocations agree** across all 8
+  programs in `shields/` + `surfaces/` (`make check-relo-baked TMM_BTF=…`). Reproducibility holds:
+  relocating twice yields byte-identical objects.
+- **The independent implementation's first version was WRONG, and that is the point of having one.**
+  It walked the *target's* member indices; CO-RE resolves by field **name** from the program's own
+  stub. It reported 7 confident mismatches against a C relocator that was right every time. Three
+  stubs declare `{state, version_num}` and one declares `{state, flags, version_num}`, so index 1
+  legitimately names different fields in different programs — index resolution cannot be right for
+  both. Recorded rather than quietly fixed, because a harness that agrees for the wrong reason is
+  worse than no harness.
+- **One live hazard surfaced and is not fatal today:** `http_parse_ctx.state` is an **8-bit
+  bitfield on a byte boundary**, read as a plain scalar by `http_observe` and `trace_stream`. Correct
+  *by alignment only*. If `state` ever narrows, or a bitfield is inserted ahead of it, both programs
+  begin reading neighbouring bits and PREVAIL, the signature and the arming gate all stay silent —
+  the `gen_type_catalog.py` failure family. The screen for it is now part of the check.
+
+**Still open:** falsifier 1 (a program signed for build A must not load on build B) needs the
+enforcement that `CONTESTED-PREMISES.md` §15 shows is absent; falsifier 3 (PREVAIL on the relocated
+object) needs a clang+PREVAIL run on the relocated output, which the two-stage split makes awkward
+today; falsifier 4 needs the bake change itself.
 
 ---
 

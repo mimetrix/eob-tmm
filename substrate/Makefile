@@ -420,6 +420,36 @@ check-audit:
 	  || { ./.audit.out; rm -f .audit.out; exit 1; }
 	@rm -f .audit.out
 
+# P9 (02-RESEARCH-PARAMETERS.md): before the embedded .BTF can be removed, the
+# offsets baked at sign time must be shown correct. This re-implements the CO-RE
+# relocation walk independently in Python and compares it to what ls_core_relo.c
+# actually wrote into the object --- comparing the offline relocator to the on-box
+# one would compare that file to itself.
+#
+# NEEDS THE TARGET BUILD'S BTF, which lives on the build box. Skipped loudly
+# rather than silently on a clone that has none: a skipped check that looks like a
+# pass is how the stale-artifact failures in this tree happened.
+#   make check-relo-baked TMM_BTF=~/lstools/tmm.btf
+TMM_BTF ?=
+check-relo-baked:
+	@if [ -z "$(TMM_BTF)" ] || [ ! -s "$(TMM_BTF)" ]; then \
+	  echo "SKIP check-relo-baked --- no target BTF."; \
+	  echo "     Pass TMM_BTF=<path to this build's tmm.btf> (build box:"; \
+	  echo "     ~/lstools/tmm.btf, produced by env/scripts/bnk-bake-tools.sh)."; \
+	  echo "     This is a SKIP, not a pass: sign-time baking is unverified without it."; \
+	  exit 0; \
+	fi; \
+	set -e; T=$$(mktemp -d); trap 'rm -rf $$T' EXIT; \
+	  cc -O2 -w -DLS_CORE_RELO_TEST ls_core_relo.c -o $$T/relo; \
+	  O=""; for d in shields surfaces; do \
+	    for f in $$d/*.bpf.c; do \
+	      [ -e "$$f" ] || continue; b=$$(basename $$f .bpf.c); \
+	      clang -O2 -g -target bpf -I. -c $$f -o $$T/$$b.bpf.o 2>/dev/null || continue; \
+	      O="$$O $$T/$$b.bpf.o"; \
+	    done; done; \
+	  [ -n "$$O" ] || { echo "*** no program compiled --- nothing to check"; exit 1; }; \
+	  python3 check_relo_baked.py "$(TMM_BTF)" $$O --relo $$T/relo
+
 check-sig:
 	@set -e; T=$$(mktemp -d); trap 'rm -rf $$T' EXIT; \
 	  openssl genpkey -algorithm ed25519 -out $$T/sk.pem 2>/dev/null; \
