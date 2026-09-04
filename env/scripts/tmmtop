@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""tmmtop --- a coherent snapshot of TMM's internals, read from the loader socket.
+
+    tmmtop --once --json                       one snapshot, machine-readable
+    tmmtop --once                              one snapshot, human-readable
+    tmmtop --interval 1 --json                 two samples one second apart -> RATES
+    tmmtop --label 5=loop --label 4=cve_shield  name the columns
+
+WHY THIS IS THE SNAPSHOT LAYER AND NOT THE UI. The interesting logic here is delta arithmetic,
+rate computation and slot->column mapping. None of it needs a terminal, and all of it is worth
+testing, so it lives in a layer with no curses in it. A refreshing UI and a Prometheus exporter
+are both thin consumers of `--json`.
+
+WHY IT MUST RUN INSIDE THE f5-tmm CONTAINER. The loader socket is /tmp/ls_load.sock.<n> in that
+container. Sampling over `kubectl exec` costs 100-300 ms per read, so six columns at a 1 s refresh
+cannot keep up --- and worse, the samples are taken at different instants, which silently corrupts
+every delta computed across them. In-container, a snapshot is a handful of local reads.
+
+WHY IT SHELLS OUT TO ls-load.py RATHER THAN SPEAKING THE PROTOCOL ITSELF. The framing is already
+implemented and tested there, including the socket-name suffix problem (LS_LOAD_SOCKET=/tmp/
+ls_load.sock becomes /tmp/ls_load.sock.24, and connecting to the unsuffixed name fails with ENOENT
+that reads exactly like "the loader is off"). A second parser is a second place to get that wrong
+--- see engine-hard-problems 4.1 on the loader being a second parser. The cost is one fork per
+slot, ~ms locally, which is coherent enough at a 1 s refresh. If that ever stops being true, the
+upgrade is to import ls-load.py as a module, not to re-implement it.
+
+WHAT IT DOES NOT KNOW. `status` returns counters, NOT which hook a slot is armed at. So a column's
+MEANING cannot be discovered --- it has to be declared with --label. That is stated rather than
+guessed: an unlabelled slot is reported as its number, never as an assumption about what is in it.
+"""
+import argparse, json, os, shutil, subprocess, sys, time
+
+FIELDS = ("armed", "mode", "gen", "fired", "safe_returns", "errors",
+          "cycles", "cycles_max", "cycles_min")
+# Counters that accumulate, so a delta between samples is meaningful. `cycles_min`/`cycles_max`
+# are envelopes, not accumulators --- differencing them would be nonsense, so they are reported
+# as observed values and excluded from the rate table.
+COUNTERS = ("fired", "safe_returns", "errors", "cycles")
+
+
+def find_loader():
+    for c in ("/usr/bin/ls-load.py", "ls-load.py"):
+        p = shutil.which(c) or (c if os.path.exists(c) else None)
+        if p:
+            return p
+    sys.exit("tmmtop: cannot find ls-load.py --- run this INSIDE the f5-tmm container")
+
+
+def read_slot(loader, slot):
+    """One slot's counters, or None if the slot is empty/unreadable. Never guesses a value."""
+    try:
+        out = subprocess.run([loader, "status", str(slot)], capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception as e:
+        return {"error": "%s: %s" % (type(e).__name__, e)}
+    if "OK" not in out:
+        return {"error": out.strip()[:120] or "no response"}
+    d = {}
+    for tok in out.split():
+        if "=" in tok:
+            k, _, v = tok.partition("=")
+            if k in FIELDS:
+                try:
+                    d[k] = int(v)
+                except ValueError:
+                    d[k] = v
+    return d or {"error": "unparsed: " + out.strip()[:80]}
+
+
+def sample(loader, slots):
+    """A snapshot. `mono` is taken once around the whole read so rates share one clock."""
+    t0 = time.monotonic()
+    slotd = {str(s): read_slot(loader, s) for s in slots}
+    t1 = time.monotonic()
+    return {"mono": (t0 + t1) / 2.0, "read_span_s": round(t1 - t0, 4),
+            "wall": time.time(), "slots": slotd}
+
+
+def rates(a, b, labels):
+    """Per-second rates from two samples. Reports the span so a consumer can judge the sample."""
+    dt = b["mono"] - a["mono"]
+    out = {"interval_s": round(dt, 4), "read_span_s": b["read_span_s"], "slots": {}}
+    if dt <= 0:
+        out["error"] = "non-positive interval"
+        return out
+    for s, bs in b["slots"].items():
+        as_ = a["slots"].get(s, {})
+        row = {"label": labels.get(s, s)}
+        if "error" in bs or "error" in as_:
+            row["error"] = bs.get("error") or as_.get("error")
+        else:
+            row["armed"] = bs.get("armed")
+            row["mode"] = bs.get("mode")
+            if bs.get("gen") != as_.get("gen"):
+                # A reload resets counters; a delta across it is meaningless. Say so.
+                row["error"] = "gen changed %s->%s (reloaded mid-sample)" % (as_.get("gen"), bs.get("gen"))
+            else:
+                for c in COUNTERS:
+                    if c in bs and c in as_:
+                        row[c + "_per_s"] = round((bs[c] - as_[c]) / dt, 2)
+                for e in ("cycles_min", "cycles_max"):
+                    if e in bs:
+                        row[e] = bs[e]
+        out["slots"][s] = row
+    return out
+
+
+def render(snap, labels, is_rate):
+    lines = []
+    if is_rate:
+        lines.append("tmmtop  interval=%ss  read_span=%ss" % (snap["interval_s"], snap["read_span_s"]))
+        lines.append("%-14s %5s %4s %12s %12s %10s %10s" %
+                     ("SLOT", "ARMED", "MODE", "FIRED/s", "MATCH/s", "CYC_MIN", "CYC_MAX"))
+        for s in sorted(snap["slots"], key=lambda x: int(x)):
+            r = snap["slots"][s]
+            if "error" in r:
+                lines.append("%-14s %s" % (r["label"], r["error"]))
+                continue
+            lines.append("%-14s %5s %4s %12s %12s %10s %10s" % (
+                r["label"], r.get("armed", "-"), r.get("mode", "-"),
+                r.get("fired_per_s", "-"), r.get("safe_returns_per_s", "-"),
+                r.get("cycles_min", "-"), r.get("cycles_max", "-")))
+    else:
+        lines.append("tmmtop  snapshot  read_span=%ss" % snap["read_span_s"])
+        for s in sorted(snap["slots"], key=lambda x: int(x)):
+            d = snap["slots"][s]
+            lab = labels.get(s, s)
+            if "error" in d:
+                lines.append("  %-14s %s" % (lab, d["error"]))
+            else:
+                lines.append("  %-14s " % lab + "  ".join(
+                    "%s=%s" % (k, d[k]) for k in FIELDS if k in d))
+    return "\n".join(lines)
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--slots", default="0-7", help="slot list/range, e.g. 4,5 or 0-7")
+    ap.add_argument("--label", action="append", default=[], metavar="N=NAME",
+                    help="name a slot; unlabelled slots report as their number")
+    ap.add_argument("--once", action="store_true", help="one snapshot, no rates")
+    ap.add_argument("--interval", type=float, default=None,
+                    help="seconds between the two samples used for rates")
+    ap.add_argument("--json", action="store_true")
+    a = ap.parse_args(argv[1:])
+
+    slots = []
+    for part in a.slots.split(","):
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            slots += list(range(int(lo), int(hi) + 1))
+        else:
+            slots.append(int(part))
+    labels = {}
+    for kv in a.label:
+        k, _, v = kv.partition("=")
+        labels[k.strip()] = v.strip()
+
+    loader = find_loader()
+    if a.once or a.interval is None:
+        snap = sample(loader, slots)
+        print(json.dumps(snap, indent=2) if a.json else render(snap, labels, False))
+        return 0
+    first = sample(loader, slots)
+    time.sleep(a.interval)
+    second = sample(loader, slots)
+    r = rates(first, second, labels)
+    print(json.dumps(r, indent=2) if a.json else render(r, labels, True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
