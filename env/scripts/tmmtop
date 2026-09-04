@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """tmmtop --- a coherent snapshot of TMM's internals, read from the loader socket.
 
+    tmmtop                                     REFRESH until you stop it (like top)
+    tmmtop -d 5                                refresh every 5s
+    tmmtop -n 3                                three refreshes, then exit
+    tmmtop --once                              one snapshot, no rates
     tmmtop --once --json                       one snapshot, machine-readable
-    tmmtop --once                              one snapshot, human-readable
-    tmmtop --interval 1 --json                 two samples one second apart -> RATES
-    tmmtop --label 5=loop --label 4=cve_shield  name the columns
+    tmmtop --json                              one JSON object per tick (JSON Lines)
+    tmmtop --label 5=loop --label 4=cve_shield name the columns
+
+Default behaviour is CONTINUOUS, because that is what makes it top rather than a snapshot tool:
+each tick diffs against the PREVIOUS tick, so the rates are a moving picture rather than one
+interval. Ctrl-C stops it and exits 0 --- interrupting a monitor is not an error.
 
 WHY THIS IS THE SNAPSHOT LAYER AND NOT THE UI. The interesting logic here is delta arithmetic,
 rate computation and slot->column mapping. None of it needs a terminal, and all of it is worth
@@ -142,6 +149,10 @@ def main(argv):
     ap.add_argument("--interval", type=float, default=None,
                     help="seconds between the two samples used for rates")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("-d", "--delay", type=float, default=2.0,
+                    help="seconds between refreshes in continuous mode (default 2)")
+    ap.add_argument("-n", "--count", type=int, default=0,
+                    help="stop after N refreshes (0 = until interrupted)")
     a = ap.parse_args(argv[1:])
 
     slots = []
@@ -157,16 +168,45 @@ def main(argv):
         labels[k.strip()] = v.strip()
 
     loader = find_loader()
-    if a.once or a.interval is None:
+
+    if a.once:
         snap = sample(loader, slots)
         print(json.dumps(snap, indent=2) if a.json else render(snap, labels, False))
         return 0
-    first = sample(loader, slots)
-    time.sleep(a.interval)
-    second = sample(loader, slots)
-    r = rates(first, second, labels)
-    print(json.dumps(r, indent=2) if a.json else render(r, labels, True))
-    return 0
+
+    if a.interval is not None:            # explicit two-sample mode, kept for scripts
+        first = sample(loader, slots)
+        time.sleep(a.interval)
+        second = sample(loader, slots)
+        r = rates(first, second, labels)
+        print(json.dumps(r, indent=2) if a.json else render(r, labels, True))
+        return 0
+
+    # --- continuous, the default. Each tick diffs against the previous tick. ---
+    # Redraw in place only on a TTY; when piped, append so the output stays greppable and a
+    # consumer gets one record per line instead of a screenful of escape codes.
+    tty = sys.stdout.isatty() and not a.json
+    prev = sample(loader, slots)
+    ticks = 0
+    try:
+        while True:
+            time.sleep(a.delay)
+            cur = sample(loader, slots)
+            r = rates(prev, cur, labels)
+            if a.json:
+                print(json.dumps(r), flush=True)      # JSON Lines: one object per tick
+            else:
+                if tty:
+                    sys.stdout.write("\033[H\033[2J")   # home + clear, like top
+                print(render(r, labels, True), flush=True)
+            prev = cur
+            ticks += 1
+            if a.count and ticks >= a.count:
+                return 0
+    except KeyboardInterrupt:
+        if tty:
+            sys.stdout.write("\n")
+        return 0                          # interrupting a monitor is not a failure
 
 
 if __name__ == "__main__":
