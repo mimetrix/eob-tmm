@@ -17,6 +17,7 @@ own topology — the fast-cycling page assumes a build machine and a Datkube mac
 
 | | `eob-bnk-build-01` | `eob-bnk-datkube-01` |
 |---|---|---|
+| **address** (added 2026-09-04 — this table had none, and finding it meant probing three) | `starin@10.145.37.36` | `starin@10.145.40.193` |
 | TMM source + toolchain container | yes | no |
 | clang for eBPF shield programs | yes | no |
 | gcc, gdb | yes | no |
@@ -876,7 +877,7 @@ datkube set-profile bnk-core && datkube install     # ~10 min; creates deploy/f5
 
 ```bash
 docker save tmm:local -o /tmp/tmm-local.tar
-scp -i ~/.ssh/id_datpush /tmp/tmm-local.tar starin@<deploy>:/tmp/
+scp -i ~/.ssh/id_datpush /tmp/tmm-local.tar starin@10.145.40.193:/tmp/   # eob-bnk-datkube-01
 
 # kind load image-archive fails: "ERROR: failed to detect containerd snapshotter"
 # so do what it does underneath --- and do it for EVERY node
