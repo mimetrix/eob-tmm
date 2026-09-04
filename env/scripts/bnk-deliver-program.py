@@ -48,6 +48,9 @@ PROG = base64.b64decode("{b64}")
 HDR = 192
 OFF_OP, OFF_EPOCH, OFF_MODE, OFF_PROGLEN, OFF_HOOK = 0, 4, 8, 12, 48
 OFF_CTX_ABI, CTX_ABI_VERSION = 16 + 105, 3
+# binding.build_min / build_max, at binding + 96 / +100 and the binding starts at 16.
+# Asserted against shield_abi.h's static_asserts rather than remembered.
+OFF_BUILD_MIN, OFF_BUILD_MAX = 16 + 96, 16 + 100
 OP_LOAD = 1
 b = bytearray(HDR)
 struct.pack_into("<I", b, OFF_OP, OP_LOAD)
@@ -55,6 +58,8 @@ struct.pack_into("<I", b, OFF_EPOCH, {slot})
 struct.pack_into("<I", b, OFF_MODE, {mode})
 struct.pack_into("<I", b, OFF_PROGLEN, len(PROG))
 b[OFF_CTX_ABI] = CTX_ABI_VERSION
+struct.pack_into("<I", b, OFF_BUILD_MIN, {build_min})
+struct.pack_into("<I", b, OFF_BUILD_MAX, {build_max})
 hook = {hook!r}.encode()
 if hook:
     b[OFF_HOOK:OFF_HOOK + len(hook)] = hook
@@ -119,6 +124,28 @@ def main():
         sys.exit(__doc__)
     path, slot, mode = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
     hook = sys.argv[4] if len(sys.argv) > 4 else ""
+
+    # THE BUILD RANGE, settable so the loader's build gate can be tested LIVE.
+    #
+    # Default 0..0 --- which is what every client sends today and what the gate reads
+    # as UNDECLARED (ls_build_gate.h). Set it to exercise the gate:
+    #
+    #   LS_BUILD_MIN=0x11111111 LS_BUILD_MAX=0x11111111   -> must be REFUSED, MISMATCH
+    #   LS_BUILD_MIN=0 LS_BUILD_MAX=0x269b5d25            -> must be REFUSED, BAD_RANGE
+    #   LS_BUILD_MIN=<real> LS_BUILD_MAX=<real>           -> must PASS the gate
+    #
+    # WHY THIS TESTS THE GATE HONESTLY DESPITE SENDING NO SIGNATURE. The gate runs on
+    # the LOADER thread, in ls_vm_load.c, while signature verification happens later on
+    # a TMM thread in ls_prep_run_pending. So the gate's decision is observable on its
+    # own, before any signature is looked at, which is exactly what we want to isolate.
+    #
+    # WHAT IT DOES NOT SHOW, and the distinction matters: an unsigned range proves the
+    # gate ACTS on the field, not that the field is UNFORGEABLE. The range is only
+    # meaningful because sign_shield.py puts it inside the signature; this test
+    # deliberately steps around that to observe the gate alone. check-sig covers the
+    # other half --- it asserts a flipped bit in build_min is detected.
+    bmin = int(os.environ.get("LS_BUILD_MIN", "0"), 0)
+    bmax = int(os.environ.get("LS_BUILD_MAX", "0"), 0)
     with open(path, "rb") as f:
         prog = f.read()
 
@@ -138,13 +165,15 @@ def main():
             sys.exit("*** no fentry/ section in %s --- cannot derive the hook name, and the\n"
                      "    loader will refuse a load without one." % path)
     script = TEMPLATE.format(b64=base64.b64encode(prog).decode(),
-                             slot=slot, mode=mode, hook=hook)
+                             slot=slot, mode=mode, hook=hook,
+                             build_min=bmin, build_max=bmax)
     targets = [os.environ["POD"]] if os.environ.get("POD") else pods()
     if not targets:
         sys.exit("*** no Running f5-tmm pods")
-    print("  %s --- %d bytes, slot %d, mode %d%s"
+    print("  %s --- %d bytes, slot %d, mode %d%s, build 0x%08x..0x%08x%s"
           % (os.path.basename(path), len(prog), slot, mode,
-             ", hook=%s" % hook if hook else ", section from the object"))
+             ", hook=%s" % hook if hook else ", section from the object",
+             bmin, bmax, "  (UNDECLARED)" if bmin == 0 and bmax == 0 else ""))
     for p in targets:
         r = subprocess.run([KUBECTL, "exec", "-i", p, "-c", "f5-tmm", "--", "python3", "-"],
                            input=script, capture_output=True, text=True)
