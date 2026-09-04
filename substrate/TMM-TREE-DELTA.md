@@ -28,6 +28,15 @@ Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, b
 
 ## 1. New source files — by function (current tree, verified 2026-08-31)
 
+> **Pending sync (2026-09-04).** `ls_build_gate.h` was added to the manifest here and in
+> `.tree-expected-delta`, and has **not been synced to the build box yet**. So the counts below are
+> the *measured* build-box numbers and are still correct for that tree; once
+> `env/scripts/bnk-sync-substrate.sh` runs they become **36 files (34 under `src/base/` — 14 `.c`,
+> 20 `.h`)**. `bnk-check-tree-sync.sh` will report the one-file difference until then, which is the
+> manifest doing its job rather than a fault. The numbers here are deliberately not updated ahead of
+> the measurement — CLAUDE.md and `tmm-bpf-engine-architect-brief.md` carry the same figures and
+> should be swept in the same edit as the sync, not before it.
+
 Authoritative source: `git status --porcelain src/` on the build box. The tree adds **35 files**
 (33 under `src/base/`, 2 whitelist snapshots under `src/compile/`) and edits **3** F5 files. Of the
 33 `base/` files, **13 `.c` are compiled into `tmm`** (they appear in `filelist` — §2); the rest are
@@ -36,6 +45,7 @@ headers pulled in by those, one build-box-only harness, and one data blob. Group
 | function | files (`base/`) | in `tmm`? |
 |---|---|---|
 | **VM / bytecode engine** — embed uBPF, load the ELF, JIT, the env knobs, per-core stack | `ls_vm.c` `ls_vm.h` · `ls_vm_load.c` · `ls_vm_config.c` `ls_vm_config.h` · `vm_stack_policy.h` | yes (`.c`) |
+| **Build gate** — refuse a program signed for a different build | `ls_build_gate.h` | yes |
 | **CO-RE relocation** — rewrite a program's field offsets to this build's layout | `ls_core_relo.c` `ls_core_relo.h` | yes |
 | **Arm / trampoline** — patch & restore the 5-byte entry pad; build `ctx`, apply the verdict; INIT_FUNC startup | `ls_arm.c` `ls_arm.h` · `ls_prep.c` · `ls_tramp.c` · `ls_tramp_asm.c` (from `trampoline_x86_64.S`) | yes (`.c`) |
 | **Function-exit hooks** — return-hijack + per-instance shadow stack | `ls_fexit.c` `ls_fexit.h` | yes |

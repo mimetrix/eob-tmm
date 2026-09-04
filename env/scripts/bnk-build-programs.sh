@@ -193,9 +193,36 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # someone has just cloned should still compile and verify, and only fail at the point where
     # the missing key actually matters, which is load.
     if [ -n "$SIGN_KEY" ] && [ -f "$SIGN_KEY" ]; then
+        # THE BUILD RANGE, which this script did not pass until 2026-09-04.
+        #
+        # sign_shield.py defaults to 0..0xffffffff and passing nothing meant every
+        # program this pipeline has ever signed is vouched for on EVERY build,
+        # forever. That was harmless only because the loader did not read the field
+        # either (CONTESTED-PREMISES.md 15) -- and it stops being harmless the moment
+        # field offsets are baked at sign time instead of resolved on-box.
+        #
+        # The range is the first 4 bytes of the target build's GNU build id, and
+        # min == max: a SHA-1 prefix has no ordering, so a wider range is not a
+        # statement about builds (ls_build_gate.h).
+        #
+        # SKIPPED LOUDLY, NOT SILENTLY, when there is no target build to read. A
+        # compile-only clone has no DEB pair, and signing a wildcard while saying
+        # nothing is exactly how this gap survived. $ADMIT_RT is already resolved
+        # above for the fexit exit-admission gate, so this costs no extra unpack.
+        BRANGE=""
+        if [ -n "$ADMIT_RT" ] && [ -f "$ADMIT_RT" ]; then
+            _BID=$(python3 "$REPO/substrate/ls_buildid.py" "$ADMIT_RT" 2>/dev/null)
+            case "$_BID" in
+            ????????*) BRANGE="--build-min 0x${_BID%${_BID#????????}} --build-max 0x${_BID%${_BID#????????}}" ;;
+            esac
+        fi
+        if [ -z "$BRANGE" ]; then
+            echo "  WARN $b  --- signing with the WILDCARD build range (any build,"
+            echo "       forever): no target binary in $ADMIT_DEBS to read a build id from."
+        fi
         if python3 "$REPO/substrate/sign_shield.py" --key "$SIGN_KEY" --prog "$o" \
                --hook "${sec#*/}" --mode-ceiling "${SIGN_CEILING:-monitor}" \
-               -o "$OUT/$b.bpf.sig" >/dev/null 2>&1; then
+               $BRANGE -o "$OUT/$b.bpf.sig" >/dev/null 2>&1; then
             echo "  verified $b  ($sec)${est:+  budget ~$est}  SIGNED"
         else
             rm -f "$OUT/$b.bpf.sig"

@@ -41,6 +41,7 @@
 #include "ls_vm.h"
 #include "ls_sig.h"
 #include "ls_audit.h"
+#include "ls_build_gate.h"
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
  * define this; a second one fails the link on a duplicate symbol. */
@@ -494,6 +495,65 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
         fprintf(stderr, "ls_vm: ctx abi UNDECLARED (0) --- accepted, but this TMM "
                         "builds %u and a mismatch would be silent\n",
                 (unsigned)SHIELD_CTX_ABI_VERSION);
+
+    /* THE SIGNED BUILD RANGE, compared to something for the first time.
+     *
+     * It has been in the binding since the ABI was written, covered by the
+     * signature, and printed into every audit record --- and until 2026-09-04
+     * nothing read it. Three trails that all looked like enforcement, and no
+     * enforcement. CONTESTED-PREMISES.md 15; the decision itself and why a
+     * "range" over a SHA-1 is almost always meaningless are in ls_build_gate.h.
+     *
+     * Placed here, beside the ctx-abi check, for the same reason that one is
+     * here: both refuse a program built against a DIFFERENT TMM, both are
+     * correctness rather than security (the signature is what stops a forgery),
+     * and both must answer before any work is handed to a TMM thread.
+     *
+     * THE WILDCARD IS ACCEPTED. sign_shield.py has defaulted to 0..0xffffffff
+     * since it was written and bnk-build-programs.sh passes no range at all, so
+     * every program the pipeline has produced carries it. Refusing it here would
+     * brick every existing artifact the day this ships and prove nothing --- the
+     * fix is in the pipeline, which now passes the real range. Logged loudly so
+     * the breadth is visible rather than assumed. */
+    {
+        uint32_t running = 0;
+        enum ls_build_verdict bv = ls_build_gate(ls_audit_build_id(),
+                                                 m->binding.build_min,
+                                                 m->binding.build_max, &running);
+        if (bv == LS_BUILD_MISMATCH || bv == LS_BUILD_BAD_RANGE ||
+            bv == LS_BUILD_NO_ID) {
+            reply(fd, "ERR build gate: %s (signed 0x%08x..0x%08x, running 0x%08x). "
+                      "Re-sign this program for this build.\n",
+                  ls_build_strerror(bv), (unsigned)m->binding.build_min,
+                  (unsigned)m->binding.build_max, (unsigned)running);
+            fprintf(stderr, "ls_vm: REFUSED --- %s: signed 0x%08x..0x%08x, "
+                            "running 0x%08x\n", ls_build_strerror(bv),
+                    (unsigned)m->binding.build_min, (unsigned)m->binding.build_max,
+                    (unsigned)running);
+            return;
+        }
+        if (bv == LS_BUILD_WILDCARD)
+            fprintf(stderr, "ls_vm: build range is the WILDCARD (0..0xffffffff) --- "
+                            "accepted, but this program is vouched for on EVERY "
+                            "build, including ones its field offsets do not fit. "
+                            "Sign with --build-min/--build-max 0x%08x.\n",
+                    (unsigned)running);
+        else
+            fprintf(stderr, "ls_vm: build gate OK --- signed for 0x%08x, running "
+                            "0x%08x\n", (unsigned)m->binding.build_min,
+                    (unsigned)running);
+    }
+
+    /* expires_with IS STILL NOT CHECKED, and that is a decision rather than an
+     * oversight. Its semantics were never defined --- "encoded build id ->
+     * auto-retire" cannot be evaluated on a box that does not know which build
+     * superseded which --- and inventing a meaning in order to enforce it would be
+     * worse than a documented gap. Pre-registered in 02-RESEARCH-PARAMETERS.md P9.
+     * TODO(f5): define it (a uint32 epoch is the obvious candidate) or delete it. */
+    if (m->binding.expires_with != 0u && m->binding.expires_with != 0xffffffffu)
+        fprintf(stderr, "ls_vm: expires_with=0x%08x is set but UNDEFINED and "
+                        "unchecked --- it constrains nothing\n",
+                (unsigned)m->binding.expires_with);
 
     switch (m->op) {
     case SHIELD_OP_LOAD: {

@@ -51,7 +51,7 @@ check-prereqs:
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
        check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -449,6 +449,15 @@ check-relo-baked:
 	    done; done; \
 	  [ -n "$$O" ] || { echo "*** no program compiled --- nothing to check"; exit 1; }; \
 	  python3 check_relo_baked.py "$(TMM_BTF)" $$O --relo $$T/relo
+
+# The signed build range, compared to something for the first time.
+# CONTESTED-PREMISES.md 15: the field was signed, tamper-tested and logged, and
+# read by nothing. 18 assertions on the decision itself, off-TMM.
+check-build-gate:
+	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .bgate.out check_build_gate.c
+	@./.bgate.out >/dev/null 2>&1 && echo "ok    ls_build_gate.h  (18 assertions: prefix encoding, mismatch refused, hash range refused, fail-closed)" \
+	  || { ./.bgate.out; rm -f .bgate.out; exit 1; }
+	@rm -f .bgate.out
 
 check-sig:
 	@set -e; T=$$(mktemp -d); trap 'rm -rf $$T' EXIT; \

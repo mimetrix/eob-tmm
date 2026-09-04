@@ -41,6 +41,7 @@
 # be copied between trees, or one build would verify against another's key.
 ?? src/base/harness.c
 ?? src/base/ls_arm.c
+?? src/base/ls_build_gate.h
 ?? src/base/ls_core_relo.c
 ?? src/base/ls_core_relo.h
 ?? src/base/ls_arm.h
