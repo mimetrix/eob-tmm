@@ -243,6 +243,40 @@ precedent); a C++ exception is handled by **refusing exit hooks on unwind-traver
 time (offline reachability), since overwriting a return address that the unwinder walks would corrupt
 the unwind itself. Both fold into the fexit build, not a new open question.
 
+### P9 · Can baked-at-sign-time field offsets be admitted safely once the binary's own BTF is gone?
+
+**Why this is open now.** Taking the 6.4 MB `.BTF` out of the shipped binary
+([`engine-hard-problems.md`](engine-hard-problems.md) §4.1) means resolving field offsets on the build
+box and shipping bytecode with the offsets baked in. That deletes the property that currently makes a
+stale offset structurally impossible: relocation today runs against the **running binary's own**
+`.BTF` (`ls_vm.c:594`). Baked offsets plus an unenforced build range is silently-wrong reads with
+nothing on-box able to notice — see [`CONTESTED-PREMISES.md`](CONTESTED-PREMISES.md) §15.
+
+**Claim under test:** a signed digest committing the program to one build's layout is sufficient
+admission control to replace on-box relocation.
+
+**Falsified if** any of these holds after the change:
+
+- a program signed against build A **loads** on build B (the digest gate is absent or not reached);
+- the offsets the offline relocator bakes differ, for any program, from those the on-box relocator
+  produces for the same build — compare the patched immediates byte-for-byte **before** the on-box
+  path is deleted;
+- PREVAIL **rejects** a program after relocation that it accepted before. It now sees real offsets
+  rather than local dummies, so this is a live possibility and not a formality; a rejection means
+  the proof was relying on the placeholder layout;
+- the shipped binary still reports a `.BTF` section, or an armed CO-RE program stops firing — the
+  first means the disclosure did not move, the second means relocation did not.
+
+**Pre-registered order, because getting it wrong is a regression rather than a bug:** enforce
+`build_min`/`build_max`/`expires_with` **first** (they are already signed and already ignored), then
+add the layout digest, and only then remove the embedded BTF. The middle step needs a wire-format
+bump — `SHIELD_BINDING_WIRE_MAX` is 128 and `16 + 112` is exactly 128, so the padding trick that got
+`ctx_abi_version` in for free is spent (`shield_abi.h:33-40`).
+
+**Status:** unbuilt. The offline relocator it depends on already exists —
+`ls_core_relo.c:315-341`, behind `-DLS_CORE_RELO_TEST` — so the first falsifier above is checkable
+today, before anything ships.
+
 ---
 
 ## Retired

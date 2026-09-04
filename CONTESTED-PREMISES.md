@@ -8,6 +8,52 @@ Ordered newest first.
 
 ---
 
+## 15 · "We pin every signature to a single build" — FALSIFIED, and the signature machinery is guarding fields nobody reads
+
+**Claimed**, by me, on 2026-09-04, while arguing that embedded BTF and build-pinning are redundant:
+*"we already pin every signature to a single build (`--build-min/--build-max 0x269b5d25`)"* — and the
+whole argument for taking BTF out of the binary rested on it. If a program is valid for exactly one
+build, its offsets can be baked and no runtime type information is needed.
+
+**Killed by** reading the loader instead of remembering a command line. Three findings, each worse
+than the last:
+
+1. **The loader never checks the range.** `build_min`, `build_max` and `expires_with` live in the
+   signed 112-byte binding. Outside `shield_abi.h`, they appear in exactly three files:
+   `check_sig.c:154-157`, which asserts that flipping a bit in each **is detected by the signature**;
+   `check_audit.c:99-102`, which sets them in a fixture; and `ls_audit.c:403-409`, which **logs** them.
+   Nothing compares them to anything.
+2. **The pipeline does not even set them.** `sign_shield.py` defaults `--build-min 0`,
+   `--build-max 0xffffffff`, `--expires-with 0xffffffff`, and `bnk-build-programs.sh:196` passes none
+   of the three. Every program the pipeline has signed is valid on **all builds, forever**.
+3. **No build gate exists on-box at all.** `ls_audit_read_build_id()` reads the running build id from
+   `/proc/self/exe`, `ls_audit_build_id()` returns it, and no caller compares it. The build-id
+   agreement check that does exist runs at **image bake time** (`ls-verify-layer.sh:36-37`). That is a
+   packaging gate: it proves the hook index matches the binary in the image, and says nothing about
+   whether an arriving program was signed for it.
+
+**Why this is the most expensive shape a gap can take.** Every visible signal says the field is
+enforced. It is in the signed structure. A test proves tampering with it is caught. The audit record
+prints it on every operation. A reviewer following any of those three trails concludes the range is a
+control. **Signing a field is not checking it, and a test that a field is signed is not a test that it
+is honoured** — `check_sig.c` proves the former and reads, at a glance, like the latter.
+
+**What saved us, and it is luck plus one deliberate property.** Nothing stale has loaded, for two
+reasons that are not the range: the hook index in the image is build-matched by the bake-time gate, so
+name→address cannot drift; and CO-RE relocation resolves field offsets against the **running binary's
+own** `.BTF`, which `ls_vm.c:594` describes exactly right — *"it IS the binary's own section"* — so
+offsets are self-correcting by construction.
+
+**Where it lands on the work it was raised for, which is the reason to write it down rather than fix
+it quietly.** The BTF-out-of-band plan's phase 3 **deletes the self-correcting property**. Baked
+offsets plus an unenforced build range is silently-wrong reads with nothing on-box able to notice —
+the same failure family as the bitfield defect, which produced wrong values and passed every gate
+without a complaint. So the sequencing is not a preference: **enforcement lands before the embedded
+BTF is removed, or the change is a net regression.** The argument I used to justify the work turned
+out to be the work.
+
+---
+
 ## 14 · "The shipped image discloses symbols, and the entry pad discloses function boundaries" — BOTH FALSIFIED in one `readelf`
 
 **The claims.** Two, made at different times, both about what the deployed ELF gives an attacker:
