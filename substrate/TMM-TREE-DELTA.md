@@ -11,7 +11,7 @@ into `src/base/` (33) and `src/compile/` (2 whitelist config), edits three build
 `git status --porcelain src/` on the build box. The larger **46 files / ~7,800 lines** figure counts a
 tree that **also** has the vulnerable-SSL demo overlay under `src/modules/hudfilter/ssl/` plus the
 `ssl.c` revert (`VULNERABLE-BUILD.md`), which is not applied in the current tree. **No existing F5
-function BODY is edited** --- that is the accurate form of
+function BODY is edited **by the substrate.** The tree as it stands also carries the **CVE-2025-41414 revert** in `http2.c`, which *does* edit an F5 function body — a demonstration artifact rather than integration, and unrecorded until 2026-09-04 (`CONTESTED-PREMISES.md` §16)** --- that is the accurate form of
 the claim, and it is smaller than "modifies no F5 source file", which this file used to say: nothing
 is spliced into TMM's own logic, because startup registers through the `INIT_FUNC` linker set. That
 constraint is real and load-bearing, because the shield targets a TMM that is *already running*.
@@ -38,7 +38,12 @@ Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, b
 > should be swept in the same edit as the sync, not before it.
 
 Authoritative source: `git status --porcelain src/` on the build box. The tree adds **35 files**
-(33 under `src/base/`, 2 whitelist snapshots under `src/compile/`) and edits **3** F5 files. Of the
+(33 under `src/base/`, 2 whitelist snapshots under `src/compile/`) and edits **4** F5 files —
+corrected 2026-09-04 from **3**. The three build-configuration edits below are the substrate's own;
+the fourth is `src/modules/hudfilter/http2/http2.c`, carrying the **CVE-2025-41414 fix `81d3428d3d`
+reverted** (`cve-41414-demonstration.md`). It was in no manifest, and it means **every binary built
+from this tree is vulnerable to CVE-2025-41414 whatever it was built for**. Status only here, never
+the diff. See `CONTESTED-PREMISES.md` §16 for why it stayed invisible. Of the
 33 `base/` files, **13 `.c` are compiled into `tmm`** (they appear in `filelist` — §2); the rest are
 headers pulled in by those, one build-box-only harness, and one data blob. Grouped by what they do:
 

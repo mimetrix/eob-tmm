@@ -78,7 +78,24 @@ if [ "$ONLY_TREE" -ne 0 ]; then
     echo "    delete them with no trace, which is how the map registrations were lost."
     exit 1
 fi
-grep -E "DIFFERS|ACKNOWLEDGED|VERDICT|delta" /tmp/.syncout | sed 's/^/  /' || true
+# PRINT THE WHOLE CHECK, AND DO NOT GREP IT. This line used to be
+#     grep -E "DIFFERS|ACKNOWLEDGED|VERDICT|delta"
+# which is the SECOND grep bug in this three-line block --- the comment above
+# documents the first. It hid three kinds of line the checker prints:
+#
+#   ONLY IN REPO                          a repo file never copied, so never built
+#   DELTA: IN TREE, NOT IN THE MANIFEST   an unrecorded change, lost if the VM dies
+#   DELTA: IN THE MANIFEST, NOT IN TREE   a stale manifest
+#
+# The first was absent from the pattern; the other two did not match because the
+# checker prints DELTA in capitals and the pattern looked for "delta". On
+# 2026-09-04 that concealed `M src/modules/hudfilter/http2/http2.c` --- the
+# CVE-2025-41414 fix REVERTED in the build tree, unrecorded, which makes every
+# binary built from it vulnerable. A filtered check is a check that decides for
+# you which of its own findings matter.
+#
+# The output is about twenty lines. Print it.
+cat /tmp/.syncout | sed 's/^/  /'
 rm -f /tmp/.syncout
 
 echo

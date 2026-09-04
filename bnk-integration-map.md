@@ -18,7 +18,7 @@ here is established for appliance or VE — whether those share this source tree
 | Disarm and re-arm | **runs** | nops restored, fire count stops |
 | The hook is really on the request path | **measured** | `http_parse_client_headers` fired **16,000 across 16,000 requests**, 1:1 |
 | Loading while traffic flows | **measured** | 10 loads during 9,000 requests, 0 failures, percentiles unchanged |
-| Splices nothing into TMM's own logic | **holds** | `INIT_FUNC` registration; `http_psm.c` pristine. NOTE: the tree still gains 39 files / ~7,200 lines and three edited build-configuration files --- "modifies no F5 source file" was the old, looser phrasing |
+| Splices nothing into TMM's own logic | **holds** | `INIT_FUNC` registration; `http_psm.c` pristine. NOTE: the tree still gains 39 files / ~7,200 lines and three edited build-configuration files --- "modifies no F5 source file" was the old, looser phrasing. **And the property is the substrate's, not the tree's:** the current tree also reverts the CVE-2025-41414 fix in `http2.c`, which edits an F5 function body (`CONTESTED-PREMISES.md` §16) |
 | A shield changing a request's outcome | **measured (2026-09-03)** | the "returns `FALLTHROUGH` by construction" reasoning no longer applies: a shield armed **enforce** at `http2_http_data_to_frames` matched 10/10 triggering requests (`safe_returns +10`) with **0/10** false positives, preventing a `SIGSEGV` that the identical request produced twice. `cve-41414-demonstration.md` |
 | Per-call cost of an armed hook | **unmeasured** | §7 |
 | Runtime time guard (fuel) | **absent** | §7 — the JIT ignores the instruction limit |

@@ -79,7 +79,7 @@ the integration, so the actual delta is set out below.
 | `Makefile.overrides` | new file, consumed at a sanctioned extension point (`Makefile.inc:116` includes it when present) |
 | `.ubpf/` | the vendored interpreter and its static library, built inside the toolchain container so the C library matches |
 
-**What was avoided is one thing, not a headline:** no existing F5 function body is edited.
+**What was avoided is one thing, not a headline:** no existing F5 function body is edited **by the substrate.** The tree as it stands also carries the **CVE-2025-41414 revert** in `http2.c`, which *does* edit an F5 function body — a demonstration artifact rather than integration, and unrecorded until 2026-09-04 (`CONTESTED-PREMISES.md` §16).
 The substrate reaches its own initialisation through `INIT_FUNC(INIT_LATE, …)` — the same
 linker-set mechanism `urlcat`, `pem_lib` and `license_pgo_gen` use — rather than being called
 from a line inserted into TMM's own logic. That keeps the diff reviewable and confines merge

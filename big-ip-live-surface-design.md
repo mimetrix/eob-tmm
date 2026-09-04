@@ -44,6 +44,8 @@
 >    substrate now splices **nothing into TMM's own logic** --- startup registers through the
 >    `INIT_FUNC` linker set. The tree does still gain 39 files and ~7,200 lines plus three edited
 >    build-configuration files; "modifies no F5 source file" was the older, looser phrasing.
+>    The property belongs to the **substrate**, not the tree: the current tree also reverts the
+>    CVE-2025-41414 fix in `http2.c`, which does edit an F5 function body (`CONTESTED-PREMISES.md` §16).
 >    Passages arguing the trade-off are kept as the
 >    record of why the decision went this way; forward-looking claims that assumed both mechanisms
 >    have been corrected. Where "designed-in" refers to **USDT tracepoints**, it is still accurate and

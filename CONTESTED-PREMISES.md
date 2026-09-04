@@ -8,6 +8,58 @@ Ordered newest first.
 
 ---
 
+## 16 · "The tree is substrate-only, and four F5 files are modified including ssl.c" — BOTH WRONG, and a filtered grep hid it
+
+**Claimed**, in `CLAUDE.md` since 2026-08-31 and in `.tree-expected-delta`'s header since it was
+written: the build-box tree is **substrate-only**, with *"three build-configuration files edited"*
+(CLAUDE.md) or *"Four F5 files are MODIFIED (two whitelists, filelist, ssl.c)"* (the manifest). The
+two documents did not even agree with each other, which nobody noticed.
+
+**Killed by** running `git status --porcelain src/` unfiltered on the build box while preparing to
+sync a new header — the same enumerate-before-you-filter move that found `SecPolicy` in §13:
+
+```
+M src/compile/debug_whitelist_x86_64
+M src/compile/default_whitelist_x86_64
+M src/compile/filelist
+M src/modules/hudfilter/http2/http2.c        <-- in NO manifest
+   (?? 33 files under src/base/, 2 under src/compile/ --- the added counts are exactly right)
+```
+
+**Both halves of the claim fail, in opposite directions.** `ssl.c` is **not** modified — the
+vulnerable-SSL overlay genuinely is not applied, so the manifest named a file that is clean. And
+`http2.c` **is** modified, by nothing the manifest knew about: `git diff --numstat` reports **+5/−14**,
+which is the **CVE-2025-41414 fix `81d3428d3d` reverted** — the NULL guard on `frame` removed. That
+revert is deliberate and is what makes the crash reproducible (`cve-41414-demonstration.md`).
+
+**The consequence is operational, not clerical.** *Every binary built from this tree is vulnerable to
+CVE-2025-41414*, whatever it was built for. Phase 2's build gate, the BTF work, a throughput
+measurement — anything compiled here inherits a live NULL dereference reachable by one client
+request. Nothing in the tree says so, and the word "substrate-only" in `CLAUDE.md` actively said the
+opposite.
+
+**Why it stayed invisible, which is the part worth keeping.** `bnk-check-tree-sync.sh` **does** detect
+it and prints two lines saying so. `bnk-sync-substrate.sh` then filtered its output through
+
+```sh
+grep -E "DIFFERS|ACKNOWLEDGED|VERDICT|delta"
+```
+
+`ONLY IN REPO` was absent from the pattern, and the two `DELTA:` lines did not match because the
+checker prints them in **capitals**. So the check worked, reported correctly, and had its finding
+discarded by the wrapper everyone actually runs. **Second grep bug in that same three-line block** —
+the comment immediately above it documents the first one, where the guard matched its own help text.
+A filtered check is a check that decides for you which of its own findings matter.
+
+**What it became.** `http2.c` recorded in `.tree-expected-delta` and `TMM-TREE-DELTA.md` as **status
+only, never the diff** (it is F5 source and a security regression, and this repo pushes to GitHub);
+the manifest header's `ssl.c` claim corrected; `CLAUDE.md`'s "substrate-only" paragraph corrected to
+say the tree builds a vulnerable binary; and the wrapper now **prints the checker's output whole**
+rather than grepping it, which removes the class of bug rather than the instance. Row added to
+`SYMPTOMS.md` keyed on the literal string.
+
+---
+
 ## 15 · "We pin every signature to a single build" — FALSIFIED, and the signature machinery is guarding fields nobody reads
 
 **Claimed**, by me, on 2026-09-04, while arguing that embedded BTF and build-pinning are redundant:

@@ -1,11 +1,25 @@
 # The exact set of changes the substrate makes to a clean TMM tree.
 #
-# WHY A MANIFEST AND NOT A PATCH. Four F5 files are MODIFIED (two whitelists,
-# filelist, ssl.c). Their diffs are build configuration and, for ssl.c, a
-# deliberate security regression -- and this repo pushes to GitHub. So what is
-# recorded here is NAMES AND STATUS, not F5 source. The whitelist symbol list and
-# the filelist entries are in TMM-TREE-DELTA.md; the ssl.c revert is described in
-# VULNERABLE-BUILD.md and deliberately NOT reproduced anywhere.
+# WHY A MANIFEST AND NOT A PATCH. F5 files are MODIFIED, and their diffs are build
+# configuration or -- for the CVE reverts -- a deliberate security regression, while
+# this repo pushes to GitHub. So what is recorded here is NAMES AND STATUS, not F5
+# source. The whitelist symbol list and the filelist entries are in
+# TMM-TREE-DELTA.md; the reverts are described in VULNERABLE-BUILD.md and
+# cve-41414-demonstration.md and deliberately NOT reproduced anywhere.
+#
+# CORRECTED 2026-09-04, and the correction is the reason to read the list rather
+# than this paragraph. It used to say "Four F5 files are MODIFIED (two whitelists,
+# filelist, ssl.c)". Both halves were wrong for the tree as it stands:
+#
+#   ssl.c   is NOT modified -- the vulnerable-SSL overlay is not applied
+#   http2.c IS modified     -- and was in no manifest at all
+#
+# http2.c carries the CVE-2025-41414 fix (81d3428d3d) REVERTED, which is what makes
+# the crash reproducible. Consequence worth stating plainly: EVERY BINARY BUILT FROM
+# THIS TREE IS VULNERABLE TO CVE-2025-41414, whatever it was built for. It went
+# unrecorded because bnk-sync-substrate.sh was grepping the tree-sync check's output
+# for lowercase "delta" while the check prints "DELTA:", so the line that reports an
+# unrecorded tree change was filtered out of every run.
 #
 # WHY IT EXISTS AT ALL. Asked "if the build VM died could we continue", the answer
 # was mostly-yes with gaps that took an audit to find: harness.c existed only on
@@ -78,6 +92,9 @@
 M src/compile/debug_whitelist_x86_64
 M src/compile/default_whitelist_x86_64
 M src/compile/filelist
+# CVE-2025-41414 fix 81d3428d3d REVERTED --- the vulnerable build. Status only, never
+# the diff. See cve-41414-demonstration.md. Revert this to get a patched binary.
+M src/modules/hudfilter/http2/http2.c
 
 # ssl.c REMOVED FROM THIS MANIFEST 2026-08-18. It was listed as MODIFIED because the
 # build tree carried a deliberate revert of the ALPN bounds check (VULNERABLE-BUILD.md).

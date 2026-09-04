@@ -139,7 +139,7 @@ could we continue".
 *elsewhere* — `gitswarm.f5net.com/tmm/tmm` (MBIP), built with `make tmm-gdb`. Everything that tree
 needs is in [`substrate/TMM-TREE-DELTA.md`](substrate/TMM-TREE-DELTA.md): **18** `filelist` entries,
 the global-state whitelist symbols, one compiler flag, and why `ls_prep.c` is the one file without
-`STDINC`. **No existing F5 function body is modified** — checkable, and worth checking. The tree
+`STDINC`. **No existing F5 function body is modified **by the substrate.** The tree as it stands also carries the **CVE-2025-41414 revert** in `http2.c`, which *does* edit an F5 function body — a demonstration artifact rather than integration, and unrecorded until 2026-09-04 (`CONTESTED-PREMISES.md` §16)** — checkable, and worth checking, and the check is `git status --porcelain src/` read unfiltered. The tree
 does gain 39 files and three edited build-configuration files; see `DOC-STATUS.md`.
 
 **2. It is not the cluster.** Reproducing the live arm needs a BNK build box and a datkube cluster.

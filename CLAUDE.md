@@ -12,7 +12,16 @@ The substrate splices **nothing into TMM's own logic** (startup registers throug
 tree does change. In the **substrate-only** tree: 35 files added (33 under `src/base/` — 14 `.c`,
 19 `.h` — and 2 whitelist config under `src/compile/`), three build-configuration files edited
 (`default_whitelist`, `debug_whitelist`, `filelist`), one compiler flag, ~8,300 lines. Authoritative
-count is `git status --porcelain src/` on the build-box TMM tree, verified 2026-08-31. The larger
+count is `git status --porcelain src/` on the build-box TMM tree, re-verified **2026-09-04** — the
+added-file counts hold exactly.
+
+**But the modified-file count did not, and the tree is not substrate-only.** The same enumeration
+shows a **fourth** modified F5 file that no manifest recorded:
+`src/modules/hudfilter/http2/http2.c`, carrying the **CVE-2025-41414 fix (`81d3428d3d`) reverted**
+— which is what makes that crash reproducible. So **every binary built from this tree is vulnerable
+to CVE-2025-41414**, whatever it was built for, and "substrate-only" describes the *substrate*
+delta, not the tree. `ssl.c`, which the manifest named as the fourth modified file, is **not**
+modified. Recorded in `CONTESTED-PREMISES.md` §16; the reason it stayed invisible is there too. The larger
 "46 files / ~7,800 lines" figure elsewhere counts a **different tree state** — one that also carries
 the vulnerable-SSL demo overlay under `src/modules/hudfilter/ssl/` plus the `ssl.c` revert
 (`VULNERABLE-BUILD.md`); that overlay is **not** applied in the current tree.
