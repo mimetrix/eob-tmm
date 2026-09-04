@@ -168,8 +168,8 @@ if [ -n "$BTF_ONLY" ]; then
     echo "  $CTX/tmm.btf  ($(wc -c < "$CTX/tmm.btf") bytes, build ${BID_BEFORE%${BID_BEFORE#????????}})"
     echo
     echo "  Next: TMM_BTF=$CTX/tmm.btf env/scripts/bnk-build-programs.sh"
-    echo "        then bnk-bake-tools.sh (add LS_EMBED_BTF=0 to ship a binary with no"
-    echo "        type information --- every program must be relocated first)."
+    echo "        then bnk-bake-tools.sh --- which ships a binary with NO type"
+    echo "        information by default. LS_EMBED_BTF=1 for the old behaviour."
     exit 0
 fi
 
