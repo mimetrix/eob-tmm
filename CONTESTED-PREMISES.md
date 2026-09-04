@@ -104,6 +104,28 @@ without a complaint. So the sequencing is not a preference: **enforcement lands 
 BTF is removed, or the change is a net regression.** The argument I used to justify the work turned
 out to be the work.
 
+**CLOSED THE SAME DAY, AND MEASURED RATHER THAN ASSERTED (2026-09-04).** `ls_build_gate.h` plus
+`check_build_gate.c` (20 assertions off-TMM) and `env/scripts/bnk-test-build-gate.sh` — **9 of 9 on a
+live deployed TMM**, build `a1c314d0`, pod `f5-tmm-ddcc5c57f-j7mf6`. A range naming a different build
+is refused; a partial or inverted range over a hash is refused as *"cannot be honoured"* rather than
+silently passing; `0..0` is accepted as UNDECLARED; and every verdict lands on the TMM log with both
+the signed and the running id. `GROUND_TRUTH.md` carries the row.
+
+**Two defects in the first cut, both found by reading what the client actually sends rather than by
+the test.** An all-zero range read literally is `min == max`, so it would have **refused every
+operation the only client we have sends** — `ls_client.py` builds `bytearray(HDR)` and never sets the
+field. And the check sat before `switch (m->op)`, so it also answered for `REVOKE` — **the kill
+switch**; a gate that can refuse a disarm on a live data plane is worse than the staleness it
+prevents. The off-TMM suite passed **18/18 through both**, because I chose the cases. That is the
+lesson worth more than the fix: a test whose cases come from the same understanding as the code
+confirms the understanding, not the code.
+
+**And the live case that proved the kill switch was reachable passed VACUOUSLY at first.** It ran
+`ls-load.py status` with no slot argument; the client refused locally, and the assertion — which only
+checked that the reply did not mention the gate — went green without a byte reaching the loader. Now
+both halves require the loader's own wording. A vacuous pass on the one case that matters most is
+worse than no case.
+
 ---
 
 ## 14 · "The shipped image discloses symbols, and the entry pad discloses function boundaries" — BOTH FALSIFIED in one `readelf`
