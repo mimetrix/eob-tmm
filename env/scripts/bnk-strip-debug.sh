@@ -3,11 +3,23 @@
 #
 #   bnk-strip-debug.sh <src-tag> [dst-tag]        default dst = <src-tag>-stripped
 #
-# WHY. The shipped image carries /usr/bin/tmm64.debug --- 76 MB of symbols for a binary that
-# is not even the one TMM runs. Symbols are reconnaissance: they hand an attacker the function
-# names and addresses that make the next memory-safety bug cheaper to exploit
-# (engine-hard-problems.md 4.1, "the binary carries a map to attack it"). Nothing on the data
-# path needs them; they belong on the build box, which already has them.
+# WHY. CORRECTED 2026-09-04 --- the original reason given here was WRONG and is kept visible
+# rather than reworded. It said "76 MB of symbols". Measured against the PRISTINE F5 image
+# (tmm-img:v10.207.3-HEAD.b13f8f034e), both binaries are ELF executables, `stripped`, with
+# symtab FUNC: 0, no .debug_* sections and no .BTF:
+#
+#     tmm64.debug   76,019,416  stripped  build id 1f7b70d0...
+#     tmm64.no_pgo  57,107,456  stripped  build id 269b5d25...   <-- the one TMM runs
+#
+# tmm64.debug is a SECOND STRIPPED EXECUTABLE from a different build configuration (unoptimised,
+# hence 76 MB vs 57 MB), named for its build config, not for debug info it does not carry.
+# F5 ships NO symbols and NO DWARF. So there is no symbol disclosure to remove.
+#
+# The real reason to remove it: it is a duplicate copy of every function --- 117,852 unwind
+# records vs the running binary's 72,142 --- compiled differently, at different addresses, and
+# WITHOUT our entry pads. That is ROP-gadget surface and a cross-build diffing aid. Lesser than
+# symbols would have been, still worth deleting, and 76 MB of executable nothing references has
+# no business in an appliance image. Nothing on the data path needs it.
 #
 # WHY AN OVERLAY RATHER THAN A PACKAGING CHANGE. The debug binary is installed by F5's
 # docker_build/Dockerfile.runtime. Editing that file would make it a FOURTH modified F5 file,

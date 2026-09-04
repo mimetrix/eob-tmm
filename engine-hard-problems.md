@@ -545,29 +545,58 @@ the embedded `.BTF` has no on-box consumer, so strip it.** Then —
 - the **address-bearing hook map** stays a build/sign artifact and is never shipped — TMM resolves its own
   pads at arm time, by symbol, live (`http_parse_client_headers -> 0xccc604`, computed on the box, not read
   from a shipped table);
-- **debug symbols** are stripped from the shipped image (never ship `tmm.debug`).
+- **symbols** need no action — F5 already ships both binaries `stripped` with `symtab FUNC: 0` (measured
+  2026-09-04 on the pristine image; see [`CONTESTED-PREMISES.md`](CONTESTED-PREMISES.md) §14, which retires
+  the earlier claim that `tmm.debug` was 76 MB of symbols). The unreferenced `tmm.debug` executable should
+  still go, for duplicate-code rather than symbol reasons.
 
 The principle, stated for the TMA: **the appliance binary should reveal as little of its own layout and
-addressing as the mechanism allows.** BTF, the address map, and symbols are build- and sign-time material;
-none needs to be reachable from the data path, and each one that is becomes reconnaissance for the next bug.
+addressing as the mechanism allows.** BTF and the address map are build- and sign-time material; neither
+needs to be reachable from the data path, and each one that is becomes reconnaissance for the next bug.
+
+**Scoped honestly, two of the three are already settled and only one is ours.** Symbols: absent from F5's
+shipped image already. Function boundaries: **public whether or not we pad** — `.eh_frame_hdr` holds a
+sorted table of 72,142 function start addresses, unchanged by the pad flag, because unwind metadata needs
+it. So the entry pad, the one build change this work requires, adds **no ELF disclosure at all**, and the
+whole of the remaining exposure is the **`.BTF` section we embed** — which is *richer* than a symbol table,
+since it gives every internal struct's fields and offsets rather than just function names. That makes the
+deferred item below the only one that changes the picture.
 
 **Day-one vs. deferred:**
 
-- **Day-one:** verify-then-parse (already the order); strip debug symbols from the shipped image and never
-  resolve to `tmm.debug`; keep the address-bearing hook map off the appliance (TMM resolves pads itself).
+- **Day-one:** verify-then-parse (already the order); drop the unreferenced `tmm.debug` executable and never
+  resolve to it; keep the address-bearing hook map off the appliance (TMM resolves pads itself).
 
-  **Done and measured (2026-09-01).** The image carried `/usr/bin/tmm64.debug` — **76 MB of symbols for a
-  binary TMM does not even run**. Two facts came out of removing it:
-  1. **`/usr/bin/tmm64.no_pgo`, the binary that actually runs, is already stripped** (`nm` finds no symbol
-     table). So the entire symbol disclosure was the *separate* debug file, not the running image.
+  **Done and measured (2026-09-01); the stated reason was FALSIFIED on 2026-09-04.** The image carries
+  `/usr/bin/tmm64.debug`, 76 MB, and this section said it was *"76 MB of symbols."* **It is not.** Read on
+  the build box against the **pristine F5 image** (`tmm-img:v10.207.3-HEAD.b13f8f034e`, unmodified by us):
+
+  ```
+  tmm64.debug    76,019,416  ELF executable, stripped   symtab FUNC: 0   .debug_*: 0   .BTF: 0
+  tmm64.no_pgo   57,107,456  ELF executable, stripped   symtab FUNC: 0   .debug_*: 0   .BTF: 0
+  build ids       1f7b70d0…            269b5d25…        <- DIFFERENT builds, not a debug companion
+  ```
+
+  So `tmm64.debug` is **a second stripped executable** — a different build configuration of TMM
+  (unoptimised, hence 76 MB against 57 MB), named for its build config, not for debug information it does
+  not carry. **F5 ships no symbols and no DWARF in either binary.** Three facts follow:
+  1. **The running binary was never the symbol exposure, and neither was the debug binary.** There is no
+     symbol exposure in the shipped image at all — `symtab FUNC: 0` in both.
   2. Removing it needs a check first, not an `rm`: `docker_build/Dockerfile.runtime` does
      `if test -f /usr/bin/tmm.debug; then ln -sf /usr/bin/tmm.debug /usr/bin/tmm; fi`, so on an image built
      with the debug binary present **the entrypoint can resolve to it** — deleting it there leaves a
      dangling entrypoint that looks fine until it runs.
 
+  3. **The script is still worth running, for a different reason than it claims.** What 76 MB of unreferenced
+     executable actually exposes is a **second copy of every function** — 117,852 unwind records against the
+     running binary's 72,142 — compiled differently, at different addresses, and **without our entry pads**.
+     That is ROP-gadget surface and a cross-build diffing aid, not a symbol table. Lesser than symbols,
+     still worth deleting, and the deletion argument does not depend on the false premise.
+
   `env/scripts/bnk-strip-debug.sh` does it safely: resolve `/usr/bin/tmm` first, refuse if it lands on a
   debug binary, remove the artifacts in a layer, then verify 0 remain **and** the entrypoint is still
   executable. Verified on the demo image: `debug artifacts remaining : 0`, `tmm -> tmm64.no_pgo`, intact.
+  Its header comment carried the same false reason and was corrected in the same edit (2026-09-04).
 
   **Its honest limit, and the production fix.** A layer makes the file *unreadable in the container* — the
   reconnaissance goal — but the bytes stay in the lower layer, so image and registry **size do not shrink**.
@@ -592,7 +621,8 @@ reads the two items already done as the whole job.
 
 | item | state |
 |---|---|
-| Debug symbols out of the shipped image | **done.** `env/scripts/bnk-strip-debug.sh` removes `tmm64.debug` (76 MB) after checking the entrypoint does not resolve to it. Bonus finding: `tmm64.no_pgo`, the binary that actually runs, is **already stripped** — the whole symbol exposure was that one extra file |
+| Debug symbols out of the shipped image | **done, and the premise was wrong.** `env/scripts/bnk-strip-debug.sh` removes `tmm64.debug` (76 MB) after checking the entrypoint does not resolve to it. **But it is not symbols** — measured 2026-09-04, both shipped binaries are `stripped`, `symtab FUNC: 0`, no `.debug_*`. `tmm64.debug` is a second *stripped executable* from a different build (build id `1f7b70d0…` vs `269b5d25…`). There is **no symbol disclosure in F5's shipped image**; removing the file buys duplicate-code removal, not symbol removal |
+| Function **boundaries** hidden by not padding | **not achievable, and never was.** `.eh_frame_hdr` in the stripped shipped binary holds a sorted, binary-searchable table of **72,142** function start addresses — required unwind metadata, present before we touched the build. The entry pad discloses nothing a `readelf` of F5's own binary does not already hand over |
 | Address-bearing hook map off the appliance | **already true.** It lives in the toolbox pod; TMM resolves its own pads by symbol at arm time |
 | Embedded `.BTF` (full type layout) | **present, and load-bearing.** CO-RE relocation runs on-box and reads it from `/proc/self/exe` |
 | ELF + `.BTF.ext` parsing on the data path | **present.** `ubpf_load_elf` + `ls_core_relo`, behind signature verification |
