@@ -496,67 +496,87 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
                         "builds %u and a mismatch would be silent\n",
                 (unsigned)SHIELD_CTX_ABI_VERSION);
 
-    /* THE SIGNED BUILD RANGE, compared to something for the first time.
-     *
-     * It has been in the binding since the ABI was written, covered by the
-     * signature, and printed into every audit record --- and until 2026-09-04
-     * nothing read it. Three trails that all looked like enforcement, and no
-     * enforcement. CONTESTED-PREMISES.md 15; the decision itself and why a
-     * "range" over a SHA-1 is almost always meaningless are in ls_build_gate.h.
-     *
-     * Placed here, beside the ctx-abi check, for the same reason that one is
-     * here: both refuse a program built against a DIFFERENT TMM, both are
-     * correctness rather than security (the signature is what stops a forgery),
-     * and both must answer before any work is handed to a TMM thread.
-     *
-     * THE WILDCARD IS ACCEPTED. sign_shield.py has defaulted to 0..0xffffffff
-     * since it was written and bnk-build-programs.sh passes no range at all, so
-     * every program the pipeline has produced carries it. Refusing it here would
-     * brick every existing artifact the day this ships and prove nothing --- the
-     * fix is in the pipeline, which now passes the real range. Logged loudly so
-     * the breadth is visible rather than assumed. */
-    {
-        uint32_t running = 0;
-        enum ls_build_verdict bv = ls_build_gate(ls_audit_build_id(),
-                                                 m->binding.build_min,
-                                                 m->binding.build_max, &running);
-        if (bv == LS_BUILD_MISMATCH || bv == LS_BUILD_BAD_RANGE ||
-            bv == LS_BUILD_NO_ID) {
-            reply(fd, "ERR build gate: %s (signed 0x%08x..0x%08x, running 0x%08x). "
-                      "Re-sign this program for this build.\n",
-                  ls_build_strerror(bv), (unsigned)m->binding.build_min,
-                  (unsigned)m->binding.build_max, (unsigned)running);
-            fprintf(stderr, "ls_vm: REFUSED --- %s: signed 0x%08x..0x%08x, "
-                            "running 0x%08x\n", ls_build_strerror(bv),
-                    (unsigned)m->binding.build_min, (unsigned)m->binding.build_max,
-                    (unsigned)running);
-            return;
-        }
-        if (bv == LS_BUILD_WILDCARD)
-            fprintf(stderr, "ls_vm: build range is the WILDCARD (0..0xffffffff) --- "
-                            "accepted, but this program is vouched for on EVERY "
-                            "build, including ones its field offsets do not fit. "
-                            "Sign with --build-min/--build-max 0x%08x.\n",
-                    (unsigned)running);
-        else
-            fprintf(stderr, "ls_vm: build gate OK --- signed for 0x%08x, running "
-                            "0x%08x\n", (unsigned)m->binding.build_min,
-                    (unsigned)running);
-    }
-
-    /* expires_with IS STILL NOT CHECKED, and that is a decision rather than an
-     * oversight. Its semantics were never defined --- "encoded build id ->
-     * auto-retire" cannot be evaluated on a box that does not know which build
-     * superseded which --- and inventing a meaning in order to enforce it would be
-     * worse than a documented gap. Pre-registered in 02-RESEARCH-PARAMETERS.md P9.
-     * TODO(f5): define it (a uint32 epoch is the obvious candidate) or delete it. */
-    if (m->binding.expires_with != 0u && m->binding.expires_with != 0xffffffffu)
-        fprintf(stderr, "ls_vm: expires_with=0x%08x is set but UNDEFINED and "
-                        "unchecked --- it constrains nothing\n",
-                (unsigned)m->binding.expires_with);
-
     switch (m->op) {
     case SHIELD_OP_LOAD: {
+        /* THE SIGNED BUILD RANGE, compared to something for the first time.
+         *
+         * It has been in the binding since the ABI was written, covered by the
+         * signature, and printed into every audit record --- and until 2026-09-04
+         * nothing read it. Three trails that all looked like enforcement, and no
+         * enforcement. CONTESTED-PREMISES.md 15; the decision itself, and why a
+         * "range" over a SHA-1 is almost always meaningless, are in
+         * ls_build_gate.h.
+         *
+         * INSIDE case SHIELD_OP_LOAD, DELIBERATELY, AND THE FIRST VERSION HAD IT
+         * OUTSIDE. Placed before `switch (m->op)` --- which is where the ctx-abi
+         * check sits --- an admission gate also answers for STATUS, DISARM and
+         * REVOKE. REVOKE is the kill switch. A gate that can refuse the kill
+         * switch is strictly worse than one that admits a stale program: the
+         * failure it creates (cannot disarm a misbehaving shield on a live data
+         * plane) is more serious than the one it prevents. LOAD is the only
+         * operation that admits new code, so LOAD is the only one gated.
+         * SET_MODE is left alone because it introduces no code and is already
+         * bounded by the signed mode_ceiling.
+         *
+         * THE WILDCARD AND THE ALL-ZERO RANGE ARE BOTH ACCEPTED, for different
+         * reasons, both transitional. sign_shield.py has defaulted to
+         * 0..0xffffffff since it was written, so every signed artifact carries the
+         * wildcard; and ls_client.py never sets the field at all, so every
+         * message carries 0..0. Refusing either would break every existing client
+         * and artifact on the day this shipped while proving nothing. Neither is
+         * an attacker escape --- the range is inside the signature, so only our
+         * own key can assert a wildcard, and an undeclared range is refused as
+         * soon as the clients set it. Both are logged loudly so the breadth is
+         * visible rather than assumed. */
+        {
+            uint32_t running = 0;
+            enum ls_build_verdict bv = ls_build_gate(ls_audit_build_id(),
+                                                     m->binding.build_min,
+                                                     m->binding.build_max, &running);
+            if (bv == LS_BUILD_MISMATCH || bv == LS_BUILD_BAD_RANGE ||
+                bv == LS_BUILD_NO_ID) {
+                reply(fd, "ERR build gate: %s (signed 0x%08x..0x%08x, running "
+                          "0x%08x). Re-sign this program for this build.\n",
+                      ls_build_strerror(bv), (unsigned)m->binding.build_min,
+                      (unsigned)m->binding.build_max, (unsigned)running);
+                fprintf(stderr, "ls_vm: REFUSED --- %s: signed 0x%08x..0x%08x, "
+                                "running 0x%08x\n", ls_build_strerror(bv),
+                        (unsigned)m->binding.build_min,
+                        (unsigned)m->binding.build_max, (unsigned)running);
+                return;
+            }
+            if (bv == LS_BUILD_WILDCARD)
+                fprintf(stderr, "ls_vm: build range is the WILDCARD "
+                                "(0..0xffffffff) --- accepted, but this program is "
+                                "vouched for on EVERY build, including ones its "
+                                "field offsets do not fit. Sign with "
+                                "--build-min/--build-max 0x%08x.\n",
+                        (unsigned)running);
+            else if (bv == LS_BUILD_UNDECLARED)
+                fprintf(stderr, "ls_vm: build range UNDECLARED (0..0) --- accepted, "
+                                "but nothing constrains this program to build "
+                                "0x%08x. The client did not set it.\n",
+                        (unsigned)running);
+            else
+                fprintf(stderr, "ls_vm: build gate OK --- signed for 0x%08x, "
+                                "running 0x%08x\n",
+                        (unsigned)m->binding.build_min, (unsigned)running);
+        }
+
+        /* expires_with IS STILL NOT CHECKED, and that is a decision rather than
+         * an oversight. Its semantics were never defined either --- "encoded build
+         * id -> auto-retire" cannot be evaluated on a box that does not know which
+         * build superseded which --- and inventing a meaning in order to enforce it
+         * would be worse than a documented gap. Pre-registered in
+         * 02-RESEARCH-PARAMETERS.md P9.
+         *   TODO(f5): define it (a uint32 epoch is the obvious candidate) or delete
+         *   the field. A field that constrains nothing is worse than no field: it
+         *   reads, in the audit record, exactly like one that does. */
+        if (m->binding.expires_with != 0u && m->binding.expires_with != 0xffffffffu)
+            fprintf(stderr, "ls_vm: expires_with=0x%08x is set but UNDEFINED and "
+                            "unchecked --- it constrains nothing\n",
+                    (unsigned)m->binding.expires_with);
+
         /* SIGNATURE IS VERIFIED ON THE TMM THREAD, not here. See ls_prep_run_pending.
          *
          * FALSIFIED 2026-08-20, and the correct answer was 350 lines above this one. The first

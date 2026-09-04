@@ -61,10 +61,28 @@
 enum ls_build_verdict {
     LS_BUILD_OK = 0,       /* min == max and it matches the running build       */
     LS_BUILD_WILDCARD,     /* 0..0xffffffff --- accepted, must be logged loudly */
+    LS_BUILD_UNDECLARED,   /* 0..0 --- the field was never set; see below       */
     LS_BUILD_MISMATCH,     /* signed for exactly one build, and not this one    */
     LS_BUILD_BAD_RANGE,    /* a range over a hash: meaningless, so refused      */
     LS_BUILD_NO_ID         /* the running build id is unreadable --- fail closed */
 };
+
+/* AN ALL-ZERO RANGE IS "UNDECLARED", NOT "BUILD ZERO", AND GETTING THIS WRONG
+ * WOULD HAVE BRICKED THE LOADER. ls_client.py builds its message as
+ * `bytearray(HDR)` and sets only op, epoch, mode, prog_len and hook --- so every
+ * request from the real client carries build_min = build_max = 0. Read literally
+ * that is min == max, which is the "exactly one build" form, and it mismatches
+ * every real build id. The first version of this header did read it literally and
+ * would have refused every load, arm, status and disarm the moment it shipped.
+ *
+ * It is the same transition case ls_vm_load.c already handles for
+ * ctx_abi_version == 0, for the same reason and with the same remedy: accept, log
+ * so the silence is visible, and remove the acceptance once every client sets the
+ * field. A build id of exactly 0x00000000 is not a real risk to distinguish ---
+ * it is one value out of 2^32 in a SHA-1 prefix --- and if it ever occurs the
+ * program is admitted rather than refused, which is the safe direction for a
+ * transition measure.
+ *   TODO(f5): make 0..0 a refusal once ls_client.py sets the range. */
 
 #define LS_BUILD_WILDCARD_MIN 0x00000000u
 #define LS_BUILD_WILDCARD_MAX 0xffffffffu
@@ -75,6 +93,7 @@ ls_build_strerror(enum ls_build_verdict v)
     switch (v) {
     case LS_BUILD_OK:        return "signed for this build";
     case LS_BUILD_WILDCARD:  return "signed for ANY build";
+    case LS_BUILD_UNDECLARED:return "no build range declared";
     case LS_BUILD_MISMATCH:  return "signed for a different build";
     case LS_BUILD_BAD_RANGE: return "build range spans a hash and cannot be honoured";
     case LS_BUILD_NO_ID:     return "this binary's build id is unreadable";
@@ -123,6 +142,8 @@ ls_build_gate(const char *running_hex, uint32_t bmin, uint32_t bmax,
      * on any binary whose build id we cannot parse. */
     if (bmin == LS_BUILD_WILDCARD_MIN && bmax == LS_BUILD_WILDCARD_MAX)
         return LS_BUILD_WILDCARD;
+    if (bmin == 0u && bmax == 0u)
+        return LS_BUILD_UNDECLARED;      /* every ls_client.py message --- see above */
 
     if (!ok)
         return LS_BUILD_NO_ID;               /* fail closed once a range is asserted */

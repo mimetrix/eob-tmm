@@ -75,6 +75,20 @@ main(void)
            "0 .. 0xffffffff                     -> WILDCARD  (every program the "
            "pipeline has ever signed)");
 
+        /* THE CASE THE FIRST VERSION OF THIS FILE DID NOT HAVE, and its absence
+         * is why 18 assertions passed on a change that would have refused every
+         * load, arm, status and disarm the moment it shipped. ls_client.py builds
+         * its message as bytearray(HDR) and never sets this field, so EVERY real
+         * request carries 0..0 -- which read literally is min == max, the
+         * "exactly one build" form, mismatching every real build id.
+         *
+         * I chose the test cases, so the test agreed with me. The defect was
+         * found by going to look at what the client actually sends. */
+        v = ls_build_gate(REAL, 0u, 0u, &run);
+        OK(v == LS_BUILD_UNDECLARED,
+           "0 .. 0 (what ls_client.py sends)  -> UNDECLARED, accepted -- NOT "
+           "read as \"build zero\" and refused");
+
         v = ls_build_gate(REAL, 0x00000000u, 0x269b5d25u, &run);
         OK(v == LS_BUILD_BAD_RANGE,
            "0 .. this build                     -> BAD_RANGE, not a pass -- a "
@@ -113,18 +127,32 @@ main(void)
            "arriving cannot brick an unparseable binary");
     }
 
+    printf("\nundeclared is distinct from the wildcard, and from a real zero build\n");
+    {
+        uint32_t run = 0;
+        OK(ls_build_gate(REAL, 0u, 0u, &run) != ls_build_gate(REAL, 0u, 0xffffffffu, &run),
+           "0..0 and 0..0xffffffff are DIFFERENT verdicts -- one is a client that "
+           "never set the field, the other is a signature that vouched for every build");
+        /* A binary whose build id genuinely begins 00000000 and a program signed
+         * for it: the transition rule admits it. Asserted so the trade is explicit
+         * rather than discovered later. */
+        OK(ls_build_gate("00000000abcd", 0u, 0u, &run) == LS_BUILD_UNDECLARED,
+           "a real 0x00000000 build + 0..0 is admitted as UNDECLARED -- the one "
+           "value in 2^32 the transition rule cannot distinguish, and it fails OPEN");
+    }
+
     printf("\nevery verdict has a distinct message\n");
     {
         const enum ls_build_verdict all[] = {
-            LS_BUILD_OK, LS_BUILD_WILDCARD, LS_BUILD_MISMATCH,
-            LS_BUILD_BAD_RANGE, LS_BUILD_NO_ID
+            LS_BUILD_OK, LS_BUILD_WILDCARD, LS_BUILD_UNDECLARED,
+            LS_BUILD_MISMATCH, LS_BUILD_BAD_RANGE, LS_BUILD_NO_ID
         };
         int n = (int)(sizeof all / sizeof all[0]), distinct = 1;
         for (int i = 0; i < n; i++)
             for (int j = i + 1; j < n; j++)
                 if (strcmp(ls_build_strerror(all[i]), ls_build_strerror(all[j])) == 0)
                     distinct = 0;
-        OK(distinct, "5 verdicts, 5 different strings -- a refusal names its reason");
+        OK(distinct, "6 verdicts, 6 different strings -- a refusal names its reason");
     }
 
     printf("\n%s (%d failure%s)\n", fails ? "*** FAILED" : "all assertions passed",

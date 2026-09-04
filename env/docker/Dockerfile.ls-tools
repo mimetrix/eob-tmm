@@ -65,8 +65,16 @@ COPY --chmod=0755 tmm64.no_pgo /usr/bin/tmm64.no_pgo
 # Repointing here rather than patching an F5 build file keeps the fix with the thing
 # that depends on it: this layer exists to make arming by name work, and arming needs
 # the padded binary. tmm64.debug is LEFT IN PLACE --- once tmm does not resolve to it
-# its presence is harmless, and deleting a 76 MB debugging aid to work around a symlink
-# would be the wrong trade.
+# its presence is harmless.
+#
+# CORRECTED 2026-09-04: this used to call it "a 76 MB debugging aid". It is not a
+# debugging aid and carries no debug information --- measured on the pristine F5
+# image, it is a second STRIPPED executable from a different build configuration
+# (symtab FUNC: 0, no .debug_*, build id 1f7b70d0 vs the running 269b5d25), 76 MB
+# against 57 because it is unoptimised. So the reason to keep it is weaker than
+# stated and the reason to delete it is different: 76 MB of duplicate, unpadded
+# copies of every function is ROP surface. env/scripts/bnk-strip-debug.sh removes
+# it; CONTESTED-PREMISES.md 14.
 RUN ln -sf /usr/bin/tmm.default /usr/bin/tmm
 
 COPY --chmod=0644 ls_buildid.py      /usr/share/ls/ls_buildid.py
