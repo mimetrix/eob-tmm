@@ -97,7 +97,35 @@ objcopy --add-section .BTF=tmm.btf --set-section-flags .BTF=readonly,data \
 - **`--lang_exclude=c++`** skips the Tcl/STL C++ compilation units BTF can't represent (TMM embeds
   Tcl for iRules). The surface structs are all C and are kept.
 - **`objcopy --add-section` preserves the GNU build-id** (verified), so embedding is invisible to the
-  arming build-id gate. The BTF now travels *inside* the exact binary that runs — it cannot drift.
+  arming build-id gate. The BTF travels *inside* the exact binary that runs — it cannot drift. That
+  non-drift property is real, and it is what `LS_EMBED_BTF=0` gives up in exchange for the section
+  not being there at all.
+- **`LS_EMBED_BTF=0` ships a binary with no type information** — removing 6,711,805 bytes naming
+  41,710 functions and 16,006 struct layouts, the only layout disclosure in an image whose binaries
+  F5 already ships `stripped`. It requires every program to have been relocated at sign time (step
+  4b), because a program still carrying `.BTF.ext` can only be resolved against an embedded `.BTF`.
+  Default is still `1`; see P9 for why the flip waits on an arm.
+
+### 4b · Build the programs — **and this now has to come AFTER packaging**
+
+```bash
+# on the BUILD BOX: clang 18, PREVAIL, the signing key and tmm.btf are all there
+TMM_BTF=$HOME/lstools/tmm.btf env/scripts/bnk-build-programs.sh
+```
+
+**Why the order became load-bearing (2026-09-04).** It never used to matter: programs were
+build-independent, carrying field *names* and being relocated on-box at load. Sign-time relocation
+(`02-RESEARCH-PARAMETERS.md` P9) changes that — the stage now reads the **packaged** binary to bake
+field offsets and to pin `build_min`/`build_max`, so running it before `bnk-package.sh` produces
+artifacts pinned to the *previous* build. They will then be refused at load by the build gate, which
+is the gate working correctly and an annoying way to discover a pipeline-order mistake.
+
+So: **`bnk-package.sh` → `bnk-build-programs.sh` → `bnk-bake-tools.sh`.** Packaging re-links the
+binary and the build id differs from `make tmm`'s, which is exactly why the programs must be signed
+against the packaged one.
+
+The run reports which target it read, and refuses to sign a relocated program that has no build
+range to bind it to — baked offsets vouched for on every build are a silent wrong-offset load.
 
 ### 5 · Bake the image — build artifacts only
 ```bash
