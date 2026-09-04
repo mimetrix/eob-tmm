@@ -154,8 +154,12 @@ The audience is a skeptical engineering + security review; credibility comes fro
 The visual explainers in `explainers/` use the `explainer` skill's design system — self-contained,
 theme-aware HTML. **One job per page**; keep each single-purpose and cross-linked only when it
 helps. Current set: the programmable-data-plane **engine** and the **engine hard-problems**
-register, plus the **live-surface** product one-pager. (Shield is one of the four surfaces; a
-dedicated shield/CVE explainer is deferred until that story is demonstrated end to end.) Companion design docs live at the repo root
+register, the **live-surface** product one-pager, and — no longer deferred, because the story is
+now demonstrated end to end — **`cve-mitigation.html`**, whose worked example is the shield that
+actually stopped CVE-2025-41414 (`cve-41414-demonstration.md`). `substrate-as-built.html` stays as
+the as-built record. **Retired 2026-09-04:** `presentations/shield-live-demo.html`, which was built
+entirely around `dtls_tx` — an internal finding with **no CVE id** — and is superseded by
+`presentations/cve-mitigation-demo.html`. Companion design docs live at the repo root
 (`engine-hard-problems.md`, `data-plane-egress-primitives.md`, `embedded-ebpf-substrate.md`,
 `big-ip-live-surface-design.md`, `tmm-usdt-tracepoints.md`).
 

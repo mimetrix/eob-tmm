@@ -82,9 +82,11 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-si
       removed on live traffic with no restart, and written once to run on any build. One general
       engine hosts a family of surfaces (observe, diagnose, protect); it is the same class of
       technology that made the Linux kernel programmable (eBPF), brought inside TMM.</p>
-    <div class="proof"><span class="dot"></span><span>Proven live in the lab: a program attached to
-      an internal traffic function on a running BIG-IP Next, read internal state on real requests,
-      and was removed — <b>no restart, no traffic impact</b>.</span></div>
+    <div class="proof"><span class="dot"></span><span>Proven live in the lab: a <b>published CVE
+      (CVE-2025-41414) crashed BIG-IP Next from one ordinary client request</b>, and a verified
+      program attached to the faulting function <b>stopped it</b> — matching 10 of 10 attacking
+      requests and 0 of 10 ordinary ones, then removed again with <b>no restart and no traffic
+      impact</b>.</span></div>
   </header>
 
   <div class="cols">
@@ -149,13 +151,15 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-si
 
     <section>
       <h2>Status — honest</h2>
-      <p class="sub">A working lab demonstration, not yet a shipping feature.</p>
+      <p class="sub">A working lab demonstration, not yet a shipping feature. Updated 2026-09-04.</p>
       <div class="status">
         <div><span class="k">Runtime engine + safety check</span><span class="tag t-live">Working</span></div>
         <div><span class="k">Signing &amp; controlled load</span><span class="tag t-live">Working</span></div>
         <div><span class="k">Live attach / read / remove</span><span class="tag t-live">Demonstrated</span></div>
         <div><span class="k">Portable across builds</span><span class="tag t-live">Demonstrated</span></div>
-        <div><span class="k">Per-fire cost floor (~570 ns)</span><span class="tag t-live">Measured</span></div>
+        <div><span class="k">Named CVE stopped end-to-end, by real traffic</span><span class="tag t-live">Measured</span></div>
+        <div><span class="k">Per-fire cost floor (~25 ns, 1.1B samples)</span><span class="tag t-live">Measured</span></div>
+        <div><span class="k">Live view of the data plane's scheduler</span><span class="tag t-live">Demonstrated</span></div>
         <div><span class="k">Full cost under production traffic</span><span class="tag t-next">Next</span></div>
         <div><span class="k">Security review for enforcement</span><span class="tag t-next">Next</span></div>
         <div><span class="k">Productization &amp; supportability</span><span class="tag t-next">Next</span></div>

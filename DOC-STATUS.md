@@ -167,3 +167,16 @@ traffic"* line and have been corrected in-repo.
 **Anything already published as a claude.ai Artifact still shows the old text** — editing the repo
 file does not change a published page, and republishing needs the owner's explicit per-item approval
 (convention 1). Treat the hosted copies as stale until that approval is given.
+
+### Retired 2026-09-04
+
+`presentations/shield-live-demo.html` — **deleted.** Its entire spine was `dtls_tx`, a
+fragment-length overflow that is an internal finding with **no CVE id**, and there is a standing
+rule here that a target without a CVE id is not a business claim. Superseded by
+`presentations/cve-mitigation-demo.html`, whose subject is a published CVE demonstrated end to end.
+The mechanism content it carried (verifier, trampoline, two-compile path) is not lost — it lives in
+`explainers/programmable-dataplane-engine.html` and `substrate-as-built.html`.
+
+**Deleting the repo file does not remove anything already published.** Any hosted Artifact made from
+it still exists and still shows `dtls_tx` as the worked example; removal from the claude.ai gallery
+is manual and cannot be done from tooling.
