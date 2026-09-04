@@ -2,6 +2,26 @@
 # Bake the live-surface tools into a built TMM image. RUNS ON THE BUILD BOX.
 #
 #   bnk-bake-tools.sh [base-tag] [out-tag]      default: tmm:local -> tmm:ls
+#   bnk-bake-tools.sh --btf-only                stop after deriving $CTX/tmm.btf
+#
+# --btf-only EXISTS TO BREAK A CIRCULAR DEPENDENCY, added 2026-09-04. Step 1b below
+# derives this build's BTF, and since sign-time relocation
+# (02-RESEARCH-PARAMETERS.md P9) the PROGRAM build needs that file --- for the build
+# just packaged, not the previous one. But the derivation lives in here, so a fresh
+# build otherwise has to bake once to get tmm.btf, build the programs, then bake
+# again: two full bakes, one of them thrown away.
+#
+# The derivation was never really part of imaging. It is a per-build artifact that
+# two other stages consume (gen_type_catalog.py needs it for tmmtrace too). So:
+#
+#   bnk-package.sh
+#   bnk-bake-tools.sh --btf-only        <- produces $CTX/tmm.btf and stops
+#   TMM_BTF=$CTX/tmm.btf bnk-build-programs.sh
+#   bnk-bake-tools.sh [--] [base] [out]
+#
+# Using the PREVIOUS build's BTF here is the failure to avoid: offsets would be
+# baked from the wrong layout, and the signature and the PREVAIL proof would both
+# cover wrong-but-consistent bytes, so every gate downstream would pass.
 #
 # WHAT THIS REPLACES. The tools used to be kubectl cp'd into running pods. That
 # leaves no record, does not survive a restart, differs per pod, and happens in front
@@ -22,6 +42,9 @@
 set -e
 
 BASE="${1:-tmm:local}"
+BTF_ONLY=""
+if [ "$1" = "--btf-only" ]; then BTF_ONLY=1; shift; fi
+[ "$1" = "--" ] && shift
 OUT="${2:-tmm:ls}"
 TMM="${TMM:-$HOME/code/tmm}"
 DEBS="${DEBS:-$TMM/docker_build/DEBS/amd64}"
@@ -125,6 +148,17 @@ else
     [ "$BID_BEFORE" = "$BID_AFTER" ] || fail "objcopy changed the build-id ($BID_BEFORE -> $BID_AFTER) --- would break the arming gate"
     echo "  BTF: $(du -h "$CTX/tmm.btf" | cut -f1) embedded into tmm64.no_pgo; build-id preserved (${BID_AFTER%${BID_AFTER#????????}})"
     echo "       (set LS_EMBED_BTF=0 to ship a binary with no type information --- P9 phase 3c)"
+fi
+
+if [ -n "$BTF_ONLY" ]; then
+    echo
+    echo "=== --btf-only: stopping here ==="
+    echo "  $CTX/tmm.btf  ($(wc -c < "$CTX/tmm.btf") bytes, build ${BID_BEFORE%${BID_BEFORE#????????}})"
+    echo
+    echo "  Next: TMM_BTF=$CTX/tmm.btf env/scripts/bnk-build-programs.sh"
+    echo "        then bnk-bake-tools.sh (add LS_EMBED_BTF=0 to ship a binary with no"
+    echo "        type information --- every program must be relocated first)."
+    exit 0
 fi
 
 echo

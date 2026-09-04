@@ -124,6 +124,20 @@ So: **`bnk-package.sh` → `bnk-build-programs.sh` → `bnk-bake-tools.sh`.** Pa
 binary and the build id differs from `make tmm`'s, which is exactly why the programs must be signed
 against the packaged one.
 
+> **The circular dependency this creates, and how to get out of it.** `tmm.btf` is derived *inside*
+> `bnk-bake-tools.sh` (step 1b, pahole on the debuginfo DEB) — but step 4b now *needs* it, and it
+> must be the BTF of the build just packaged, not the previous one. So on a fresh build the order is
+> **bake once to produce `tmm.btf`, then build the programs, then bake again**, which pays for a bake
+> twice for no reason.
+>
+> The derivation is not really part of imaging: it is a per-build artifact two other stages consume
+> (`gen_type_catalog.py` needs it for `tmmtrace` as well). **It belongs in its own step before the
+> program build** — `bnk-bake-tools.sh --btf-only` stops after step 1b for exactly this. Using the
+> *previous* build's BTF here is the failure mode to avoid: the offsets would be baked from the wrong
+> layout and every gate downstream would pass, because the signature and the proof would both cover
+> the wrong-but-consistent bytes. The build gate catches the mismatch only because the range is
+> pinned separately.
+
 The run reports which target it read, and refuses to sign a relocated program that has no build
 range to bind it to — baked offsets vouched for on every build are a silent wrong-offset load.
 
