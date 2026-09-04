@@ -306,13 +306,20 @@ measured: `ls_build_gate.h`, 20 assertions off-TMM, and **9 of 9 on a live deplo
 refused; the verdict is on the log with both ids. The pipeline additionally **refuses to sign** a
 relocated program that has no build range, which is the coupling that makes baked offsets safe.
 
-**Falsifier 3 — DOES NOT FIRE (2026-09-04).** `substrate/check_prevail_after_relo.sh`: 12 programs,
-**12 unchanged PREVAIL verdicts, 0 changed**, against this build's BTF. Both directions are treated
-as findings — a `PASS → REJECT` would mean the proof relied on the placeholder layout, and a
-`REJECT → PASS` would mean a `reject_*` negative test had stopped testing anything. `reject_memory`
-stays REJECT. **Scope:** run where PREVAIL and clang live, which *is* the pipeline's verification
-stage — but that clang is 14 and the build box is 18, and that difference has flipped a PREVAIL
-verdict before. Authoritative for this stage, not for the build box.
+**Falsifier 3 — DOES NOT FIRE, and it is now a CONCLUSION rather than a hint (2026-09-04).**
+`substrate/check_prevail_after_relo.sh`: 12 programs, **12 unchanged PREVAIL verdicts, 0 changed**.
+Run twice — under clang 14 in the dev sandbox, then **on the build box under clang 18, the pinned
+build compiler**, which is what makes it a conclusion (CLAUDE.md rule 5 records clang-14 passing a
+program clang-18 refused). Identical result both times. Both directions are treated as findings — a
+`PASS → REJECT` would mean the proof relied on the placeholder layout, and a `REJECT → PASS` would
+mean a `reject_*` negative test had stopped testing anything. `reject_memory` stays REJECT.
+
+**And a premise of this whole plan was wrong, in the helpful direction.** The plan said the
+relocation stage faced an awkward cross-machine dependency because `tmm.btf` is produced on the build
+box while clang and PREVAIL live in the dev sandbox. **The build box has PREVAIL** — `bnk-stage.sh`
+stages it there and it runs — so that box holds all four things the stage needs: clang 18, PREVAIL,
+the signing key and `tmm.btf`. There is no cross-stage handoff to engineer; the stage should simply
+run there, which is also the only place its verdict is authoritative.
 
 **Falsifier 4 — HALF DISCHARGED, and the remaining half is deliberate.** The measurable half is done:
 `bnk-build-programs.sh` now runs **compile → relocate → strip → PREVAIL → sign**, and all **11

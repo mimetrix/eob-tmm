@@ -104,5 +104,19 @@ if [ "$CHANGED" -ne 0 ]; then
 fi
 echo
 echo "  PREVAIL's verdict is unchanged by relocation on every program that has any."
-echo "  Falsifier 3 does not fire HERE (clang $($CLANG --version | head -1 | grep -oE '[0-9]+' | head -1),"
-echo "  this stage's toolchain). The build box runs a different clang."
+# SAY WHICH TOOLCHAIN THIS WAS, and do not assert anything about the other one.
+# The first version of this line ended "The build box runs a different clang" ---
+# which is false when the script is run ON the build box, and it was. CLAUDE.md
+# rule 5 makes the distinction load-bearing: clang-14 once passed a program that
+# clang-18, the pinned build, REFUSED. So the host and compiler are reported and
+# the reader is told what that buys, rather than being handed a claim about a
+# machine this run never touched.
+_cv=$($CLANG --version | head -1 | grep -oE '[0-9]+' | head -1)
+echo "  Toolchain: clang $_cv on $(uname -n) ($(uname -m))."
+if [ "$_cv" = "18" ]; then
+    echo "  That is the PINNED build compiler, so this is a conclusion and not a hint"
+    echo "  (CLAUDE.md rule 5)."
+else
+    echo "  The pinned build compiler is clang 18. This is a HINT, not a conclusion ---"
+    echo "  re-run on the build box before relying on it (CLAUDE.md rule 5)."
+fi

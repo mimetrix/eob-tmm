@@ -17,11 +17,22 @@
 # direction. Compiling everything and baking whatever came out would bake a rejected program
 # on one path and, on the other, quietly lose the evidence that the verifier still works.
 #
-# WHERE THIS RUNS. clang and PREVAIL both, which today means the dev sandbox (PREVAIL built
-# from source, clang 14) rather than the build box (clang 18, no PREVAIL). That split is not
-# an accident of these two machines --- it is the shape the production pipeline is meant to
-# have: compile in dev/CI, verify and sign at F5, load on the target and nowhere else. The
-# script states which half it can do and refuses rather than skipping the other.
+# WHERE THIS RUNS --- CORRECTED 2026-09-04, and the correction matters for what a clean
+# result is worth. This said the split was forced: "the dev sandbox (PREVAIL built from
+# source, clang 14) rather than the build box (clang 18, no PREVAIL)". The build box DOES
+# have PREVAIL --- bnk-stage.sh puts it at ~/eob-tmm-staged/ebpf-verifier/bin/prevail, it
+# is an x86-64 binary and it runs there. So the build box has ALL FOUR things this stage
+# needs: clang 18, PREVAIL, the signing key ($HOME/.ls-signing) and this build's tmm.btf.
+#
+# RUN IT THERE BY PREFERENCE, because clang 18 is the PINNED build compiler and the
+# difference is not cosmetic: CLAUDE.md rule 5 records clang-14 passing a PREVAIL program
+# that clang-18 REFUSED. A verification taken under clang 14 is a hint about a program the
+# pinned toolchain may reject.
+#
+# The dev sandbox remains useful (it is where the sources are edited, and it has the same
+# PREVAIL), and the eventual production shape is still the one described before: compile in
+# dev/CI, verify and sign at F5, load on the target and nowhere else. What was wrong was
+# the claim that today's two machines FORCE that split. They do not.
 #
 # PREVAIL's defaults are permissive. --termination is "Default: ignore",
 # --allow-division-by-zero is "Default: allow", --strict is off. They are passed explicitly
