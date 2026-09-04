@@ -32,6 +32,38 @@ REPO="${REPO:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OUT="${1:-$HOME/lstools/shields}"
 PREVAIL="${PREVAIL:-$REPO/ebpf-verifier/bin/prevail}"
 
+# SIGN-TIME RELOCATION (02-RESEARCH-PARAMETERS.md P9). When this build's BTF is
+# available, field offsets are resolved HERE and the .BTF/.BTF.ext sections are
+# stripped from the artifact, so the shipped program carries baked offsets and the
+# appliance needs no type information of its own --- which is what lets the 6.7 MB
+# `.BTF` section come out of the binary.
+#
+# It also fixes something that was already wrong: today PREVAIL proves a program
+# whose offsets are still the local stub's, and the immediates are rewritten
+# afterwards inside TMM. So neither the proof nor the signed hash covers the bytes
+# that actually run. Relocating BEFORE verification and signing makes both cover
+# them. Measured not to change any PREVAIL verdict: substrate/check_prevail_after_relo.sh.
+#
+# WITHOUT THE BTF THIS STAGE SKIPS RELOCATION AND SAYS SO, LOUDLY, PER PROGRAM. It
+# does not fail: a program with .BTF.ext intact still loads against a binary that
+# embeds its own BTF, which is every binary until the bake stops embedding it. A
+# silent skip is what would be dangerous --- the artifact would look identical and
+# the disclosure would still be required.
+TMM_BTF="${TMM_BTF:-}"
+if [ -z "$TMM_BTF" ] && [ -s "$HOME/lstools/tmm.btf" ]; then
+    TMM_BTF="$HOME/lstools/tmm.btf"
+fi
+
+# llvm-objcopy, NOT objcopy. GNU objcopy cannot read a BPF ELF --- binutils 2.40
+# answers "Unable to recognise the format of the input file" --- and the failure is
+# quiet in the way that matters: an unstripped program still loads and verifies
+# perfectly, so the only casualty is the disclosure this strip exists to remove.
+# Resolved once and asserted, the same lesson as $READELF below.
+OBJCOPY=""
+for _c in llvm-objcopy llvm-objcopy-18 llvm-objcopy-14 /usr/lib/llvm-18/bin/llvm-objcopy; do
+    command -v "$_c" >/dev/null 2>&1 && { OBJCOPY="$_c"; break; }
+done
+
 # WHICH readelf, RESOLVED ONCE AND ASSERTED --- because a missing tool here reads as a broken
 # program. This used `llvm-readelf --sections` with 2>/dev/null, and on a build box configured from
 # the dev-machine playbook llvm-readelf is NOT on PATH: it ships at /usr/lib/llvm-18/bin and nothing
@@ -97,7 +129,31 @@ echo "  prevail  : $PREVAIL"
 echo "  out      : $OUT"
 echo
 
+# The relocator is the SAME SOURCE that runs inside TMM (src/base/ls_core_relo.c),
+# compiled here with its test driver. Not a second implementation --- that was the
+# point of check_relo_baked.py, which cross-checks this one against an independent
+# Python walk and agrees on every relocation.
+RELO=""
+if [ -n "$TMM_BTF" ] && [ -s "$TMM_BTF" ]; then
+    if [ -z "$OBJCOPY" ]; then
+        echo "  WARN sign-time relocation DISABLED --- no llvm-objcopy on PATH."
+        echo "       GNU objcopy cannot strip a BPF ELF, so the artifact could not be"
+        echo "       stripped even if it were relocated. Install llvm-objcopy."
+    elif cc -O2 -w -DLS_CORE_RELO_TEST "$REPO/substrate/ls_core_relo.c" -o "$TMP/relo" 2>/dev/null; then
+        RELO="$TMP/relo"
+        echo "  relocate : sign-time, against $TMM_BTF ($(wc -c < "$TMM_BTF") bytes)"
+        echo "  objcopy  : $OBJCOPY"
+    else
+        echo "  WARN sign-time relocation DISABLED --- ls_core_relo.c did not build here."
+    fi
+else
+    echo "  relocate : SKIPPED (no TMM_BTF) --- programs keep .BTF.ext and will be"
+    echo "             relocated ON-BOX, which requires the binary to embed its own .BTF"
+fi
+echo
+
 npass=0; nreject=0; nbad=0
+nreloc=0; nstrip=0; nskipreloc=0
 for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     [ -e "$f" ] || continue
     b=$(basename "$f" .bpf.c)
@@ -118,6 +174,42 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     sec=$($READELF "$o" 2>/dev/null | grep -oE 'f(entry|exit)/[^ ]*' | head -1)
     [ -n "$sec" ] || { echo "  *** $b: no fentry/ or fexit/ section --- nothing says what it attaches to"
                        nbad=$((nbad + 1)); continue; }
+
+    # RELOCATE, THEN STRIP, THEN VERIFY --- in that order, deliberately. PREVAIL
+    # must see the offsets that will actually execute, and the signature below must
+    # cover the stripped bytes, so both come after this.
+    RELOCATED=no
+    if [ -n "$RELO" ]; then
+        if "$RELO" "$o" "$TMM_BTF" "$TMP/$b.reloc" >"$TMP/rl" 2>&1; then
+            nr=$(grep -oE '[0-9]+ relo' "$TMP/rl" | grep -oE '^[0-9]+' | head -1)
+            mv "$TMP/$b.reloc" "$o"
+            "$OBJCOPY" --remove-section=.BTF --remove-section=.BTF.ext \
+                       --remove-section=.rel.BTF.ext "$o" 2>/dev/null || true
+            # VERIFY THE STRIP BY READING THE RESULT, not by trusting an exit code.
+            # A strip that silently no-ops leaves a working program and an intact
+            # disclosure, which is the one failure that would not announce itself.
+            left=$($READELF "$o" 2>/dev/null | grep -c '\.BTF' || true)
+            if [ "${left:-1}" -ne 0 ]; then
+                echo "  *** $b: relocated but the .BTF sections are STILL PRESENT after"
+                echo "      $OBJCOPY. Refusing to sign an artifact that still carries them."
+                nbad=$((nbad + 1)); continue
+            fi
+            RELOCATED=yes
+            nreloc=$((nreloc + 1))
+            RELNOTE="  reloc ${nr:-0}"
+        else
+            # A zero-relocation object is refused by the relocator (a known symptom).
+            # Nothing needed resolving, so the program is already build-independent;
+            # strip anyway so it carries no type information either.
+            "$OBJCOPY" --remove-section=.BTF --remove-section=.BTF.ext \
+                       --remove-section=.rel.BTF.ext "$o" 2>/dev/null || true
+            RELOCATED=yes
+            RELNOTE="  reloc 0"
+        fi
+    else
+        nskipreloc=$((nskipreloc + 1))
+        RELNOTE=""
+    fi
 
     if "$PREVAIL" "$o" "$sec" --termination --strict --no-division-by-zero \
                   --stack-size 256 >"$TMP/v" 2>&1; then got=PASS; else got=REJECT; fi
@@ -216,6 +308,19 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
             ????????*) BRANGE="--build-min 0x${_BID%${_BID#????????}} --build-max 0x${_BID%${_BID#????????}}" ;;
             esac
         fi
+        # A RELOCATED PROGRAM MUST NOT CARRY THE WILDCARD. This is the coupling the
+        # build gate was built for (CONTESTED-PREMISES.md 15). Baked offsets are
+        # valid for exactly ONE build; vouching for them on every build is how a
+        # program ends up reading the wrong bytes of a real TMM structure with
+        # PREVAIL's blessing and no complaint from anything. Refuse, do not warn:
+        # the artifact would look identical to a correct one.
+        if [ "$RELOCATED" = yes ] && [ -z "$BRANGE" ]; then
+            echo "  *** $b: offsets were BAKED at sign time but there is no build range"
+            echo "      to bind them to (no target binary in $ADMIT_DEBS). A relocated"
+            echo "      program signed for every build is a silent wrong-offset load."
+            echo "      Refusing to sign it."
+            nbad=$((nbad + 1)); continue
+        fi
         if [ -z "$BRANGE" ]; then
             echo "  WARN $b  --- signing with the WILDCARD build range (any build,"
             echo "       forever): no target binary in $ADMIT_DEBS to read a build id from."
@@ -223,20 +328,40 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
         if python3 "$REPO/substrate/sign_shield.py" --key "$SIGN_KEY" --prog "$o" \
                --hook "${sec#*/}" --mode-ceiling "${SIGN_CEILING:-monitor}" \
                $BRANGE -o "$OUT/$b.bpf.sig" >/dev/null 2>&1; then
-            echo "  verified $b  ($sec)${est:+  budget ~$est}  SIGNED"
+            echo "  verified $b  ($sec)${est:+  budget ~$est}${RELNOTE}  SIGNED"
         else
             rm -f "$OUT/$b.bpf.sig"
             echo "  *** $b verified but COULD NOT BE SIGNED --- it will be refused at load"
             nbad=$((nbad + 1)); continue
         fi
     else
-        echo "  verified $b  ($sec)${est:+  budget ~$est}  UNSIGNED (no \$SIGN_KEY)"
+        echo "  verified $b  ($sec)${est:+  budget ~$est}${RELNOTE}  UNSIGNED (no \$SIGN_KEY)"
     fi
+    # COUNTED HERE, NOT AT STRIP TIME. reject_* programs are stripped as well and
+    # then correctly refused, so counting at the strip made the summary claim one
+    # more shipped artifact than exists. Count what is emitted.
+    [ "$RELOCATED" = yes ] && nstrip=$((nstrip + 1))
     npass=$((npass + 1))
 done
 
 echo
 echo "  $npass verified and emitted, $nreject correctly refused, $nbad unexpected"
+if [ "$nstrip" -gt 0 ]; then
+    # TWO DIFFERENT NUMBERS, said separately. $nreloc had at least one field offset
+    # resolved; $nstrip is every program whose .BTF/.BTF.ext came out. They differ
+    # because a program with NO field reads needs no relocation but is still stripped,
+    # and the first version of this message reported the smaller number as if it
+    # covered both --- understating what had actually been emitted.
+    echo "  $nstrip program(s) stripped of .BTF/.BTF.ext --- they carry no type"
+    echo "    information and the appliance needs none to load them."
+    echo "  of those, $nreloc had field offsets RESOLVED HERE and baked for one build;"
+    echo "    the rest read no fields, so there was nothing to resolve."
+    echo "    The signature therefore covers the bytes that will actually run."
+fi
+if [ "$nskipreloc" -gt 0 ]; then
+    echo "  $nskipreloc program(s) NOT relocated --- they keep .BTF.ext and depend on the"
+    echo "    binary embedding its own .BTF. Pass TMM_BTF= to relocate them here."
+fi
 [ "$nbad" -eq 0 ] || fail "$nbad program(s) did not behave as expected. Nothing was emitted for
     them, but do not bake this set --- a surprise here is either a broken program or a
     verifier that changed behaviour, and both need looking at before an image ships."

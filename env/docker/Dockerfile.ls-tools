@@ -49,10 +49,22 @@ COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
 # signed .bpf.o is loaded over the socket at runtime and relocated against this binary's embedded
 # .BTF. The image carries only build artifacts (binary+VM+.BTF, hook-index, signatures, tools).
 
-# Replace the runtime binary with the .BTF-embedded one built on the build box (same
-# build-id; objcopy --add-section only appends a section). The loader reads its OWN .BTF
-# section from /proc/self/exe --- the kernel's vmlinux model for a userspace process --- so
-# the type info travels inside the exact binary that gets armed and cannot drift from it.
+# Replace the runtime binary with the one staged by the bake (same build-id; objcopy
+# --add-section only appends a section).
+#
+# WHETHER IT CARRIES `.BTF` IS NOW A CHOICE, and the default is still "yes" --- see
+# LS_EMBED_BTF in bnk-bake-tools.sh. With BTF embedded, the loader reads its OWN `.BTF`
+# from /proc/self/exe (the kernel's vmlinux model for a userspace process) so the type
+# info travels inside the exact binary that gets armed and cannot drift from it. That
+# non-drift property is real and is the reason it was done this way.
+#
+# With LS_EMBED_BTF=0 the section is absent, field offsets are resolved at sign time
+# instead, and the loader never reads type information at all
+# (02-RESEARCH-PARAMETERS.md P9). That removes 6,711,805 bytes naming 41,710 functions
+# and 16,006 struct layouts from the shipped ELF --- the only layout disclosure in the
+# image, since F5 ships both binaries `stripped` with symtab FUNC: 0. It also removes
+# the non-drift property, which is why the signed build range had to be enforced first
+# (CONTESTED-PREMISES.md 15).
 COPY --chmod=0755 tmm64.no_pgo /usr/bin/tmm64.no_pgo
 
 # POINT /usr/bin/tmm AT THE PADDED BINARY. Dockerfile.runtime points it at tmm.debug
