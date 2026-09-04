@@ -51,7 +51,7 @@ check-prereqs:
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
        check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate check-prevail-relo
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -453,6 +453,17 @@ check-relo-baked:
 # The signed build range, compared to something for the first time.
 # CONTESTED-PREMISES.md 15: the field was signed, tamper-tested and logged, and
 # read by nothing. 18 assertions on the decision itself, off-TMM.
+# P9 falsifier 3: does PREVAIL still accept a program after its offsets are baked?
+# Needs the target build's BTF; skipped LOUDLY without it, like check-relo-baked.
+#   make check-prevail-relo TMM_BTF=/path/to/tmm.btf
+check-prevail-relo:
+	@if [ -z "$(TMM_BTF)" ] || [ ! -s "$(TMM_BTF)" ]; then \
+	  echo "SKIP check-prevail-relo --- no target BTF. Pass TMM_BTF=<this build's tmm.btf>."; \
+	  echo "     This is a SKIP, not a pass: relocate-before-verify is unverified without it."; \
+	  exit 0; \
+	fi; \
+	sh check_prevail_after_relo.sh "$(TMM_BTF)"
+
 check-build-gate:
 	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .bgate.out check_build_gate.c
 	@./.bgate.out >/dev/null 2>&1 && echo "ok    ls_build_gate.h  (20 assertions: prefix encoding, mismatch refused, hash range refused, UNDECLARED vs wildcard, fail-closed)" \
