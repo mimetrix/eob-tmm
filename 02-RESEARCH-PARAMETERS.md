@@ -327,13 +327,13 @@ emitted artifacts carry 0 `.BTF` sections** (verified with `readelf` and the `--
 ~28% smaller); 7 of them had offsets resolved and baked. `bnk-bake-tools.sh` gained
 **`LS_EMBED_BTF=0`**, which ships a binary with no type information.
 
-**What is NOT done, and why it is a decision rather than a gap.** `LS_EMBED_BTF` still defaults to
-**1**, so the deployed ELF still carries **6,711,805 bytes** of `.BTF` — measured on the running pod,
-not assumed. The default has not been flipped because **this stage bakes no bytecode by design**, so
-it cannot verify that the programs about to ship are stripped; flipping it would break any artifact
-built without `TMM_BTF` set, and break it at **arm time on the cluster** rather than at build time.
-Given this project's record of green builds shipping stale artifacts, the sequence is: bake once with
-`LS_EMBED_BTF=0`, deploy, **arm a shield**, and only then change the default.
+**The default is now 0 (2026-09-04), and it waited on evidence rather than confidence.** The reason
+to hesitate was real: this stage bakes no bytecode by design, so it cannot verify the programs about
+to ship are stripped, and a wrong-order build would fail at **arm time on the cluster** rather than
+at build time. What made the flip safe is case 5 of `bnk-test-btfless.sh` — a program that still
+needs relocating is **refused with the cause named on the log**, so the wrong-order build now fails
+with a message saying what to do instead of silently reading placeholder offsets. `LS_EMBED_BTF=1`
+restores the old behaviour and now prints a warning that it is no longer the default.
 
 **Falsifier 4 — FULLY DISCHARGED, on the cluster (2026-09-04).** `env/scripts/bnk-test-btfless.sh`,
 **6 of 6**, build `1824611c`, image `tmm:NOBTF-CVE-2025-41414-DEMO-ONLY`. The running binary's section

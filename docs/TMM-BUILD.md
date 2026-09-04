@@ -100,11 +100,13 @@ objcopy --add-section .BTF=tmm.btf --set-section-flags .BTF=readonly,data \
   arming build-id gate. The BTF travels *inside* the exact binary that runs — it cannot drift. That
   non-drift property is real, and it is what `LS_EMBED_BTF=0` gives up in exchange for the section
   not being there at all.
-- **`LS_EMBED_BTF=0` ships a binary with no type information** — removing 6,711,805 bytes naming
-  41,710 functions and 16,006 struct layouts, the only layout disclosure in an image whose binaries
+- **The binary ships with no type information — this is the default since 2026-09-04.** It keeps
+  6,711,805 bytes naming 41,710 functions and 16,006 struct layouts out of an image whose binaries
   F5 already ships `stripped`. It requires every program to have been relocated at sign time (step
-  4b), because a program still carrying `.BTF.ext` can only be resolved against an embedded `.BTF`.
-  Default is still `1`; see P9 for why the flip waits on an arm.
+  4b); a program still carrying `.BTF.ext` is **refused at load with the cause named on the log**,
+  which is what makes the default safe rather than merely desirable. `LS_EMBED_BTF=1` restores the
+  old behaviour. Measured: `bnk-test-btfless.sh` 6/6 — a shield loads, arms and runs
+  (`fired 145,850 → 211,836 in 3 s`) on a binary with 0 bytes of `.BTF`.
 
 ### 4b · Build the programs — **and this now has to come AFTER packaging**
 

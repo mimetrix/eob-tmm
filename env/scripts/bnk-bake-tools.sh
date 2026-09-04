@@ -108,7 +108,7 @@ LD_LIBRARY_PATH="$(dirname "$PAHOLE")" "$PAHOLE" --lang_exclude=c++     --btf_en
 REALBIN="$RT/usr/bin/tmm64.no_pgo"
 BID_BEFORE=$(readelf -n "$REALBIN" | sed -n 's/.*Build ID: //p')
 
-# LS_EMBED_BTF=0 SHIPS A BINARY WITH NO TYPE INFORMATION IN IT (P9 phase 3c).
+# THE SHIPPED BINARY CARRIES NO TYPE INFORMATION. THAT IS NOW THE DEFAULT (P9 3c).
 #
 # $CTX/tmm.btf is still derived above and still kept on the build box --- the program
 # build stage needs it to resolve offsets at sign time, and gen_type_catalog.py needs
@@ -120,34 +120,46 @@ BID_BEFORE=$(readelf -n "$REALBIN" | sed -n 's/.*Build ID: //p')
 # with symtab FUNC: 0, so this section is the ONLY layout disclosure in the whole
 # image, and it is ours (CONTESTED-PREMISES.md 14).
 #
-# WHY IT IS OPT-IN AND NOT THE DEFAULT, which is the honest part. A program that still
-# carries .BTF.ext can only be relocated against a binary that embeds .BTF. This stage
-# CANNOT check that the programs about to ship are stripped, because it bakes no
-# bytecode at all --- that is a separate stage by design. So flipping the default here
-# would break every artifact built without TMM_BTF set, and it would break them at
-# ARM time on the cluster rather than here. Set it deliberately, once
-# bnk-build-programs.sh has been run with TMM_BTF= and its summary reports every
-# program stripped.
-#   LS_EMBED_BTF=1 (default)  embed --- programs may carry .BTF.ext
-#   LS_EMBED_BTF=0            do not --- every program MUST be relocated at sign time
-if [ "${LS_EMBED_BTF:-1}" = "0" ]; then
+# IT WAS OPT-IN UNTIL 2026-09-04, AND THE REASON IT NO LONGER IS. A program that
+# still carries .BTF.ext can only be relocated against a binary that embeds .BTF, and
+# this stage CANNOT check that the programs about to ship are stripped, because it
+# bakes no bytecode at all --- that is a separate stage by design. So the failure mode
+# of a wrong-order build lands at ARM time on the cluster rather than here, which is
+# why the default waited on evidence rather than on confidence.
+#
+# The evidence arrived: env/scripts/bnk-test-btfless.sh, 6 of 6 on build 1824611c ---
+# 0 bytes of .BTF in the running binary, a stripped/relocated/signed program loads,
+# arms and RUNS (fired 145,850 -> 211,836 in 3 s, errors=0, restarts=0), and a program
+# still carrying .BTF.ext is REFUSED with the cause named on the log. That last case is
+# what makes the default safe: the wrong-order build now fails with a message that says
+# exactly what to do, instead of silently reading placeholder offsets.
+#
+#   LS_EMBED_BTF=0 (default)  do NOT embed --- every program must be relocated at sign
+#                             time, which bnk-build-programs.sh does by default on the
+#                             build box (it auto-discovers tmm.btf and says so)
+#   LS_EMBED_BTF=1            embed, for a build whose programs were made with
+#                             TMM_BTF=none, or to compare against the old behaviour
+if [ "${LS_EMBED_BTF:-0}" = "0" ]; then
     cp "$REALBIN" "$CTX/tmm64.no_pgo" || fail "could not stage the runtime binary"
     readelf -SW "$CTX/tmm64.no_pgo" | grep -q '\.BTF' && fail "LS_EMBED_BTF=0 but the
     binary ALREADY carries a .BTF section --- it came from somewhere other than this
     step, and shipping it would defeat the point. Find out where before continuing."
     BID_AFTER=$(readelf -n "$CTX/tmm64.no_pgo" | sed -n 's/.*Build ID: //p')
     [ "$BID_BEFORE" = "$BID_AFTER" ] || fail "the build-id changed ($BID_BEFORE -> $BID_AFTER)"
-    echo "  BTF: NOT embedded (LS_EMBED_BTF=0). $(du -h "$CTX/tmm.btf" | cut -f1) kept on the"
-    echo "       build box only; the shipped ELF carries no type information."
-    echo "       EVERY program must be relocated at sign time --- run"
-    echo "       bnk-build-programs.sh with TMM_BTF=$CTX/tmm.btf or nothing will arm."
+    echo "  BTF: NOT embedded (the default). $(du -h "$CTX/tmm.btf" | cut -f1) kept on the build"
+    echo "       box only; the shipped ELF carries no type information at all."
+    echo "       EVERY program must be relocated at sign time --- bnk-build-programs.sh"
+    echo "       does that by default here. A program that was not will be REFUSED at"
+    echo "       load, saying so. Set LS_EMBED_BTF=1 for the old behaviour."
 else
     objcopy --add-section .BTF="$CTX/tmm.btf" --set-section-flags .BTF=readonly,data     "$REALBIN" "$CTX/tmm64.no_pgo" || fail "objcopy failed to embed .BTF"
     BID_AFTER=$(readelf -n "$CTX/tmm64.no_pgo" | sed -n 's/.*Build ID: //p')
     readelf -SW "$CTX/tmm64.no_pgo" | grep -q '\.BTF' || fail "embedded binary has no .BTF section"
     [ "$BID_BEFORE" = "$BID_AFTER" ] || fail "objcopy changed the build-id ($BID_BEFORE -> $BID_AFTER) --- would break the arming gate"
     echo "  BTF: $(du -h "$CTX/tmm.btf" | cut -f1) embedded into tmm64.no_pgo; build-id preserved (${BID_AFTER%${BID_AFTER#????????}})"
-    echo "       (set LS_EMBED_BTF=0 to ship a binary with no type information --- P9 phase 3c)"
+    echo "       *** LS_EMBED_BTF=1 --- this is NO LONGER the default. The shipped ELF will"
+    echo "       carry the full internal type layout: 41,710 function names and 16,006"
+    echo "       struct layouts in a binary F5 otherwise ships stripped. Deliberate?"
 fi
 
 if [ -n "$BTF_ONLY" ]; then

@@ -530,6 +530,11 @@ fixed-format instruction array, and JITs; `ubpf_load_elf` and `ls_core_relo` lea
 The program becomes **build-pinned**, which the binding already models (`build_min`/`build_max` +
 `prog_sha256`, `shield_abi.h`) and which is *tighter*, not looser.
 
+> **Superseded 2026-09-04 — kept because the reasoning is why the system is shaped as it is.** The
+> disclosure described below is **gone**: the binary no longer embeds `.BTF` by default. What follows
+> is the analysis that motivated removing it, not a description of the current build. See
+> `02-RESEARCH-PARAMETERS.md` P9 and `CONTESTED-PREMISES.md` §14.
+
 **The disclosure.** To relocate on-box today, TMM **embeds its own `.BTF`** — the full internal type
 layout: struct field names, byte offsets, sizes — read back from `/proc/self/exe` (`ls_vm.c`). That layout
 is precisely the map an attacker wants for a memory-corruption exploit; shipping it in the reachable binary
@@ -624,7 +629,7 @@ reads the two items already done as the whole job.
 | Debug symbols out of the shipped image | **done, and the premise was wrong.** `env/scripts/bnk-strip-debug.sh` removes `tmm64.debug` (76 MB) after checking the entrypoint does not resolve to it. **But it is not symbols** — measured 2026-09-04, both shipped binaries are `stripped`, `symtab FUNC: 0`, no `.debug_*`. `tmm64.debug` is a second *stripped executable* from a different build (build id `1f7b70d0…` vs `269b5d25…`). There is **no symbol disclosure in F5's shipped image**; removing the file buys duplicate-code removal, not symbol removal |
 | Function **boundaries** hidden by not padding | **not achievable, and never was.** `.eh_frame_hdr` in the stripped shipped binary holds a sorted, binary-searchable table of **72,142** function start addresses — required unwind metadata, present before we touched the build. The entry pad discloses nothing a `readelf` of F5's own binary does not already hand over |
 | Address-bearing hook map off the appliance | **already true.** It lives in the toolbox pod; TMM resolves its own pads by symbol at arm time |
-| Embedded `.BTF` (full type layout) | **present, and load-bearing.** CO-RE relocation runs on-box and reads it from `/proc/self/exe` |
+| Embedded `.BTF` (full type layout) | **REMOVED, and measured (2026-09-04).** Not shipped by default: offsets are resolved at sign time and the loader reads no type information. 6,711,805 bytes — 41,710 function names, 16,006 struct layouts — out of the ELF. `bnk-test-btfless.sh` 6/6: a shield loads, arms and **runs** (`fired 145,850 → 211,836 in 3 s`, restarts=0) on a binary with 0 bytes of `.BTF`, and a program that still needs relocating is refused with the cause on the log |
 | ELF + `.BTF.ext` parsing on the data path | **present.** `ubpf_load_elf` + `ls_core_relo`, behind signature verification |
 
 **What we intend to do, and why it is one move.** Relocation is a *build-time* fact — it maps field names
