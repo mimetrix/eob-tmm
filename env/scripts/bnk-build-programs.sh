@@ -163,6 +163,41 @@ else
 fi
 echo
 
+# UNPACK THE TARGET DEB PAIR ONCE, BEFORE THE LOOP.
+#
+# THE BUG THIS FIXES, 2026-09-04. This block used to sit INSIDE `case "$sec" in
+# fexit/*)`, because exit-admission was its only consumer. Then the build range
+# (below) started reading $ADMIT_RT too --- and $ADMIT_RT only existed after the
+# first fexit program had been processed. So a run refused six fentry programs for
+# "no build range" and signed five, and which five depended on ALPHABETICAL ORDER
+# relative to the one fexit program in the set. Programs before exit_probe failed;
+# exit_probe and everything after it inherited the variable it had just set.
+#
+# Lazy initialisation inside a conditional is fine while the conditional is the
+# only reader. It becomes an order-dependent bug the moment it is not, and the
+# symptom -- some programs signed, some refused, no pattern in the program itself
+# -- points nowhere near the cause. Resolve it unconditionally.
+ADMIT_STATE=""
+_DDEB=$(find "$ADMIT_DEBS" -name 'tmm-debuginfo_*.deb' 2>/dev/null | head -1)
+_RDEB=$(ls "$ADMIT_DEBS"/tmm_*.deb 2>/dev/null | head -1)
+if [ -n "$_DDEB" ] && [ -n "$_RDEB" ]; then
+    mkdir -p "$TMP/admit/rt" "$TMP/admit/db"
+    dpkg-deb -x "$_RDEB" "$TMP/admit/rt" 2>/dev/null
+    dpkg-deb -x "$_DDEB" "$TMP/admit/db" 2>/dev/null
+    ADMIT_RT=$(find "$TMP/admit/rt" -name tmm64.no_pgo ! -name '*.debug' | head -1)
+    ADMIT_DB=$(find "$TMP/admit/db" -name tmm64.no_pgo.debug | head -1)
+    ADMIT_STATE=ready
+    [ -n "$ADMIT_RT" ] && [ -n "$ADMIT_DB" ] || ADMIT_STATE=none
+else
+    ADMIT_STATE=none
+fi
+if [ "$ADMIT_STATE" = ready ]; then
+    echo "  target   : $(basename "$_RDEB") (build range + exit-admit read from it)"
+else
+    echo "  target   : NONE in $ADMIT_DEBS --- no build range and no exit-admission."
+    echo "             Relocated programs will be REFUSED rather than signed for every build."
+fi
+
 npass=0; nreject=0; nbad=0
 nreloc=0; nstrip=0; nskipreloc=0
 for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
@@ -189,7 +224,7 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # RELOCATE, THEN STRIP, THEN VERIFY --- in that order, deliberately. PREVAIL
     # must see the offsets that will actually execute, and the signature below must
     # cover the stripped bytes, so both come after this.
-    RELOCATED=no
+    RELOCATED=no; DIDRELO=no
     if [ -n "$RELO" ]; then
         if "$RELO" "$o" "$TMM_BTF" "$TMP/$b.reloc" >"$TMP/rl" 2>&1; then
             nr=$(grep -oE '[0-9]+ relo' "$TMP/rl" | grep -oE '^[0-9]+' | head -1)
@@ -206,8 +241,8 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
                 nbad=$((nbad + 1)); continue
             fi
             RELOCATED=yes
-            nreloc=$((nreloc + 1))
             RELNOTE="  reloc ${nr:-0}"
+            DIDRELO=yes
         else
             # A zero-relocation object is refused by the relocator (a known symptom).
             # Nothing needed resolving, so the program is already build-independent;
@@ -215,6 +250,7 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
             "$OBJCOPY" --remove-section=.BTF --remove-section=.BTF.ext \
                        --remove-section=.rel.BTF.ext "$o" 2>/dev/null || true
             RELOCATED=yes
+            DIDRELO=no
             RELNOTE="  reloc 0"
         fi
     else
@@ -249,21 +285,6 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # for. Skipped LOUDLY on a compile-only clone that has no target build to check.
     case "$sec" in
     fexit/*)
-        if [ -z "$ADMIT_STATE" ]; then
-            _DDEB=$(find "$ADMIT_DEBS" -name 'tmm-debuginfo_*.deb' 2>/dev/null | head -1)
-            _RDEB=$(ls "$ADMIT_DEBS"/tmm_*.deb 2>/dev/null | head -1)
-            if [ -n "$_DDEB" ] && [ -n "$_RDEB" ]; then
-                mkdir -p "$TMP/admit/rt" "$TMP/admit/db"
-                dpkg-deb -x "$_RDEB" "$TMP/admit/rt" 2>/dev/null
-                dpkg-deb -x "$_DDEB" "$TMP/admit/db" 2>/dev/null
-                ADMIT_RT=$(find "$TMP/admit/rt" -name tmm64.no_pgo ! -name '*.debug' | head -1)
-                ADMIT_DB=$(find "$TMP/admit/db" -name tmm64.no_pgo.debug | head -1)
-                ADMIT_STATE=ready
-                [ -n "$ADMIT_RT" ] && [ -n "$ADMIT_DB" ] || ADMIT_STATE=none
-            else
-                ADMIT_STATE=none
-            fi
-        fi
         if [ "$ADMIT_STATE" = none ]; then
             echo "  WARN $b  ($sec)  --- exit-admit SKIPPED (no target DEB in $ADMIT_DEBS); return-type/unwind safety UNVERIFIED"
         elif python3 "$REPO/substrate/exit_admit.py" "$ADMIT_DB" "$ADMIT_RT" "${sec#*/}" >"$TMP/a" 2>&1; then
@@ -352,6 +373,7 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
     # then correctly refused, so counting at the strip made the summary claim one
     # more shipped artifact than exists. Count what is emitted.
     [ "$RELOCATED" = yes ] && nstrip=$((nstrip + 1))
+    [ "$DIDRELO" = yes ] && nreloc=$((nreloc + 1))
     npass=$((npass + 1))
 done
 
