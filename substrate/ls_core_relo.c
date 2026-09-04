@@ -126,6 +126,44 @@ int ls_core_btf_find_in_elf(const uint8_t *elf, uint32_t elf_len,
     return -1;   /* no .BTF section */
 }
 
+/* Does this program object carry CO-RE relocation records at all?
+ *
+ * WHY IT IS A SEPARATE, CHEAP QUESTION. Once field offsets are resolved at sign
+ * time (02-RESEARCH-PARAMETERS.md P9) the shipped program has its `.BTF` and
+ * `.BTF.ext` sections STRIPPED, and the appliance no longer needs type information
+ * of its own. But a program built the old way still needs relocating, and the two
+ * must be told apart BEFORE the target BTF is demanded --- otherwise the loader
+ * refuses an already-relocated program for lacking something it does not use.
+ * That ordering is the whole point: it lets the embedded `.BTF` be removed without
+ * the loader's refusal logic changing again.
+ *
+ * Returns 1 if `.BTF.ext` is present, 0 if it is absent, and -1 if the ELF cannot
+ * be walked. FAIL-DARK on -1: the caller must treat "cannot tell" as "needs
+ * relocation" rather than as "nothing to do", because guessing the second on a
+ * malformed object runs a program against unresolved placeholder offsets.
+ */
+int ls_core_elf_has_relos(const uint8_t *elf, uint32_t elf_len) {
+    if (elf_len < 64) return -1;
+    uint64_t shoff = rd64(elf + 0x28);
+    uint16_t shentsize = rd16(elf + 0x3a), shnum = rd16(elf + 0x3c), shstrndx = rd16(elf + 0x3e);
+    if (shentsize < 64 || shnum == 0 || shstrndx >= shnum) return -1;
+    if (shoff > elf_len || (uint64_t)shnum * shentsize > elf_len - shoff) return -1;
+    const uint8_t *she = elf + shoff + (uint64_t)shstrndx * shentsize;
+    uint64_t str_off = rd64(she + 0x18), str_size = rd64(she + 0x20);
+    if (str_off > elf_len || str_size > elf_len - str_off) return -1;
+    const char *shstr = (const char *)(elf + str_off);
+    for (uint16_t i = 0; i < shnum; i++) {
+        const uint8_t *e = elf + shoff + (uint64_t)i * shentsize;
+        uint32_t nameo = rd32(e);
+        if (nameo >= str_size) continue;
+        if (strcmp(shstr + nameo, ".BTF.ext") == 0) {
+            uint64_t sz = rd64(e + 0x20);
+            return sz > 0 ? 1 : 0;      /* an empty section relocates nothing */
+        }
+    }
+    return 0;
+}
+
 /* skip const/volatile/restrict/typedef/type_tag qualifiers to the real type */
 static const struct btf_type *btf_skip_mods(const struct btf *b, uint32_t *id) {
     const struct btf_type *t = btf_type_by_id(b, *id);
@@ -322,7 +360,24 @@ static int read_file(const char *path, uint8_t **buf, size_t *len) {
     *buf=malloc(n); *len=fread(*buf,1,n,f); fclose(f); return 0;
 }
 int main(int argc, char **argv) {
-    if (argc < 3) { fprintf(stderr,"usage: %s prog.o tmm.btf [out.o]\n",argv[0]); return 2; }
+    /* --has-relos <obj>...  : print the ls_core_elf_has_relos() verdict per object.
+     * Lives in the same driver so it is compiled exactly the way the in-TMM copy is,
+     * rather than in a second harness that could drift from it. */
+    if (argc >= 3 && strcmp(argv[1], "--has-relos") == 0) {
+        int bad = 0;
+        for (int i = 2; i < argc; i++) {
+            uint8_t *e; size_t n;
+            if (read_file(argv[i], &e, &n)) { printf("%-28s UNREADABLE\n", argv[i]); bad = 1; continue; }
+            int r = ls_core_elf_has_relos(e, (uint32_t)n);
+            printf("%-28s %s\n", argv[i],
+                   r == 1 ? "1  needs relocation" :
+                   r == 0 ? "0  offsets are baked" : "-1 cannot parse (treated as NEEDS)");
+            free(e);
+        }
+        return bad;
+    }
+    if (argc < 3) { fprintf(stderr,"usage: %s prog.o tmm.btf [out.o]\n"
+                                   "       %s --has-relos <obj>...\n",argv[0],argv[0]); return 2; }
     uint8_t *elf; size_t elflen; if (read_file(argv[1],&elf,&elflen)) return 2;
     uint8_t *tbtf; size_t tbtflen; if (read_file(argv[2],&tbtf,&tbtflen)) return 2;
     struct btf T;

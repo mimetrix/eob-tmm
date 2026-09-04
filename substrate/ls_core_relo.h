@@ -37,6 +37,13 @@ void ls_core_btf_free(struct btf *b);
 int ls_core_btf_find_in_elf(const uint8_t *elf, uint32_t elf_len,
                             const uint8_t **btf, uint32_t *btf_sz);
 
+/* 1 if the program object carries `.BTF.ext` (so it needs relocating), 0 if it does
+ * not, -1 if the ELF cannot be walked. Asked BEFORE the target BTF is demanded, so
+ * a program whose offsets were resolved at sign time --- and whose `.BTF`/`.BTF.ext`
+ * were therefore stripped --- is not refused for lacking type information it does
+ * not use. Treat -1 as "needs relocation": see the note in ls_core_relo.c. */
+int ls_core_elf_has_relos(const uint8_t *elf, uint32_t elf_len);
+
 /* Relocate `elf` (an eBPF program object, MUTABLE) in place against `target`.
  * Parses the program's own .BTF/.BTF.ext, resolves every FIELD_BYTE_OFFSET record
  * by field name against `target`, and patches the instruction immediates.

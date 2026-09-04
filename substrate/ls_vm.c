@@ -695,17 +695,53 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * never run against a stale offset; a program with no .BTF.ext (nothing to
      * relocate) proceeds. Reached on the TMM thread, where malloc is legal. */
     {
-        const struct btf *tb = ls_vm_target_btf();
-        if (tb == NULL) {
-            fprintf(stderr, "ls_vm: refusing --- no target BTF to relocate against\n");
+        /* ASK WHETHER RELOCATION IS NEEDED BEFORE DEMANDING THE TYPE INFORMATION.
+         *
+         * This block used to call ls_vm_target_btf() first and refuse outright on
+         * NULL. That is correct only while the binary carries its own `.BTF`, and
+         * it is the single line standing between here and removing that section
+         * (02-RESEARCH-PARAMETERS.md P9): once offsets are resolved at sign time
+         * the shipped program has `.BTF`/`.BTF.ext` STRIPPED and needs no target
+         * BTF at all --- but the old order refused it for lacking something it does
+         * not use. The check further down already tolerated -LS_RELO_ENOBTF, so
+         * the tolerance existed and was unreachable, guarded by a refusal above it.
+         *
+         * The three cases are now distinguished, and the middle one is the point:
+         *   needs relocation + BTF present -> relocate, as before
+         *   needs NO relocation            -> proceed; the target BTF is never read
+         *   needs relocation + no BTF      -> REFUSE, naming the actual problem
+         *
+         * FAIL-DARK ON "CANNOT TELL". A malformed object gives -1 from the probe,
+         * and that is treated as "needs relocation" --- never as "nothing to do".
+         * Guessing the latter would run a program against unresolved placeholder
+         * offsets (0, 1, 2 for a stub struct), reading whatever sits at the front
+         * of a real TMM structure. Silently, and with PREVAIL's blessing, because
+         * the proof was taken against the placeholder. */
+        int needs = ls_core_elf_has_relos((const uint8_t *)elf, (uint32_t)elf_len);
+        const struct btf *tb = (needs != 0) ? ls_vm_target_btf() : NULL;
+
+        if (needs != 0 && tb == NULL) {
+            fprintf(stderr, "ls_vm: refusing --- this program carries CO-RE "
+                            "relocation records%s but this binary has no `.BTF` to "
+                            "resolve them against. Resolve the field offsets at "
+                            "sign time (the offsets must match this build) or load "
+                            "a binary that embeds its own type information.\n",
+                    needs < 0 ? " (or could not be parsed, which is treated the same)"
+                              : "");
             goto fail;
         }
+
         unsigned nrel = 0;
-        int rrc = ls_core_relocate((void *)elf, (uint32_t)elf_len, tb, &nrel);
+        int rrc = (needs != 0)
+                ? ls_core_relocate((void *)elf, (uint32_t)elf_len, tb, &nrel)
+                : LS_RELO_OK;
         if (rrc != LS_RELO_OK && rrc != -LS_RELO_ENOBTF) {
             fprintf(stderr, "ls_vm: refusing --- CO-RE relocation failed (rc=%d)\n", rrc);
             goto fail;
         }
+        if (needs == 0 && g_cfg.verbose)
+            fprintf(stderr, "ls_vm: no CO-RE records --- offsets are baked; the "
+                            "binary's own type information was not read\n");
         if (g_cfg.verbose && nrel)
             fprintf(stderr, "ls_vm: CO-RE relocated %u field offset(s)\n", nrel);
     }
