@@ -5,7 +5,7 @@ build tree. That split is the reason someone can read every file here and still 
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
 **The headline property — and read the scope carefully, because it depends on tree state.** In the
-**substrate-only** tree (no vulnerable-SSL overlay) the substrate adds **35 files and ~8,300 lines**
+**substrate-only** tree (no vulnerable-SSL overlay) the substrate adds **36 files and ~8,400 lines**
 into `src/base/` (33) and `src/compile/` (2 whitelist config), edits three build-configuration files
 (`filelist` and the two globals whitelists), and adds a `Makefile.overrides` — verified 2026-08-31 by
 `git status --porcelain src/` on the build box. The larger **46 files / ~7,800 lines** figure counts a
@@ -28,17 +28,9 @@ Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, b
 
 ## 1. New source files — by function (current tree, verified 2026-08-31)
 
-> **Pending sync (2026-09-04).** `ls_build_gate.h` was added to the manifest here and in
-> `.tree-expected-delta`, and has **not been synced to the build box yet**. So the counts below are
-> the *measured* build-box numbers and are still correct for that tree; once
-> `env/scripts/bnk-sync-substrate.sh` runs they become **36 files (34 under `src/base/` — 14 `.c`,
-> 20 `.h`)**. `bnk-check-tree-sync.sh` will report the one-file difference until then, which is the
-> manifest doing its job rather than a fault. The numbers here are deliberately not updated ahead of
-> the measurement — CLAUDE.md and `tmm-bpf-engine-architect-brief.md` carry the same figures and
-> should be swept in the same edit as the sync, not before it.
-
-Authoritative source: `git status --porcelain src/` on the build box. The tree adds **35 files**
-(33 under `src/base/`, 2 whitelist snapshots under `src/compile/`) and edits **4** F5 files —
+Authoritative source: `git status --porcelain src/` on the build box, **re-measured 2026-09-05:
+36 added, 4 modified**. The tree adds **36 files** (34 under `src/base/`, 2 whitelist snapshots under
+`src/compile/`) and edits **4** F5 files —
 corrected 2026-09-04 from **3**. The three build-configuration edits below are the substrate's own;
 the fourth is `src/modules/hudfilter/http2/http2.c`, carrying the **CVE-2025-41414 fix `81d3428d3d`
 reverted** (`cve-41414-demonstration.md`). It was in no manifest, and it means **every binary built
