@@ -152,4 +152,53 @@ ls_build_gate(const char *running_hex, uint32_t bmin, uint32_t bmax,
     return (running == bmin) ? LS_BUILD_OK : LS_BUILD_MISMATCH;
 }
 
+/* ---- EXPIRY -----------------------------------------------------------------
+ *
+ * Same family as the build gate and in the same header for that reason: both are
+ * pure decisions about the signed binding, and both were fields that existed,
+ * were signed, were logged, and were read by nothing.
+ *
+ * WHY IT FAILS **OPEN** ON A CLOCK IT CANNOT TRUST, which is the opposite of the
+ * build gate and is a deliberate asymmetry. A shield exists to stop a crash. If
+ * the box's clock is wrong, refusing the shield converts a clock problem into an
+ * outage, and the thing it was protecting against happens instead. A wrong build
+ * is a correctness error and must refuse; a wrong clock is an environment error
+ * and must not. So an implausible clock is accepted and logged loudly.
+ *
+ * "Implausible" is anything before LS_EPOCH_SANE --- 2020-01-01. A container that
+ * starts before NTP has run reads 1970, and that is the case this exists for.
+ */
+enum ls_expiry_verdict {
+    LS_EXPIRY_OK = 0,      /* a deadline is set and has not been reached        */
+    LS_EXPIRY_NEVER,       /* 0 or ~0 --- no deadline was declared             */
+    LS_EXPIRY_UNKNOWN,     /* the clock is implausible --- accepted, logged     */
+    LS_EXPIRY_EXPIRED      /* the deadline has passed --- REFUSE               */
+};
+
+#define LS_EPOCH_SANE 1577836800u   /* 2020-01-01T00:00:00Z */
+
+static inline const char *
+ls_expiry_strerror(enum ls_expiry_verdict v)
+{
+    switch (v) {
+    case LS_EXPIRY_OK:      return "within its validity window";
+    case LS_EXPIRY_NEVER:   return "no expiry declared";
+    case LS_EXPIRY_UNKNOWN: return "this box's clock is implausible, so expiry could not be judged";
+    case LS_EXPIRY_EXPIRED: return "this program has expired";
+    }
+    return "unknown";
+}
+
+/* `now` is seconds since the Unix epoch, UTC --- time(NULL) at the call site, passed
+ * in rather than read here so the decision stays pure and testable. */
+static inline enum ls_expiry_verdict
+ls_expiry_gate(uint32_t expires_with, uint64_t now)
+{
+    if (expires_with == 0u || expires_with == 0xffffffffu)
+        return LS_EXPIRY_NEVER;
+    if (now < (uint64_t)LS_EPOCH_SANE)
+        return LS_EXPIRY_UNKNOWN;
+    return (now >= (uint64_t)expires_with) ? LS_EXPIRY_EXPIRED : LS_EXPIRY_OK;
+}
+
 #endif /* LS_BUILD_GATE_H */

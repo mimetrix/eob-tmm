@@ -105,6 +105,36 @@ def current_ctx_abi():
     return int(m.group(1))
 
 
+def parse_expiry(x):
+    """A date, a relative offset, 'never', or a raw integer -> uint32 epoch."""
+    import datetime, re as _re
+    if x in ("never", "none", ""):
+        return 0xFFFFFFFF
+    m = _re.fullmatch(r"\+(\d+)([dhw])", x)
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        secs = n * {"h": 3600, "d": 86400, "w": 604800}[unit]
+        v = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) + secs
+    elif _re.fullmatch(r"\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?", x):
+        iso = x.replace(" ", "T")
+        if len(iso) == 10:
+            iso += "T00:00:00"
+        elif len(iso) == 16:
+            iso += ":00"
+        v = int(datetime.datetime.fromisoformat(iso)
+                .replace(tzinfo=datetime.timezone.utc).timestamp())
+    else:
+        v = int(x, 0)
+    if v != 0xFFFFFFFF and v != 0 and not (1577836800 <= v <= 0xFFFFFFFE):
+        # LS_EPOCH_SANE is 2020-01-01; the loader will not trust a clock before it,
+        # so a deadline before it can never be enforced and is refused here instead
+        # of shipping as a field that quietly means nothing.
+        raise argparse.ArgumentTypeError(
+            "%r resolves to epoch %d, which is before 2020-01-01. The loader treats "
+            "a clock that early as untrustworthy and would never enforce it." % (x, v))
+    return v
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--key", required=True, help="Ed25519 private key (PEM). A file is the "
@@ -119,7 +149,15 @@ def main():
     ap.add_argument("--ctx-abi", type=int, default=None,
                     help="context ABI version. Defaults to whatever shield_abi.h declares, "
                          "because a hardcoded 1 signs programs this TMM refuses")
-    ap.add_argument("--expires-with", type=lambda x: int(x, 0), default=0xffffffff)
+    # EXPIRY, as a DATE as well as a number. Defined 2026-09-05 as a uint32 Unix
+    # epoch, UTC (shield_abi.h). Accepting only an integer here invites the mistake
+    # this field spent its life in: a plausible-looking number nobody can read back.
+    #   --expires-with 2026-12-31        a date, taken as 00:00:00Z
+    #   --expires-with 2026-12-31T18:00  a datetime, UTC
+    #   --expires-with +90d              ninety days from now
+    #   --expires-with never             0xffffffff, the default
+    ap.add_argument("--expires-with", type=parse_expiry, default=0xffffffff,
+                    help="uint32 Unix epoch UTC, or a date / +Nd / 'never'")
     ap.add_argument("-o", "--out", required=True)
     a = ap.parse_args()
 

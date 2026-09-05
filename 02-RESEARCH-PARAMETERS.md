@@ -273,6 +273,21 @@ add the layout digest, and only then remove the embedded BTF. The middle step ne
 bump — `SHIELD_BINDING_WIRE_MAX` is 128 and `16 + 112` is exactly 128, so the padding trick that got
 `ctx_abi_version` in for free is spent (`shield_abi.h:33-40`).
 
+**`expires_with` — DEFINED AND ENFORCED, 2026-09-05, closing the last of the three fields named
+above.** It is a **uint32 Unix epoch, UTC**: the program may not load at or after it, with `0` and
+`0xffffffff` meaning never. No wire change was needed — the field was already present and already
+inside the signature — whereas *deleting* it would have broken the 112-byte binding and every
+signature in the field, which is why defining beat deleting. `sign_shield.py` now takes a date
+(`--expires-with 2026-12-31`, `+90d`, `never`) and **refuses a deadline before 2020-01-01**, because
+the loader will not trust a clock that early and could never enforce it.
+
+**It fails OPEN on an untrustworthy clock, unlike the build gate, and the asymmetry is deliberate.** A
+shield exists to stop a crash: refusing one because the container started before NTP ran converts a
+clock problem into the outage the shield was preventing. A wrong build is a correctness error and must
+refuse; a wrong clock is an environment error and must not. Both branches are asserted in
+`check_build_gate.c` (32 assertions) precisely so this is not later "fixed" by someone reading it as a
+bug.
+
 **Status (2026-09-04): two of the four falsifiers discharged, on the build box.**
 
 - **Falsifier 2 (offline ≠ on-box) is answered as a PROOF, not a sample.** The `.BTF` section

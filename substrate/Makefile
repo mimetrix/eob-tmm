@@ -466,7 +466,7 @@ check-prevail-relo:
 
 check-build-gate:
 	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .bgate.out check_build_gate.c
-	@./.bgate.out >/dev/null 2>&1 && echo "ok    ls_build_gate.h  (20 assertions: prefix encoding, mismatch refused, hash range refused, UNDECLARED vs wildcard, fail-closed)" \
+	@./.bgate.out >/dev/null 2>&1 && echo "ok    ls_build_gate.h  (32 assertions: prefix encoding, mismatch refused, hash range refused, UNDECLARED vs wildcard, fail-closed, and expiry --- which fails OPEN on a bad clock, deliberately)" \
 	  || { ./.bgate.out; rm -f .bgate.out; exit 1; }
 	@rm -f .bgate.out
 

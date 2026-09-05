@@ -141,6 +141,47 @@ main(void)
            "value in 2^32 the transition rule cannot distinguish, and it fails OPEN");
     }
 
+    printf("\nexpiry --- a field that was signed, logged, and read by nothing until 2026-09-05\n");
+    {
+        const uint64_t NOW = 1788000000ull;        /* 2026-09-05-ish, UTC */
+        const uint64_t PAST = 1600000000ull;       /* 2020-09 */
+        const uint64_t FUTURE = 1900000000ull;     /* 2030-03 */
+
+        OK(ls_expiry_gate(0u, NOW) == LS_EXPIRY_NEVER,
+           "0            -> NEVER   (what every client sends today)");
+        OK(ls_expiry_gate(0xffffffffu, NOW) == LS_EXPIRY_NEVER,
+           "0xffffffff   -> NEVER   (sign_shield.py's default)");
+        OK(ls_expiry_gate((uint32_t)FUTURE, NOW) == LS_EXPIRY_OK,
+           "a future deadline           -> OK");
+        OK(ls_expiry_gate((uint32_t)PAST, NOW) == LS_EXPIRY_EXPIRED,
+           "a past deadline             -> EXPIRED, refused");
+        OK(ls_expiry_gate((uint32_t)NOW, NOW) == LS_EXPIRY_EXPIRED,
+           "the deadline second ITSELF  -> EXPIRED (\"may not load at or after\")");
+        OK(ls_expiry_gate((uint32_t)(NOW + 1), NOW) == LS_EXPIRY_OK,
+           "one second before it        -> OK, so the boundary is not off by one");
+
+        /* THE ASYMMETRY, ASSERTED SO IT IS NOT "FIXED" LATER BY SOMEONE WHO READS
+         * IT AS A BUG. The build gate fails CLOSED on an unreadable id; expiry
+         * fails OPEN on an unreadable clock. A shield exists to stop a crash, so
+         * refusing one because the box booted before NTP ran converts a clock
+         * problem into the outage the shield was preventing. A wrong build is a
+         * correctness error; a wrong clock is an environment error. */
+        OK(ls_expiry_gate((uint32_t)PAST, 0ull) == LS_EXPIRY_UNKNOWN,
+           "an EXPIRED program + a 1970 clock -> UNKNOWN, ACCEPTED, not refused");
+        OK(ls_expiry_gate((uint32_t)PAST, (uint64_t)LS_EPOCH_SANE - 1) == LS_EXPIRY_UNKNOWN,
+           "one second before the sanity epoch -> still UNKNOWN");
+        /* The deadline has to precede the sanity epoch for this to test what it
+         * says. My first version used PAST (2020-09), which is AFTER the epoch
+         * (2020-01) --- so at now == epoch the deadline had not been reached and OK
+         * was the correct answer. The check caught the test, not the code. */
+        OK(ls_expiry_gate(1500000000u, (uint64_t)LS_EPOCH_SANE) == LS_EXPIRY_EXPIRED,
+           "AT the sanity epoch the clock is trusted again -> a 2017 deadline is EXPIRED");
+        OK(ls_expiry_gate((uint32_t)PAST, (uint64_t)LS_EPOCH_SANE) == LS_EXPIRY_OK,
+           "and a deadline AFTER the epoch is not yet reached at the epoch -> OK");
+        OK(ls_expiry_gate(0u, 0ull) == LS_EXPIRY_NEVER,
+           "no deadline + a bad clock -> NEVER; the clock is never consulted");
+    }
+
     printf("\nevery verdict has a distinct message\n");
     {
         const enum ls_build_verdict all[] = {
@@ -152,7 +193,16 @@ main(void)
             for (int j = i + 1; j < n; j++)
                 if (strcmp(ls_build_strerror(all[i]), ls_build_strerror(all[j])) == 0)
                     distinct = 0;
-        OK(distinct, "6 verdicts, 6 different strings -- a refusal names its reason");
+        OK(distinct, "6 build verdicts, 6 different strings -- a refusal names its reason");
+
+        const enum ls_expiry_verdict ex[] = { LS_EXPIRY_OK, LS_EXPIRY_NEVER,
+                                              LS_EXPIRY_UNKNOWN, LS_EXPIRY_EXPIRED };
+        int m = (int)(sizeof ex / sizeof ex[0]), exd = 1;
+        for (int i = 0; i < m; i++)
+            for (int j = i + 1; j < m; j++)
+                if (strcmp(ls_expiry_strerror(ex[i]), ls_expiry_strerror(ex[j])) == 0)
+                    exd = 0;
+        OK(exd, "4 expiry verdicts, 4 different strings");
     }
 
     printf("\n%s (%d failure%s)\n", fails ? "*** FAILED" : "all assertions passed",

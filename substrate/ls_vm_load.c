@@ -42,6 +42,7 @@
 #include "ls_sig.h"
 #include "ls_audit.h"
 #include "ls_build_gate.h"
+#include <time.h>
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
  * define this; a second one fails the link on a duplicate symbol. */
@@ -563,19 +564,39 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
                         (unsigned)m->binding.build_min, (unsigned)running);
         }
 
-        /* expires_with IS STILL NOT CHECKED, and that is a decision rather than
-         * an oversight. Its semantics were never defined either --- "encoded build
-         * id -> auto-retire" cannot be evaluated on a box that does not know which
-         * build superseded which --- and inventing a meaning in order to enforce it
-         * would be worse than a documented gap. Pre-registered in
-         * 02-RESEARCH-PARAMETERS.md P9.
-         *   TODO(f5): define it (a uint32 epoch is the obvious candidate) or delete
-         *   the field. A field that constrains nothing is worse than no field: it
-         *   reads, in the audit record, exactly like one that does. */
-        if (m->binding.expires_with != 0u && m->binding.expires_with != 0xffffffffu)
-            fprintf(stderr, "ls_vm: expires_with=0x%08x is set but UNDEFINED and "
-                            "unchecked --- it constrains nothing\n",
-                    (unsigned)m->binding.expires_with);
+        /* EXPIRY. Defined 2026-09-05 as a uint32 Unix epoch and checked here; it
+         * spent its whole life signed, logged, and compared to nothing, which is
+         * the same shape as build_min/build_max before yesterday.
+         *
+         * IT FAILS **OPEN** ON A CLOCK IT CANNOT TRUST, unlike the build gate
+         * directly above, and the asymmetry is deliberate. A shield exists to stop
+         * a crash: refusing one because this container started before NTP ran turns
+         * a clock problem into the outage the shield was preventing. A wrong build
+         * is a correctness error and must refuse; a wrong clock is an environment
+         * error and must not. ls_build_gate.h carries the argument and
+         * check_build_gate.c asserts the branch, so it does not get "fixed" later
+         * by someone reading it as a bug. */
+        {
+            enum ls_expiry_verdict ev =
+                ls_expiry_gate(m->binding.expires_with, (uint64_t)time(NULL));
+            if (ev == LS_EXPIRY_EXPIRED) {
+                reply(fd, "ERR %s (expired at %u, now %u). Re-sign it.\n",
+                      ls_expiry_strerror(ev), (unsigned)m->binding.expires_with,
+                      (unsigned)time(NULL));
+                fprintf(stderr, "ls_vm: REFUSED --- %s: expires_with=%u, now=%u\n",
+                        ls_expiry_strerror(ev), (unsigned)m->binding.expires_with,
+                        (unsigned)time(NULL));
+                return;
+            }
+            if (ev == LS_EXPIRY_UNKNOWN)
+                fprintf(stderr, "ls_vm: expiry NOT JUDGED --- this box's clock reads "
+                                "%u, which is before 2020. Accepting rather than "
+                                "refusing: a wrong clock must not block a shield.\n",
+                        (unsigned)time(NULL));
+            else if (ev == LS_EXPIRY_OK)
+                fprintf(stderr, "ls_vm: expiry OK --- valid until %u\n",
+                        (unsigned)m->binding.expires_with);
+        }
 
         /* SIGNATURE IS VERIFIED ON THE TMM THREAD, not here. See ls_prep_run_pending.
          *

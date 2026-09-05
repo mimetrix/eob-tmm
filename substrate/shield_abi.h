@@ -145,7 +145,27 @@ struct shield_binding {
      */
     uint8_t  ctx_abi_version;                  /* must equal the running builder's  */
     uint8_t  _pad0[2];                         /* named, so it is not re-used blind */
-    uint32_t expires_with;                     /* encoded build id -> auto-retire  */
+    /*
+     * EXPIRY, DEFINED 2026-09-05. It used to say "encoded build id -> auto-retire",
+     * which is not a definition: nothing said what the encoding was, and no reading
+     * of it can be evaluated on a box that does not know which build superseded
+     * which. So for its whole life this field was signed, printed into every audit
+     * record, and compared to NOTHING --- the same shape as build_min/build_max
+     * before 2026-09-04 (CONTESTED-PREMISES.md 15), and the same trap for whoever
+     * read it next.
+     *
+     * It is now a **uint32 Unix epoch, UTC**: the program may not be loaded at or
+     * after this second. That needed no wire change --- the field was already here
+     * and already inside the signature --- whereas DELETING it would have broken
+     * the 112-byte binding and every signature in the field.
+     *
+     *   0 and 0xffffffff  never expires (both already in use as "unset")
+     *   anything else     a deadline; the loader refuses at or after it
+     *
+     * Y2038 is not an issue and 2106 is: as an UNSIGNED epoch this runs out in
+     * 2106, which is longer than the wire format will live.
+     */
+    uint32_t expires_with;                     /* uint32 Unix epoch, UTC; 0/~0 = never */
 };
 
 /* The loader message.
