@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1460 1136" width="1460" height="1136" font-family="Helvetica, Arial, sans-serif">
+<style>
+  .zone   { font-size:13px; font-weight:bold; fill:#1a1a1a; }
+  .zsub   { font-size:11px; fill:#444; }
+  .cmd    { font-size:12.5px; font-family:"DejaVu Sans Mono",Menlo,monospace; fill:#111; }
+  .art    { font-size:11.5px; font-family:"DejaVu Sans Mono",Menlo,monospace; fill:#111; }
+  .gate   { font-size:11.5px; fill:#111; }
+  .hdr    { font-size:12px; font-weight:bold; fill:#000; letter-spacing:0.6px; }
+  .note   { font-size:11px; fill:#333; font-style:italic; }
+  .title  { font-size:17px; font-weight:bold; fill:#000; }
+  .sub    { font-size:12px; fill:#333; }
+  .hot    { font-size:12px; font-weight:bold; fill:#000; }
+  .band   { fill:#f4f4f4; stroke:#c8c8c8; stroke-width:1; }
+  .bandh  { fill:#e8e8e8; stroke:#999;    stroke-width:1.5; }
+  .box    { fill:#fff; stroke:#333; stroke-width:1.2; }
+  .boxh   { fill:#fff; stroke:#000; stroke-width:2.4; }
+  .arr    { stroke:#333; stroke-width:1.4; fill:none; marker-end:url(#a); }
+</style>
+<defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+  <path d="M0,0 L0,6 L8,3 z" fill="#333"/></marker></defs>
+
+<text class="title" x="30" y="34">TMM live-surface pipeline — every stage, where it runs, what it emits, and what must pass</text>
+<text class="sub"   x="30" y="54">Six stages across three machines. The order is load-bearing: getting it wrong yields artifacts that pass every gate and fail at arm time. Verified end to end 2026-09-04, build 1824611c.</text>
+
+<line x1="30" y1="72" x2="1430" y2="72" stroke="#000" stroke-width="1.5"/>
+<text class="hdr" x="36"   y="90">WHERE IT RUNS</text>
+<text class="hdr" x="250"  y="90">STEP</text>
+<text class="hdr" x="700"  y="90">ARTIFACT IT EMITS</text>
+<text class="hdr" x="1040" y="90">WHAT MUST PASS</text>
+<line x1="30" y1="98" x2="1430" y2="98" stroke="#000" stroke-width="1"/>
+
+<!-- ============ ZONE 1: repo / dev sandbox ============ -->
+<rect class="band" x="30" y="106" width="205" height="124"/>
+<text class="zone" x="42" y="130">repo · dev sandbox</text>
+<text class="zsub" x="42" y="148">this machine</text>
+<text class="zsub" x="42" y="164">aarch64</text>
+<text class="zsub" x="42" y="184">sources are edited here;</text>
+<text class="zsub" x="42" y="200">nothing is built for the</text>
+<text class="zsub" x="42" y="216">target here</text>
+
+<rect class="box" x="245" y="112" width="440" height="52"/>
+<text class="cmd" x="257" y="132">bnk-stage.sh</text>
+<text class="note" x="257" y="150">copies substrate + env/ to the build box</text>
+<rect class="box" x="695" y="112" width="330" height="52"/>
+<text class="art" x="705" y="132">~/eob-tmm-staged/</text>
+<text class="art" x="705" y="150">.staged-commit</text>
+<rect class="box" x="1035" y="112" width="395" height="52"/>
+<text class="gate" x="1045" y="132">sha256 of the whole set compared</text>
+<text class="gate" x="1045" y="150">FROM THE FAR END, not from scp's exit code</text>
+
+<rect class="box" x="245" y="172" width="440" height="52"/>
+<text class="cmd" x="257" y="192">bnk-sync-substrate.sh</text>
+<text class="note" x="257" y="210">copies src/base/*, then DELETES the objects</text>
+<rect class="box" x="695" y="172" width="330" height="52"/>
+<text class="art" x="705" y="192">~/code/tmm/src/base/ls_*</text>
+<text class="art" x="705" y="210">34 files · 3 F5 files edited</text>
+<rect class="box" x="1035" y="172" width="395" height="52"/>
+<text class="gate" x="1045" y="192">tree-sync, BOTH directions, vs the manifest</text>
+<text class="gate" x="1045" y="210">(no .d files exist, so make cannot see headers)</text>
+
+<!-- ============ ZONE 2: build box ============ -->
+<rect class="band" x="30" y="238" width="205" height="428"/>
+<text class="zone" x="42" y="262">build box</text>
+<text class="zsub" x="42" y="280">eob-bnk-build-01</text>
+<text class="zsub" x="42" y="296">x86-64</text>
+<text class="zsub" x="42" y="320">clang 18  ·  PREVAIL</text>
+<text class="zsub" x="42" y="336">signing key  ·  tmm.btf</text>
+<text class="zsub" x="42" y="360">ALL FOUR live here, so</text>
+<text class="zsub" x="42" y="376">this is the authoritative</text>
+<text class="zsub" x="42" y="392">place for every verdict</text>
+<text class="zsub" x="42" y="416">clang 14 elsewhere has</text>
+<text class="zsub" x="42" y="432">PASSED what clang 18</text>
+<text class="zsub" x="42" y="448">REFUSED</text>
+
+<rect class="box" x="245" y="244" width="440" height="52"/>
+<text class="cmd" x="257" y="264">make tmm</text>
+<text class="note" x="257" y="282">compiles + links the substrate into TMM</text>
+<rect class="box" x="695" y="244" width="330" height="52"/>
+<text class="art" x="705" y="264">obj_x86_64.no_pgo/tmm.no_pgo</text>
+<text class="art" x="705" y="282">13 ls_*.o</text>
+<rect class="box" x="1035" y="244" width="395" height="52"/>
+<text class="gate" x="1045" y="264">diff-globals against BOTH whitelists —</text>
+<text class="gate" x="1045" y="282">an undeclared global fails the build</text>
+
+<rect class="box" x="245" y="304" width="440" height="52"/>
+<text class="cmd" x="257" y="324">bnk-package.sh</text>
+<text class="note" x="257" y="342">clears the version-stamped chain first</text>
+<rect class="box" x="695" y="304" width="330" height="52"/>
+<text class="art" x="705" y="324">tmm_*.deb · tmm-debuginfo_*.deb</text>
+<text class="art" x="705" y="342">receipt: package build_id</text>
+<rect class="box" x="1035" y="304" width="395" height="52"/>
+<text class="gate" x="1045" y="324">A: package newer than every substrate source</text>
+<text class="gate" x="1045" y="342">B: every non-static substrate function present</text>
+
+<rect class="box" x="245" y="364" width="440" height="52"/>
+<text class="cmd" x="257" y="384">bnk-bake-tools.sh --btf-only</text>
+<text class="note" x="257" y="402">breaks a circular dependency — see the note below</text>
+<rect class="box" x="695" y="364" width="330" height="52"/>
+<text class="art" x="705" y="384">tmm.btf  6.7 MB</text>
+<text class="art" x="705" y="402">stays on the build box</text>
+<rect class="box" x="1035" y="364" width="395" height="52"/>
+<text class="gate" x="1045" y="384">receipt build_id matches these DEBs —</text>
+<text class="gate" x="1045" y="402">refuses BTF derived from a different build</text>
+
+<rect class="boxh" x="245" y="424" width="440" height="80"/>
+<text class="cmd" x="257" y="444">TMM_BTF=… bnk-build-programs.sh</text>
+<text class="note" x="257" y="462">compile → RELOCATE → STRIP → PREVAIL → sign</text>
+<text class="note" x="257" y="480">offsets baked here, so the proof and the signature</text>
+<text class="note" x="257" y="492">both cover the bytes that will actually run</text>
+<rect class="boxh" x="695" y="424" width="330" height="80"/>
+<text class="art" x="705" y="444">*.bpf.o   0 .BTF sections</text>
+<text class="art" x="705" y="462">*.bpf.sig binding + Ed25519</text>
+<text class="art" x="705" y="480">pinned min==max to ONE build</text>
+<rect class="boxh" x="1035" y="424" width="395" height="80"/>
+<text class="gate" x="1045" y="444">PREVAIL: memory safety + termination</text>
+<text class="gate" x="1045" y="462">exit-admit (fexit only) · strip re-read, not trusted</text>
+<text class="gate" x="1045" y="480">REFUSES to sign a relocated program with no range</text>
+
+<rect class="box" x="245" y="512" width="440" height="52"/>
+<text class="cmd" x="257" y="532">bnk-bake-tools.sh</text>
+<text class="note" x="257" y="550">layers tools onto the built image</text>
+<rect class="box" x="695" y="512" width="330" height="52"/>
+<text class="art" x="705" y="532">tmm:&lt;tag&gt; · hook-index.tsv</text>
+<text class="art" x="705" y="550">signatures.tsv · NO .BTF (default)</text>
+<rect class="box" x="1035" y="512" width="395" height="52"/>
+<text class="gate" x="1045" y="532">index build_id == binary build_id (arming works)</text>
+<text class="gate" x="1045" y="550">binary trusts the key the programs were signed with</text>
+
+<rect class="box" x="245" y="564" width="440" height="52"/>
+<text class="cmd" x="257" y="584">bnk-ship-image.sh verify</text>
+<text class="note" x="257" y="602">reads the image, not this script's beliefs</text>
+<rect class="box" x="695" y="564" width="330" height="52"/>
+<text class="art" x="705" y="584">VERDICT: READY</text>
+<text class="art" x="705" y="602">+ your change, found in the binary</text>
+<rect class="box" x="1035" y="564" width="395" height="52"/>
+<text class="gate" x="1045" y="584">/usr/bin/tmm resolves to the PADDED binary</text>
+<text class="gate" x="1045" y="602">(tmm.debug has no pads — nothing in it can arm)</text>
+
+<rect class="box" x="245" y="624" width="440" height="36"/>
+<text class="cmd" x="257" y="647">docker save | ssh  (id_datpush)</text>
+<rect class="box" x="695" y="624" width="330" height="36"/>
+<text class="art" x="705" y="647">/tmp/&lt;tag&gt;.tar   ~335 MB</text>
+<rect class="box" x="1035" y="624" width="395" height="36"/>
+<text class="gate" x="1045" y="647">size confirmed at the far end</text>
+
+<!-- ============ ZONE 3: datkube host ============ -->
+<rect class="band" x="30" y="674" width="205" height="124"/>
+<text class="zone" x="42" y="698">datkube host</text>
+<text class="zsub" x="42" y="716">eob-bnk-datkube-01</text>
+<text class="zsub" x="42" y="740">TWO kind clusters:</text>
+<text class="zsub" x="42" y="756">datkube  and  vs</text>
+<text class="zsub" x="42" y="776">the workload runs on vs —</text>
+<text class="zsub" x="42" y="792">derive it, never assume</text>
+
+<rect class="box" x="245" y="680" width="440" height="52"/>
+<text class="cmd" x="257" y="700">ctr images import   — PER NODE</text>
+<text class="note" x="257" y="718">nodes from `kubectl config current-context`</text>
+<rect class="box" x="695" y="680" width="330" height="52"/>
+<text class="art" x="705" y="700">image in each node's containerd</text>
+<text class="art" x="705" y="718">(kind shares nothing between nodes)</text>
+<rect class="box" x="1035" y="680" width="395" height="52"/>
+<text class="gate" x="1045" y="700">crictl on EVERY node — that is what the</text>
+<text class="gate" x="1045" y="718">kubelet asks; docker on the host is a different store</text>
+
+<rect class="box" x="245" y="740" width="440" height="52"/>
+<text class="cmd" x="257" y="760">kubectl set image + rollout status</text>
+<text class="note" x="257" y="778">a NEW tag forces the roll; a reused tag does not</text>
+<rect class="box" x="695" y="740" width="330" height="52"/>
+<text class="art" x="705" y="760">a running pod on the new image</text>
+<text class="art" x="705" y="778">restarts=0</text>
+<rect class="box" x="1035" y="740" width="395" height="52"/>
+<text class="gate" x="1045" y="760">rollout completes — and the RUNNING binary's</text>
+<text class="gate" x="1045" y="778">build id is read back from inside the pod</text>
+
+<!-- ============ ZONE 4: inside TMM ============ -->
+<rect class="bandh" x="30" y="806" width="205" height="230"/>
+<text class="zone" x="42" y="830">inside TMM</text>
+<text class="zsub" x="42" y="848">the running process</text>
+<text class="zsub" x="42" y="872">no bytecode is baked</text>
+<text class="zsub" x="42" y="888">into the image; programs</text>
+<text class="zsub" x="42" y="904">arrive over a socket and</text>
+<text class="zsub" x="42" y="920">nothing is written to</text>
+<text class="zsub" x="42" y="936">the pod's disk</text>
+<text class="zsub" x="42" y="964">the ELF carries NO type</text>
+<text class="zsub" x="42" y="980">information: 0 bytes of</text>
+<text class="zsub" x="42" y="996">.BTF, and F5 already</text>
+<text class="zsub" x="42" y="1012">ships it stripped</text>
+
+<rect class="box" x="245" y="812" width="440" height="70"/>
+<text class="cmd" x="257" y="832">LOAD  (loader thread)</text>
+<text class="note" x="257" y="850">bnk-deliver-program.py — program AND signature</text>
+<text class="note" x="257" y="868">travel over the socket together</text>
+<rect class="box" x="695" y="812" width="330" height="70"/>
+<text class="art" x="705" y="832">a program in a slot</text>
+<text class="art" x="705" y="850">armed=0 — loaded, not live</text>
+<text class="art" x="705" y="868">audit record per operation</text>
+<rect class="box" x="1035" y="812" width="395" height="70"/>
+<text class="gate" x="1045" y="832">ctx ABI · BUILD GATE (min==max vs running id)</text>
+<text class="gate" x="1045" y="850">"needs relocation?" — refuses a program that</text>
+<text class="gate" x="1045" y="868">does, since there is no .BTF to resolve it against</text>
+
+<rect class="box" x="245" y="890" width="440" height="52"/>
+<text class="cmd" x="257" y="910">PREPARE  (a TMM thread, not the loader)</text>
+<text class="note" x="257" y="928">EVP allocates; TMM's allocator wedges elsewhere</text>
+<rect class="box" x="695" y="890" width="330" height="52"/>
+<text class="art" x="705" y="910">a JIT'd program</text>
+<text class="art" x="705" y="928">signature=verified</text>
+<rect class="box" x="1035" y="890" width="395" height="52"/>
+<text class="gate" x="1045" y="910">Ed25519 over the 112-byte binding, and the body</text>
+<text class="gate" x="1045" y="928">must hash to what the binding commits to</text>
+
+<rect class="box" x="245" y="950" width="440" height="52"/>
+<text class="cmd" x="257" y="970">ARM  ls-load.py arm &lt;slot&gt; &lt;name&gt;</text>
+<text class="note" x="257" y="988">by NAME — a raw address once armed the wrong pad</text>
+<rect class="box" x="695" y="950" width="330" height="52"/>
+<text class="art" x="705" y="970">5 bytes of the entry pad patched</text>
+<text class="art" x="705" y="988">live, under traffic, no restart</text>
+<rect class="box" x="1035" y="950" width="395" height="52"/>
+<text class="gate" x="1045" y="970">hook-index build id == the RUNNING binary's</text>
+<text class="gate" x="1045" y="988">the pad is present and has the expected shape</text>
+
+<rect class="boxh" x="245" y="1010" width="1185" height="60"/>
+<text class="hot" x="257" y="1030">THE ONLY THING ON THE HOT PATH:  the patched entry pad → trampoline → JIT'd program → verdict</text>
+<text class="note" x="257" y="1046">Everything above this line is build-time or admission-time and runs once. This runs per call; an unarmed pad is a nop.</text>
+<text class="note" x="257" y="1060">Per-call cost on the data path is still UNMEASURED. A ≤11 ns floor exists for the program alone and excludes the trampoline's save/restore and cache effects.</text>
+
+<line x1="30" y1="1084" x2="1430" y2="1076" stroke="#000" stroke-width="1"/>
+<text class="note" x="30" y="1104">ORDER IS LOAD-BEARING. build-programs must follow package (it bakes offsets and pins the build range from the PACKAGED binary), and --btf-only must precede it (tmm.btf is derived by the bake but consumed by the program stage).</text>
+<text class="note" x="30" y="1120">Run out of order and the artifacts still pass PREVAIL, the signature and the freshness checks — they fail at ARM time on the cluster. The build gate is what catches it, because the range is pinned from a source independent of the BTF.</text>
+</svg>

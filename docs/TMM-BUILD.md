@@ -1,15 +1,24 @@
 # TMM build — the image and its build artifacts
 
-How the TMM image is built, what our adjustments are, and how the type information the
-runtime needs (`.BTF`) becomes an artifact **embedded in the binary**. Everything here is
-**build-time**: it produces the image a pod runs. Compiling the bytecode that gets loaded
-into that running TMM is a **separate, independent process** — see
-[`BYTECODE-BUILD.md`](BYTECODE-BUILD.md). The two never touch.
+How the TMM image is built and what our adjustments are. Everything here is **build-time**:
+it produces the image a pod runs.
 
-> **What this delivers:** a TMM image whose binary carries the eBPF VM, the entry pads that
-> make live arming possible, and its own type information as a `.BTF` ELF section — so
-> portable bytecode can be relocated against it and loaded at runtime with no rebuild.
-> Validated end to end (live arm on build `ee2056234fd0`, 2026-08-26 — see `co-re-plan.md`).
+**[`pipeline.svg`](pipeline.svg) is this page in one picture** — every stage, which of the
+three machines it runs on, the artifact it emits, and what has to pass. Read it first; the
+sections below are the detail behind each row.
+
+> **What this delivers:** a TMM image whose binary carries the eBPF VM and the entry pads
+> that make live arming possible — and, since 2026-09-04, **no type information at all**.
+> Field offsets are resolved at sign time instead, so the shipped ELF holds 0 bytes of
+> `.BTF` (it was 6,711,805 — 41,710 function names and 16,006 struct layouts) in a binary
+> F5 already ships `stripped`. Validated end to end: a shield loads, arms and runs on such a
+> binary, twice, the second time from a cold pipeline pass — `bnk-test-btfless.sh` 6/6 on
+> build `1824611c`, 2026-09-04.
+>
+> **Bytecode is compiled by a separate process** ([`BYTECODE-BUILD.md`](BYTECODE-BUILD.md)),
+> and that separation now has a constraint on it: the program build reads the **packaged**
+> binary to bake offsets and pin the build range, so it must run *after* packaging. See
+> step 4b.
 
 ## Boxes
 

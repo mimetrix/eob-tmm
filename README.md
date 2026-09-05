@@ -59,11 +59,13 @@ toolchain.*
 
 The two never touch, and that separation is the point.
 
-- **The TMM image** carries only build artifacts: the engine, the entry pads that make live
-  attachment possible, and the build's own type information embedded in the binary — see
-  **[`docs/TMM-BUILD.md`](docs/TMM-BUILD.md)**.
+- **The TMM image** carries only build artifacts: the engine and the entry pads that make live
+  attachment possible — and, since 2026-09-04, **no type information**. The shipped ELF holds
+  0 bytes of `.BTF`; offsets are resolved at sign time instead. See
+  **[`docs/TMM-BUILD.md`](docs/TMM-BUILD.md)** and its one-picture summary,
+  **[`docs/pipeline.svg`](docs/pipeline.svg)**.
 - **Bytecode** is authored, compiled, verified, and signed as a **completely independent process**,
-  then loaded over a socket into a running TMM and relocated against its embedded type info — see
+  with its field offsets resolved and baked there, then loaded over a socket into a running TMM — see
   **[`docs/BYTECODE-BUILD.md`](docs/BYTECODE-BUILD.md)**. A new attach point or a new field to read
   is a new program in minutes, not a build.
 

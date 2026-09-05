@@ -152,6 +152,13 @@ build-coupled detour in CONTESTED-PREMISES.md.
 
 ## BTF as a build artifact (embedded in the binary — the kernel's model)
 
+> **Superseded 2026-09-04, kept because the reasoning still explains the shape of the system.**
+> The binary no longer embeds `.BTF`: offsets are resolved at sign time and the shipped ELF holds
+> 0 bytes of it. What follows is the argument that made embedding the right first answer — and its
+> central property, that BTF travelling *inside* the binary cannot drift from it, is exactly what
+> the change gives up, which is why the signed build range had to be enforced first. See
+> `02-RESEARCH-PARAMETERS.md` P9 and `docs/pipeline.svg`.
+
 Resolved 2026-08-26, grounded in the cached kernel docs (SOURCES.md): the kernel embeds its BTF as a
 `.BTF` ELF section in `vmlinux` (pahole at build) and only re-exposes it via `/sys/kernel/btf/vmlinux`
 because userspace cannot read kernel memory. TMM is one userspace process, so its equivalent is to
