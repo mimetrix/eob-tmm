@@ -50,6 +50,11 @@ construction, kept that way on purpose, and carrying its own dated accuracy note
 
 | document | covers |
 |---|---|
+| [`docs/pipeline.svg`](docs/pipeline.svg) | **current — the one picture.** Six stages, three machines: step, where it runs, the artifact it emits, what must pass. The hot path is one row; everything above it is build- or admission-time |
+| [`env/k8s/h2-trailer-backend.yaml`](env/k8s/h2-trailer-backend.yaml) | **current — half of the CVE demonstration.** ConfigMap + Pod: an h2c origin whose every response ends in a trailer with an empty header block, which is the only shape that reaches CVE-2025-41414. Was a scratch-directory script until 2026-09-05, which is why the demo could not be re-run |
+| [`substrate/shields/h2_trailer_guard.bpf.c`](substrate/shields/h2_trailer_guard.bpf.c) | **current — the other half.** The shield that prevents it. PREVAIL-verified, ~74 cycles, signed at `enforce`. Its comment states the predicate is a deliberate over-approximation and that 0/10 false positives is measured, not proven-zero |
+| [`substrate/ls_build_gate.h`](substrate/ls_build_gate.h) | **current.** The decision that refuses a program signed for a different build — header-only and pure, so `check_build_gate.c` asserts every branch off-TMM |
+| Checks added with the sign-time-relocation work | `substrate/check_relo_baked.py` (baked offsets vs an independent implementation), `substrate/check_prevail_after_relo.sh` (does PREVAIL's verdict survive relocation), `env/scripts/bnk-test-build-gate.sh` (the gate, live), `env/scripts/bnk-test-btfless.sh` (a shield loads, arms and runs on a binary with no type information) |
 | [`cve-41414-demonstration.md`](cve-41414-demonstration.md) | **current — the evidence record.** CVE-2025-41414 crashed by one client request and prevented by a selective shield (2026-09-03). Read this before any claim about CVE mitigation; it supersedes every "no CVE has been mitigated" line elsewhere |
 | [`cve-to-shield-process.md`](cve-to-shield-process.md) | **current — procedure.** The nine steps from a CVE description to a verified shield, which two actually kill attempts, and the v0→v1→v2 predicate derivation. Read with the demonstration record |
 | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) | The entry point. Mechanism, results with evidence, limits, ranked extensions |
@@ -167,6 +172,30 @@ traffic"* line and have been corrected in-repo.
 **Anything already published as a claude.ai Artifact still shows the old text** — editing the repo
 file does not change a published page, and republishing needs the owner's explicit per-item approval
 (convention 1). Treat the hosted copies as stale until that approval is given.
+
+### Retired 2026-09-05
+
+`dtls-tx-shield-demo.md` — **deleted**, and it is the surviving half of the retirement below.
+`presentations/shield-live-demo.html` went on 2026-09-04 for having a `dtls_tx` spine and no CVE id;
+this was its markdown twin. Its own headline conceded the demo never landed: *"the `dtls_tx` shield
+is verified but **not yet armed live**, blocked on a relocator bug."* The evidence-event pipeline it
+recorded is not lost — it is a MEASURED row in `GROUND_TRUTH.md`, and the shield story it was
+standing in for is now `cve-41414-demonstration.md`.
+
+`cve-mitigation-milestone.md` — **deleted.** It described itself as *"thesis + milestone plan …
+what is MEASURED today vs. the **milestone that isn't reached yet**"*. That milestone has been
+reached twice: CVE-2025-41414 crashed by one client request and prevented by a selective shield
+(2026-09-03), then reproduced on a binary carrying **no type information at all** (2026-09-05). A
+plan for a completed milestone is the clearest case of overcome-by-events in the repo. Its two jobs
+are now split cleanly: `cve-41414-demonstration.md` holds the evidence, `cve-to-shield-process.md`
+the procedure. Seven citations in `SYMPTOMS.md` plus four elsewhere were repointed rather than left
+dangling.
+
+**What was deliberately NOT deleted in the same pass**, because the bar here is *wrong and useless*
+rather than merely old: `cve-shield-capability-matrix.md` (a forward map, still the roadmap input),
+`cve-hunt-runbook.md` (the procedure for sourcing the next target), `reachability-survey.md` (a
+measurement record — records age but stay true), and every design-era document, which this page
+already classifies and which is kept because the reasoning explains the system's shape.
 
 ### Retired 2026-09-04
 

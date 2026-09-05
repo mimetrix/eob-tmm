@@ -6,7 +6,9 @@ real TMM; **SHIPPED-UNVALIDATED** = in the binary, not yet exercised); anchors a
 approach — they will not change) and **current** (engineering — they will). Companions:
 [`cve-shield-capability-matrix.md`](cve-shield-capability-matrix.md) (which *vulnerability classes*
 are reachable), [`engine-hard-problems.md`](engine-hard-problems.md) (the hard parts),
-[`cve-mitigation-milestone.md`](cve-mitigation-milestone.md) (what's proven vs. the milestone).
+[`cve-41414-demonstration.md`](cve-41414-demonstration.md) (the evidence record) and
+[`cve-to-shield-process.md`](cve-to-shield-process.md) (the procedure). These replace the milestone
+plan that used to be cited here, retired 2026-09-05 once its milestone was reached.
 
 ---
 

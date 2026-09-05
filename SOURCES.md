@@ -110,7 +110,9 @@ re-fetch to audit them.
 `F5BigLogHslpub`, `F5BigLogProfile`, `F5SPKEgress`, `F5SPKSnatpool`, `F5SPKStaticRoute`, `F5SPKVLAN`,
 `Gateway`, `GatewayClass`, `GRPCRoute`, `HTTPRoute`, `L4Route`, `F5BigCneIrule`, `F5BigGlobalOptions`.
 
-Three findings that close open questions in `cve-mitigation-milestone.md` §4B/§4C:
+Three findings that closed open questions in the CVE-mitigation milestone plan (retired
+2026-09-05 once the milestone was reached; the evidence now lives in
+`cve-41414-demonstration.md` and the procedure in `cve-to-shield-process.md`):
 
 1. **Gateway TLS is certificate-only.** Under `listeners.tls` the reference documents
    `certificateRefs` (with `group`/`kind`/`name`/`namespace`) and *nothing else* — **no `options`

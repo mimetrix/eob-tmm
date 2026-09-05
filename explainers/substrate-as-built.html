@@ -142,6 +142,15 @@
   function entry while traffic flows, and removed again leaving the bytes exactly as they were.
   No rebuild. No restart. This page is what exists and what it has been measured to do — not a
   proposal.</p>
+  <p class="sub" style="border-left:3px solid currentColor;padding-left:12px;opacity:.85">
+  <strong>Snapshot: 2026-08-24.</strong> Everything below was true when written and still is, but the
+  page has not been refreshed since, and three things have happened that it does not mention. A named
+  CVE — <strong>CVE-2025-41414</strong> — has been crashed by a single client request and prevented by
+  a selective verified shield. The signed build range is now <em>enforced</em> at load. And the shipped
+  binary carries <strong>no type information at all</strong>: field offsets are resolved at sign time,
+  so the ELF holds 0 bytes of <code>.BTF</code> where it once held 6,711,805. For the current state see
+  <code>GROUND_TRUTH.md</code> and <code>docs/pipeline.svg</code>; this page is kept as the record of
+  what the substrate looked like when it first ran.</p>
   <div class="chips">
     <span class="chip m">measured on build 499b8c30</span>
     <span class="chip m">signatures 16/16 · audit 11/11</span>

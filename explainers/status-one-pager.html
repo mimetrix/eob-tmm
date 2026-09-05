@@ -144,19 +144,30 @@ footer{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule);font-si
         <tr><td>Where it runs</td><td class="old">Fixed events</td><td class="new">Any function</td></tr>
         <tr><td>What it sees</td><td class="old">Curated variables</td><td class="new">Any internal field</td></tr>
         <tr><td>Changing it</td><td class="old">Reconfigure</td><td class="new">Load / unload live, no restart</td></tr>
-        <tr><td>Across versions</td><td class="old">n/a</td><td class="new">Write once, runs on any build</td></tr>
+        <tr><td>Across versions</td><td class="old">n/a</td><td class="new">Written once, re-signed per build</td></tr>
+        <tr><td>What the binary reveals</td><td class="old">n/a</td><td class="new">Nothing — 0 bytes of type information</td></tr>
         <tr><td>Safety</td><td class="old">Interpreter limits</td><td class="new">Proven before it runs</td></tr>
       </table>
     </section>
 
     <section>
       <h2>Status — honest</h2>
-      <p class="sub">A working lab demonstration, not yet a shipping feature. Updated 2026-09-04.</p>
+      <p class="sub">A working lab demonstration, not yet a shipping feature. Updated 2026-09-05.</p>
+      <p class="sub" style="border-left:3px solid currentColor;padding-left:12px;opacity:.85">
+      <strong>One row changed meaning, so it is spelled out rather than quietly edited.</strong> This
+      page used to claim <em>“write once, runs on any build”</em> and list portability as Demonstrated.
+      It was true, and it was traded away deliberately. Field offsets are now resolved when a program
+      is <em>signed</em>, which is what lets the shipped binary carry <strong>no type information at
+      all</strong> — 0 bytes where it once held 6,711,805, naming 41,710 functions and 16,006 struct
+      layouts in a binary F5 otherwise ships stripped. The cost is that a program is signed for one
+      build and must be re-signed for the next; the loader refuses it otherwise, by design. Measured
+      both ways: a shield loads, arms and fires per request on such a binary, and a program built for
+      a different build is refused.</p>
       <div class="status">
         <div><span class="k">Runtime engine + safety check</span><span class="tag t-live">Working</span></div>
         <div><span class="k">Signing &amp; controlled load</span><span class="tag t-live">Working</span></div>
         <div><span class="k">Live attach / read / remove</span><span class="tag t-live">Demonstrated</span></div>
-        <div><span class="k">Portable across builds</span><span class="tag t-live">Demonstrated</span></div>
+        <div><span class="k">Shipped binary discloses no internal layout</span><span class="tag t-live">Measured</span></div>
         <div><span class="k">Named CVE stopped end-to-end, by real traffic</span><span class="tag t-live">Measured</span></div>
         <div><span class="k">Per-fire cost floor (~25 ns, 1.1B samples)</span><span class="tag t-live">Measured</span></div>
         <div><span class="k">Live view of the data plane's scheduler</span><span class="tag t-live">Demonstrated</span></div>

@@ -118,9 +118,17 @@ The only thing a surface needs from a TMM build is **field names** (for authorin
 offsets are resolved **at load, not at compile**, by the loader's CO-RE relocator against the running
 binary's embedded `.BTF`. So:
 
-- The **same signed `.bpf.o`** runs on any build whose structs still contain those fields; on a build
-  where a field moved, the loader relocates to the new offset. Proven: identical bytecode relocated
-  correctly against two builds with different offsets.
+- **CHANGED 2026-09-05 — offsets are now resolved at SIGN time, not at load.** The paragraph that
+  stood here said the same signed `.bpf.o` runs on any build whose structs still contain those
+  fields, because the loader relocated against the binary's embedded `.BTF`. That was true and was
+  given up deliberately: resolving offsets in the pipeline is what lets the shipped binary carry
+  **no type information at all** — 0 bytes of `.BTF` where it held 6,711,805
+  (`02-RESEARCH-PARAMETERS.md` P9).
+- So a program is now **signed for one build** (`build_min == build_max`) and must be re-signed for
+  the next. The loader **refuses** it otherwise, and refuses a program that still carries
+  `.BTF.ext` with the cause on the log — a wrong-build load fails loudly instead of reading
+  placeholder offsets. Measured: `bnk-test-build-gate.sh` 9/9, `bnk-test-btfless.sh` 6/6.
+- What did **not** change: nothing about compiling a surface depends on rebuilding TMM.
 - Nothing about compiling a surface depends on rebuilding TMM. A new attach point or a new field read
   is a **new program in minutes**, not a build cycle.
 

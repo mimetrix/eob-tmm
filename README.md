@@ -16,7 +16,7 @@ can't: the data plane's own functions and internal state.
 | **Where it attaches** | fixed events / curated hooks | **any function** in the data plane |
 | **What it reads** | curated variables | **any internal field**, by name |
 | **Changing it** | reconfigure, or rebuild | **load / unload live**, no restart |
-| **Across builds** | — | **write once, runs on any build** (offsets resolved at load) |
+| **Across builds** | — | **written once, re-signed per build** (offsets resolved at *sign* time, so the shipped binary needs no type information) |
 | **Safety** | interpreter/runtime limits | **statically proven** before it runs, then **F5-signed** |
 
 Kernel eBPF can *watch* the `tmm` binary from outside, but it traps into the kernel on every hit
