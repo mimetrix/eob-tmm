@@ -34,7 +34,23 @@ per-invocation cost of an armed hook at more than roughly 5× the floor. That wo
 trampoline and cache effects dominate and the floor is not a useful proxy.
 
 **Blocked by:** `perf_event_paranoid=4`, and the watchpoint prototype established that
-`CAP_PERFMON` does not lift it — so this needs the same privilege conversation as P4.
+`CAP_PERFMON` does not lift it — so an *independent* measurement still needs the same privilege
+conversation as P4.
+
+**PARTLY ANSWERED WITHOUT IT, 2026-09-05.** The trampoline already times itself with an `rdtsc`
+pair, and an armed hook on a live TMM reports that per invocation — no PMU required. `poll_probe`
+at `device_poll`, ~22.6k/s on a Xeon 8358 @ 2.60 GHz: **`cycles_min` = 96–98, ≈ 37 ns**. That is a
+floor for the **whole armed path** — trampoline save/restore, call and return, dispatch, and the
+JIT'd program — which is precisely what the ≤ 11 ns bench floor excluded. So the claim above moves
+from "the floor is not a useful proxy, unknown" to "**the floor including the trampoline is ~3.4×
+the program-only floor**".
+
+**The falsifier does NOT fire, and the original question is still open.** It asked whether the real
+per-invocation cost exceeds ~5× the floor. The *mean* here is 314–397 cycles (≈ 121–153 ns), which
+is 3.3–4.1× — under 5×, but the number cannot be used: `cycles_max` hit **377,426** cycles (~145 µs),
+so the tail is preemption and the mean is contaminated exactly as `load-path-scope.md` §7 says. An
+independent method is still required to settle the mean, and `device_poll` is the poll loop rather
+than a packet path — the trampoline transfers, the cache behaviour under traffic does not.
 
 ### P3 · Is `CAP_SYS_ADMIN` in a data-plane container acceptable?
 
