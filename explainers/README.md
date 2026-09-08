@@ -1,5 +1,41 @@
 # Explainers — index
 
+## Publication tracking — EMPTY, and that is the finding
+
+| page | published? | artifact URL | published from commit |
+|---|---|---|---|
+| `cve-mitigation.html` | unknown | — | — |
+| `status-one-pager.html` | unknown | — | — |
+| `programmable-dataplane-engine.html` | unknown | — | — |
+| `engine-hard-problems.html` | unknown | — | — |
+| `substrate-as-built.html` | unknown | — | — |
+| `presentations/cve-mitigation-demo.html` | unknown | — | — |
+
+**Why this table exists and why it is blank.** The convention here is to *redeploy to the same
+artifact URL so shared links never break* — and nothing in this repository has ever recorded a single
+artifact URL, so that convention could not be honoured even in principle. Worse, it means nobody can
+answer the only question that matters when a page's claims change: **is there a copy out there still
+saying the old thing?**
+
+Asked on 2026-09-05, the answer was "unknown", and it stayed unknown because it is not recoverable
+from here — the gallery cannot be listed or edited from tooling, and artifact deletion is manual.
+
+**Fill a row in when you publish.** The commit is the important column: it is what makes "this
+published copy predates the correction" a checkable statement instead of a guess.
+
+**What a stale copy would be saying**, worst first, as of 2026-09-05:
+
+| a copy published before | still claims |
+|---|---|
+| **2026-09-03** | **`dtls_tx` as the worked example for CVE mitigation** — an internal finding with **no CVE id**. This is the one that matters: the standing rule here is that a target without a CVE id is not a business claim, so such a copy is not merely out of date, it makes a claim we do not make |
+| **2026-09-03** | *"No CVE has been mitigated on live traffic"* — false since CVE-2025-41414 was crashed by a client request and prevented |
+| **2026-09-04** | a microbenchmark cost figure (`~570 ns` / `~8.8 ns`) rather than the live measurement, and a pre-CVE proof chip |
+| **2026-09-05** | *"write once, runs on any build"* and portability as **Demonstrated** — deliberately traded away for a binary that carries no type information; and it omits that result entirely, which is the strongest thing now on the page |
+
+Every repo copy is clean of all four — the sweeps caught them. This table is only about copies that
+left the repo.
+
+
 > **Accuracy note (2026-08-13).** These pages were written when this was a proposal. The data-plane
 > mechanism now **runs on a live TMM** — load, arm, disarm, no restart — and designed-in call sites
 > have been **removed** as the shield mechanism in favour of patched function entries. (They returned
