@@ -214,6 +214,141 @@ def setup(loader, slot, progdir):
     return True, "armed %s at %s in slot %d" % (SETUP_PROBE, SETUP_HOOK, slot)
 
 
+
+def human(n):
+    """Bytes as a short string. Binary units, labelled as such --- KiB not KB, because
+    a memory figure off by 2.4% is the kind of thing that gets argued about."""
+    if not isinstance(n, int):
+        return str(n)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if abs(n) < 1024 or unit == "GiB":
+            return "%d %s" % (n, unit) if unit == "B" else "%.1f %s" % (n, unit)
+        n /= 1024.0
+    return str(n)
+
+
+# ---- tmstat, via tmctl -------------------------------------------------------
+#
+# THE SOURCE THE MEMORY AND NETWORK PANES NEEDED, and it was in the pod all along.
+# Shield slot counters can only report what a loaded program measures, so allocator
+# and drop state are invisible that way --- which is why these panes did not exist.
+# TMM publishes its own stat tables into shared memory under /var/tmstat/blade, and
+# `tmctl` reads them. 856 tables.
+#
+# THE INVOCATION IS `tmctl -d blade`, and finding that cost a detour worth recording:
+# bare `tmctl` fails with "tmstat_subscribe cluster: No such file or directory",
+# which reads like a broken install. It is not --- it defaults to a `cluster` segment
+# this deployment does not have. `-d blade` selects the one it does.
+TMCTL = "/usr/bin/tmctl"
+TMSTAT_DIR = "blade"
+
+# Gauges describe a level right now; differencing them is meaningless, exactly like
+# cycles_min/max in the slot table. Kept apart for the same reason.
+MEM_GAUGES = ("used", "avail", "allocated", "max_allocated")
+MEM_COUNTERS = ("fail_allocs",)
+NET_COUNTERS = ("dropped_packets", "incoming_packet_errors", "outgoing_packet_errors",
+                "connection_memory_errors")
+
+
+def read_tmctl(table, tmctl=TMCTL):
+    """[{column: value}] for one tmstat table, or [] on any failure.
+
+    Parses tmctl's aligned column output: a header line, a rule line of dashes, then
+    rows. Values that look like integers are converted; everything else stays a
+    string, because a name column silently becoming 0 is worse than a name column."""
+    try:
+        r = subprocess.run([tmctl, "-d", TMSTAT_DIR, table],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return []
+    lines = [l for l in r.stdout.splitlines() if l.strip()]
+    if len(lines) < 2 or not set(lines[1].strip()) <= set("- "):
+        return []                      # no header/rule pair: not a table we can read
+    cols = lines[0].split()
+    out = []
+    for line in lines[2:]:
+        vals = line.split()
+        if len(vals) != len(cols):
+            continue                   # ragged row: skip it rather than mis-align
+        row = {}
+        for c, v in zip(cols, vals):
+            try:
+                row[c] = int(v)
+            except ValueError:
+                row[c] = v
+        out.append(row)
+    return out
+
+
+def mem_snapshot(tmctl=TMCTL):
+    """Physical memory, plus any umem cache that has FAILED an allocation.
+
+    Only failing caches are listed, not the top consumers. A cache being large is
+    normal; a cache that could not satisfy a request is the thing worth a line on a
+    one-screen tool, and 200 rows of normal hides it."""
+    phys = read_tmctl("tmm/physmem", tmctl)
+    caches = read_tmctl("tmm/umem_usage_stat", tmctl)
+    failing = [c for c in caches if isinstance(c.get("fail_allocs"), int)
+               and c["fail_allocs"] > 0]
+    return {"physmem": phys[0] if phys else {"error": "unreadable"},
+            "caches_total": len(caches),
+            "caches_failing": sorted(failing, key=lambda c: -c["fail_allocs"])[:8]}
+
+
+def read_tmctl_pivot(table, tmctl=TMCTL):
+    """{field: value} from `tmctl -P`, which prints one field per line.
+
+    WHY PIVOTED. tmm_stat is ONE ROW with 158 columns, so the drop counters are
+    columns rather than rows --- and reading `tmctl -C` (describe columns) as if it
+    were data is exactly the mistake that made the first version of the network pane
+    report "no drop counters found" against a table that has four of them. `-P`
+    turns the row on its side and gives name/value pairs."""
+    try:
+        r = subprocess.run([tmctl, "-d", TMSTAT_DIR, "-P", table],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return {}
+    out = {}
+    for line in r.stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 2:
+            try:
+                out[parts[0]] = int(parts[1])
+            except ValueError:
+                out[parts[0]] = parts[1]
+    return out
+
+
+def net_snapshot(tmctl=TMCTL):
+    """The drop and error counters from tmm_stat."""
+    d = read_tmctl_pivot("tmm_stat", tmctl)
+    if not d:
+        return {"error": "tmm_stat unreadable (is tmctl present?)"}
+    wanted = {k: d[k] for k in NET_COUNTERS if isinstance(d.get(k), int)}
+    return wanted or {"error": "tmm_stat read, but none of %s present" % (NET_COUNTERS,)}
+
+
+def sched_snapshot(tmctl=TMCTL):
+    """The poll loop, straight from TMM rather than from an armed shield.
+
+    A BETTER SOURCE THAN THE ONE THIS TOOL STARTED WITH. tmm_stat carries `polls` and
+    `idle_polls`, so "is the scheduler busy" is answerable with NO shield armed at all
+    --- where the slot table needs a probe loaded, armed, and signed for this build.
+    The slot view is still worth having: it measures what a shield costs, which this
+    cannot see. They answer different questions."""
+    d = read_tmctl_pivot("tmm_stat", tmctl)
+    if not isinstance(d.get("polls"), int):
+        return {"error": "tmm_stat has no `polls` column"}
+    polls, idle = d["polls"], d.get("idle_polls", 0)
+    out = {"polls": polls, "idle_polls": idle}
+    if polls:
+        # A GAUGE COMPUTED FROM TWO ACCUMULATORS is a lifetime average, not a rate.
+        # Labelled that way: it is the fraction of all polls since boot that found
+        # nothing to do, which is not the same as "idle now".
+        out["idle_fraction_since_boot"] = round(idle / float(polls), 4)
+    return out
+
+
 def main(argv):
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--slots", default="0-7", help="slot list/range, e.g. 4,5 or 0-7")
@@ -234,6 +369,13 @@ def main(argv):
                     help="which slot --setup uses (default 6); refuses if already armed")
     ap.add_argument("--progdir", default="/usr/share/ls/shields",
                     help="where --setup looks for the signed probe")
+    ap.add_argument("--mem", action="store_true",
+                    help="memory pane: physmem, and any umem cache that FAILED an alloc")
+    ap.add_argument("--net", action="store_true",
+                    help="network pane: drop and packet-error counters from tmm_stat")
+    ap.add_argument("--sched", action="store_true",
+                    help="scheduler pane: polls / idle_polls from tmm_stat, no shield needed")
+    ap.add_argument("--tmctl", default=TMCTL, help="path to tmctl (reads /var/tmstat/blade)")
     a = ap.parse_args(argv[1:])
 
     slots = []
@@ -264,9 +406,57 @@ def main(argv):
             slots.append(a.setup_slot)
         labels.setdefault(str(a.setup_slot), SETUP_HOOK)
 
+    def panes():
+        """The memory and network panes, as text. Empty when neither was asked for."""
+        out = []
+        if a.mem:
+            m = mem_snapshot(a.tmctl)
+            ph = m["physmem"]
+            if "error" in ph:
+                out.append("memory   %s (is tmctl present and /var/tmstat/blade readable?)" % ph["error"])
+            else:
+                used, avail = ph.get("used", 0), ph.get("avail", 0)
+                tot = used + avail
+                out.append("memory   physmem used %s of %s (%.1f%%)   umem caches %d"
+                           % (human(used), human(tot),
+                              (100.0 * used / tot) if tot else 0.0, m["caches_total"]))
+            for c in m["caches_failing"]:
+                out.append("  ALLOC FAILURES  %-30s fail_allocs=%d used=%s"
+                           % (c.get("name"), c["fail_allocs"], human(c.get("used", 0))))
+            if not m["caches_failing"] and "error" not in ph:
+                out.append("  no umem cache has failed an allocation")
+        if a.sched:
+            sc = sched_snapshot(a.tmctl)
+            if "error" in sc:
+                out.append("sched    %s" % sc["error"])
+            else:
+                out.append("sched    polls %d   idle %d   idle fraction since boot %.1f%%"
+                           % (sc["polls"], sc["idle_polls"],
+                              100.0 * sc.get("idle_fraction_since_boot", 0.0)))
+                out.append("         (a lifetime average, not \"idle now\" --- both are"
+                           " counters since boot)")
+        if a.net:
+            n = net_snapshot(a.tmctl)
+            if "error" in n:
+                out.append("network  %s" % n["error"])
+            else:
+                out.append("network  " + "  ".join("%s=%d" % (k, n[k]) for k in sorted(n)))
+        return out
+
     if a.once:
         snap = sample(loader, slots)
-        print(json.dumps(snap, indent=2) if a.json else render(snap, labels, False))
+        if a.json:
+            if a.mem:
+                snap["memory"] = mem_snapshot(a.tmctl)
+            if a.net:
+                snap["network"] = net_snapshot(a.tmctl)
+            if a.sched:
+                snap["scheduler"] = sched_snapshot(a.tmctl)
+            print(json.dumps(snap, indent=2))
+        else:
+            print(render(snap, labels, False))
+            for line in panes():
+                print(line)
         return 0
 
     if a.interval is not None:            # explicit two-sample mode, kept for scripts

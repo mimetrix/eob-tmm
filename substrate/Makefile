@@ -468,7 +468,7 @@ check-prevail-relo:
 # and the failure mode of a difference is a wrong number rather than a missing one.
 # No cluster, no TMM, no loader --- fixtures only.
 check-tmmtop:
-	@$(PYTHON) check_tmmtop.py >/dev/null 2>&1 && echo "ok    tmmtop  (21 assertions: envelopes never differenced, reload and backwards-counter refused, one bad slot does not delete the others)" \
+	@$(PYTHON) check_tmmtop.py >/dev/null 2>&1 && echo "ok    tmmtop  (36 assertions: envelopes never differenced, reload and backwards-counter refused, tmctl aligned-vs-pivot parsing, panes fail soft)" \
 	  || { $(PYTHON) check_tmmtop.py; exit 1; }
 
 check-build-gate:

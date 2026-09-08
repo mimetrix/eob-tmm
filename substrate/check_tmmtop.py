@@ -109,6 +109,72 @@ full = tt.rates(a, b, {})
 ok(full.get("interval_s") == 2.0, "interval_s is reported")
 ok("read_span_s" in full, "read_span_s is reported --- a long read skews every rate in the table")
 
+print("\ntmctl parsing --- the panes read TMM's own stat tables, not shield counters")
+{
+}
+# A fake tmctl on PATH, so the parsers are exercised without a pod. The point is the
+# PARSE: tmctl's output is aligned columns for most tables and name/value pairs under
+# -P, and reading one as the other is exactly the bug that made the first network pane
+# report "no drop counters found" against a table that has four.
+import subprocess as _sp, tempfile as _tf, textwrap as _tw
+_d = _tf.mkdtemp()
+_fake = os.path.join(_d, "tmctl")
+open(_fake, "w").write(_tw.dedent("""\
+    #!/bin/sh
+    # $1=-d $2=blade then either TABLE or -P TABLE
+    if [ "$3" = "-P" ]; then
+      case "$4" in
+        tmm_stat) printf 'polls 1000\\nidle_polls 250\\ndropped_packets 7\\nincoming_packet_errors 2\\noutgoing_packet_errors 0\\nconnection_memory_errors 0\\n' ;;
+      esac
+      exit 0
+    fi
+    case "$3" in
+      tmm/physmem) printf 'name        used      avail\\n------- -------- ----------\\nphysmem 15745024 1564475392\\n' ;;
+      tmm/umem_usage_stat) printf 'name        used allocated max_allocated fail_allocs\\n----------- ---- --------- ------------- -----------\\numem_ok     2304      8192          8192           0\\numem_bad    4096     16384         16384          42\\n' ;;
+    esac
+    """))
+os.chmod(_fake, 0o755)
+
+rows = tt.read_tmctl("tmm/physmem", _fake)
+ok(len(rows) == 1 and rows[0]["used"] == 15745024 and rows[0]["avail"] == 1564475392,
+   "aligned columns parse, and integers become integers")
+ok(rows[0]["name"] == "physmem",
+   "a name column stays a STRING --- silently becoming 0 is worse than staying text")
+
+piv = tt.read_tmctl_pivot("tmm_stat", _fake)
+ok(piv.get("dropped_packets") == 7 and piv.get("polls") == 1000,
+   "-P name/value pairs parse")
+
+m = tt.mem_snapshot(_fake)
+ok(m["physmem"]["used"] == 15745024, "mem pane reads physmem")
+ok(m["caches_total"] == 2, "it counts every cache")
+ok(len(m["caches_failing"]) == 1 and m["caches_failing"][0]["name"] == "umem_bad",
+   "it lists ONLY caches that failed an alloc --- a large cache is normal, a failing one is not")
+
+n = tt.net_snapshot(_fake)
+ok(n.get("dropped_packets") == 7 and n.get("outgoing_packet_errors") == 0,
+   "net pane reads the drop counters, including the zeros")
+ok("error" not in n, "and reports no error when the table is readable")
+
+sc = tt.sched_snapshot(_fake)
+ok(sc["polls"] == 1000 and sc["idle_polls"] == 250, "sched pane reads polls/idle_polls")
+ok(sc["idle_fraction_since_boot"] == 0.25,
+   "idle fraction is computed, and named 'since boot' --- two accumulators make a "
+   "lifetime average, not 'idle now'")
+
+print("\nthe panes fail SOFT --- a missing tmctl must not take the slot table with it")
+ok(tt.read_tmctl("tmm/physmem", "/nonexistent/tmctl") == [],
+   "no tmctl -> empty list, no exception")
+ok("error" in tt.mem_snapshot("/nonexistent/tmctl")["physmem"],
+   "mem pane reports the failure instead of printing zeros")
+ok("error" in tt.net_snapshot("/nonexistent/tmctl"), "net pane reports the failure")
+ok("error" in tt.sched_snapshot("/nonexistent/tmctl"), "sched pane reports the failure")
+
+print("\nhuman() units")
+ok(tt.human(1024) == "1.0 KiB" and tt.human(15745024) == "15.0 MiB",
+   "binary units, labelled KiB/MiB --- a memory figure off by 2.4% gets argued about")
+ok(tt.human("x") == "x", "a non-integer passes through rather than crashing the pane")
+
 print("\n%s (%d failure%s)" % ("all assertions passed" if not fails else "*** FAILED",
                               fails, "" if fails == 1 else "s"))
 sys.exit(1 if fails else 0)
