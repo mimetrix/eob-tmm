@@ -20,6 +20,15 @@ saying the old thing?**
 Asked on 2026-09-05, the answer was "unknown", and it stayed unknown because it is not recoverable
 from here — the gallery cannot be listed or edited from tooling, and artifact deletion is manual.
 
+**The two CVE pages are a PAIR, and must be swept together.**
+`explainers/cve-mitigation.html` is the argument (8 beats, for circulating);
+`presentations/cve-mitigation-demo.html` is the script (15 slides, the live walkthrough — *"feed it
+the CVE condition"*, *"now decline to shield"*). Neither is redundant: one is read, one is shown. But
+they share the opening beat, the five-bytes explanation, the honest-scope list and **every measured
+number** — so a claim that changes in one is wrong in the other. On 2026-09-05 the deck was found two
+days and four corrections behind, because nothing said they were a pair. Both now carry an HTML
+comment saying so.
+
 **Fill a row in when you publish.** The commit is the important column: it is what makes "this
 published copy predates the correction" a checkable statement instead of a guess.
 
