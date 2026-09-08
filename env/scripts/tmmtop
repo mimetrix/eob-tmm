@@ -104,7 +104,19 @@ def rates(a, b, labels):
             else:
                 for c in COUNTERS:
                     if c in bs and c in as_:
-                        row[c + "_per_s"] = round((bs[c] - as_[c]) / dt, 2)
+                        delta = bs[c] - as_[c]
+                        if delta < 0:
+                            # A COUNTER WENT BACKWARDS WITHOUT `gen` MOVING, which this
+                            # tool cannot model. It should not happen: counters accumulate
+                            # and survive a reload (only `gen` increments), and a pod
+                            # replacement resets `gen` too, so that case is caught above.
+                            # Something else did it. A negative rate printed as fact is
+                            # worse than saying so --- the whole point of the rate table
+                            # is that a reader can trust the numbers in it.
+                            row["error"] = ("%s went backwards %d->%d with gen unchanged"
+                                            % (c, as_[c], bs[c]))
+                            break
+                        row[c + "_per_s"] = round(delta / dt, 2)
                 for e in ("cycles_min", "cycles_max"):
                     if e in bs:
                         row[e] = bs[e]
@@ -140,6 +152,68 @@ def render(snap, labels, is_rate):
     return "\n".join(lines)
 
 
+# The probe tmmtop arms for itself. device_poll because the poll loop runs whether
+# or not anything is being served, so "is the scheduler alive" needs no traffic --- the
+# lesson that cost an hour on 2026-09-05, when an HTTP hook armed cleanly and reported
+# fired=0 through requests that were returning 200 because the virtual server was fastL4.
+SETUP_PROBE = "poll_probe"
+SETUP_HOOK = "device_poll"
+
+
+def setup(loader, slot, progdir):
+    """Load and arm tmmtop's own probe. Returns (ok, message).
+
+    WHY THIS EXISTS. Without it the tool is only usable by someone who already knows
+    which slots hold what, has loaded a program into one, and has armed it --- which is
+    everyone who built it and nobody else. `--setup` is the difference between a tool
+    and a thing you have to be told how to hold.
+
+    IT REFUSES RATHER THAN GUESSES in two places. It will not arm over a slot that is
+    already armed, because that slot belongs to whoever armed it and a monitoring tool
+    stealing it is worse than a monitoring tool that will not start. And it will not
+    invent a program path: if the signed object is not where it was told to look, it
+    says where it looked."""
+    prog = os.path.join(progdir, SETUP_PROBE + ".bpf.o")
+    if not os.path.exists(prog):
+        # THE IMAGE BAKES NO BYTECODE, ON PURPOSE, so this directory is normally
+        # absent and that is not a packaging bug. Compiling, verifying and signing
+        # programs is a separate stage from imaging (docs/BYTECODE-BUILD.md), which
+        # is what keeps a program's provenance independent of the image it runs on.
+        # So --setup works when a signed probe has been PUT here, and says so rather
+        # than reading as a missing file.
+        return False, (
+            "no %s in %s.\n"
+            "        The image bakes no bytecode by design, so this is expected on a\n"
+            "        stock pod rather than a fault. Either point --progdir at a signed\n"
+            "        probe, or arm one from the host and drop --setup:\n"
+            "          bnk-deliver-program.py <dir>/%s.bpf.o <slot> 1\n"
+            "          ls-load.py arm <slot> %s\n"
+            "          tmmtop --slots <slot> --label <slot>=%s"
+            % (os.path.basename(prog), progdir, SETUP_PROBE, SETUP_HOOK, SETUP_HOOK))
+    cur = read_slot(loader, slot)
+    if "error" not in cur and cur.get("armed") == 1:
+        return False, ("slot %d is ALREADY ARMED (mode=%s, gen=%s). Refusing to take it: "
+                       "it belongs to whoever armed it. Pick another --setup-slot."
+                       % (slot, cur.get("mode"), cur.get("gen")))
+    try:
+        r = subprocess.run([loader, "load", str(slot), prog, "1"],
+                           capture_output=True, text=True, timeout=30)
+        out = (r.stdout + r.stderr).strip()
+    except Exception as e:
+        return False, "load failed: %s: %s" % (type(e).__name__, e)
+    if "signature=verified" not in out:
+        return False, "load did not report a verified signature: " + out[-160:]
+    try:
+        r = subprocess.run([loader, "arm", str(slot), SETUP_HOOK],
+                           capture_output=True, text=True, timeout=30)
+        out2 = (r.stdout + r.stderr).strip()
+    except Exception as e:
+        return False, "arm failed: %s: %s" % (type(e).__name__, e)
+    if "ARMED" not in out2:
+        return False, "arm did not report ARMED: " + out2[-160:]
+    return True, "armed %s at %s in slot %d" % (SETUP_PROBE, SETUP_HOOK, slot)
+
+
 def main(argv):
     ap = argparse.ArgumentParser(add_help=True)
     ap.add_argument("--slots", default="0-7", help="slot list/range, e.g. 4,5 or 0-7")
@@ -153,6 +227,13 @@ def main(argv):
                     help="seconds between refreshes in continuous mode (default 2)")
     ap.add_argument("-n", "--count", type=int, default=0,
                     help="stop after N refreshes (0 = until interrupted)")
+    ap.add_argument("--setup", action="store_true",
+                    help="load and arm tmmtop's own probe (%s at %s) before watching"
+                         % (SETUP_PROBE, SETUP_HOOK))
+    ap.add_argument("--setup-slot", type=int, default=6,
+                    help="which slot --setup uses (default 6); refuses if already armed")
+    ap.add_argument("--progdir", default="/usr/share/ls/shields",
+                    help="where --setup looks for the signed probe")
     a = ap.parse_args(argv[1:])
 
     slots = []
@@ -168,6 +249,20 @@ def main(argv):
         labels[k.strip()] = v.strip()
 
     loader = find_loader()
+
+    if a.setup:
+        # Before anything is watched, and it FAILS THE RUN rather than warning. A
+        # monitoring tool that could not arm what it came to watch, then draws an
+        # empty table, is indistinguishable from one watching an idle system --- and
+        # "the counters are all zero" is the single most misleading thing this tool
+        # can display.
+        good, msg = setup(loader, a.setup_slot, a.progdir)
+        print("tmmtop --setup: %s" % msg)
+        if not good:
+            return 2
+        if a.setup_slot not in slots:
+            slots.append(a.setup_slot)
+        labels.setdefault(str(a.setup_slot), SETUP_HOOK)
 
     if a.once:
         snap = sample(loader, slots)

@@ -51,7 +51,7 @@ check-prereqs:
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
        check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
-       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate check-prevail-relo
+       check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate check-prevail-relo check-tmmtop
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
@@ -463,6 +463,13 @@ check-prevail-relo:
 	  exit 0; \
 	fi; \
 	sh check_prevail_after_relo.sh "$(TMM_BTF)"
+
+# tmmtop's arithmetic. Every number it prints is a DIFFERENCE between two samples,
+# and the failure mode of a difference is a wrong number rather than a missing one.
+# No cluster, no TMM, no loader --- fixtures only.
+check-tmmtop:
+	@$(PYTHON) check_tmmtop.py >/dev/null 2>&1 && echo "ok    tmmtop  (21 assertions: envelopes never differenced, reload and backwards-counter refused, one bad slot does not delete the others)" \
+	  || { $(PYTHON) check_tmmtop.py; exit 1; }
 
 check-build-gate:
 	@$(CC) -O2 -Wall -Wextra -Werror -I. -o .bgate.out check_build_gate.c

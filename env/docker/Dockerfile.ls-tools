@@ -44,6 +44,16 @@ COPY --chmod=0644 hook-index.tsv /usr/share/ls/hook-index.tsv
 COPY --chmod=0644 signatures.tsv /usr/share/ls/signatures.tsv
 COPY --chmod=0755 ls-load.py     /usr/bin/ls-load.py
 COPY --chmod=0755 ls_drain       /usr/bin/ls_drain
+# tmmtop --- "top for TMM". Baked rather than copied in at demo time, which is the
+# standing rule here: a tool hand-copied into a running data-plane container leaves
+# no record, differs per pod, dies with the pod, and happens in front of whoever the
+# demo is for. Python 3 stdlib only, so it needs nothing the image does not have.
+#
+# IT MUST RUN INSIDE THE CONTAINER, and that is a measurement constraint rather than
+# a convenience: driving it through `kubectl exec` costs 100-300 ms per counter read,
+# which is longer than the interval it is trying to measure and skews every rate it
+# prints. Its own `read_span_s` column exists so a reader can see that happening.
+COPY --chmod=0755 tmmtop          /usr/bin/tmmtop
 # NO bytecode is baked into the image. Compiling bytecode is a COMPLETELY INDEPENDENT process
 # (bnk-build-programs.sh: clang -> PREVAIL -> sign, run on its own against any build's BTF); the
 # signed .bpf.o is loaded over the socket at runtime and relocated against this binary's embedded

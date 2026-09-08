@@ -311,6 +311,16 @@ echo "  ls_drain  : rebuilt from source ($(stat -c%s "$CTX/ls_drain") bytes, sta
 # So: copy all three, then assert the Dockerfile actually references the verifier. A
 # Dockerfile that does not is either stale or has had its assertion removed, and both are
 # reasons to stop.
+# tmmtop, staged and CHECKED. A COPY of a missing file fails the docker build with
+# a message about a build context, which is a long way from "the tool is not in the
+# repo". Assert it here where the answer is obvious.
+[ -f "$REPO/env/scripts/tmmtop" ] || fail "no tmmtop at $REPO/env/scripts/tmmtop ---
+    the Dockerfile COPYs it and the build would fail with a context error instead."
+python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$REPO/env/scripts/tmmtop" \
+    || fail "tmmtop does not parse as Python --- refusing to bake a broken tool."
+cp "$REPO/env/scripts/tmmtop" "$CTX/tmmtop"
+echo "  tmmtop    : staged ($(stat -c%s "$CTX/tmmtop") bytes, parses)"
+
 cp "$REPO/env/docker/Dockerfile.ls-tools" "$CTX/Dockerfile"
 cp "$REPO/env/docker/ls-verify-layer.sh" "$CTX/ls-verify-layer.sh"
 # FROM substrate/, not env/docker/. There was a second copy of the build-id reader under
