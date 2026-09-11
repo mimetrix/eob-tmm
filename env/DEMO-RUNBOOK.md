@@ -1,5 +1,13 @@
 # CVE-2025-41414 demo — run it from here
 
+> **Doing it live in terminals? Source the helper in every window:**
+> `scp env/scripts/demo-env.sh <datkube>:~/` once, then `. ~/demo-env.sh` in each xterm.
+> It gives you `preflight`, `tmm_wait`, `loader`, `normal`, `attack`, `btf_bytes`,
+> `tmm_reset` — and it **re-resolves the TMM pod on every call**, which matters because
+> the pod name changes when TMM dies halfway through the demo. A window holding a stale
+> pod name breaks at exactly the wrong moment. The prose below explains what each step
+> proves; the helper is what you type.
+
 **Verified working 2026-09-10** on `tmm:CLEAN-NOBTF`, build `1824611c`, cluster `kind-vs`.
 Two commands crash TMM; three prevent it. Everything is already deployed.
 
