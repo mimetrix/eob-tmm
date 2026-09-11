@@ -37,6 +37,14 @@ for i in 3 4 6; do kubectl exec $P -c f5-tmm -- env LS_LOAD_SOCKET=$S \
 
 Every line must read `armed=0`. If not: `ls-load.py disarm <hook>`.
 
+> **`armed=0` is necessary but not sufficient, and `armed=1` may be a lie.** On 2026-09-11
+> `status 3` reported `armed=1 mode=2` while the entry was **not patched** — `disarm` on the
+> same hook answered `ERR ... (not armed?)` and a single h2c request then crashed TMM, which
+> an armed enforce shield makes impossible. The flag and the patched bytes are separate state
+> and can disagree. **If anything looks off, replace the TMM pod** — a fresh pod comes up with
+> every slot `armed=0 mode=0 gen=0`, which is the only state worth trusting before a demo.
+> Never curl **:8082** as a liveness check: that is the crash path.
+
 ## The claim worth making first
 
 The binary about to crash and be defended carries **no internal type information at all**:
