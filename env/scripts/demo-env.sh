@@ -86,10 +86,27 @@ preflight() {
     [ -n "$p" ] || return 1
     echo "image     : $(kubectl get deploy f5-tmm -o jsonpath='{.spec.template.spec.containers[0].image}')"
     s=$(tmm_sock); echo "socket    : ${s:-*** MISSING}"
-    printf 'http path : '; normal 3
+    # THREE CONSECUTIVE 200s, not "a 200 appeared somewhere". On 2026-09-15 this
+    # printed `000 200 200` and I read it as the warm-up window; it was the plain-HTTP
+    # backend wedged --- a socket listening on :80 in the `server` pod that never
+    # replies (curl exit 52, empty reply) --- and the single 200 came from a connection
+    # already established. A check that tolerates a leading 000 cannot tell a warm-up
+    # from a dying backend, which is the whole job.
+    local codes ok200
+    codes=$(normal 3)
+    ok200=$(echo "$codes" | grep -oE '200' | wc -l)
+    printf 'http path : %s' "$codes"
+    if [ "$ok200" -lt 3 ]; then
+        echo "  *** NOT three 200s. If these are 000 with curl exit 52, the backend is"
+        echo "            wedged (listening, not replying) --- restart the 'server' pod. The"
+        echo "            CVE path uses a DIFFERENT backend and may still be fine."
+        bad_http=1
+    else
+        echo ''
+    fi
     echo -n 'disclosure: '; btf_bytes
     echo 'slots     :'
-    local i st bad=0
+    local i st bad=${bad_http:-0}
     for i in 0 1 2 3 4 5 6 7; do
         st=$(loader status $i 2>/dev/null | grep -oE 'armed=[0-9]+')
         [ "$st" = "armed=0" ] || { echo "  *** slot $i is $st --- disarm it or replace the pod"; bad=1; }
