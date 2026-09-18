@@ -8,6 +8,47 @@ Ordered newest first.
 
 ---
 
+## 17 · "The 96-byte context ceiling is a capacity limit" — TRUE, AND IT IS ALSO A GAP WE HAD NOT NAMED
+
+**Claimed**, in six documents since the `fentry/` → `tracing` discovery: the context ceiling is
+**96 bytes, measured** — a read at byte 95 of a 96-byte ctx verifies, byte 99 of a 100-byte ctx is
+refused. Recorded as a constraint on *us*: keep the context under 96 bytes, which is why the reset
+record carries a flow cookie instead of a 5-tuple.
+
+**All of that is correct.** What none of the six said is what it means in the other direction.
+
+**Prompted by** the owner asking whether `ubpf/docs/VerifiedPrograms.md` had been factored in. Its
+headline warning — a verified program dereferencing a NULL `r1`, because PREVAIL assumes `r1` is
+valid and uBPF permits a NULL `mem` — **does not apply to us**, and structurally rather than by
+luck: `ls_tramp.c:107` passes `&ctx, sizeof ctx` where `ctx` is a local struct, so no path can
+supply NULL. But the doc's *third* assumption is that "memory accesses via the context are
+bounds-checked" **against the size the verifier assumes**, and that is where the contract breaks:
+
+```
+PREVAIL assumes (fentry/ -> tracing) : 96 bytes
+the trampoline actually passes       : 40 bytes   (uint64_t arg[5])
+measured, pinned clang-18            : bytes 88..95 PASS · 96..103 REJECT
+```
+
+**So bytes 40–95 are verifiable but unallocated** — 56 bytes of the trampoline's own stack frame:
+saved registers, the return address, locals. A program reading them passes **PREVAIL, the Ed25519
+signature, the build gate and the ctx-ABI check**. Every gate we have.
+
+**Severity, stated honestly rather than dramatised.** The reader must hold our signing key, so this
+is not a remote-attacker path — it is a *signed* program reading host stack. Two things make it
+matter anyway: a program can emit records through the ring buffer, so a return address can leave the
+box, which defeats ASLR for whatever comes next; and an ordinary off-by-one in a program's context
+indexing now returns **garbage instead of a refusal**, which is the same silent-wrongness family as
+the bitfield defect. It also weakens the sentence the whole design rests on — *"PREVAIL proves
+memory safety"* is worth less when the proved bound is 2.4× the real allocation.
+
+**The fix is cheap and not yet applied:** pad the trampoline's context to the full 96 bytes and zero
+the tail, so the verified bound and the real allocation agree and a read past `arg[4]` returns zeros
+instead of frame. Cost is seven 8-byte stores per invocation on the hot path, against a measured
+~37 ns floor. **Not done unilaterally — it is a hot-path change and the owner's call.**
+
+---
+
 ## 16 · "The tree is substrate-only, and four F5 files are modified including ssl.c" — BOTH WRONG, and a filtered grep hid it
 
 **Claimed**, in `CLAUDE.md` since 2026-08-31 and in `.tree-expected-delta`'s header since it was
