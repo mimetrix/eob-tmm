@@ -34,7 +34,7 @@ You also want the signature index locally, because generation happens where `cla
 are, not in the pod:
 
 ```bash
-scp starin@10.145.42.119:~/lstools/signatures.tsv .
+scp starin@10.145.37.36:~/lstools/signatures.tsv .
 head -2 signatures.tsv                            # same build id as above
 ```
 

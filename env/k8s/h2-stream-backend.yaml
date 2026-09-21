@@ -1,0 +1,192 @@
+# An HTTP/2 origin that STREAMS: one HEADERS frame, then N separate DATA frames
+# spaced in time, then END_STREAM. The shape of an SSE / token-by-token inference
+# response.
+#
+# WHY IT EXISTS. To settle one question that gates the whole "mid-stream response
+# control" idea (cross-plane / streaming design work): when an origin emits N
+# separate DATA frames, does TMM's client-facing egress path run N times, or does
+# it coalesce the body and run once? Everything downstream --- per-token metering,
+# cutting a generation mid-flight, record-shape measurement --- needs per-frame
+# calls. If TMM coalesces, there is no per-frame control point and the idea dies
+# here rather than after a quarter of design work.
+#
+# HOW IT IS USED. Arm a candidate egress function in MONITOR mode, drive one
+# request, and compare the `fired` delta against N. Then change N and confirm the
+# delta tracks it --- one data point is a coincidence, two is a correlation.
+#
+#   kubectl apply -f env/k8s/h2-stream-backend.yaml
+#   curl --http2-prior-knowledge http://11.11.11.99:8083/   # from the client pod
+#
+# N is the pod's third argument (default 20). Change it and delete the pod to
+# re-run with a different frame count.
+#
+# Structure is deliberately copied from h2-trailer-backend.yaml, including the two
+# things that page records as found the hard way: never send an unsolicited
+# SETTINGS ACK, and serve many exchanges per connection because TMM pools
+# serverside connections.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: h2-stream-backend
+  namespace: default
+data:
+  stream.py: |
+    #!/usr/bin/env python3
+    """h2c origin that streams N DATA frames, spaced, before END_STREAM."""
+    import socket, struct, sys, threading, time
+
+    DATA, HEADERS, SETTINGS, WINDOW_UPDATE = 0x0, 0x1, 0x4, 0x8
+    END_STREAM, END_HEADERS, ACK = 0x1, 0x4, 0x1
+    PREFACE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+
+    NFRAMES = 20
+    GAP_S = 0.02
+
+    def frame(ftype, flags, sid, payload=b""):
+        return struct.pack(">I", len(payload))[1:] + bytes([ftype, flags]) + \
+               struct.pack(">I", sid) + payload
+
+    def recv_exactly(c, n):
+        buf = b""
+        while len(buf) < n:
+            b = c.recv(n - len(buf))
+            if not b:
+                return None
+            buf += b
+        return buf
+
+    def respond(c, sid):
+        # 0x88 == HPACK static index 8 == ":status: 200". Non-empty header block,
+        # so this takes the ordinary path and is NOT the CVE-41414 vector.
+        c.sendall(frame(HEADERS, END_HEADERS, sid, b"\x88"))
+        # N separate DATA frames, each its own sendall, spaced in time so the
+        # origin cannot be accused of having handed TMM one buffer.
+        for i in range(NFRAMES):
+            body = ("data: token-%03d\n\n" % i).encode()
+            c.sendall(frame(DATA, 0, sid, body))
+            time.sleep(GAP_S)
+        c.sendall(frame(DATA, END_STREAM, sid, b""))
+
+    def serve(c, addr):
+        try:
+            if recv_exactly(c, len(PREFACE)) != PREFACE:
+                return
+            c.sendall(frame(SETTINGS, 0, 0))            # ours; NOT an ack
+            while True:
+                head = recv_exactly(c, 9)
+                if head is None:
+                    return
+                ln = int.from_bytes(head[0:3], "big")
+                ftype, flags = head[3], head[4]
+                sid = struct.unpack(">I", head[5:9])[0] & 0x7FFFFFFF
+                body = recv_exactly(c, ln) if ln else b""
+                if body is None:
+                    return
+                if ftype == SETTINGS and not (flags & ACK):
+                    c.sendall(frame(SETTINGS, ACK, 0))  # ack THEIRS, only now
+                elif ftype == HEADERS and (flags & END_STREAM) and sid:
+                    threading.Thread(target=respond, args=(c, sid),
+                                     daemon=True).start()
+                elif ftype == DATA and (flags & END_STREAM) and sid:
+                    threading.Thread(target=respond, args=(c, sid),
+                                     daemon=True).start()
+        except (ConnectionError, OSError):
+            pass
+        finally:
+            try:
+                c.close()
+            except OSError:
+                pass
+
+    def main():
+        global NFRAMES
+        host = sys.argv[1] if len(sys.argv) > 1 else "0.0.0.0"
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+        if len(sys.argv) > 3:
+            NFRAMES = int(sys.argv[3])
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((host, port))
+        s.listen(64)
+        print("h2 stream backend on %s:%d  nframes=%d" % (host, port, NFRAMES),
+              flush=True)
+        while True:
+            c, a = s.accept()
+            threading.Thread(target=serve, args=(c, a), daemon=True).start()
+
+    main()
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: h2-stream-backend
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [{"name":"server-net","interface":"server-net","ips":["22.22.22.112/24"]}]
+    eob-tmm/purpose: "HTTP/2 origin that streams N spaced DATA frames --- the per-frame egress question"
+spec:
+  nodeName: vs-worker
+  containers:
+    - name: backend
+      image: artifactory.f5net.com/f5-positron-docker/testing-utils:v1.1.2
+      command: ["/bin/sh", "-c"]
+      args:
+        - "python3 /opt/h2/stream.py 0.0.0.0 8080 20"
+      volumeMounts:
+        - name: script
+          mountPath: /opt/h2
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN"]
+  volumes:
+    - name: script
+      configMap:
+        name: h2-stream-backend
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5BigCnePool
+metadata:
+  name: h2-stream-pool
+  namespace: default
+spec:
+  members:
+    - address: 22.22.22.112
+      port: 8080
+      priorityGroup: 0
+  minActiveMembers: 0
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5VirtualServer
+metadata:
+  name: h2-stream-vs
+  namespace: default
+  annotations:
+    eob-tmm/purpose: "Streaming HTTP/2 response path: h2 clientside AND serverside, origin streams N DATA frames"
+spec:
+  destinationAddress: 11.11.11.99
+  destinationPort: 8083
+  http:
+    clientside: sys-default-http
+    serverside: sys-default-http
+  http2:
+    clientside: h2-always
+    serverside: h2-always
+  httpRouter: true
+  ipfamilies: IPv4
+  loadBalancingMethod: ROUND_ROBIN
+  pool: h2-stream-pool
+  protocol: tcp
+  protocolProfile:
+    clientside: sys-default-tcp
+    serverside: sys-default-tcp
+  snat:
+    pool: ""
+    type: automap
+  sourcePort: preserve
+  translateAddress: true
+  translatePort: true
+  vlans:
+    disableListedVlans: false
+    vlanList:
+      - tmm-client

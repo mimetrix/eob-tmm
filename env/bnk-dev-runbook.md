@@ -441,10 +441,10 @@ Worth keeping a `~/.ssh/config` block so the addresses stop being something to l
 
 ```
 Host bnk-build
-    HostName 10.145.42.119
+    HostName 10.145.37.36
     User <ldap-user>
 Host bnk-datkube
-    HostName 10.145.35.70
+    HostName 10.145.40.193
     User <ldap-user>
 ```
 
@@ -1113,21 +1113,21 @@ binaries exist.
 
 ```bash
 # BUILD BOX --- every TMM image, and the build id inside each one
-ssh starin@10.145.42.119 'docker images --format "{{.ID}}  {{.Repository}}:{{.Tag}}  {{.Size}}" | sort'
+ssh starin@10.145.37.36 'docker images --format "{{.ID}}  {{.Repository}}:{{.Tag}}  {{.Size}}" | sort'
 for T in tmm:ls tmm:local tmm:local_img; do
   printf "%-16s " "$T"
-  ssh starin@10.145.42.119 "docker run --rm --entrypoint sh $T -c \
+  ssh starin@10.145.37.36 "docker run --rm --entrypoint sh $T -c \
     'R=\$(readlink -f /usr/bin/tmm); python3 /usr/share/ls/ls_buildid.py \$R 2>/dev/null || echo no-ls-tools'"
 done
 
 # BUILD BOX --- the linked binary, and the one that actually shipped
-ssh starin@10.145.42.119 'cd code/tmm
+ssh starin@10.145.37.36 'cd code/tmm
   python3 ~/eob-tmm-staged/substrate/ls_buildid.py src/compile/obj_x86_64.no_pgo/tmm.no_pgo
   T=$(mktemp -d); dpkg-deb -x docker_build/DEBS/amd64/tmm_10*.deb $T
   python3 ~/eob-tmm-staged/substrate/ls_buildid.py $T/usr/bin/tmm64.no_pgo; rm -rf $T'
 
 # DATKUBE --- kind keeps images per NODE, in containerd, not in the host's docker
-ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 starin@10.145.35.70 '
+ssh -o IdentitiesOnly=yes -i ~/.ssh/id_ed25519 starin@10.145.40.193 '
   for n in $(docker ps --format "{{.Names}}" | grep datkube); do
     echo "--- $n"; docker exec $n ctr -n k8s.io images ls -q | grep -i tmm
   done'
