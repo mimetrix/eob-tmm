@@ -28,6 +28,14 @@ exist. Four things falsified it, and they are kept here because the reasons gene
 
 And the framing itself was wrong in a way no limit table would have caught — §2.
 
+**And one thing the draft got RIGHT that this rewrite deleted.** Its "PoC 3 and beyond" list ended
+with *"cross-plane map schema (shared BTF) for TMM ↔ host kernel correlation and
+attestation-by-disagreement."* That bullet is a bigger idea than everything above it, and the
+rewrite cut it as part of removing the section. It is now
+[`cross-plane-intent-binding.md`](cross-plane-intent-binding.md). Recorded because the failure mode
+is not having a weak idea — it is **editing past a strong one** sitting in the part of a page you
+have already written off as filler.
+
 > **The pattern worth keeping from this.** The draft's errors were all the same error: proposing
 > a capability rather than reading `vm-capability-inventory.md` to find it already shipped, or
 > already retired for a stated reason. The inventory exists precisely so this does not cost a

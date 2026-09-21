@@ -385,6 +385,49 @@ and verifies perfectly, so the only casualty is the disclosure the strip exists 
 pipeline resolves the tool up front and **re-reads the object** to confirm the sections are gone
 rather than trusting an exit code.
 
+### P10 · Is an agent's tool call distinguishable at the syscall layer?
+
+**Claim under test:** one tool call by an LLM agent produces an attributable syscall from an
+attributable process, so a host-kernel program can bind it to a capability the proxy minted
+([`cross-plane-intent-binding.md`](cross-plane-intent-binding.md) tier 1).
+
+**Falsified if:** instrumenting a real agent stack (a LangGraph-style runtime, or an MCP server)
+with `bpftrace` shows tool calls are **not** separable at the syscall boundary — a pooled HTTP
+client, a sidecar, or a multiplexing language runtime leaves the kernel one long-lived socket —
+and no cheap host-side signal recovers the boundary. That kills tier 1, and tiers 2 and 3 with it.
+
+**Status:** unrun, and **it should be run before any other work on that document.** Cost is an
+afternoon with `bpftrace` on any host; it needs no substrate, no build box and no cluster. This is
+the same shape as `idea.md` §3.1 — the cheapest experiment is off-substrate and can kill the whole
+programme.
+
+### P11 · Can a capability be bound so on-host code cannot replay it?
+
+**Claim under test:** a capability minted off-host can be verified in-kernel against context the
+caller does not choose — cgroup, process lineage, destination, expiry — such that on-host code
+without kernel privilege cannot spend it for an action the proxy did not authorize.
+
+**Falsified if:** a cooperating process on the same host, **without** kernel privilege, causes an
+unauthorized action — by reading and replaying the capability out of the environment, the request or
+`/proc`; by inheriting it outside its intended process subtree; or by racing its expiry.
+
+**Status:** unrun. Note the residual risk is conceded in advance rather than tested for: a
+kernel-privileged on-host attacker defeats this by construction, so the claim is only ever *"the bar
+is host kernel privilege **plus** an off-host proxy"*. Anything stronger is an overclaim.
+
+### P12 · Do the two planes share a join key and a comparable clock?
+
+**Claim under test:** an identity available to TMM at request time can be reconstructed host-side,
+and the two planes' timestamps are close enough that a disagreement window is meaningful.
+
+**Falsified if:** no such identity exists without a lookup that the join was supposed to replace;
+**or** clock skew between the planes exceeds tool-call inter-arrival time, making the tier-2 window
+unusable.
+
+**Related and already open:** exporting the TSC-to-wallclock offset so userspace and host-side
+timestamps align. `UFLOW_COOKIE` is TMM-side only and is a hand-written semantic derivation
+(`mk_probe.py:30`), so it is not a join key as it stands.
+
 ---
 
 ## Retired
