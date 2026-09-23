@@ -69,6 +69,7 @@ reachable, or what something costs, prefer the current documents.
 
 | document | what has been superseded since |
 |---|---|
+| [`ai-gateway-tracepoints.md`](ai-gateway-tracepoints.md) | **Design / IDEA, 2026-09-23 — collaborator working paper.** Proposed semantic tracepoints for MCP, agent-to-agent, and inference traffic: event catalog, correlation/provenance, host-owned decision gates, and an initial lifecycle demonstration. The AI-specific interfaces are unimplemented; validation questions P13–P16 are pre-registered in `02-RESEARCH-PARAMETERS.md`. |
 | [`big-ip-live-surface-design.md`](big-ip-live-surface-design.md) | The threat model and lifecycle stand. The worked CVE example is not a real advisory (see `design-review-findings.md` T4), and the cost discussion predates any measurement |
 | [`embedded-ebpf-substrate.md`](embedded-ebpf-substrate.md) | **Still says nothing executes.** The programmability spectrum and hook-point catalogue stand |
 | [`engine-hard-problems.md`](engine-hard-problems.md) | The register of hard problems is still the right register. Several entries now have measurements attached |
@@ -83,6 +84,7 @@ reachable, or what something costs, prefer the current documents.
 
 | document | what it records |
 |---|---|
+| [`ctx-contract-validation.md`](ctx-contract-validation.md) | **2026-09-23:** 96-byte entry/exit context fix rebuilt and deployed as `5c76bc3a`; signed live JIT probes, process-memory disarm witnesses, cached receipts, and test failures/corrections. Added hook cost remains unmeasured |
 | [`tmm-integration-findings.md`](tmm-integration-findings.md) | The first integration into the TMM tree |
 | [`design-review-findings.md`](design-review-findings.md) | An adversarial review of the design. Several findings are now closed; **T4 remains open** — the worked CVE example is not a real published advisory |
 | [`probe-a-function.md`](probe-a-function.md) | **CURRENT, and every command was run.** The reverse-engineering procedure as a command sequence, walked end to end on build 03c6f0e0 |

@@ -430,6 +430,58 @@ timestamps align. `UFLOW_COOKIE` is TMM-side only and is a hand-written semantic
 
 ---
 
+### P13 · Can AI gateway events preserve operation identity across concurrent lifecycles?
+
+**Claim under test:** the semantic event interface proposed in
+[`ai-gateway-tracepoints.md`](ai-gateway-tracepoints.md) joins gateway-observed events to the correct
+logical request, task, and upstream attempt through multiplexing, retries, disconnects, and task
+continuation, while marking unavailable or untrusted lineage explicitly.
+
+**Falsified if:** an event joins the wrong operation or tenant, an attempt is confused with its
+logical request, or ambiguous lineage is reported as known. Compare event joins with an independent
+test-client/upstream ledger; agreement between two consumers of the same event stream is insufficient.
+
+**Status:** unrun, IDEA; protocol adapters and event schemas are not implemented by this proposal.
+
+### P14 · Does an AI dispatch gate precede every protected upstream write?
+
+**Claim under test:** a host-owned dispatch gate can reject a selected operation before its bytes
+reach the upstream, including retry paths, while preserving unrelated traffic and protocol state.
+
+**Falsified if:** any protected operation bytes reach the test upstream before or despite denial,
+or rejection corrupts unrelated traffic. Exercise known-positive denials and allowed controls;
+use upstream capture/receipt as the witness rather than the predicate's own match counter.
+
+**Status:** unrun, IDEA; the existing function safe-return mechanism is not evidence of this new
+protocol-aware action contract. Scope the first experiment to a named adapter and operation class.
+
+### P15 · Do cancellation events distinguish intent from observed completion?
+
+**Claim under test:** the proposed gateway events distinguish cancellation receipt, forwarding,
+local cleanup, upstream acknowledgment, and any subsequently observed output.
+
+**Falsified if:** forwarding alone is reported as acknowledgment or remote completion, or later
+output is hidden by premature terminal accounting. Test upstreams that acknowledge, delay, or ignore
+cancellation, comparing gateway events to the independent upstream ledger.
+
+**Status:** unrun, IDEA. Remote computation stopping remains unknown without an appropriate remote
+witness, even when the gateway's own cancellation path completes.
+
+### P16 · Can semantic AI probes stay bounded and within an agreed traffic budget?
+
+**Claim under test:** the proposed semantic probes and event publication have bounded inline work
+and resource use, do not wait for a consumer, and meet an agreed workload-specific performance budget.
+
+**Falsified if:** publication waits for a slow/stopped drainer, resource use escapes configured
+bounds, or armed/unarmed comparisons exceed the pre-agreed latency or throughput budget. Exercise
+representative streams, high event rates, retries, and consumer pressure; include context assembly
+and publication rather than timing only the eBPF program.
+
+**Status:** unrun, IDEA. Record workload, numeric budgets, event/sampling limits, and binary identity
+before execution. Existing microbenchmark floors do not discharge this question.
+
+---
+
 ## Retired
 
 ### R1 · "Per-call cost cannot be obtained from a live TMM" — RETIRED
