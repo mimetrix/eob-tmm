@@ -42,10 +42,67 @@ indexing now returns **garbage instead of a refusal**, which is the same silent-
 the bitfield defect. It also weakens the sentence the whole design rests on — *"PREVAIL proves
 memory safety"* is worth less when the proved bound is 2.4× the real allocation.
 
-**The fix is cheap and not yet applied:** pad the trampoline's context to the full 96 bytes and zero
+**The proposed fix at discovery:** pad the trampoline's context to the full 96 bytes and zero
 the tail, so the verified bound and the real allocation agree and a read past `arg[4]` returns zeros
-instead of frame. Cost is seven 8-byte stores per invocation on the hot path, against a measured
-~37 ns floor. **Not done unilaterally — it is a hot-path change and the owner's call.**
+instead of frame. The estimate was seven 8-byte stores per entry invocation, not a measured cost.
+It was deferred pending the owner's decision because it changes the hot path.
+
+**FIX APPLIED TO REPO SOURCES, 2026-09-23, at the owner's request.** Entry now uses a
+96-byte `ls_ctx_generic`, zero-initialised on every dispatch. The exit path had the same defect
+(48-byte allocation under the same tracing descriptor), and now also supplies 96 bytes with a
+zeroed tail. Argument offsets 0–39 and the exit return value at offset 40 are unchanged; static
+assertions pin the layouts. The self-test uses the padded entry type, and both VM benchmark
+contexts grow from 64 to 96 bytes. Samples/evidence retain their bounded payload copies; the
+reported context length becomes 96.
+
+**MEASURED, off-TMM on `eob-bnk-build-01`:** `check-ctx-contract` passes with clang-18
+18.1.3 + AddressSanitizer/UBSan and with GCC 13.3. It checks 32 entry and 32 exit calls, all tail
+bytes zero, then overwrites all 96 bytes to check isolation and fresh initialisation on the next
+call. `check-tramp` and `check-fexit` pass with clang-18, including caller transparency, nonzero
+safe-return value, nesting, recursion and skipped-return reclaim. `check-ctx-verifier` confirms
+the pinned PREVAIL accepts bytes 88–95 and refuses 96–103 for **both** `fentry/` and `fexit/`.
+The changed `ls_vm.c` also passes clang-18 syntax checking against the build box's uBPF headers.
+
+Reproduce the focused checks on the build box (the verifier target deliberately does not skip
+when its tools are absent):
+
+```sh
+make -C substrate check-ctx-contract CC=clang-18 \
+  CFLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer'
+make -C substrate check-ctx-contract CC=gcc
+make -C substrate check-tramp check-fexit CC=clang-18
+make -C substrate check-ctx-verifier CLANG=clang-18 \
+  PREVAIL=/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail
+```
+
+**Limits at the off-TMM stage (superseded by the live result below):** these are C-dispatcher and assembly harness results, not a rebuilt/deployed TMM
+result. The VM boundary test uses a stand-in program that reads/writes the context, not the JIT.
+The benchmark/self-test changes are compile-checked, not exercised live. Added hot-path cost is
+unmeasured; the old cost floors do not measure this change. This closes the allocation gap in the
+entry/exit sources, not every verifier/runtime assumption or the retired typed-tracepoint path.
+
+**A test defect found in the same run:** both assembly harnesses lacked the `ls_vm_safe_value`
+stub introduced by configurable safe returns. `check-tramp` failed to link and its recipe hid the
+diagnostic. `ask` found no record. The stubs now match the real interface, the entry test checks
+safe value 2, and both recipes show compiler and harness output rather than suppressing it.
+
+**REBUILT, DEPLOYED AND MEASURED LIVE, later on 2026-09-23:** image
+`tmm:CTX96-20260923`, build `5c76bc3a6069d7aa2aea51d32b69a2742563ddc4`.
+[`ctx-contract-validation.md`](ctx-contract-validation.md) records the full provenance and cached
+receipts. Signed JIT probes read and poison the entire reserved tail on each call: **32 entry +
+32 exit HTTP requests**, all zero-tail verdicts, `len=96`, HTTP 200, errors=0, restarts=0.
+Both disarms restore five NOPs observed through `/proc/24/mem`; eight requests after each cause
+no further fires. The executing BTF-less ELF's SHA-256 matches the packaged runtime inspected
+by disassembly, which passes `0x60` to the VM and zeros the tail on both paths.
+
+**New limits:** one function on one stable pod, using a dedicated HTTP/1 fixture because the
+shared HTTP/1 listener points at the HTTP/2 CVE backend. The probe's success verdict is counted
+in **monitor mode**, not evidence of blocking. Counters/samples/JIT logs remain SELF evidence;
+curl, `/proc` reads and Kubernetes provide the separate observations. Added hot-path cost is
+still unmeasured; benchmark/self-test changes remain compile-checked only. Two incorrect test
+assertions are retained in the validation record: expecting `armed=0` after disarm/revoke
+despite the known status defect, and expecting a reload's JIT preparation log to name the live
+slot rather than the spare staging slot. The corrected driver passed end to end.
 
 ---
 

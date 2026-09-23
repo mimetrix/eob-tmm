@@ -38,6 +38,22 @@
 #include <stddef.h>   /* size_t --- this header must stand alone */
 #include <stdint.h>
 
+/* PREVAIL's tracing descriptor (fentry/ and fexit/) permits 96 context bytes.
+ * The JIT does not bounds-check these accesses: every trampoline must supply
+ * the full allocation, with a zeroed tail, not just the fields a program uses.
+ * Keep this in step with the pinned verifier; CONTESTED-PREMISES.md §17.
+ */
+#define LS_TRACING_CTX_SIZE 96u
+
+struct ls_ctx_generic {
+    uint64_t arg[5];
+    uint64_t reserved[LS_TRACING_CTX_SIZE / sizeof(uint64_t) - 5];
+};
+_Static_assert(sizeof(struct ls_ctx_generic) == LS_TRACING_CTX_SIZE,
+               "entry context must cover the verifier's tracing region");
+_Static_assert(offsetof(struct ls_ctx_generic, reserved) == 40,
+               "entry argument offsets must not change");
+
 /* Outcomes the host owns. The program SELECTS one; the host APPLIES it. In
  * observe mode the host counts the selection and applies nothing --- observe is
  * not a seventh outcome (substrate §2). */
@@ -65,7 +81,7 @@ enum ls_mode {
  * is per-core shared memory with a consumer ABI. Sized to answer one question,
  * not to be that. */
 #define LS_CTX_SAMPLES 8
-#define LS_CTX_SAMPLE_BYTES 48   /* fits the fexit exit ctx (arg[5] + ret = 48B), so a
+#define LS_CTX_SAMPLE_BYTES 48   /* fits the fexit payload (arg[5] + ret = 48B), so a
                                   * sample captures the RETURN VALUE at offset 40, not
                                   * just the first four args. Was 32 (entry ctx only). */
 

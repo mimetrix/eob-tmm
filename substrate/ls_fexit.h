@@ -13,17 +13,24 @@
 #define LS_FEXIT_H
 
 #include <stdint.h>
+#include "ls_vm.h"
 
 #define LS_FEXIT_LOG 64u        /* recent exits kept for inspection */
 
-/* The exit context a program is handed: the entry arguments AND the return
- * value. This is the shape the fexit PREVAIL program type verifies against, and
- * the bump over the entry ctx's bare arg[5]. (Running the program on it ---
- * ls_vm_call from ls_fexit_leave --- is fexit step #2; today leave records it.) */
+/* The exit payload retains arg[0..4] at bytes 0..39 and ret at bytes 40..47.
+ * fexit/ selects the same 96-byte tracing descriptor as fentry/, so the rest
+ * must also be allocated and zeroed before calling the program. */
 struct ls_ctx_exit {
     uint64_t arg[5];            /* rdi..r8, as the entry ctx           */
     uint64_t ret;              /* the hooked function's return value  */
+    uint64_t reserved[LS_TRACING_CTX_SIZE / sizeof(uint64_t) - 6];
 };
+_Static_assert(sizeof(struct ls_ctx_exit) == LS_TRACING_CTX_SIZE,
+               "exit context must cover the verifier's tracing region");
+_Static_assert(offsetof(struct ls_ctx_exit, ret) == 40,
+               "exit return-value offset must not change");
+_Static_assert(offsetof(struct ls_ctx_exit, reserved) == 48,
+               "exit payload must remain 48 bytes");
 
 /* One observed exit: what the exit program would have been handed, plus which
  * slot's program it was. */

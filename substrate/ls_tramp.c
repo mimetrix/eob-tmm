@@ -81,13 +81,13 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
      * (finding O1); handing it the live frame would make the safety mechanism
      * an argument-injection primitive.
      *
-     * Sized and shaped per hook in the real thing --- generated alongside the
-     * hook map. This generic five-slot form is what an untyped `tracing`
-     * program sees, and it is deliberately flat: no pointers out.
+     * PREVAIL's tracing descriptor permits 96 bytes, even though the argument
+     * payload is only 40. Allocate and initialise the entire verified region;
+     * otherwise a verified JIT load/store can reach this function's own frame.
+     * The reserved tail is reset on EVERY invocation, including after a program
+     * writes it. Existing programs retain their five argument offsets.
      */
-    struct {
-        uint64_t arg[5];
-    } ctx;
+    struct ls_ctx_generic ctx = {0};
 
     ctx.arg[0] = a0;
     ctx.arg[1] = a1;
@@ -98,7 +98,7 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
     /*
      * ONE PATH: the generic five-register context. There are no typed, per-hook ctx builders
      * any more. A program reads whatever fields it needs from the argument pointers via CO-RE
-     * relocations resolved at load against this build's own BTF (ls_core_relo.c), so the host
+     * relocations resolved against the target build's BTF before signing, so the host
      * never learns any hook's layout --- which is what removed the "burns a build per data
      * source" coupling: adding a data source is writing bytecode now, not editing TMM. An
      * arbitrary armed function therefore gets exactly this: the register block, nothing

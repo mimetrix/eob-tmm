@@ -29,7 +29,7 @@
  * the right slot and exit context (entry args + return value). It also satisfies
  * the linker for the ENTRY slots' ls_tramp_dispatch, which never runs here. */
 struct { int slot; uint64_t ret; uint64_t arg[5]; unsigned calls; } g_vm;
-int ls_vm_call(int slot, void *ctx, unsigned long n)
+enum ls_verdict ls_vm_call(int slot, void *ctx, size_t n)
 {
     const struct ls_ctx_exit *c = ctx;
     if (n >= sizeof *c) {
@@ -40,6 +40,7 @@ int ls_vm_call(int slot, void *ctx, unsigned long n)
     }
     return 0;   /* verdict ignored at exit */
 }
+uint64_t ls_vm_safe_value(int slot) { (void)slot; return 2; }
 
 extern uint64_t xv_leaf(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 extern uint64_t xv_mid (uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);

@@ -1,0 +1,174 @@
+pinned pod identity: ('041de6aa-9680-4a01-a674-0364ef270a43', 'containerd://5ac36a3a1e619a827a39f6f0c23f94d67958855419887778e4dd07dc22fcda99', 0, 'sha256:b67d24abdc97b48babb94a9c942f24a7ea2e9d741039a1996eec19507dd0e5d1')
+EXECUTING /proc/24/exe 5c76bc3a6069d7aa2aea51d32b69a2742563ddc4 BTF=absent sha256=e51d4d79b7dc39294c12e32b7da6d7fda79a0446720e4afb3cca79c09c0a40d7
+/tmp/ls_load.sock.24
+OK armed=1 mode=0 gen=2 fired=96 safe_returns=96 errors=0 cycles=106894 cycles_max=2464 cycles_min=522
+PAD 0xccc604 9090909090
+200
+200
+200
+200
+  ctx96-fentry.bpf.o --- 872 bytes, slot 0, mode 1, SIGNED for build 0x5c76bc3a..0x5c76bc3a
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-59696979b6-6xv8n      872 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+OK ARMED LIVE entry=0xccc604 slot=0 kind=fentry (no restart)
+http_parse_client_headers -> 0xccc604  (pad, pad_offset=4, build 5c76bc3a6069)
+PAD 0xccc604 e85d0a7b00
+OK armed=1 mode=1 gen=3 fired=96 safe_returns=96 errors=0 cycles=106894 cycles_max=2464 cycles_min=522
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=128 safe_returns=128 errors=0 cycles=143932 cycles_max=2464 cycles_min=522
+OK sample seq=120 len=96 verdict=1 ctx=c0cc43a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=121 len=96 verdict=1 ctx=40ce43a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=122 len=96 verdict=1 ctx=4087fb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=123 len=96 verdict=1 ctx=80b043a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=124 len=96 verdict=1 ctx=00b243a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=125 len=96 verdict=1 ctx=80b343a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=126 len=96 verdict=1 ctx=c085fb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000006961743639787463
+OK sample seq=127 len=96 verdict=1 ctx=4084fb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000006961743639787463
+OK DISARMED LIVE entry=0xccc604
+http_parse_client_headers -> 0xccc604  (pad, pad_offset=4, build 5c76bc3a6069)
+PAD 0xccc604 9090909090
+OK armed=1 mode=1 gen=3 fired=128 safe_returns=128 errors=0 cycles=143932 cycles_max=2464 cycles_min=522
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=128 safe_returns=128 errors=0 cycles=143932 cycles_max=2464 cycles_min=522
+PASS fentry: {'fired': 32, 'safe_returns': 32, 'errors': 0}; len=96; 8 post-disarm HTTP 200s, no fires
+OK disabled (not reclaimed --- see item 0c)
+  ctx96-fexit.bpf.o --- 848 bytes, slot 0, mode 1, SIGNED for build 0x5c76bc3a..0x5c76bc3a
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-59696979b6-6xv8n      848 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+OK ARMED LIVE entry=0xccc604 slot=0 kind=fexit (no restart)
+http_parse_client_headers -> 0xccc604  (pad, pad_offset=4, build 5c76bc3a6069)
+PAD 0xccc604 e8a50d7b00
+OK armed=1 mode=1 gen=4 fired=128 safe_returns=128 errors=0 cycles=143932 cycles_max=2464 cycles_min=522
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=4 fired=160 safe_returns=160 errors=0 cycles=171598 cycles_max=2464 cycles_min=400
+OK sample seq=152 len=96 verdict=1 ctx=004d59a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=153 len=96 verdict=1 ctx=804e59a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=154 len=96 verdict=1 ctx=c0c043a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=155 len=96 verdict=1 ctx=c08efb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=156 len=96 verdict=1 ctx=809cfb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=157 len=96 verdict=1 ctx=40c243a0dd3c00008000809bdd3c00009c50ee9fdd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=158 len=96 verdict=1 ctx=8093fb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000000000000000000000
+OK sample seq=159 len=96 verdict=1 ctx=0092fb70dd3c000020c71f6cdd3c00009c17e870dd3c0000000000000000000000000000000000000000000000000000
+OK DISARMED LIVE entry=0xccc604
+http_parse_client_headers -> 0xccc604  (pad, pad_offset=4, build 5c76bc3a6069)
+PAD 0xccc604 9090909090
+OK armed=1 mode=1 gen=4 fired=160 safe_returns=160 errors=0 cycles=171598 cycles_max=2464 cycles_min=400
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=4 fired=160 safe_returns=160 errors=0 cycles=171598 cycles_max=2464 cycles_min=400
+PASS fexit: {'fired': 32, 'safe_returns': 32, 'errors': 0}; len=96; 8 post-disarm HTTP 200s, no fires
+OK disabled (not reclaimed --- see item 0c)
+ls_vm: init  build=Sep 23 2026 16:53:41  jit=1 fuel=0 timing=1
+ls_vm: signature verification ARMED --- unsigned programs are refused
+ls_vm: no built-in shield armed (LS_SHIELD_BUILTIN=0) --- socket load is the only arming path
+ls_vm: prepare handoff armed on tmm 0 (every 10 ticks)
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock.24 --- programs are signature-checked, the PEER is not, and every operation is recorded (ls_audit:). Lab builds only.
+ls_vm: init  build=Sep 23 2026 16:53:41  jit=1 fuel=0 timing=1
+ls_vm: signature verification ARMED --- unsigned programs are refused
+ls_vm: no built-in shield armed (LS_SHIELD_BUILTIN=0) --- socket load is the only arming path
+ls_vm: build gate OK --- signed for 0x5c76bc3a, running 0x5c76bc3a
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=872 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=0 section=fentry/http_parse_client_headers function=check_ctx_live mode=1 bytes=872 origin=builtin jit=1
+ls_vm: FIRST INVOCATION slot=0 --- the hook is reached
+ls_vm: slot=0 mode -> 0
+ls_vm: build gate OK --- signed for 0x5c76bc3a, running 0x5c76bc3a
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=872 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fentry/http_parse_client_headers function=check_ctx_live mode=1 bytes=872 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=872 (previous VM leaked --- reclamation is item 0c)
+ls_vm: slot=0 mode -> 0
+ls_vm: build gate OK --- signed for 0x5c76bc3a, running 0x5c76bc3a
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=848 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fexit/http_parse_client_headers function=check_ctx_live mode=1 bytes=848 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=848 (previous VM leaked --- reclamation is item 0c)
+ls_vm: slot=0 mode -> 0
+ls_vm: build gate OK --- signed for 0x5c76bc3a, running 0x5c76bc3a
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=872 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fentry/http_parse_client_headers function=check_ctx_live mode=1 bytes=872 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=872 (previous VM leaked --- reclamation is item 0c)
+ls_vm: slot=0 mode -> 0
+ls_vm: build gate OK --- signed for 0x5c76bc3a, running 0x5c76bc3a
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=848 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fexit/http_parse_client_headers function=check_ctx_live mode=1 bytes=848 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=848 (previous VM leaked --- reclamation is item 0c)
+ls_vm: slot=0 mode -> 0
+PASS live entry/exit context contract; stable pod, no new restarts

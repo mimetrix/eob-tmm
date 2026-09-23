@@ -415,7 +415,7 @@ ls_vm_bench_program(const void *elf, size_t elf_len,
     char *err = NULL;
     struct ubpf_vm *vm = NULL;
     uint8_t *stack = NULL;
-    unsigned char ctx[64];
+    unsigned char ctx[LS_TRACING_CTX_SIZE];
     uint64_t ret = 0, best = ~0ull, worst = 0, total = 0;
     int rc = -1;
 
@@ -552,7 +552,7 @@ static void
 ls_vm_bench(int slot, uint32_t iters)
 {
     struct ls_slot *s = &g_slots[slot];
-    unsigned char ctx[64];
+    unsigned char ctx[LS_TRACING_CTX_SIZE];
     uint64_t ret = 0, best = ~0ull, worst = 0, total = 0;
 
     if (!s->armed || iters == 0)
@@ -843,7 +843,7 @@ ls_vm_selftest(int slot, unsigned level)
      * more --- a CO-RE program reads the fields it needs by relocation, so the self-test's
      * job is only to feed the mechanism the CVE condition (a null source pointer) and see
      * whether the loaded program returns SAFE_RETURN. */
-    struct { uint64_t arg[5]; } c;
+    struct ls_ctx_generic c;
     memset(&c, 0, sizeof c);          /* arg[0] == NULL --- the CVE condition (source pointer null) */
 
     enum ls_verdict v = ls_vm_call(slot, &c, sizeof c);

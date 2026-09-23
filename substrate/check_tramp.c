@@ -1,9 +1,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#define LS_SAFE_RETURN 1
-static int g_verdict; static uint64_t g_seen[5];
-int ls_vm_call(int slot,void*ctx,size_t n){(void)slot;memcpy(g_seen,ctx,n<sizeof g_seen?n:sizeof g_seen);return g_verdict;}
+#include "ls_vm.h"
+static enum ls_verdict g_verdict; static uint64_t g_seen[5];
+enum ls_verdict ls_vm_call(int slot,void*ctx,size_t n){(void)slot;memcpy(g_seen,ctx,n<sizeof g_seen?n:sizeof g_seen);return g_verdict;}
+uint64_t ls_vm_safe_value(int slot){(void)slot;return 2;}
 extern uint64_t victim(uint64_t,uint64_t,uint64_t,uint64_t,uint64_t);
 extern uint64_t body_ran;
 int main(void){
@@ -21,7 +22,7 @@ int main(void){
     r=victim(1,2,3,4,5);
     printf("  SAFE_RETURN: ret=%#llx body_ran=%llu\n",(unsigned long long)r,(unsigned long long)body_ran);
     if(body_ran!=0){puts("  FAIL body ran despite safe return");f++;}else puts("  ok   body SKIPPED");
-    if(r!=0){puts("  FAIL safe value");f++;}else puts("  ok   safe value delivered to caller");
+    if(r!=2){puts("  FAIL safe value");f++;}else puts("  ok   per-slot safe value delivered to caller");
     printf("\n  %s\n", f?"FAILURES":"trampoline validated end to end");
     return f;
 }

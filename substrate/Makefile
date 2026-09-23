@@ -8,10 +8,14 @@
 
 CC     ?= cc
 PYTHON ?= python3
+CLANG  ?= clang-18
+PREVAIL ?= ../ebpf-verifier/bin/prevail
+
+.PHONY: check-ctx-verifier
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
-        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-vendor-pin check-prereqs check-sig check-audit shield-blob gate clean
+        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-ctx-reg check-ctx-contract check-vendor-pin check-prereqs check-sig check-audit shield-blob gate clean
 
 # THE FIRST THING `check` DOES IS SAY WHETHER IT CAN RUN. Measured on a fresh clone 2026-08-20:
 # four targets failed on `fatal error: ubpf.h: No such file or directory`, three screens below
@@ -50,7 +54,7 @@ check-prereqs:
 	 fi
 
 check: check-prereqs check-header check-schema check-offsets check-budget check-gates \
-       check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
+       check-geometry check-shields check-stack check-vm check-ctx-contract check-tramp check-fexit check-arm check-swap \
        check-selfpatch check-ring check-tp check-tp-ring check-drain check-pads check-alpn check-rst check-json check-tramp-mirror check-map check-glue check-hook-map check-ls-load check-sslerr check-h2abort check-audit check-ctx-parse check-alpn-get check-build-gate check-prevail-relo check-tmmtop
 
 # The header must compile standalone, be include-guard clean, and its
@@ -113,6 +117,33 @@ check-vm: shield-blob
 	 $(CC) -fsyntax-only -Wall -Wextra -I. -I../ubpf/vm/inc -I "$$CFG" ls_vm_load.c \
 	  && echo "ok    ls_vm_load.c  (runtime load path; compiles against the real ABI)"
 
+# The real C dispatchers must allocate the complete verifier-visible context,
+# zero its tail on every call, and isolate writes from the live frame. Runs on
+# every architecture; the assembly tests below cover caller transparency.
+check-ctx-contract:
+	@$(CC) $(CFLAGS) -O2 -Wall -Wextra -Werror -I. -o .ctx-contract.out check_ctx_contract.c ls_tramp.c ls_fexit.c && \
+	  ./.ctx-contract.out; rc=$$?; rm -f .ctx-contract.out; exit $$rc
+
+# Companion gate, explicitly run on the build box with pinned clang/PREVAIL.
+# Assert the boundary for BOTH hook types, including the reason for rejection;
+# a missing verifier or a compiler failure must not count as the negative case.
+check-ctx-verifier:
+	@set -e; obj=$$(mktemp .ctx-boundary.XXXXXX); trap 'rm -f "$$obj"' EXIT; \
+	  for kind in fentry fexit; do for idx in 11 12; do \
+	    $(CLANG) -O2 -g -target bpf -DKIND=\"$$kind/ctx_boundary\" -DINDEX=$$idx \
+	      -c check_ctx_boundary.bpf.c -o "$$obj"; \
+	    out=$$("$(PREVAIL)" "$$obj" $$kind/ctx_boundary --termination --strict \
+	      --no-division-by-zero --stack-size 256 2>&1) || true; \
+	    case "$$idx:$$out" in \
+	      11:PASS:*) ;; \
+	      12:FAIL:*) case "$$out" in \
+	        *'Upper bound must be at most 96 (valid_access(r1.offset+96, width=8) for read)'*) ;; \
+	        *) printf '%s\n' "$$out"; exit 1;; esac ;; \
+	      *) printf '%s\n' "$$out"; exit 1;; \
+	    esac; \
+	    printf 'ok    %s context boundary, word %s: %s\n' "$$kind" "$$idx" "$$out"; \
+	  done; done
+
 # The patched-entry trampoline. The .S is x86-64 only, so it is assembled where
 # the assembler can take it and skipped loudly elsewhere --- this sandbox is
 # aarch64, which is exactly the kind of thing that otherwise reports success by
@@ -121,8 +152,8 @@ check-tramp:
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_tramp.c \
 	  && echo "ok    ls_tramp.c  (the per-hook C half; arch-generic)"
 	@if [ "$$(uname -m)" = "x86_64" ]; then \
-	  $(CC) -O1 -I. -o .tramp.out check_tramp.c ls_tramp.c ls_fexit.c trampoline_x86_64.S victim.S 2>/dev/null && \
-	  ./.tramp.out >/dev/null && \
+	  $(CC) -O1 -I. -o .tramp.out check_tramp.c ls_tramp.c ls_fexit.c trampoline_x86_64.S victim.S && \
+	  ./.tramp.out && \
 	  echo "ok    trampoline_x86_64.S  (patched a stand-in entry; body runs on fall-through, skipped on safe return)" && \
 	  rm -f .tramp.out; \
 	else \
@@ -137,8 +168,8 @@ check-fexit:
 	@$(CC) -fsyntax-only -Wall -Wextra -I. ls_fexit.c \
 	  && echo "ok    ls_fexit.c  (the shadow stack; arch-generic C half)"
 	@if [ "$$(uname -m)" = "x86_64" ]; then \
-	  $(CC) -O2 -fcf-protection=branch -I. -o .fexit.out check_fexit.c ls_fexit.c ls_tramp.c trampoline_x86_64.S fexit_victims.S 2>/dev/null && \
-	  ./.fexit.out >/dev/null && \
+	  $(CC) -O2 -fcf-protection=branch -I. -o .fexit.out check_fexit.c ls_fexit.c ls_tramp.c trampoline_x86_64.S fexit_victims.S && \
+	  ./.fexit.out && \
 	  echo "ok    ls_fexit_x86_64.S  (armed a stand-in exit; return captured, caller transparent, nesting/recursion synced, skipped return reclaimed)" && \
 	  rm -f .fexit.out; \
 	else \

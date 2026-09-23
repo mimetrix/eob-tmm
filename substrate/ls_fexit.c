@@ -138,7 +138,7 @@ ls_fexit_leave(uint64_t cur, uint64_t retval)
      * state, stream, count). ls_vm_call fails open, exactly like the entry path:
      * a program that cannot run must not take TMM down with it.
      */
-    struct ls_ctx_exit ctx;
+    struct ls_ctx_exit ctx = {0};
     ctx.arg[0] = f->args[0];
     ctx.arg[1] = f->args[1];
     ctx.arg[2] = f->args[2];

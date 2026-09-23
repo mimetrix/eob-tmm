@@ -1,4 +1,7 @@
 # SHA-256 of every file in this directory. Regenerate with the loop in SOURCES.md.
+061ca2054d248a287a2cb2cd0a015941b9d85bb808c2bcbffbd16fb8af2a45c9  ctx96-package-20260923.log
+89b3221cb3f0a6ac6de60f64fa555bf20c946a97989f09b3f74541a75e7b6945  ctx96-bake-20260923.log
+9fac29d962747babe95ac2e4507073a16675298c423a4e784561fcc6c6efa8a7  ctx96-live-20260923.log
 01d134ae8be5c1ee8f4f3ee8573cc012f2cc689ff0898a688f8d432e250c1ee8  ubpf-c900ed9f-commit.txt
 269e4b0760ff37cd2a67d1fe13196e9f38c49fd9824237a36bed4a8b82a4d032  kernel-libbpf_overview.html
 325dfc8ea4e2c61536065a7d770d51f989f8083f47fbabb6b4028efa221f6f41  kernel-btf.html

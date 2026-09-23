@@ -1,0 +1,87 @@
+# Temporary HTTP/1 fixture for bnk-test-ctx-contract.py on kind-vs.
+# Apply before the test; delete this manifest afterwards. Addresses/port were
+# checked unused on 2026-09-23. Recheck before replaying in a different lab.
+# The shared server:80 may be running the HTTP/2 CVE backend, so do not use it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ctx-contract-test
+  namespace: default
+data:
+  backend.py: |
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        def do_GET(self):
+            body = b"ctx96\n"
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    ThreadingHTTPServer(("0.0.0.0", 18081), Handler).serve_forever()
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ctx-contract-test
+  namespace: default
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [{"name":"server-net","interface":"server-net","ips":["22.22.22.113/24"]}]
+spec:
+  nodeName: vs-worker
+  containers:
+    - name: backend
+      image: artifactory.f5net.com/f5-positron-docker/testing-utils:v1.1.2
+      command: ["python3", "/opt/ctx/backend.py"]
+      readinessProbe:
+        tcpSocket:
+          port: 18081
+      volumeMounts:
+        - name: script
+          mountPath: /opt/ctx
+  volumes:
+    - name: script
+      configMap:
+        name: ctx-contract-test
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5BigCnePool
+metadata:
+  name: ctx-contract-test
+  namespace: default
+spec:
+  members:
+    - address: 22.22.22.113
+      port: 18081
+      priorityGroup: 0
+  minActiveMembers: 0
+---
+apiVersion: k8s.f5net.com/v1
+kind: F5VirtualServer
+metadata:
+  name: ctx-contract-test
+  namespace: default
+spec:
+  destinationAddress: 11.11.11.99
+  destinationPort: 18081
+  http:
+    clientside: sys-default-http
+    serverside: sys-default-http
+  httpRouter: true
+  ipfamilies: IPv4
+  loadBalancingMethod: ROUND_ROBIN
+  pool: ctx-contract-test
+  protocol: tcp
+  protocolProfile:
+    clientside: sys-default-tcp
+    serverside: sys-default-tcp
+  snat:
+    pool: ""
+    type: automap
+  sourcePort: preserve
+  translateAddress: true
+  translatePort: true
+  vlans:
+    disableListedVlans: false
+    vlanList: [tmm-client]
