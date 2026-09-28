@@ -1,64 +1,28 @@
 #!/bin/sh
-# Assert this image can actually arm by name. RUNS AT IMAGE BUILD TIME, inside the
-# image, so a broken layer fails at build rather than during a demo.
-#
-# THE CHECK THAT MATTERS is the build-id comparison. Dockerfile.runtime points
-# /usr/bin/tmm at tmm.debug whenever a debug binary is present, and the debug build
-# overrides CFLAGS_OPTIMIZE --- which is where -fpatchable-function-entry lives. So
-# tmm64.debug has no entry pads and NOTHING in it can be armed; arming fails with "no
-# pad", which reads like a stale address and is not. That has shipped four times, three
-# of them reaching the cluster.
-#
-# Comparing the index's build id against the binary tmm RESOLVES to catches both that
-# and a stale index, which are different faults with identical symptoms.
-set -e
-
-IDX_FILE=/usr/share/ls/hook-index.tsv
-SIG_FILE=/usr/share/ls/signatures.tsv
-
-test -s "$IDX_FILE"       || { echo "*** $IDX_FILE missing or empty"; exit 1; }
-grep -q '^#build_id' "$IDX_FILE" || { echo "*** index carries no #build_id header"; exit 1; }
-test -s "$SIG_FILE"       || { echo "*** $SIG_FILE missing or empty"; exit 1; }
-grep -q '^#build_id' "$SIG_FILE" || { echo "*** signature index carries no #build_id header"; exit 1; }
-test -x /usr/bin/ls_drain || { echo "*** /usr/bin/ls_drain missing or not executable"; exit 1; }
-test -f /usr/bin/ls-load.py || { echo "*** /usr/bin/ls-load.py missing"; exit 1; }
-# NO programs are baked --- bytecode is compiled/verified/signed as a completely independent
-# process and loaded over the socket at runtime (see BYTECODE-BUILD.md). This layer verifies
-# only the build artifacts: the binary/index/signatures/tools and their build-id agreement.
-
-R=$(readlink -f /usr/bin/tmm)
-case "$R" in
-  *debug*) echo "*** /usr/bin/tmm resolves to $R --- the debug build has NO entry pads,"
-           echo "    so nothing can ever be armed. Repoint it at tmm.default."
-           exit 1 ;;
-esac
-
-IDX=$(awk -F'\t' '/^#build_id/{print $2}' "$IDX_FILE")
-SIG=$(awk -F'\t' '/^#build_id/{print $2}' "$SIG_FILE")
-LIVE=$(python3 /usr/share/ls/ls_buildid.py "$R")
-
-echo "  tmm resolves to : $R"
-echo "  index build id  : $IDX"
-echo "  sig index bid   : $SIG"
-echo "  binary build id : $LIVE"
-
-# BOTH indexes, separately. They are produced by two different tools from the same DEB
-# pair, so checking one and assuming the other is how a stale file survives. A signature
-# index from another build gives the right parameter NAMES with the wrong TYPES for
-# anything whose struct changed --- a probe that verifies clean and reads the wrong bytes.
-if [ "$SIG" != "$LIVE" ]; then
-    echo "*** SIGNATURE INDEX MISMATCH. $SIG describes a different binary than this"
-    echo "    image runs. Generated probes would read the wrong offsets and still pass"
-    echo "    verification, because PREVAIL checks bounds, not meaning."
-    exit 1
-fi
-
-if [ "$IDX" != "$LIVE" ]; then
-    echo "*** BUILD ID MISMATCH. The index describes a different binary than this"
-    echo "    image runs, so every address in it is wrong. ls-load.py would refuse"
-    echo "    to arm --- correct, but useless. Regenerate the index from the DEB pair"
-    echo "    this image was built from."
-    exit 1
-fi
-
-echo "  ls-tools OK: $(grep -vc '^#' "$IDX_FILE") symbols, $(ls /usr/share/ls/*.bpf.o | wc -l) programs"
+# Image-build gate. Full layer inspection is additionally required by bake/ship;
+# an absent final file does not prove it was absent from an earlier image layer.
+set -eu
+test -x /usr/bin/ls_drain
+test -x /usr/bin/ls-load.py
+python3 - <<'PY'
+import hashlib, json, os, sys
+sys.path.insert(0, '/usr/share/ls')
+from ls_buildid import build_id
+path = os.path.realpath('/usr/bin/tmm')
+if path != '/usr/bin/tmm64.no_pgo':
+    sys.exit('unexpected executing binary: ' + path)
+receipt = json.load(open('/usr/share/ls/runtime-identity.json'))
+blob = open(path, 'rb').read()
+bid = build_id(path)
+if bid != receipt['build_id'] or hashlib.sha256(blob).hexdigest() != receipt['sha256']:
+    sys.exit('runtime identity mismatch against packaged binary')
+for name in ('hook-index.tsv', 'signatures.tsv', 'hook-map.json', 'types.json', 'tmm.btf'):
+    if os.path.lexists('/usr/share/ls/' + name):
+        sys.exit('deployed catalog forbidden: ' + name)
+if b'ls_vm: LOAD REFUSED --- signed target/build/mode contract' not in blob:
+    sys.exit('runtime lacks authenticated attachment contract')
+if blob.count(b'\xf3\x0f\x1e\xfa' + b'\x90' * 5) < 1000:
+    sys.exit('runtime does not carry the expected entry pads')
+print('ls-tools: runtime identity matches, build ' + bid)
+print('ls-tools: authenticated per-program targets; no bulk catalogs in /usr/share/ls')
+PY

@@ -1,0 +1,2766 @@
+{
+  "build": {
+    "command": "ssh -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes -i /home/claude/.ssh/id_ed25519 starin@10.145.37.36 'python3 -'",
+    "host": "starin@10.145.37.36",
+    "result": {
+      "catalogs": {
+        "hook-index.tsv": {
+          "candidate_rows": [
+            "adapt_handle_result_tcl_done\t0xb9c180\tpad\t0\t5",
+            "adapt_handle_result_tcl_done.cold\t0x14e3d7e\tdisplace\t-\t7",
+            "adapt_process_error\t0xb9b0c0\tpad\t0\t5",
+            "adapt_process_error.cold\t0x14e3d42\tdisplace\t-\t7",
+            "adapt_send_preview_data_to_proxy_if_bypassing\t0xb9a880\tpad\t0\t5",
+            "adapt_send_preview_data_to_proxy_if_bypassing.cold\t0x14e3d1a\tdisplace\t-\t7",
+            "adapt_set_state\t0xb9a1c0\tpad\t0\t5",
+            "adapt_set_state.cold\t0x14e3cf2\tdisplace\t-\t7",
+            "adapt_timeout_callback\t0xb9cc44\tpad\t4\t5",
+            "adapt_timeout_callback.cold\t0x14e3db0\tdisplace\t-\t7",
+            "ext_proc_apply_mutations\t0xd2a140\tpad\t0\t5",
+            "ext_proc_build_hdr_request\t0xd28b00\tpad\t0\t5",
+            "ext_proc_compose_request\t0xd29e04\tpad\t4\t5",
+            "ext_proc_compose_response_body\t0xd297c4\tpad\t4\t5",
+            "ext_proc_compose_response_headers\t0xd299c4\tpad\t4\t5",
+            "ext_proc_cs_count_pre_verdict_death.part.0\t0xd26bc0\tpad\t0\t5",
+            "ext_proc_cs_hd_reap_cb\t0xd264c4\tpad\t4\t5",
+            "ext_proc_cs_log_level_cb\t0xd26384\tpad\t4\t5",
+            "ext_proc_cs_pcb_uninit\t0xd26e40\tpad\t0\t5",
+            "ext_proc_cs_send_deferred_request_done\t0xd26440\tpad\t0\t5",
+            "ext_proc_cs_timeout_cb\t0xd280c4\tpad\t4\t5",
+            "ext_proc_header_is_denied\t0xd29704\tpad\t4\t5",
+            "ext_proc_header_mutation_safe\t0xd2a004\tpad\t4\t5",
+            "ext_proc_parse_message\t0xd2a344\tpad\t4\t5",
+            "ext_proc_send_immediate_response\t0xd282c4\tpad\t4\t5",
+            "ext_proc_send_modified_request\t0xd28244\tpad\t4\t5",
+            "ext_proc_send_result\t0xd27044\tpad\t4\t5"
+          ],
+          "headers": [
+            "#ls-hook-index\t1",
+            "#build_id\tc3b81927dfdcc31137cd8212b5e23bb85677a06c",
+            "#tmos_version\tunknown"
+          ],
+          "sha256": "83e9d4b5fbd22a48c8ea8a7b271ce852a6eccc62daa0aaffd2d149832963356f"
+        },
+        "signatures.tsv": {
+          "candidate_rows": [
+            "adapt_handle_result\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|result:scalar:enum ivs_result",
+            "adapt_handle_result_tcl_done\t2\tnode:blob:struct hudnode *|cf:blob:struct connflow *",
+            "adapt_ivs_forward_data_from_ivs\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|xb:blob:struct xbuf *",
+            "adapt_process_error\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|reason:string:unsigned char *",
+            "adapt_send_preview_data_to_proxy_if_bypassing\t4\tnode:blob:struct hudnode *|cf:blob:struct connflow *|queue_events:scalar:enum ?|first_call:scalar:enum ?",
+            "adapt_set_state\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|new_state:scalar:enum adapt_modify_state",
+            "adapt_timeout_callback\t2\ttimer:blob:struct timer *|arg:opaque:void *",
+            "ext_proc_apply_mutations\t2\ttarget_hd:blob:struct http_data *|common:blob:struct _Extproc__CommonResponse *",
+            "ext_proc_build_body_request\t2\txb_request_body:blob:struct xbuf *|xb_body_out:blob:struct xbuf *",
+            "ext_proc_build_hdr_request\t4\tpcb:blob:struct ext_proc_cs_pcb *|cfg:blob:struct ext_proc_config *|original_request_hd:blob:struct http_data *|xb_hdr_out:blob:struct xbuf *",
+            "ext_proc_build_immediate_hd\t3\tpcb:blob:struct ext_proc_cs_pcb *|cfg:blob:struct ext_proc_config *|imm:blob:struct _Extproc__ImmediateResponse *",
+            "ext_proc_build_mutated_hd\t2\tpcb:blob:struct ext_proc_cs_pcb *|resp:blob:struct _Extproc__ProcessingResponse *",
+            "ext_proc_compose_request\t6\tpcb:blob:struct ext_proc_cs_pcb *|cfg:blob:struct ext_proc_config *|original_request_hd:blob:struct http_data *|original_body:blob:struct xbuf *|xb_hdr_out:blob:struct xbuf *|xb_body_out:blob:struct xbuf *",
+            "ext_proc_compose_response_body\t4\txb_body:blob:struct xbuf *|xb_out:blob:struct xbuf *|end_of_stream:scalar:enum ?|truncated:opaque:DW_TAG_enumeration_type *",
+            "ext_proc_compose_response_headers\t2\tresponse_hd:blob:struct http_data *|xb_out:blob:struct xbuf *",
+            "ext_proc_cs_append_str\t2\txb:blob:struct xbuf *|s:string:char *",
+            "ext_proc_cs_build_grpc_request_hd\t2\tnode:blob:struct hudnode *|out_hd:opaque:DW_TAG_pointer_type *",
+            "ext_proc_cs_count_pre_verdict_death\t2\tpcb:blob:struct ext_proc_cs_pcb *|config:blob:struct ext_proc_config *",
+            "ext_proc_cs_flush_outbound\t4\tnode:blob:struct hudnode *|cf:blob:struct connflow *|xb_hdr:blob:struct xbuf *|xb_body:blob:struct xbuf *",
+            "ext_proc_cs_grpc_prepend_frame\t1\txb:blob:struct xbuf *",
+            "ext_proc_cs_handle_decoded\t2\tnode:blob:struct hudnode *|cf:blob:struct connflow *",
+            "ext_proc_cs_hd_reap_cb\t2\tt:blob:struct timer *|arg:opaque:void *",
+            "ext_proc_cs_hd_release_deferred\t1\thd:blob:struct http_data *",
+            "ext_proc_cs_log_level_cb\t4\tname:string:char *|value:blob:struct tmm_bigdb_value *|size:scalar:unsigned int|data:opaque:void *",
+            "ext_proc_cs_mark_detach_at_response_done\t1\tcf:blob:struct connflow *",
+            "ext_proc_cs_pcb_init\t2\tpcb:blob:struct ext_proc_cs_pcb *|mss:scalar:int",
+            "ext_proc_cs_pcb_uninit\t1\tpcb:blob:struct ext_proc_cs_pcb *",
+            "ext_proc_cs_rearm\t1\tpcb:blob:struct ext_proc_cs_pcb *",
+            "ext_proc_cs_send_deferred_request_done\t2\tnode:blob:struct hudnode *|cf:blob:struct connflow *",
+            "ext_proc_cs_send_response_chunk\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|xb:blob:struct xbuf *",
+            "ext_proc_cs_send_response_eos\t2\tnode:blob:struct hudnode *|cf:blob:struct connflow *",
+            "ext_proc_cs_send_response_headers\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|hd:blob:struct http_data *",
+            "ext_proc_cs_set_state\t2\tpcb:blob:struct ext_proc_cs_pcb *|s:scalar:enum ext_proc_cs_state",
+            "ext_proc_cs_timeout_cb\t2\tt:blob:struct timer *|arg:opaque:void *",
+            "ext_proc_header_is_base\t2\tname:string:char *|name_len:scalar:long unsigned int",
+            "ext_proc_header_is_denied\t2\tname:string:char *|name_len:scalar:long unsigned int",
+            "ext_proc_header_mutation_safe\t4\tname:string:unsigned char *|name_len:scalar:long unsigned int|value:string:unsigned char *|value_len:scalar:long unsigned int",
+            "ext_proc_headers_contain\t2\tmut:blob:struct _Extproc__HeaderMutation *|name:string:char *",
+            "ext_proc_is_tchar\t1\tc:scalar:unsigned char",
+            "ext_proc_parse_message\t2\tpcb:blob:struct ext_proc_cs_pcb *|msg:blob:struct xbuf *",
+            "ext_proc_send_immediate_response\t4\tnode:blob:struct hudnode *|cf:blob:struct connflow *|synth_hd:blob:struct http_data *|synth_body:blob:struct xbuf *",
+            "ext_proc_send_modified_request\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|mutated_hd:blob:struct http_data *",
+            "ext_proc_send_result\t3\tnode:blob:struct hudnode *|cf:blob:struct connflow *|result:scalar:int",
+            "ext_proc_state_post_verdict\t1\tpcb:blob:struct ext_proc_cs_pcb *"
+          ],
+          "headers": [
+            "#ls-sig-index\t1",
+            "#build_id\tc3b81927dfdcc31137cd8212b5e23bb85677a06c",
+            "#name\tnparams\tname:kind:detail|..."
+          ],
+          "sha256": "64b57167c0e1719f970470557105d00e972b42b36bbb3577cba5b5f9c481df5c"
+        }
+      },
+      "files": {
+        "src/modules/hudfilter/adapt/adapt.c": {
+          "excerpts": [
+            {
+              "first_line": 14,
+              "last_line": 48,
+              "text": "/*\n * The ADAPT filter is used to modify HTTP request and/or responses as they\n * pass through the BIGIP. The ADAPT filter operates on both the clientside\n * and serverside of the Hudchain. It only modifies data on ingress. Thus\n * the clientside will modify HTTP requests and the serverside will modify\n * HTTP responses. Each side has a corresponding profile. The clientside is\n * configured via a request-adapt profile and the serverside is configured\n * via a response-adapt profile. Either may be modified via perform-method.\n *\n * An 'adaptation context' encapsulates the complete interface with an internal\n * virtual server (IVS) including configuration parameters and execution state.\n * There is always one adaptation context that is initialized from the profile\n * as described above and may be modified via perform-methods. This is known\n * as the 'static context'.\n *\n * ADAPT supports dynamic adaptation contexts controlled by perform-methods.\n * Any number of dynamic contexts may be created in a chain to provide for\n * multiple adaptations in series within a connection flow. The static context\n * is used to set up and tear down the connection flow and also functions as a\n * prototype (template) for all dynamic contexts within the ADAPT hudnode.\n *\n * A dynamic context may only be created after the connection flow has been\n * established by HUDEVT_FLOW_INIT and HUDEVT_ACCEPTED or HUDEVT_CONNECTED has\n * been recevied by ADAPT and it is ready and waiting for a HUDEVT_REQUEST\n * or HUDEVT_RESPONSE, resp. If at that point a dynamic context is created\n * via perform-method, a new dynamic context is cloned from the static\n * context and inserted in the data and control path in place of the static\n * context (thus the hudchain is extended inside ADAPT to contain one or\n * more adaptation contexts). The new dynamic context may be configured by\n * perform-methods to override the profile defaults inherited from the static\n * contexts (eg. select IVS). The static context retains the initial state\n * as a template for creating more dynamic contexts. The HUDEVT_REQUEST or\n * HUDEVT_RESPONSE is then handled by the dynamic context, which performs\n * an adaptation and might (depending on the result) pass it on up after\n * forwarding HUDEVT_ACCEPTED."
+            },
+            {
+              "first_line": 790,
+              "last_line": 840,
+              "text": "    struct profile_listener *pl;\n    UINT32 last_ctx_irid;                 /* Last alloc'd ctx iRule ID. */\n    BOOL   f_pem_exist : 1;               /* config has PEM (clientside only) */\n};\n\n/* These bit values are used to designate the reason that XOFF has been set. */\n#define ADAPT_XOFF_REASON_NONE          0x00\n#define ADAPT_XOFF_REASON_PREVIEW_FULL  0x01    /* preview buffer is full */\n#define ADAPT_XOFF_REASON_IVS           0x02    /* ivs requests xoff */\n#define ADAPT_XOFF_REASON_PROXY         0x04    /* proxy requests xoff */\n\n/* Additional private IVS result codes. */\n#define ADAPT_IVS_RESULT_NONE           (IVS_RESULT_TOP + 1)\n#define ADAPT_IVS_RESULT_TIMEOUT        (IVS_RESULT_TOP + 2)\n\n/*\n * This structure is used to store mappings between an enum value and a\n * string for HUDCTL_PERFORM_METHOD functions.\n */\nstruct adapt_method_enum_string_mapping\n{\n    const char *string;\n    unsigned    value;\n};\n\nstatic const struct adapt_method_enum_string_mapping\n        servicedown_enum_mapping[] = {\n    { \"ignore\", ADAPT_DOWN_IGNORE },\n    { \"reset\",  ADAPT_DOWN_RESET },\n    { \"drop\",   ADAPT_DOWN_DROP },\n    { NULL,     0 }\n};\n\nstatic const struct adapt_method_enum_string_mapping\n        result_enum_mapping[] = {\n    { \"unknown\",    ADAPT_IVS_RESULT_NONE },\n    { \"bypass\",     IVS_NOOP },\n    { \"continue\",   IVS_CONTINUE },\n    { \"modify\",     IVS_MODIFIED },\n    { \"respond\",    IVS_RESPONSE },\n    { \"close\",      IVS_CLOSE },\n    { \"abort\",      IVS_ABORT },\n    { \"timeout\",    ADAPT_IVS_RESULT_TIMEOUT },\n    { NULL,         0 }\n};\n\n/*\n * Adapt hudfilter template.\n */\nHUD_DEFAULT_HANDLER_DECLARE(adapt, hud_adapt_handler);\nstatic const struct hudfilter_spec hudfilter_adapt_spec = {"
+            },
+            {
+              "first_line": 1658,
+              "last_line": 1705,
+              "text": "\n/*\n * Check if the data stored in the preview xbuf exceeds the maximum\n * preview size as set in the configuration, or if we are capturing\n * a preview only allow recovery from service-down. If so, set XOFF\n * flag for preview.\n */\nstatic void\nadapt_xoff_if_preview_is_full(struct hudnode *node, struct connflow *cf)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n\n    if (((pcb->ctx->working_cfg.preview_size > 0) ||\n                pcb->ctx->working_cfg.f_xoff_no_preview) &&\n            (pcb->ctx->xpreview.len > pcb->ctx->working_cfg.preview_size)) {\n        pcb->ctx->xoff_reason |= ADAPT_XOFF_REASON_PREVIEW_FULL;\n    } else {\n        pcb->ctx->xoff_reason &=  ~ADAPT_XOFF_REASON_PREVIEW_FULL;\n    }\n    adapt_update_xoff(node, cf);\n}\n\n/* Update the statemachine state. */\nstatic void\nadapt_set_state(struct hudnode *node, struct connflow *cf,\n        enum adapt_modify_state new_state)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n\n    /* Flush preview if no longer needed. */\n    if (ADAPT_MODST_IS_CAPTURE_PREVIEW(pcb->ctx->state) &&\n                !ADAPT_MODST_IS_CAPTURE_PREVIEW(new_state)) {\n        xbuf_free(&pcb->ctx->xpreview);\n        adapt_xoff_if_preview_is_full(node, cf);\n    }\n    ADAPT_TRACEF(\"node==%p old_state==%s new_state==%s\\n\", node,\n            adapt_state_names[pcb->ctx->state], adapt_state_names[new_state]);\n    pcb->ctx->state = new_state;\n    if ((pcb->ctx->state == ADAPT_STATE_DONE) ||\n                (pcb->ctx->state == ADAPT_STATE_FAIL)) {\n        adapt_disconnect_ivs(pcb->ctx);\n    }\n}\n\n/* Advance the statemachine to the next state based on the provided event. */\nstatic void\nadapt_advance_state(struct hudnode *node, struct connflow *cf,\n        enum adapt_state_events event)"
+            },
+            {
+              "first_line": 1780,
+              "last_line": 1836,
+              "text": "/*\n * An error has occured. Determine the proper action based on the\n * configured service-down-action value.\n */\nstatic void\nadapt_process_error(struct hudnode *node, struct connflow *cf,\n        const BYTE *reason)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n    enum adapt_service_down_action action =\n            pcb->ctx->working_cfg.service_down_action;\n\n    ADAPT_STATS_INC(pcb->ctx, adaptation_errors);\n    timer_remove(&pcb->ctx->timeout_timer);\n    switch (action) {\n        case ADAPT_DOWN_IGNORE:\n            adapt_ivs_result_no_modification_needed(node, cf);\n            break;\n        case ADAPT_DOWN_RESET:\n            adapt_handle_context_upper(node, pcb->ctx->above,\n                    HUDEVT_ABORTED, cf, RST_WHY_CF(cf, reason));\n            adapt_set_state(node, cf, ADAPT_STATE_FAIL);\n            break;\n        case ADAPT_DOWN_DROP:\n            adapt_handle_context_upper(node, pcb->ctx->above,\n                    HUDEVT_EOF, cf, NULL);\n            pcb->ctx->f_eof_has_been_sent = TRUE;\n            adapt_set_state(node, cf, ADAPT_STATE_DONE);\n            adapt_send_closing_events_to_proxy_if_not_sent(node, cf);\n            break;\n    }\n}\n\n/*\n * Called if the IVS does not return a result before the configured timeout.\n * This will be treated as an error. Entrypoint to an adaptation context.\n */\nstatic void\nadapt_timeout_callback(struct timer *timer, void *arg)\n{\n    struct adapt_context *ctx = arg;\n    struct adapt_context *saved_ctx;\n    struct adapt_pcb *pcb = HUDNODE_CTX(ctx->node);\n\n    ADAPT_TRACEF(\"node==%p\\n\", ctx->node);\n    saved_ctx = adapt_dynamic_context_enter(pcb, ctx);\n\n    ADAPTERR_IVS_TIMEOUT_LOG(CONNFLOW_FLOW_KEY(ctx->cf),\n        (ctx->working_cfg.name != NULL) ?\n            (const char *)ctx->working_cfg.name : \"NULL\",\n        (ctx->working_cfg.internal_vs_name != NULL) ?\n            (const char *)ctx->working_cfg.internal_vs_name : \"NULL\");\n    ADAPT_STATS_INC(ctx, timeout_errors);\n    adapt_handle_result(ctx->node, ctx->cf, ADAPT_IVS_RESULT_TIMEOUT);\n\n    adapt_dynamic_context_exit(pcb, saved_ctx);\n}"
+            },
+            {
+              "first_line": 3340,
+              "last_line": 3485,
+              "text": "\n/*\n * The IVS has reported it does not need to modify the request or response,\n * send all cached headers and preview data to proxy.\n */\nstatic void\nadapt_send_preview_data_to_proxy_if_bypassing(struct hudnode *node,\n        struct connflow *cf, BOOL queue_events, BOOL first_call)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n\n    /* If first call - send DONE even if there is no preview data. */\n    if ((pcb->ctx->xdraining_preview.len > 0) || first_call) {\n        int retry_count = ADAPT_DRAIN_PREVIEW_RETRY_COUNT;\n\n        while ((retry_count-- > 0) && (pcb->ctx->xdraining_preview.len > 0)) {\n            ADAPT_TRACEF(\"send data: node==%p xb==%p)\\n\", node,\n                        &pcb->ctx->xdraining_preview);\n            adapt_process_context_ingress(node, pcb->ctx->above, cf,\n                        &pcb->ctx->xdraining_preview);\n            /*\n             * Do not free the pcb->ctx->xdraining_preview - it is now owned\n             * by the filter above.\n             */\n        }\n\n        /* If all preview data is sent, check if HTTP has reported _DONE. */\n        if (pcb->ctx->xdraining_preview.len == 0) {\n            pcb->ctx->xoff_reason &= ~(ADAPT_XOFF_REASON_IVS |\n                    ADAPT_XOFF_REASON_PREVIEW_FULL);\n            adapt_update_xoff(node, cf);\n            if (ADAPT_MODST_IS_HTTP_DONE(pcb->ctx->state)) {\n                hud_msg_t msg = HUDNODE_IS_CLIENTSIDE(node) ?\n                        HUDEVT_REQUEST_DONE : HUDEVT_RESPONSE_DONE;\n\n                ADAPT_TRACEF(\"sending: node==%p msg==%s(%s)\\n\",\n                        node, hud_msg_name_str(msg), hud_msg_desc_str(msg));\n                if (queue_events) {\n                    adapt_handle_context_queue(node, msg, cf,\n                            (void*)(UINTPTR)pcb->ctx->f_done_complete);\n                } else {\n                    adapt_handle_context_upper(node, pcb->ctx->above, msg, cf,\n                            (void*)(UINTPTR)pcb->ctx->f_done_complete);\n                }\n                ADAPT_STATS_INC(pcb->ctx, records_out);\n                adapt_send_closing_events_to_proxy_if_not_sent(node, cf);\n            }\n        }\n    }\n}\n\n/*\n * Modification not needed, setup for bypass mode sending data directly\n * from HTTP to proxy.\n */\nstatic void\nadapt_ivs_result_no_modification_needed(struct hudnode *node,\n        struct connflow *cf)\n{\n    err_t err = ERR_OK;\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n    struct adapt_cfg *cfg = HUDNODE_PRIVATE(node);\n    /* Save off preview data. */\n    struct http_data *tmp_headers = NULL;\n    xbuf_merge(&pcb->ctx->xdraining_preview, &pcb->ctx->xpreview);\n    tmp_headers = pcb->ctx->original_headers;\n\n    /*\n     * Try to advance the state. If we don't have an active preview\n     * (configured for no-preview, or it has been drained or dropped),\n     * issue a warning about possible data loss and flip to bypass mode.\n     * Should not happen as a result of normal IVS operation, but can be\n     * caused by a timeout awaiting a response from the IVS, an error,\n     * or the iRule \"ADAPT::result bypass\".\n     */\n    if (!ADAPT_MODST_IS_CAPTURE_PREVIEW(pcb->ctx->state)) {\n        ADAPT_TRACEF(\"node==%p, set to bypass without or beyond preview\\n\",\n                     node);\n        ADAPTERR_BYPASS_NO_PREVIEW_LOG(CONNFLOW_FLOW_KEY(pcb->ctx->cf),\n            pcb->ctx->working_cfg.name,\n            (pcb->ctx->working_cfg.internal_vs_name != NULL) ?\n                (const char *)pcb->ctx->working_cfg.internal_vs_name : \"NULL\");\n    }\n    adapt_advance_state(node, cf, ADAPT_STEVT_ADAPT_NO_MODIFY);\n    /* If this fails, we were in a state where we could not switch to no\n     * modification needed.\n     */\n    if (pcb->ctx->state != ADAPT_STATE_FAIL) {\n        /* Send headers. */\n        if (tmp_headers != NULL) {\n            hud_msg_t msg = HUDNODE_IS_CLIENTSIDE(node) ? HUDEVT_REQUEST :\n                        HUDEVT_RESPONSE;\n            /*\n             * For client side (request) adaptation only.\n             * Allow PEM to inspect headers before sending them up.\n             * Send HUDCTL_PERFORM_METHOD to PEM:\n             *     PEM can modify headers\n             *     PEM can request adapt done.\n             */\n            if (cfg->f_pem_exist && (msg == HUDEVT_REQUEST)) {\n                err = adapt_send_request_to_pem(node, cf, tmp_headers);\n                if (err == ERR_ABRT) {\n                    /*\n                     * ERR_ABRT code interpretation for adapt filter is\n                     * discontinue the current adaptation and send\n                     * response down the chain.\n                     * HTTP headers already modified by PEM.\n                     */\n                    ADAPT_TRACEF(\"node==%p, send respond\\n\", node);\n                    /* Finalize response (to nodes below, not contexts). */\n                    hudQ_handle_lower(node,\n                            HUDCTL_RESPONSE, cf, tmp_headers);\n                    hudQ_handle_lower(node,\n                            HUDCTL_RESPONSE_DONE, cf, (void *)FALSE);\n                    /* Response is done - queue a close connection. */\n                    adapt_advance_state(node, cf, ADAPT_STEVT_ADAPT_DONE);\n                    goto out;\n                }\n                if (err != ERR_OK) {\n                    ADAPT_TRACEF(\n                        \"node==%p, PEM process returned error %E(%lE)\\n\",\n                        node, err, err);\n                }\n            }\n            adapt_send_accepted_to_proxy_if_not_sent(node, cf);\n            ADAPT_TRACEF(\"send header: node==%p msg==%s(%s)\\n\", node,\n                        hud_msg_name_str(msg), hud_msg_desc_str(msg));\n            adapt_handle_context_upper(node, pcb->ctx->above,\n                    msg, cf, tmp_headers);\n            tmp_headers = NULL;\n        } else {\n            adapt_send_accepted_to_proxy_if_not_sent(node, cf);\n        }\n\n        /* Send preview data. */\n        adapt_send_preview_data_to_proxy_if_bypassing(node, cf, FALSE, TRUE);\n    } else {\n        /* Cleanup. */\n        xbuf_free(&pcb->ctx->xdraining_preview);\n    }\nout:\n    return;\n}\n\n/*\n * Cache preview data in case IVS server is down or modification is not needed."
+            },
+            {
+              "first_line": 3538,
+              "last_line": 3695,
+              "text": "/* Processing for result from IVS or timeout callback. */\nstatic void\nadapt_handle_result(struct hudnode *node, struct connflow *cf,\n        enum ivs_result result)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n    ADAPT_TRACEF(\"node==%p, result==%d(%s)\\n\",\n                 node, result, ivs_result_name_str(result));\n    if (!ADAPT_MODST_IS_WAITING_TCL(pcb->ctx->state)) {\n        pcb->ctx->result = result;\n\n        /* If adapt is done - ignore result callbacks - most likely a close. */\n        if (!ADAPT_MODST_IS_ADAPT_DONE(pcb->ctx->state) &&\n                (pcb->ctx->state != ADAPT_STATE_FAIL)) {\n            if (result == IVS_CONTINUE) {\n                /* Continue resets timeout but does not raise a Tcl event. */\n                if (ADAPT_MODST_IS_HTTP_DONE(pcb->ctx->state)) {\n                    if (pcb->ctx->working_cfg.timeout > 0) {\n                        timer_update(&pcb->ctx->timeout_timer,\n                                (pcb->ctx->working_cfg.timeout * HZ) / 1000);\n                    }\n                } else {\n                    /*\n                     * Some ICAP servers operate in \"100 continue mode\"\n                     * where they send 100-continue after preview and then\n                     * don't begin their response until they have received\n                     * the entire request. In that case a large request can\n                     * trigger a timeout. Turn off the timer here and restart\n                     * it after we have sent _DONE to the IVS.\n                     */\n                    if (pcb->ctx->working_cfg.timeout > 0) {\n                        timer_remove(&pcb->ctx->timeout_timer);\n                    }\n                }\n                adapt_advance_state(node, cf, ADAPT_STEVT_ADAPT_CONTINUE);\n            } else {\n                timer_remove(&pcb->ctx->timeout_timer);\n                adapt_advance_state(node, cf, ADAPT_STEVT_RAISE_TCL);\n                adapt_handle_result_tcl(node, cf);\n            }\n        }\n    }\n}\n\n/*\n * Raise TCL event based on IVS result.\n * Provides an opportunity for an iRule to inspect and even change the\n * result code via the ADAPT::result Tcl command.\n */\nstatic void\nadapt_handle_result_tcl(struct hudnode *node, struct connflow *cf)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n    err_t err;\n    tclrule_t event = HUDNODE_IS_CLIENTSIDE(node) ?\n                TCLRULE_ADAPT_REQUEST_RESULT :\n                TCLRULE_ADAPT_RESPONSE_RESULT;\n\n    ADAPT_TRACEF(\"execute_tcl node==%p event==%s\\n\", node,\n        tclrule_strmap[event]);\n\n    err = tclrule_execute(node, uflow_fromconnflow(cf), event);\n    ADAPT_TRACEF(\"... tclrule_execute() returned %E(%lE)\\n\", err, err);\n\n    if (err == ERR_INPROGRESS) {\n        /* Will complete asynchronously during HUDEVT_TCL. Save context. */\n        ADAPTERR_IRULE_PARKED_EVENT_LOG(CONNFLOW_FLOW_KEY(cf),\n                pcb->ctx->working_cfg.name, tclrule_strmap[event]);\n        pcb->tcl_ctx = pcb->ctx;\n    } else {\n        /* Execute remaining flow even if there's a Tcl error. */\n        adapt_handle_result_tcl_done(node, cf);\n    }\n}\n\n/*\n * Process IVS result after TCL event has been raised. The result might\n * have been changed by the ADAPT::result Tcl command.\n */\nstatic void\nadapt_handle_result_tcl_done(struct hudnode *node, struct connflow *cf)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n\n    ADAPT_TRACEF(\"node==%p result==%d\\n\", node, pcb->ctx->result);\n\n    /* If the event sets the state, skip. */\n    switch (pcb->ctx->result) {\n        case IVS_NOOP:\n            adapt_ivs_clear_hudctl_queue(node);\n            adapt_ivs_result_no_modification_needed(node, cf);\n            pcb->ctx->xoff_reason &= ~ADAPT_XOFF_REASON_IVS;\n            adapt_update_xoff(node, cf);\n            break;\n        case IVS_MODIFIED:\n        case IVS_RESPONSE:\n            /* Expect encapsulated HTTP headers from IVS. */\n            if (!ADAPT_MODST_IS_ADAPT_DONE(pcb->ctx->state)) {\n                adapt_advance_state(node, cf, ADAPT_STEVT_ADAPT_WAIT_HEADERS);\n            }\n            adapt_ivs_drain_hudctl_queue(node, cf);\n            break;\n        case IVS_CONTINUE:\n            /* This result is handled earlier and does not raise a Tcl event. */\n            DBG_ASSERT(\"IVS_CONTINUE does not raise a Tcl event\", FALSE);\n            /* fall through */\n        default:\n            adapt_ivs_clear_hudctl_queue(node);\n            if (!ADAPT_MODST_IS_ADAPT_DONE(pcb->ctx->state))\n            {\n                if (pcb->ctx->result == ADAPT_IVS_RESULT_TIMEOUT) {\n                    adapt_process_error(node, cf, \"IVS TIMEOUT\");\n                    adapt_disconnect_ivs(pcb->ctx);\n                } else {\n                    /* Unknown or unexpected IVS result. */\n                    adapt_process_error(node, cf, \"Unexpected IVS result\");\n                    ADAPTERR_IVS_ERROR_LOG(\n                        CONNFLOW_FLOW_KEY(cf),\n                        (pcb->ctx->working_cfg.name != NULL) ?\n                            (const char *)pcb->ctx->working_cfg.name : \"NULL\",\n                        (pcb->ctx->working_cfg.internal_vs_name != NULL) ?\n                            (const char *)pcb->ctx->working_cfg.internal_vs_name : \"NULL\",\n                        pcb->ctx->result,\n                        ivs_result_name_str(pcb->ctx->result),\n                        ivs_result_desc_str(pcb->ctx->result));\n                }\n            }\n            pcb->ctx->xoff_reason &= ~ADAPT_XOFF_REASON_IVS;\n            adapt_update_xoff(node, cf);\n            break;\n    }\n}\n\nstatic void\nadapt_ivs_forward_data_from_ivs(struct hudnode *node, struct connflow *cf,\n        struct xbuf *xb)\n{\n    struct adapt_pcb *pcb = HUDNODE_CTX(node);\n\n    if (xb->len > 0) {\n        if (ADAPT_MODST_IS_MODIFYING(pcb->ctx->state)) {\n            /* Request or response has been modified. */\n            if (!pcb->ctx->f_proxy_xoff) {\n                /* Proxy is still receiving data. */\n                adapt_process_context_ingress(node, pcb->ctx->above, cf, xb);\n            }\n        } else if (ADAPT_MODST_IS_RETURNINGRESULT(pcb->ctx->state)) {\n            /* Response returned instead of a modified request. */\n            if (HUDNODE_IS_CLIENTSIDE(node)) {\n                (void) hud_process_lower(node, cf, xb);\n            } else if (!pcb->ctx->f_proxy_xoff) {\n                /* Proxy is still receiving data. */\n                adapt_process_context_ingress(node, pcb->ctx->above, cf, xb);\n            }\n        }\n        if (xb->len > 0) {\n            /*\n             * Either the filter below rejected the IVS data or an XOFF"
+            }
+          ],
+          "sha256": "5ed4b4330d09f8b1a7dfcbc39bc8babf0298c173be0c708da300834a707ea086"
+        },
+        "src/modules/hudfilter/adapt/adapt_internal.h": {
+          "excerpts": [
+            {
+              "first_line": 35,
+              "last_line": 200,
+              "text": "#define ADAPT_DRAIN_PREVIEW_RETRY_COUNT 2\n\n\nenum adapt_service_down_action\n{\n    ADAPT_DOWN_IGNORE,\n    ADAPT_DOWN_RESET,\n    ADAPT_DOWN_DROP,\n};\n\n/* Configuration of a either request-adapt or response-adapt. */\nstruct adapt_side_cfg\n{\n    BOOL        f_enabled : 1;          /* Enable adaptation, else bypass. */\n    enum adapt_service_down_action      /* What to do if IVS not responding.*/\n                service_down_action : 2;\n    BOOL        f_is_vs_name_alloc : 1; /* internal_vs name must be freed. */\n    BOOL        f_http_v10 : 1;         /* Send HTTP v1.0 to IVS, else bypass.*/\n    BOOL        f_xoff_no_preview : 1;  /* XOFF and buffer when no preview.\n                                         * Supports service-down-action 'ignore'\n                                         * with preview-size 0 by always keeping\n                                         * a preview, but XOFF after headers to\n                                         * limit the buffer size. IVS must reply\n                                         * \"modified\" or \"continue\" to resume.\n                                         * Turn off if IVS server can't do that.\n                                         */\n    UINT32      preview_size;\n    UINT32      timeout;\n    SIZE        internal_vs_name_len;\n    BYTE       *internal_vs_name;\n    const BYTE *name;                   /* Name of profile or dyn. context. */\n    tmm_profile_adapt_stat_t *stat;     /* Stats structure to use */\n};\n\n/*\n * The adapt filter is run by a state machine. This statemachine maintains\n * the current state of the content adaptation process. The states are\n * defined in 'adapt_modify_state.h'. This include file is loaded twice,\n * once to populate the enum and other to populate an array of user readable\n * state descriptions for tracing.\n */\n#define ADAPT_STATE_DEF(name)   name,\nenum adapt_modify_state\n{\n#include <local/modules/hudfilter/adapt/adapt_modify_state.h>\n};\n#undef ADAPT_STATE_DEF\n\n#if ADAPT_DEBUG\n#define ADAPT_STATE_DEF(name)   #name,\nstatic const char *const adapt_state_names[] = {\n#include <local/modules/hudfilter/adapt/adapt_modify_state.h>\n};\n#undef ADAPT_STATE_DEF\n#endif\n\n/* Dynamic Tcl Events for iRules. */\nenum adapt_tcl_evt_id {\n    ADAPT_REQUEST_RESULT,       /* IVS request-adapt  decision available. */\n    ADAPT_RESPONSE_RESULT,      /* IVS response-adapt decision available. */\n    ADAPT_REQUEST_HEADERS,      /* IVS request-adapt  headers  available. */\n    ADAPT_RESPONSE_HEADERS,     /* IVS response-adapt headers  available. */\n    /* Last: Number of events. */\n    ADAPT_TCL_EVT_TOP\n};\n\n/* Holds hudctl events received while pending TCL script is running. */\nstruct adapt_hudctl_during_tcl\n{\n    hud_msg_t    msg;\n    void        *data;\n};\n\n/*\n * Adaptation Context. This is the complete interface to an internal virtual\n * server, including configuration parameters and execution state.\n */\nstruct adapt_context\n{\n    struct hudnode             *node;\n    struct connflow            *cf;\n    struct adapt_context       *above;              /* Dynamic ctx links,    */\n    struct adapt_context       *below;              /*   NULL in static ctx. */\n    struct ivs_connection      *ivs_connection;     /* IVS handle. */\n    struct xbuf                 xpremature;         /* Ingress before req/rsp */\n    struct xbuf                 xpreview;           /* Preview for bypass */\n    struct xbuf                 xdraining_preview;\n    struct xbuf                 xfrom_ivs_during_tcl;\n    struct http_data           *original_headers;   /* Incoming HTTP headers. */\n    struct timer_callback       timeout_timer;      /* IVS connection t/out. */\n    struct adapt_hudctl_during_tcl hudctl_during_tcl[MAX_HUDCTL_DURING_TCL];\n\n    /* Data from HUDEVT_ABORTED captured when f_aborted_to_be_sent was set. */\n    void                       *aborted_data_to_be_sent;\n\n    UINT32                      irid;               /* Unique ID for iRules. */\n\n    enum adapt_modify_state     state : 8;\n    enum ivs_result             result : 8;\n    unsigned                    xoff_reason : 8;\n\n    /*\n     * Context is for response adaptation, operating on the serverside.\n     * This supports validation of method calls on dynamic contexts,\n     * even when the context is still pending and held on clientside.\n     */\n    BOOL                        f_for_serverside : 1;\n\n    /*\n     * The proxy has requested transfer be held. Do not receive egress\n     * from IVS.\n     */\n    BOOL                        f_proxy_xoff : 1;\n\n    /* XOFF has been sent to the bottom filter. */\n    BOOL                        f_xoff_set : 1;\n\n    /* Egress from IVS has been rejected (not fully consumed). */\n    BOOL                        f_ivs_egress_xoff : 1;\n\n    /* HUDEVT_*_DONE was received from below with this boolean arg value. */\n    BOOL                        f_done_complete : 1;\n\n    /*\n     * HUDEVT_ACCEPTED will only be forwarded after IVS has determined if\n     * modification occurs.\n     */\n    BOOL                        f_accepted_to_be_sent : 1;\n    /*\n     * HUDEVT_ABORTED will only be sent after IVS has determined if\n     * modification occurs.\n     */\n    BOOL                        f_aborted_to_be_sent : 1;\n    /*\n     * HUDEVT_EOF has been received from below on serverside but is\n     * deferred until after ADAPT has forwarded any IVS response payload.\n     * HUDEVT_EOF can come up from SSL below on session closure, or even\n     * from a lower ADAPT dynamic context on service-down-action \"drop\".\n     */\n    BOOL                        f_eof_to_be_sent : 1;\n    /*\n     * HUDEVT_SHUTDOWN has been received from below on serverside but is\n     * deferred until after ADAPT has forwarded any IVS response payload.\n     */\n    BOOL                        f_shutdown_to_be_sent : 1;\n    /*\n     * HUDEVT_CLOSED has been received from bwlow on serverside but it\n     * deferred until after ADAPT has forwarded any IVS response payload.\n     */\n    BOOL                        f_closed_to_be_sent : 1;\n    /*\n     * HUDEVT_EOF has already been sent to proxy, so don't send\n     * again if received from below.    //XXX: Should this be outside context?\n     */\n    BOOL                        f_eof_has_been_sent : 1;\n\n    /* Keep track of stat row handle so it can be dropped to avoid leak. */\n    TMROW                       stats_row;\n\n    /*\n     * Working configuration for this context.\n     * May be changed by perform-method from PEM, iRule or policy action.\n     */\n    struct adapt_side_cfg       working_cfg;    /* DO NOT PUT ANYTHING AFTER */\n};\n"
+            }
+          ],
+          "sha256": "48c41f30427a8e002f22fea95b2626782c128d35e54926ffce61bce0d9e90d54"
+        },
+        "src/modules/hudfilter/adapt/adapt_tcl.c": {
+          "excerpts": [
+            {
+              "first_line": 48,
+              "last_line": 136,
+              "text": "static const struct adapt_subcommand adapt_enable_subcmds[] = {\n    {\"\",        ADAPT_METHOD_ENABLED,       's',    \"#sb\"},\n    {\"request\", ADAPT_METHOD_ENABLED_REQ,   's',    \"#sb\"},\n    {\"response\",ADAPT_METHOD_ENABLED_RSP,   's',    \"#sb\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_select_subcmds[] = {\n    {\"\",        ADAPT_METHOD_SELECT,        's',    \"#ss\"},\n    {\"request\", ADAPT_METHOD_SELECT_REQ,    's',    \"#ss\"},\n    {\"response\",ADAPT_METHOD_SELECT_RSP,    's',    \"#ss\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_previewsz_subcmds[] = {\n    {\"\",        ADAPT_METHOD_PREVIEW_SIZE,      's',    \"#su\"},\n    {\"request\", ADAPT_METHOD_PREVIEW_SIZE_REQ,  's',    \"#su\"},\n    {\"response\",ADAPT_METHOD_PREVIEW_SIZE_RSP,  's',    \"#su\"},\n    {NULL,      0,                              0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_timeout_subcmds[] = {\n    {\"\",        ADAPT_METHOD_TIMEOUT,       's',    \"#su\"},\n    {\"request\", ADAPT_METHOD_TIMEOUT_REQ,   's',    \"#su\"},\n    {\"response\",ADAPT_METHOD_TIMEOUT_RSP,   's',    \"#su\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_srvdownact_subcmds[] = {\n    {\"\",        ADAPT_METHOD_SERVICE_DOWN_ACTION,       's',    \"#ss\"},\n    {\"request\", ADAPT_METHOD_SERVICE_DOWN_ACTION_REQ,   's',    \"#ss\"},\n    {\"response\",ADAPT_METHOD_SERVICE_DOWN_ACTION_RSP,   's',    \"#ss\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_result_subcmds[] = {\n    {\"\",        ADAPT_METHOD_RESULT,        's',    \"ss\"},\n    {\"request\", ADAPT_METHOD_RESULT_REQ,    's',    \"ss\"},\n    {\"response\",ADAPT_METHOD_RESULT_RSP,    's',    \"ss\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_allow_subcmds[] = {\n    {\"\",        ADAPT_METHOD_ALLOW,         's',    \"#sdb\"},\n    {\"request\", ADAPT_METHOD_ALLOW_REQ,     's',    \"#sdb\"},\n    {\"response\",ADAPT_METHOD_ALLOW_RSP,     's',    \"#sdb\"},\n    {NULL,      0,                          0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_context_current_subcmds[] = {\n    {\"\",        ADAPT_METHOD_CONTEXT_CURRENT,       's',    \"#s\"},\n    {NULL,      0,                                  0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_context_static_subcmds[] = {\n    {\"\",        ADAPT_METHOD_CONTEXT_STATIC,        's',    \"#s\"},\n    {\"request\", ADAPT_METHOD_CONTEXT_STATIC_REQ,    's',    \"#s\"},\n    {\"response\",ADAPT_METHOD_CONTEXT_STATIC_RSP,    's',    \"#s\"},\n    {NULL,      0,                                  0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_context_create_subcmds[] = {\n    {\"\",        ADAPT_METHOD_CONTEXT_CREATE,        's',    \"#<ss\"},\n    {\"request\", ADAPT_METHOD_CONTEXT_CREATE_REQ,    's',    \"#<ss\"},\n    {\"response\",ADAPT_METHOD_CONTEXT_CREATE_RSP,    's',    \"#<ss\"},\n    {NULL,      0,                                  0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_context_delete_all_subcmds[] = {\n    {\"\",        ADAPT_METHOD_CONTEXT_DELETE_ALL,    0,      \"#<s\"},\n    {NULL,      0,                                  0,      NULL}\n};\n\nstatic const struct adapt_subcommand adapt_context_name_subcmds[] = {\n    {\"\",        ADAPT_METHOD_CONTEXT_NAME,          's',    \"#s\"},\n    {NULL,      0,                                  0,      NULL}\n};\n\nstruct adapt_allow_property_map\n{\n    const char                 *selector;\n    enum adapt_allow_property   property;\n};\n\nstatic const struct adapt_allow_property_map adapt_allow_property_map[] = {\n    { \"http_v1.0\",          ADAPT_ALLOW_PROP_HTTP_V10 },\n    { \"xoff_no_preview\",    ADAPT_ALLOW_PROP_XOFF_NO_PREVIEW },\n    { NULL,                 ADAPT_ALLOW_PROP_TOP }\n};"
+            },
+            {
+              "first_line": 432,
+              "last_line": 451,
+              "text": "TCL_CMD(\"ADAPT::enable\",    hud_adapt_enable_tcl_cmd, ADAPT_METHOD_ENABLED);\nTCL_CMD(\"ADAPT::select\",    hud_adapt_select_tcl_cmd, ADAPT_METHOD_SELECT);\nTCL_CMD(\"ADAPT::preview_size\", hud_adapt_previewsz_tcl_cmd, \\\n        ADAPT_METHOD_PREVIEW_SIZE);\nTCL_CMD(\"ADAPT::timeout\",   hud_adapt_timeout_tcl_cmd, ADAPT_METHOD_TIMEOUT);\nTCL_CMD(\"ADAPT::service_down_action\", hud_adapt_srvdownact_tcl_cmd, \\\n        ADAPT_METHOD_SERVICE_DOWN_ACTION);\nTCL_CMD(\"ADAPT::result\",    hud_adapt_result_tcl_cmd, ADAPT_METHOD_RESULT);\nTCL_CMD(\"ADAPT::allow\",     hud_adapt_allow_tcl_cmd, ADAPT_METHOD_ALLOW);\nTCL_CMD(\"ADAPT::context_current\", hud_adapt_context_current_tcl_cmd,\n        ADAPT_METHOD_CONTEXT_CURRENT);\nTCL_CMD(\"ADAPT::context_static\", hud_adapt_context_static_tcl_cmd,\n        ADAPT_METHOD_CONTEXT_STATIC);\nTCL_CMD(\"ADAPT::context_name\", hud_adapt_context_name_tcl_cmd,\n        ADAPT_METHOD_CONTEXT_NAME);\nTCL_CMD(\"ADAPT::context_create\", hud_adapt_context_create_tcl_cmd,\n        ADAPT_METHOD_CONTEXT_CREATE);\nTCL_CMD(\"ADAPT::context_delete_all\", hud_adapt_context_delete_all_tcl_cmd,\n        ADAPT_METHOD_CONTEXT_DELETE_ALL);\n"
+            }
+          ],
+          "sha256": "274d0df3615f3af31695ba9953825ff4b4d917aecb0386789f7fd3e87c2464e4"
+        },
+        "src/modules/hudfilter/inference/inference.h": {
+          "excerpts": [
+            {
+              "first_line": 145,
+              "last_line": 175,
+              "text": "    enum inference_failure_mode default_fail_mode;\n};\n\n/*\n * Priority constants.  Gaps leave room for future sub-modules without\n * renumbering.  See INTEGRATION.md section Pipeline ordering for the\n * rationale.\n */\nenum {\n    INFERENCE_PRI_PRE_ROUTE = 100, /* Guardrails (future). */\n    INFERENCE_PRI_CACHE = 150,     /* Semantic cache (future). */\n    INFERENCE_PRI_AUGMENT = 175,   /* RAG (future). */\n    INFERENCE_PRI_ROUTE = 200,     /* EPP scheduling (Day-1). */\n};\n\n/*\n * Fixed mod_ctx[] slot per sub-module, assigned at compile time so the\n * shared descriptor is never written per request-serving thread (see\n * inference_init()).  Distinct from priority: priority orders execution,\n * id is the per-flow context slot.  Each must be < INFERENCE_MOD_MAX.\n */\nenum inference_module_id {\n    INFERENCE_MOD_EPP = 0,\n    /* Future: INFERENCE_MOD_GUARDRAILS, INFERENCE_MOD_CACHE, ... */\n};\n\n/*\n * Linker-set registration.  Each sub-module ends its .c file with:\n *   INFERENCE_MODULE_REGISTER(my_module_desc);\n * and the core filter's init walks the set and sorts by priority.\n *"
+            }
+          ],
+          "sha256": "6c4a5246590fb707506b9848c6097a105a781a0ee4427f96ca98538f7ea12d4f"
+        },
+        "test/ssa_functional/sslo_tao/py_libs/create_object.py": {
+          "excerpts": [
+            {
+              "first_line": 160,
+              "last_line": 205,
+              "text": "\n    proto_list.append(pool)\n\n    return proto_list\n\n\ndef create_ivs_with_endpoint(\n    svc_addr_list, prefix, no_translate=False, port_translation=False\n):\n    \"\"\"\n    Creating configuration: IVS with TMC, Pool, Pool Member?, Monitor?\n    Retuns [traffic_matching_criteria, virtual_server, pool, pool_member?..., monitor?]\n    \"\"\"\n    proto_list = create_internal_vs_with_tmc()  # proto_list is array\n    proto_list += create_endpoint_list(\n        tuple(svc_addr_list),\n        # prefix should be unique (because of the port) not conflicting with the pool on the main vs\n        prefix,\n    )\n    endpoint_list = pru_ssa_config_builder.get_last_instance_of(\n        proto_list, pool_pb2.pool\n    )\n    ivs = get_vs(proto_list)\n    ivs.default_pool = endpoint_list.id\n    ivs.no_translate = no_translate\n    ivs.port_translation = port_translation\n\n    return proto_list\n\n\ndef create_splitsession_client_profile(\n    peer_ip=\"::\",\n    peer_port=0,\n    http_header=None,\n    local_peer=False,\n    lookup_type=\"LOOKUP_TYPE_SESSION_FLOW\",\n):\n    \"\"\"\n    Create Splitsession Client Profile\n    Returns: splitsession_client_profile\n    \"\"\"\n    peer_ip = pru_ssa_config_builder.create_ip_address(peer_ip)\n    profile_ssc = profile_splitsessionclient_pb2.profile_splitsessionclient(\n        peer_ip=peer_ip\n    )\n    profile_ssc.id = str(uuid1())"
+            },
+            {
+              "first_line": 245,
+              "last_line": 295,
+              "text": "def create_profile_responseadapt(ivs_id, enabled=False):\n    \"\"\"\n    Create Response Adapt Profile\n    Returns: profile_responseadapt\n    \"\"\"\n    profile_responseadapt = profile_responseadapt_pb2.profile_responseadapt()\n    profile_responseadapt.id = str(uuid4())\n    profile_responseadapt.name = profile_responseadapt.id\n    profile_responseadapt.internal_virtual_name = ivs_id\n    profile_responseadapt.enabled = enabled\n\n    return profile_responseadapt\n\n\ndef create_profile_requestadapt(ivs_id, enabled=False):\n    \"\"\"\n    Create Request Adapt Profile\n    Returns: profile_requestadapt\n    \"\"\"\n    profile_requestadapt = profile_requestadapt_pb2.profile_requestadapt()\n    profile_requestadapt.id = str(uuid4())\n    profile_requestadapt.name = profile_requestadapt.id\n    profile_requestadapt.internal_virtual_name = ivs_id\n    profile_requestadapt.enabled = enabled\n\n    return profile_requestadapt\n\n\ndef create_profile_icap(uri):\n    \"\"\"\n    Create ICAP Profile\n    Returns: profile_icap\n    \"\"\"\n    profile_icap = profile_icap_pb2.profile_icap()\n    profile_icap.id = str(uuid4())\n    profile_icap.name = profile_icap.id\n    if uri is not None:\n        profile_icap.uri = uri\n\n    return profile_icap\n\n\ndef create_tcp_or_udp_profile(log, traffic_type):\n    \"\"\"\n    Creating transport layer profile (UDP or TCP).\n    Returns: udp_profile or tcp_profile\n    \"\"\"\n    udp_tcp = \"upd\" if traffic_type is TestTrafficType.UDP else \"tcp\"\n    log.info(f\"Creating transport layer: {udp_tcp} profile.\")\n\n    if traffic_type is TestTrafficType.UDP:"
+            }
+          ],
+          "sha256": "5adcf1e30e7bc14c240716a80c6c4ca1c85e77c4518857c9fb54b53ee98464d8"
+        },
+        "test/ssa_functional/sslo_tao/py_libs/sslo_common.py": {
+          "excerpts": [
+            {
+              "first_line": 476,
+              "last_line": 520,
+              "text": "async def send_create_messages(log, proto_list, LOG_OBJECTS=False):\n    \"\"\"\n    Logging and sending create protobuf messages to tmm\n    \"\"\"\n    if LOG_OBJECTS:\n        log.info(\"=== Create messages to send:\")\n        for proto in proto_list:\n            log.info(f\"{proto}\")\n        log.info(\"===\")\n\n    log.info(\"Getting Config Server.\")\n    conf_svr = await get_config_server()\n\n    log.info(\"Sending create messages.\")\n    await conf_svr.send_create_msgs(proto_list)\n    log.info(\"Create messages are sent.\")\n\n\nasync def send_delete_messages(log, proto_list, LOG_OBJECTS=False):\n    \"\"\"\n    Logging and sending delete protobuf messages to tmm\n    \"\"\"\n    if LOG_OBJECTS:\n        log.info(\"=== Delete messages to send:\")\n        for proto in proto_list:\n            log.info(f\"{proto}\")\n        log.info(\"===\")\n\n    log.info(\"Getting Config Server.\")\n    conf_svr = await get_config_server()\n\n    log.info(\"Sending delete messages\")\n    await conf_svr.send_delete_msgs(proto_list)\n    log.info(\"Delete messages are sent.\")\n\n\ndef combine_profiles(proto_list, profiles):\n    \"\"\"Create profile<->vs joins, add profiles and joins to proto_list\n    there are 3 types of entry:\n    [profile, {\"justadd\": object}, {\"profile\": profile, \"context\": \"SERVER\"|\"CLIENT\"|ALL}]\n    profile is {\"profile\": profile, \"context\": \"ALL\"}\"\n    \"justappend\" is for objects that need to be added in sequence i.e. no add_profile call\n    Returns: [...proto_list, ...profiles] original proto_list with Profiles added\n    \"\"\"\n    for profile in profiles:"
+            }
+          ],
+          "sha256": "7c352f06796cca262b015e633ca769076aa502f9d271f9f7f3619793c098731a"
+        },
+        "test/ssa_functional/sslo_tao/tests/icap_service_test.py": {
+          "excerpts": [
+            {
+              "first_line": 35,
+              "last_line": 126,
+              "text": "async def icap_create_service_request_ivs(log, svc_addr_list):\n    \"\"\"\n    Creating configuration of internal ICAP Request VS:\n    ICAP -> VS <- ICAP <- TCP\n    \"\"\"\n    log.info(\"\")\n    log.info(\"Creating Request IVS and Endpoint service, adding to list\")\n    req_proto_list = create_ivs_with_endpoint(svc_addr_list, \"icap-req-ivs\")\n\n    profiles = []\n    log.info(\"Creating ICAP Profile.\")\n    profile_service = create_profile_icap(\n        uri=\"icap://${SERVER_IP}:${SERVER_PORT}/srv_clamav\"\n    )\n    profiles.append(profile_service)\n\n    log.info(\"Creating TCP Profile.\")\n    profile_tcp = pru_ssa_config_builder.create_default_tcp_profile()\n    profiles.append(profile_tcp)\n\n    log.info(\"Adding Profiles to list.\")\n    req_proto_list = combine_profiles(req_proto_list, profiles)\n\n    await send_create_messages(log, req_proto_list, LOG_OBJECTS)\n\n    return get_vs(req_proto_list).id\n\n\nasync def icap_create_service_response_ivs(log, svc_addr_list):\n    \"\"\"\n    Creating configuration of Internal ICAP Response VS\n    ICAP -> VS <- ICAP <- TCP\n    \"\"\"\n    log.info(\"\")\n    log.info(\"Creating Response IVS and Endpoint service, adding to list\")\n    res_proto_list = create_ivs_with_endpoint(svc_addr_list, \"icap-res-ivs\")\n\n    profiles = []\n    log.info(\"Creating ICAP Profile.\")\n    profile_service = create_profile_icap(\n        uri=\"icap://${SERVER_IP}:${SERVER_PORT}/srv_clamav\"\n    )\n    profiles.append(profile_service)\n\n    log.info(\"Creating TCP Profile.\")\n    profile_tcp = pru_ssa_config_builder.create_default_tcp_profile()\n    profiles.append(profile_tcp)\n\n    log.info(\"Adding Profiles to list.\")\n    res_proto_list = combine_profiles(res_proto_list, profiles)\n\n    await send_create_messages(log, res_proto_list, LOG_OBJECTS)\n\n    return get_vs(res_proto_list).id\n\n\nasync def icap_create_main_ivs(log, svc_addr_list, response_ivs_id, request_ivs_id):\n    \"\"\"\n    Creating Main IVS:\n    Service -> TCP -> HTTP -> Req ADAPT -> IVS (no_trans) <- Res ADAPT <- HTTP <- TCP <- Service\n    \"\"\"\n    log.info(\"\")\n    log.info(\"Creating Main IVS and Endpoit Service, adding to list\")\n    proto_list = create_ivs_with_endpoint(svc_addr_list, \"icap-main-ivs\", True)\n\n    profiles = []\n    log.info(\"Creating ResponseADAPT Profile.\")\n    profile_responseadapt = create_profile_responseadapt(response_ivs_id, True)\n    profiles.append({\"profile\": profile_responseadapt, \"context\": \"SERVERSIDE\"})\n\n    log.info(\"Creating RequestADAPT Profile.\")\n    profile_requestadapt = create_profile_requestadapt(request_ivs_id, True)\n    profiles.append({\"profile\": profile_requestadapt, \"context\": \"CLIENTSIDE\"})\n\n    log.info(\"Creating HTTP Profile.\")\n    profile_http = pru_ssa_config_builder.create_default_http_profile()\n    profiles.append(profile_http)\n\n    log.info(\"Creating TCP Profile.\")\n    profile_tcp = pru_ssa_config_builder.create_default_tcp_profile()\n    profiles.append(profile_tcp)\n\n    log.info(\"Creating ICAP Service Profile.\")\n    profile_service = create_service_profile(type=\"icap\")\n    profiles.append(profile_service)\n\n    log.info(\"Adding Profiles to list.\")\n    proto_list = combine_profiles(proto_list, profiles)\n\n    await send_create_messages(log, proto_list, LOG_OBJECTS)\n\n    return get_vs(proto_list).id"
+            },
+            {
+              "first_line": 148,
+              "last_line": 159,
+              "text": "async def icap_service_test(log, config, traffic_type):\n    \"\"\"\n    ICAP service test:\n    GSTS_2015_ICAP_ADAPT.ptx\n    https://docs.f5net.com/pages/viewpage.action?pageId=334311168#SSLOrchestrator:TeeConnectorforServiceChainingSDD-ICAPService\n    https://gitswarm.f5net.com/apis/modular-bip/-/blob/fac5753328eb23a5269981d7e70194d9057f9f16/core/openapi/schema/inspection-service-icap.yaml\n    Configuration requries 4 virtuals\n    Incoming VS: TCP -> SSL -> Connector* -> HTTP -> VS (pool) <- HTTP <- SSL <- TCP\n    Main IVS: Service* -> TCP? -> HTTP -> Req ADAPT** -> IVS <- ADAPT*** <- HTTP <- TCP <- Service*\n    Service Request IVS: Entry? -> ICAP -> VS <- ICAP <- TCP\n    Service Response IVS: Entry? -> ICAP -> VS <- ICAP <- TCP\n    \"\"\""
+            }
+          ],
+          "sha256": "856aa4fcc7da95176841adb782e575da1dc8c557fef85826b088c14efe4dfaa0"
+        }
+      },
+      "queries": [
+        {
+          "argv": [
+            "rev-parse",
+            "HEAD"
+          ],
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "e2104734a940a099a9190eb84bfbea01fb4b81d4\n"
+        },
+        {
+          "argv": [
+            "status",
+            "--porcelain",
+            "--",
+            "src/modules/hudfilter/inference/inference.h",
+            "src/modules/hudfilter/adapt/adapt_internal.h",
+            "src/modules/hudfilter/adapt/adapt_tcl.c",
+            "src/modules/hudfilter/adapt/adapt.c",
+            "test/ssa_functional/sslo_tao/tests/icap_service_test.py",
+            "test/ssa_functional/sslo_tao/py_libs/create_object.py",
+            "test/ssa_functional/sslo_tao/py_libs/sslo_common.py"
+          ],
+          "returncode": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        {
+          "argv": [
+            "ls-files",
+            "src/modules/hudfilter/inference/*",
+            "src/modules/hudfilter/ext_proc_cs/*"
+          ],
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "src/modules/hudfilter/ext_proc_cs/ext_proc_cs.c\nsrc/modules/hudfilter/ext_proc_cs/ext_proc_cs.h\nsrc/modules/hudfilter/ext_proc_cs/ext_proc_cs_internal.h\nsrc/modules/hudfilter/ext_proc_cs/ext_proc_cs_state.h\nsrc/modules/hudfilter/ext_proc_cs/ext_proc_parser.c\nsrc/modules/hudfilter/ext_proc_cs/ext_proc_protocol.c\nsrc/modules/hudfilter/ext_proc_cs/pbuf/ext_proc.proto\nsrc/modules/hudfilter/inference/inference.c\nsrc/modules/hudfilter/inference/inference.h\nsrc/modules/hudfilter/inference/inference_internal.h\nsrc/modules/hudfilter/inference/inference_ivs_session.c\nsrc/modules/hudfilter/inference/inference_ivs_session.h\nsrc/modules/hudfilter/inference/inference_stats.h\nsrc/modules/hudfilter/inference/mods/inference_epp.c\nsrc/modules/hudfilter/inference/mods/inference_epp.h\nsrc/modules/hudfilter/inference/mods/inference_epp_stats.h\n"
+        },
+        {
+          "argv": [
+            "grep",
+            "-n",
+            "-E",
+            "hudfilter/(adapt|icap|inference|ext_proc_cs)",
+            "--",
+            "src/compile/filelist"
+          ],
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "src/compile/filelist:1160:modules/hudfilter/adapt/adapt.c                                             NOWRITESTR\nsrc/compile/filelist:1161:modules/hudfilter/adapt/adapt_tcl.c\nsrc/compile/filelist:1328:modules/hudfilter/icap/icap.c\nsrc/compile/filelist:1329:modules/hudfilter/icap/icap_protocol.c                                      STDINC\nsrc/compile/filelist:1330:modules/hudfilter/icap/icap_parser.c\nsrc/compile/filelist:1331:modules/hudfilter/icap/icap_tcl.c\nsrc/compile/filelist:1332:modules/hudfilter/ext_proc_cs/ext_proc_cs.c                                 STDINC ALLOW_ADR_PKD_MEM\nsrc/compile/filelist:1333:modules/hudfilter/ext_proc_cs/ext_proc_protocol.c                           STDINC\nsrc/compile/filelist:1334:modules/hudfilter/ext_proc_cs/ext_proc_parser.c                             STDINC\nsrc/compile/filelist:1335:modules/hudfilter/ext_proc_cs/pbuf/ext_proc.pb-c.c                          STDINC OPT ALLOW_BRACES\nsrc/compile/filelist:1336:modules/hudfilter/inference/inference.c                                     STDINC\nsrc/compile/filelist:1337:modules/hudfilter/inference/inference_ivs_session.c                         STDINC\nsrc/compile/filelist:1338:modules/hudfilter/inference/mods/inference_epp.c                            STDINC\n"
+        },
+        {
+          "argv": [
+            "grep",
+            "-n",
+            "-E",
+            "profile_responseadapt|profile_requestadapt|profile_icap|ext_proc",
+            "--",
+            "src/pbuf/declarative/decl_atomic_config.c",
+            "src/pbuf/declarative/handlers/decl_profile.c",
+            "src/pbuf/declarative/handlers/decl_tmos_handlers.c"
+          ],
+          "returncode": 0,
+          "stderr": "",
+          "stdout": "src/pbuf/declarative/decl_atomic_config.c:100:    _ORDER_ENTRY(profile_ext_proc),\nsrc/pbuf/declarative/decl_atomic_config.c:199:    _TMOS_ORDER_ENTRY(profile_icap),\nsrc/pbuf/declarative/decl_atomic_config.c:220:    _TMOS_ORDER_ENTRY(profile_requestadapt),\nsrc/pbuf/declarative/decl_atomic_config.c:221:    _TMOS_ORDER_ENTRY(profile_responseadapt),\nsrc/pbuf/declarative/handlers/decl_profile.c:46:#include <proto/decl/profile_requestadapt.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_profile.c:47:#include <proto/decl/profile_responseadapt.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_profile.c:48:#include <proto/decl/profile_icap.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_profile.c:50:#include <proto/decl/profile_ext_proc.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_profile.c:1731:DECL_PROFILE_PBUF_REGISTER(profile_requestadapt);\nsrc/pbuf/declarative/handlers/decl_profile.c:1732:DECL_PROFILE_PBUF_REGISTER(profile_responseadapt);\nsrc/pbuf/declarative/handlers/decl_profile.c:1733:DECL_PROFILE_PBUF_REGISTER(profile_icap);\nsrc/pbuf/declarative/handlers/decl_profile.c:1735:DECL_PROFILE_PBUF_REGISTER(profile_ext_proc);\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:60:#include <proto/tmosTmm/profile_icap.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:157:#include <proto/tmosTmm/profile_requestadapt.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:158:#include <proto/tmosTmm/profile_responseadapt.pb-c.h>\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:255:TMOS_PBUF_REGISTER_SIMPLE(profile_icap, NULL);\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:265:TMOS_PBUF_REGISTER_SIMPLE(profile_requestadapt, NULL);\nsrc/pbuf/declarative/handlers/decl_tmos_handlers.c:266:TMOS_PBUF_REGISTER_SIMPLE(profile_responseadapt, NULL);\n"
+        }
+      ]
+    },
+    "returncode": 0,
+    "script": "\nimport hashlib, json, pathlib, re, subprocess\nroot = pathlib.Path('/home/starin/code/tmm')\ndef git(*args):\n    p = subprocess.run(['git', '-C', str(root), *args], capture_output=True, text=True)\n    return {'argv': list(args), 'returncode': p.returncode, 'stdout': p.stdout, 'stderr': p.stderr}\nspecs = {\n    'src/modules/hudfilter/inference/inference.h': [(145, 175)],\n    'src/modules/hudfilter/adapt/adapt_internal.h': [(35, 200)],\n    'src/modules/hudfilter/adapt/adapt_tcl.c': [(48, 136), (432, 451)],\n    'src/modules/hudfilter/adapt/adapt.c': [(14, 48), (790, 840), (1658, 1705),\n        (1780, 1836), (3340, 3485), (3538, 3695)],\n    'test/ssa_functional/sslo_tao/tests/icap_service_test.py': [(35, 126), (148, 159)],\n    'test/ssa_functional/sslo_tao/py_libs/create_object.py': [(160, 205), (245, 295)],\n    'test/ssa_functional/sslo_tao/py_libs/sslo_common.py': [(476, 520)],\n}\nfiles = {}\nfor name, ranges in specs.items():\n    data = (root / name).read_bytes()\n    lines = data.decode().splitlines()\n    files[name] = {'sha256': hashlib.sha256(data).hexdigest(),\n        'excerpts': [{'first_line': a, 'last_line': min(b, len(lines)),\n                      'text': '\\n'.join(lines[a-1:b])} for a, b in ranges]}\ncatalogs = {}\nfor name in ('hook-index.tsv', 'signatures.tsv'):\n    path = pathlib.Path('/home/starin/lstools') / name\n    if not path.exists():\n        catalogs[name] = {'missing': True}\n        continue\n    data = path.read_bytes()\n    lines = data.decode().splitlines()\n    catalogs[name] = {'sha256': hashlib.sha256(data).hexdigest(),\n        'headers': lines[:3], 'candidate_rows': [s for s in lines if re.search(\n            r'\\b(adapt_(handle_result|handle_result_tcl_done|process_error|set_state|timeout_callback|ivs_forward_data_from_ivs|send_preview_data_to_proxy_if_bypassing)|ext_proc_\\w+)\\b', s)]}\nqueries = [\n    git('rev-parse', 'HEAD'),\n    git('status', '--porcelain', '--', *specs),\n    git('ls-files', 'src/modules/hudfilter/inference/*', 'src/modules/hudfilter/ext_proc_cs/*'),\n    git('grep', '-n', '-E', 'hudfilter/(adapt|icap|inference|ext_proc_cs)', '--', 'src/compile/filelist'),\n    git('grep', '-n', '-E', 'profile_responseadapt|profile_requestadapt|profile_icap|ext_proc', '--',\n        'src/pbuf/declarative/decl_atomic_config.c', 'src/pbuf/declarative/handlers/decl_profile.c',\n        'src/pbuf/declarative/handlers/decl_tmos_handlers.c'),\n]\nprint(json.dumps({'queries': queries, 'files': files, 'catalogs': catalogs}, sort_keys=True))\n",
+    "stderr": ""
+  },
+  "cluster": {
+    "command": "ssh -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes -i /home/claude/.ssh/id_ed25519 starin@10.145.40.193 'python3 -'",
+    "host": "starin@10.145.40.193",
+    "result": {
+      "baseline_listener": {
+        "apiVersion": "k8s.f5net.com/v1",
+        "kind": "F5VirtualServer",
+        "metadata": {
+          "creationTimestamp": "2026-09-24T14:55:39Z",
+          "finalizers": [
+            "handletmmconfig_inconsistency"
+          ],
+          "generation": 1,
+          "labels": {
+            "app.kubernetes.io/managed-by": "eob-ai-traffic-jig"
+          },
+          "name": "ai-traffic",
+          "namespace": "default",
+          "resourceVersion": "3608272",
+          "uid": "a67faa33-2f33-487c-9ba9-58feac916b95"
+        },
+        "spec": {
+          "a2a": false,
+          "access": "",
+          "clientssl": "",
+          "connectionRateLimit": {
+            "rateLimit": 0,
+            "rateLimitDestinationMask": 0,
+            "rateLimitMode": "object",
+            "rateLimitSourceMask": 0
+          },
+          "ddosProfile": "",
+          "destinationAddress": "11.11.11.99",
+          "destinationPort": 18090,
+          "fastL4": "",
+          "genericMessage": "",
+          "http": {
+            "clientside": "sys-default-http",
+            "serverside": "sys-default-http"
+          },
+          "httpCompression": false,
+          "httpRouter": true,
+          "iRules": [],
+          "ipfamilies": "IPv4",
+          "json": false,
+          "loadBalancingMethod": "ROUND_ROBIN",
+          "mcp": false,
+          "namespace": "",
+          "persistence": "",
+          "pool": "ai-traffic",
+          "protocol": "tcp",
+          "protocolProfile": {
+            "clientside": "sys-default-tcp",
+            "serverside": "sys-default-tcp"
+          },
+          "routeAdvertisement": false,
+          "serverssl": "",
+          "sip": "",
+          "site": "",
+          "snat": {
+            "pool": "",
+            "type": "automap"
+          },
+          "sourcePort": "preserve",
+          "sse": false,
+          "tenant": "",
+          "translateAddress": true,
+          "translatePort": true,
+          "vlans": {
+            "disableListedVlans": false,
+            "vlanList": [
+              "tmm-client"
+            ]
+          },
+          "vrf": ""
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastTransitionTime": "2026-09-24T14:55:39Z",
+              "message": "",
+              "observedGeneration": 0,
+              "reason": "Accepted",
+              "status": "True",
+              "type": "Accepted"
+            },
+            {
+              "lastTransitionTime": "2026-09-24T14:55:40Z",
+              "message": "CR config sent to all grpc endpoints",
+              "observedGeneration": 2,
+              "reason": "Programmed",
+              "status": "True",
+              "type": "Programmed"
+            }
+          ],
+          "generationId": 0
+        }
+      },
+      "crd_inventory": [
+        {
+          "kind": "AdminNetworkPolicy",
+          "name": "adminnetworkpolicies.policy.networking.k8s.io"
+        },
+        {
+          "kind": "BGPConfiguration",
+          "name": "bgpconfigurations.crd.projectcalico.org"
+        },
+        {
+          "kind": "BGPFilter",
+          "name": "bgpfilters.crd.projectcalico.org"
+        },
+        {
+          "kind": "BGPPeer",
+          "name": "bgppeers.crd.projectcalico.org"
+        },
+        {
+          "kind": "BlockAffinity",
+          "name": "blockaffinities.crd.projectcalico.org"
+        },
+        {
+          "kind": "CalicoNodeStatus",
+          "name": "caliconodestatuses.crd.projectcalico.org"
+        },
+        {
+          "kind": "CertificateRequest",
+          "name": "certificaterequests.cert-manager.io"
+        },
+        {
+          "kind": "Certificate",
+          "name": "certificates.cert-manager.io"
+        },
+        {
+          "kind": "Challenge",
+          "name": "challenges.acme.cert-manager.io"
+        },
+        {
+          "kind": "ClusterInformation",
+          "name": "clusterinformations.crd.projectcalico.org"
+        },
+        {
+          "kind": "ClusterIssuer",
+          "name": "clusterissuers.cert-manager.io"
+        },
+        {
+          "kind": "EventFlow",
+          "name": "eventflows.assistant.f5.net"
+        },
+        {
+          "kind": "EventSource",
+          "name": "eventsources.assistant.f5.net"
+        },
+        {
+          "kind": "F5BigAlgFtp",
+          "name": "f5-big-alg-ftps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigAlgPptp",
+          "name": "f5-big-alg-pptps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigAlgRtsp",
+          "name": "f5-big-alg-rtsps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigAlgTftp",
+          "name": "f5-big-alg-tftps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigBdosCustSig",
+          "name": "f5-big-bdos-cust-sigs.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigClientsslSetting",
+          "name": "f5-big-clientssl-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneAddresslist",
+          "name": "f5-big-cne-addresslists.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneDatagroup",
+          "name": "f5-big-cne-datagroups.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneDownloader",
+          "name": "f5-big-cne-downloaders.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneIrule",
+          "name": "f5-big-cne-irules.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCnePool",
+          "name": "f5-big-cne-pools.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCnePortlist",
+          "name": "f5-big-cne-portlists.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneSnatpool",
+          "name": "f5-big-cne-snatpools.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigCneZone",
+          "name": "f5-big-cne-zones.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigContextGlobal",
+          "name": "f5-big-context-globals.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigContextSecure",
+          "name": "f5-big-context-secures.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDdosGlobal",
+          "name": "f5-big-ddos-globals.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDdosProfile",
+          "name": "f5-big-ddos-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDiameterAvp",
+          "name": "f5-big-diameter-avps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDiameterEndpoint",
+          "name": "f5-big-diameter-endpoints.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDiameterProtocolProfile",
+          "name": "f5-big-diameter-protocol-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsApp",
+          "name": "f5-big-dns-apps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsCache",
+          "name": "f5-big-dns-caches.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsLocalZone",
+          "name": "f5-big-dns-local-zones.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsNamedOption",
+          "name": "f5-big-dns-named-options.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsView",
+          "name": "f5-big-dns-views.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsZone",
+          "name": "f5-big-dns-zones.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDnsxGlobalOptions",
+          "name": "f5-big-dnsx-global-optionses.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDpiPeOptions",
+          "name": "f5-big-dpi-pe-optionses.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigDpiProfile",
+          "name": "f5-big-dpi-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigFastl4Setting",
+          "name": "f5-big-fastl4-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigFwPolicy",
+          "name": "f5-big-fw-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigFwRulelist",
+          "name": "f5-big-fw-rulelists.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGlobalOptions",
+          "name": "f5-big-global-optionses.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbDatacenter",
+          "name": "f5-big-gslb-datacenters.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbInstance",
+          "name": "f5-big-gslb-instances.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbLocalInstance",
+          "name": "f5-big-gslb-local-instances.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbMonitor",
+          "name": "f5-big-gslb-monitors.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbOptions",
+          "name": "f5-big-gslb-optionses.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbPool",
+          "name": "f5-big-gslb-pools.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbProberPool",
+          "name": "f5-big-gslb-prober-pools.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbRegion",
+          "name": "f5-big-gslb-regions.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbServer",
+          "name": "f5-big-gslb-servers.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbSyncAgent",
+          "name": "f5-big-gslb-sync-agents.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbTopologyRecord",
+          "name": "f5-big-gslb-topology-records.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigGslbWideip",
+          "name": "f5-big-gslb-wideips.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigHttpSetting",
+          "name": "f5-big-http-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigHttp2Setting",
+          "name": "f5-big-http2-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIkeGlobal",
+          "name": "f5-big-ike-globals.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIkePeer",
+          "name": "f5-big-ike-peers.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIpiCategorylist",
+          "name": "f5-big-ipi-categorylists.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIpiFeedlist",
+          "name": "f5-big-ipi-feedlists.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIpiPolicy",
+          "name": "f5-big-ipi-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigIpsPolicy",
+          "name": "f5-big-ips-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigLogHslpub",
+          "name": "f5-big-log-hslpubs.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigLogProfile",
+          "name": "f5-big-log-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigNatPolicy",
+          "name": "f5-big-nat-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigNetStaticroute",
+          "name": "f5-big-net-staticroutes.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigNetVlan",
+          "name": "f5-big-net-vlans.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigPePolicy",
+          "name": "f5-big-pe-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigPeProfile",
+          "name": "f5-big-pe-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigPersistenceProfile",
+          "name": "f5-big-persistence-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigRadiusAttribute",
+          "name": "f5-big-radius-attributes.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigRadiusProtocolProfile",
+          "name": "f5-big-radius-protocol-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigRadiusSubscriberAwareProfile",
+          "name": "f5-big-radius-subscriber-aware-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigServersslSetting",
+          "name": "f5-big-serverssl-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigSubscriberAttribute",
+          "name": "f5-big-subscriber-attributes.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigSvcPolicy",
+          "name": "f5-big-svc-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigTcpSetting",
+          "name": "f5-big-tcp-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigUdpSetting",
+          "name": "f5-big-udp-settings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigWebSecurityProfile",
+          "name": "f5-big-web-security-profiles.k8s.f5net.com"
+        },
+        {
+          "kind": "F5BigZeroratingPolicy",
+          "name": "f5-big-zerorating-policies.k8s.f5net.com"
+        },
+        {
+          "kind": "F5FtpSetting",
+          "name": "f5-ftpsettings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5GenericMsgSetting",
+          "name": "f5-genericmsgsettings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SipSetting",
+          "name": "f5-sipsettings.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKEgress",
+          "name": "f5-spk-egresses.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressDiameter",
+          "name": "f5-spk-ingressdiameters.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressEgressUDP",
+          "name": "f5-spk-ingressegressudps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressGTP",
+          "name": "f5-spk-ingressgtps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressHTTP2",
+          "name": "f5-spk-ingresshttp2s.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressNGAP",
+          "name": "f5-spk-ingressngaps.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressTCP",
+          "name": "f5-spk-ingresstcps.ingresstcp.k8s.f5net.com"
+        },
+        {
+          "kind": "F5SPKIngressUDP",
+          "name": "f5-spk-ingressudps.ingressudp.k8s.f5net.com"
+        },
+        {
+          "kind": "F5VirtualServer",
+          "name": "f5-virtualservers.k8s.f5net.com"
+        },
+        {
+          "kind": "FelixConfiguration",
+          "name": "felixconfigurations.crd.projectcalico.org"
+        },
+        {
+          "kind": "GlobalNetworkPolicy",
+          "name": "globalnetworkpolicies.crd.projectcalico.org"
+        },
+        {
+          "kind": "GlobalNetworkSet",
+          "name": "globalnetworksets.crd.projectcalico.org"
+        },
+        {
+          "kind": "GlobalRoutingConfig",
+          "name": "globalroutingconfigs.k8s.f5net.com"
+        },
+        {
+          "kind": "GreTunnel",
+          "name": "gretunnels.k8s.f5net.com"
+        },
+        {
+          "kind": "HostEndpoint",
+          "name": "hostendpoints.crd.projectcalico.org"
+        },
+        {
+          "kind": "IPAMBlock",
+          "name": "ipamblocks.crd.projectcalico.org"
+        },
+        {
+          "kind": "IPAMConfig",
+          "name": "ipamconfigs.crd.projectcalico.org"
+        },
+        {
+          "kind": "IPAMHandle",
+          "name": "ipamhandles.crd.projectcalico.org"
+        },
+        {
+          "kind": "IPPool",
+          "name": "ippools.crd.projectcalico.org"
+        },
+        {
+          "kind": "IPReservation",
+          "name": "ipreservations.crd.projectcalico.org"
+        },
+        {
+          "kind": "Issuer",
+          "name": "issuers.cert-manager.io"
+        },
+        {
+          "kind": "KubeControllersConfiguration",
+          "name": "kubecontrollersconfigurations.crd.projectcalico.org"
+        },
+        {
+          "kind": "License",
+          "name": "licenses.k8s.f5net.com"
+        },
+        {
+          "kind": "NetworkAttachmentDefinition",
+          "name": "network-attachment-definitions.k8s.cni.cncf.io"
+        },
+        {
+          "kind": "NetworkPolicy",
+          "name": "networkpolicies.crd.projectcalico.org"
+        },
+        {
+          "kind": "NetworkSet",
+          "name": "networksets.crd.projectcalico.org"
+        },
+        {
+          "kind": "Order",
+          "name": "orders.acme.cert-manager.io"
+        },
+        {
+          "kind": "RoutingConfig",
+          "name": "routingconfigs.k8s.f5net.com"
+        },
+        {
+          "kind": "RoutingTemplate",
+          "name": "routingtemplates.k8s.f5net.com"
+        },
+        {
+          "kind": "SecPolicy",
+          "name": "secpolicies.gateway.k8s.f5.com"
+        },
+        {
+          "kind": "Tier",
+          "name": "tiers.crd.projectcalico.org"
+        },
+        {
+          "kind": "ToolSet",
+          "name": "toolsets.assistant.f5.net"
+        },
+        {
+          "kind": "Vrf",
+          "name": "vrfs.k8s.f5net.com"
+        }
+      ],
+      "identity_after": {
+        "containers": [
+          {
+            "containerID": "containerd://ab803ad596cc206e13dc2c05b2284706640ac70dd85fb19b7cd8ec1ebb4da5b0",
+            "image": "artifactory.f5net.com/f5-mbip-docker/f5-debug-sidecar:v10.161.5",
+            "imageID": "artifactory.f5net.com/f5-mbip-docker/f5-debug-sidecar@sha256:5c136b8f17ebd89162fcd3c77adba34c671e6c6464ed4506132b0f4eb087cae5",
+            "lastState": {},
+            "name": "debug",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-09-24T13:43:03Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/crash",
+                "name": "kernel-cores"
+              },
+              {
+                "mountPath": "/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/run",
+                "name": "run-dir"
+              },
+              {
+                "mountPath": "/logs",
+                "name": "volume-log-level"
+              },
+              {
+                "mountPath": "/tls/f5-debug-sidecar/grpc/svr",
+                "name": "tls-f5-debug-sidecar-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/amqp/clt",
+                "name": "tls-debug-amqp-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/etc/podinfo",
+                "name": "podinfo",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/var/tmstat",
+                "name": "f5tmstat",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/config",
+                "name": "config-shared",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/grpc/clt",
+                "name": "tls-debug-grpc-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/mds/clt",
+                "name": "tls-debug-mds-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tmm/core",
+                "name": "tmm-core",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/var/run/s6",
+                "name": "s6-mount"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-4cwf5",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          },
+          {
+            "containerID": "containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63",
+            "image": "docker.io/library/tmm:CATALOGFREE-20260924",
+            "imageID": "sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1",
+            "lastState": {},
+            "name": "f5-tmm",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-09-24T13:43:03Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/crash",
+                "name": "kernel-cores"
+              },
+              {
+                "mountPath": "/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/var/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/run",
+                "name": "run-dir"
+              },
+              {
+                "mountPath": "/etc/ipsec/certs",
+                "name": "ipsec-certs"
+              },
+              {
+                "mountPath": "/tls/tmm/grpc/svr",
+                "name": "tls-tmm-qkview-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/etc/podinfo",
+                "name": "podinfo"
+              },
+              {
+                "mountPath": "/ssl",
+                "name": "tls-tmm-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/opt/lib/tmm",
+                "name": "config-volume"
+              },
+              {
+                "mountPath": "/config",
+                "name": "config-shared"
+              },
+              {
+                "mountPath": "/dev/net/tun",
+                "name": "dev-tun"
+              },
+              {
+                "mountPath": "/var/tmstat",
+                "name": "f5tmstat"
+              },
+              {
+                "mountPath": "/tls/tmm/mds/clt",
+                "name": "tls-tmm-mds-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/shared/core",
+                "name": "tmm-core"
+              },
+              {
+                "mountPath": "/var/run",
+                "name": "f5-toda-log"
+              },
+              {
+                "mountPath": "/logs",
+                "name": "volume-log-level"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-4cwf5",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "name": "f5-tmm-7597dfff8b-28s9z",
+        "node": "vs-worker",
+        "phase": "Running",
+        "uid": "42259fbc-3303-492a-95b1-9146b4105583"
+      },
+      "identity_before": {
+        "containers": [
+          {
+            "containerID": "containerd://ab803ad596cc206e13dc2c05b2284706640ac70dd85fb19b7cd8ec1ebb4da5b0",
+            "image": "artifactory.f5net.com/f5-mbip-docker/f5-debug-sidecar:v10.161.5",
+            "imageID": "artifactory.f5net.com/f5-mbip-docker/f5-debug-sidecar@sha256:5c136b8f17ebd89162fcd3c77adba34c671e6c6464ed4506132b0f4eb087cae5",
+            "lastState": {},
+            "name": "debug",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-09-24T13:43:03Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/crash",
+                "name": "kernel-cores"
+              },
+              {
+                "mountPath": "/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/run",
+                "name": "run-dir"
+              },
+              {
+                "mountPath": "/logs",
+                "name": "volume-log-level"
+              },
+              {
+                "mountPath": "/tls/f5-debug-sidecar/grpc/svr",
+                "name": "tls-f5-debug-sidecar-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/amqp/clt",
+                "name": "tls-debug-amqp-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/etc/podinfo",
+                "name": "podinfo",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/var/tmstat",
+                "name": "f5tmstat",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/config",
+                "name": "config-shared",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/grpc/clt",
+                "name": "tls-debug-grpc-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tls/debug/mds/clt",
+                "name": "tls-debug-mds-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/tmm/core",
+                "name": "tmm-core",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/var/run/s6",
+                "name": "s6-mount"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-4cwf5",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          },
+          {
+            "containerID": "containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63",
+            "image": "docker.io/library/tmm:CATALOGFREE-20260924",
+            "imageID": "sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1",
+            "lastState": {},
+            "name": "f5-tmm",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-09-24T13:43:03Z"
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/crash",
+                "name": "kernel-cores"
+              },
+              {
+                "mountPath": "/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/var/tmp",
+                "name": "tmp-empty-dir"
+              },
+              {
+                "mountPath": "/run",
+                "name": "run-dir"
+              },
+              {
+                "mountPath": "/etc/ipsec/certs",
+                "name": "ipsec-certs"
+              },
+              {
+                "mountPath": "/tls/tmm/grpc/svr",
+                "name": "tls-tmm-qkview-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/etc/podinfo",
+                "name": "podinfo"
+              },
+              {
+                "mountPath": "/ssl",
+                "name": "tls-tmm-grpc-svr-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/opt/lib/tmm",
+                "name": "config-volume"
+              },
+              {
+                "mountPath": "/config",
+                "name": "config-shared"
+              },
+              {
+                "mountPath": "/dev/net/tun",
+                "name": "dev-tun"
+              },
+              {
+                "mountPath": "/var/tmstat",
+                "name": "f5tmstat"
+              },
+              {
+                "mountPath": "/tls/tmm/mds/clt",
+                "name": "tls-tmm-mds-clt-volume",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/shared/core",
+                "name": "tmm-core"
+              },
+              {
+                "mountPath": "/var/run",
+                "name": "f5-toda-log"
+              },
+              {
+                "mountPath": "/logs",
+                "name": "volume-log-level"
+              },
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-4cwf5",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "name": "f5-tmm-7597dfff8b-28s9z",
+        "node": "vs-worker",
+        "phase": "Running",
+        "uid": "42259fbc-3303-492a-95b1-9146b4105583"
+      },
+      "inspection_schema_hits": [],
+      "runtime": {
+        "drainers_in_container_pid_namespace": [],
+        "environment": [
+          "LS_SHIELD_ENABLE=1",
+          "LS_SHIELD_MODE=enforce",
+          "LS_SHIELD_SAFE_VALUE=2",
+          "LS_TP_RING=/dev/shm/ls_tp_ring",
+          "LS_VM_JIT=1",
+          "LS_VM_SAMPLES=true",
+          "LS_VM_TIMING=1",
+          "LS_VM_VERBOSE=1"
+        ],
+        "pid": 24,
+        "ring": {
+          "exists": true,
+          "inode": 7,
+          "size": 1049504
+        },
+        "runtime_sha256": "a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7"
+      },
+      "selected_schemas": {
+        "f5-big-http-settings.k8s.f5net.com/v1": {
+          "properties": {
+            "spec": {
+              "description": "Specifies the CRD fields. For a blank/default spec use `spec: {}`\n",
+              "properties": {
+                "acceptXff": {
+                  "default": false,
+                  "description": "Enables or disables trusting the client IP  address, and statistics from the client IP address, based on the request's XFF (X-forwarded-for) headers, if they exist.\n",
+                  "type": "boolean"
+                },
+                "adaptiveParsing": {
+                  "default": false,
+                  "description": "Specifies parsing in an adaptive way of HTTP.\n",
+                  "type": "boolean"
+                },
+                "analyticsEnabled": {
+                  "default": false,
+                  "description": "When enabled, specifies that the system will report extra HTTP analytics such as request/response duration, client and server latency, etc.\n",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "basicAuthRealm": {
+                  "default": "",
+                  "description": "Specifies a quoted string for the basic authentication  realm. The system sends this string to a client whenever  authorization fails.\n",
+                  "type": "string"
+                },
+                "encryptCookieSecret": {
+                  "default": "",
+                  "description": "Specifies a passphrase for the cookie encryption.\n",
+                  "type": "string"
+                },
+                "encryptCookies": {
+                  "default": [],
+                  "description": "Encrypts specified cookies that the BIG-IP system sends to  a client system.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "fallbackHost": {
+                  "default": "",
+                  "description": "Specifies an HTTP fallback host; HTTP redirection allows  you to redirect HTTP traffic to another protocol identifier, host name, port number, or URI path.\n",
+                  "maxLength": 4096,
+                  "pattern": "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?",
+                  "type": "string"
+                },
+                "fallbackStatusCodes": {
+                  "default": [],
+                  "description": "Specifies one or more three-digit status codes that can be  returned by an HTTP server.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "fwdpBadRequestErrorMsg": {
+                  "default": "",
+                  "description": "Specifies the error message that will be returned to the  browser when a proxy request can't be completed because the  request was malformed.\n",
+                  "type": "string"
+                },
+                "fwdpBadResponseErrorMsg": {
+                  "default": "",
+                  "description": "Specifies the error message that will be returned to the  browser when a proxy request can't be completed because the  response was malformed\n",
+                  "type": "string"
+                },
+                "fwdpConnectAllowed": {
+                  "default": false,
+                  "description": "Specifies the behavior of the proxy service for CONNECT  requests.\n",
+                  "type": "boolean"
+                },
+                "fwdpConnectErrorMsg": {
+                  "default": "",
+                  "description": "Specifies the error message that will be returned to the  browser when a proxy request can't be completed because of  a failure to establish the outbound connection.\n",
+                  "type": "string"
+                },
+                "fwdpDnsErrorMsg": {
+                  "default": "",
+                  "description": "Specifies the error message that will be returned to the  browser when a proxy request can't be completed because of  a failure to resolve the hostname in the request.\n",
+                  "type": "string"
+                },
+                "fwdpDnsResolver": {
+                  "default": "",
+                  "description": "Specifies the dns-resolver object that will be used to  resolve hostnames in proxy requests.\n",
+                  "type": "string"
+                },
+                "fwdpHostnames": {
+                  "default": [],
+                  "description": "Specifies the which host names are to be treated as local.  Proxy requests made for those hosts will be treated as  regular HTTP requests and will be sent to the configured  default pool.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "fwdpIpv6": {
+                  "default": false,
+                  "description": "Specifies that URIs will attempted to be resolved as IPv6  addresses before trying as IPv4.\n",
+                  "type": "boolean"
+                },
+                "fwdpRouteDomain": {
+                  "default": "",
+                  "description": "Specifies the route-domain that will be used for outbound  proxy requests.\n",
+                  "type": "string"
+                },
+                "fwdpTunnelName": {
+                  "default": "",
+                  "description": "Specifies the tunnel that will be used for outbound proxy  requests.  This enables other virtual servers to receive  connections initiated by the proxy service.\n",
+                  "type": "string"
+                },
+                "headerErase": {
+                  "default": "",
+                  "description": "Specifies the header string that you want to erase from an  HTTP request. You can also specify none.\n",
+                  "maxLength": 64000,
+                  "pattern": "^[\\x21-\\x39\\x3B-\\x7E]*$",
+                  "type": "string"
+                },
+                "headerInsert": {
+                  "default": "",
+                  "description": "Specifies a quoted header string that you want to insert  into an HTTP request. You can also specify none.\n",
+                  "maxLength": 64000,
+                  "pattern": "^$|^([\\x21-\\x39\\x3B-\\x7E]+:[\\x09\\x20-\\x7E\\x80-\\xff]*[\\x21-\\x7E\\x80-\\xff]+)*$",
+                  "type": "string"
+                },
+                "hstsIncludeSubdomains": {
+                  "default": "enable",
+                  "description": "Specifies whether to include the includeSubdomains  directive in the HSTS header.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "hstsMaximumAge": {
+                  "default": 16070400,
+                  "description": "Specifies the maximum age to assume the connection should  remain secure.\n",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "hstsMode": {
+                  "default": "disable",
+                  "description": "Specifies whether to include the HSTS response header.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "hstsPreload": {
+                  "default": "disable",
+                  "description": "Specifies whether to include the preload directive in the  HSTS header.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "insertXforwardedFor": {
+                  "default": "disable",
+                  "description": "When using connection pooling, which allows clients to make  use of other client requests' server-side connections, you  can insert the X-Forwarded-For header and specify a client  IP address.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "knownMethods": {
+                  "default": [
+                    "CONNECT",
+                    "DELETE",
+                    "GET",
+                    "HEAD",
+                    "LOCK",
+                    "OPTIONS",
+                    "POST",
+                    "PROPFIND",
+                    "PUT",
+                    "TRACE",
+                    "UNLOCK"
+                  ],
+                  "description": "Specifies which HTTP methods count as being known.   Removing RFC-defined methods from this list will cause the  HTTP filter to not recognize them.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "lwsMaxColumn": {
+                  "default": 80,
+                  "description": "Specifies the maximum number of columns allowed for a  header that is inserted into an HTTP request.\n",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "lwsSeparator": {
+                  "default": "\\r\\n ",
+                  "description": "Specifies the linear white space separator that the system  should use between HTTP headers when a header exceeds the  maximum width specified by the lws width setting.\n",
+                  "type": "string"
+                },
+                "maxHeaderCount": {
+                  "default": 64,
+                  "description": "Specifies the maximum number of headers allowed in HTTP  request/response.\n",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxHeaderSize": {
+                  "default": 32768,
+                  "description": "Specifies the maximum header size\n",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxRequests": {
+                  "default": 0,
+                  "description": "Specifies the number of requests that the system accepts  on a per-connection basis.\n",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "namespace": {
+                  "default": "",
+                  "description": "The Tenant Namespace in which the HTTP profile was created.",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "oneConnect": {
+                  "default": false,
+                  "description": "Specifies, when checked (enabled), that the system performs HTTP header transformations for the purpose of keeping connections open. The default is disabled. This setting is applicable only when you configure a OneConnect pool.\n",
+                  "type": "boolean"
+                },
+                "oneConnectStatusReuse": {
+                  "default": "200 206",
+                  "description": "Specifies a quoted string for the status reuse for the one connect.\n",
+                  "type": "string"
+                },
+                "passthroughExcessClientHeaders": {
+                  "default": false,
+                  "description": "Specifies the behavior when too many client headers are  received. If enabled, will switch to pass through mode  instead of rejecting the connection.\n",
+                  "type": "boolean"
+                },
+                "passthroughExcessServerHeaders": {
+                  "default": false,
+                  "description": "Specifies the behavior when too many server headers are  received. If enabled, will switch to pass through mode  instead of rejecting the connection.\n",
+                  "type": "boolean"
+                },
+                "passthroughOversizeClientHeaders": {
+                  "default": false,
+                  "description": "Specifies the behavior when too-large client  headers are received. If enabled, will switch to pass  through mode instead of rejecting the connection.\n",
+                  "type": "boolean"
+                },
+                "passthroughOversizeServerHeaders": {
+                  "default": false,
+                  "description": "Specifies the behavior when too-large server headers are  received. If enabled, will switch to pass through mode  instead of rejecting the connection.\n",
+                  "type": "boolean"
+                },
+                "passthroughPipeline": {
+                  "default": "allow",
+                  "description": "Enables or disables HTTP/1.1 pipelining. If Pass Through is selected, then the HTTP filter will switch to pass through mode and be disabled if pipelined data is seen. The default value is Allow, which means that clients can make requests even when prior requests have not received a response. In order for this to succeed, however, destination servers must include support for pipelining.\n",
+                  "enum": [
+                    "reject",
+                    "allow",
+                    "passthrough"
+                  ],
+                  "type": "string"
+                },
+                "passthroughUnknownMethod": {
+                  "default": "allow",
+                  "description": "Specifies whether to allow, reject or switch to  pass-through mode when an unknown HTTP method is parsed.\n",
+                  "enum": [
+                    "reject",
+                    "allow",
+                    "passthrough"
+                  ],
+                  "type": "string"
+                },
+                "pipelining": {
+                  "default": "disable",
+                  "description": "Specifies the pipelining in HTTP streams.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "proxyType": {
+                  "default": "reverse",
+                  "description": "Specifies the type of HTTP proxy.\n",
+                  "enum": [
+                    "reverse",
+                    "explicit",
+                    "transparent"
+                  ],
+                  "type": "string"
+                },
+                "redirectRewrite": {
+                  "default": "none",
+                  "description": "Specifies which of the application HTTP redirects the  system rewrites to HTTPS.\n",
+                  "enum": [
+                    "none",
+                    "all",
+                    "matching",
+                    "nodes",
+                    "last"
+                  ],
+                  "type": "string"
+                },
+                "requestChunking": {
+                  "default": "sustain",
+                  "description": "Specifies how to handle chunked and unchunked requests.\n",
+                  "enum": [
+                    "preserve",
+                    "selective",
+                    "unchunk",
+                    "rechunk",
+                    "sustain",
+                    "last"
+                  ],
+                  "type": "string"
+                },
+                "responseChunking": {
+                  "default": "sustain",
+                  "description": "Specifies how to handle chunked and unchunked responses.\n",
+                  "enum": [
+                    "preserve",
+                    "selective",
+                    "unchunk",
+                    "rechunk",
+                    "sustain",
+                    "last"
+                  ],
+                  "type": "string"
+                },
+                "responseHeadersPermitted": {
+                  "default": [],
+                  "description": "Specifies headers that the BIG-IP system allows in an HTTP  response.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "sendProxyViaHeaderHostName": {
+                  "default": "",
+                  "description": "Specifies the hostname to include into Via header.\n",
+                  "type": "string"
+                },
+                "sendProxyViaHeaderInRequest": {
+                  "default": "preserve",
+                  "description": "Specifies whether to append, remove, or preserve a Via  header in an HTTP request.\n",
+                  "enum": [
+                    "remove",
+                    "preserve",
+                    "append"
+                  ],
+                  "type": "string"
+                },
+                "sendProxyViaHeaderInResponse": {
+                  "default": "preserve",
+                  "description": "Specifies whether to append, remove, or preserve a Via  header in an HTTP response.\n",
+                  "enum": [
+                    "remove",
+                    "preserve",
+                    "append"
+                  ],
+                  "type": "string"
+                },
+                "serverAgentName": {
+                  "default": "BigIP",
+                  "description": "Specifies the value of the Server header in responses that  the BIG-IP itself generates.\n",
+                  "maxLength": 64000,
+                  "pattern": "^$|^[\\x21-\\x7E\\x80-\\xff]([\\x09\\x20-\\x7E\\x80-\\xff]*[\\x21-\\x7E\\x80-\\xff]+)*$",
+                  "type": "string"
+                },
+                "tenant": {
+                  "default": "",
+                  "description": "The name of the Tenant that owns the HTTP profile.",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "truncatedRedirects": {
+                  "default": "disable",
+                  "description": "Specifies what happens if a truncated redirect is seen from  a server. If enabled, the redirect will be forwarded to the  client, otherwise the malformed HTTP will be silently  ignored.\n",
+                  "enum": [
+                    "disable",
+                    "enable"
+                  ],
+                  "type": "string"
+                },
+                "xffAlternativeNames": {
+                  "default": [],
+                  "description": "Specifies alternative XFF headers instead of the default  X-forwarded-for header.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "status": {
+              "properties": {
+                "conditions": {
+                  "items": {
+                    "properties": {
+                      "lastTransitionTime": {
+                        "description": "latest time when this condition was updated",
+                        "type": "string"
+                      },
+                      "message": {
+                        "description": "Message describing status of this custom resource",
+                        "type": "string"
+                      },
+                      "observedGeneration": {
+                        "default": 0,
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "reason": {
+                        "description": "reason for the condition status",
+                        "type": "string"
+                      },
+                      "status": {
+                        "description": "Status of the current condition",
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "Current status of this custom resource",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "currentStatus": {
+                  "description": "DEPRECATED Current status of this custom resource",
+                  "enum": [
+                    "DEPLOYING",
+                    "WAITING",
+                    "SUCCESS",
+                    "FAILED"
+                  ],
+                  "type": "string"
+                },
+                "generationId": {
+                  "default": 0,
+                  "description": "DEPRECATED",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "message": {
+                  "description": "DEPRECATED Message describing status of this custom resource",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "spec"
+          ],
+          "type": "object"
+        },
+        "f5-big-svc-policies.k8s.f5net.com/v1": {
+          "properties": {
+            "spec": {
+              "properties": {
+                "description": {
+                  "default": "",
+                  "description": "Specifies the detailed description of the service policy that defines timer policies for custom timeout configurations.\n",
+                  "maxLength": 1024,
+                  "minLength": 0,
+                  "pattern": "^[0-9a-zA-Z.\\s,\\/_-]*$",
+                  "type": "string"
+                },
+                "timer": {
+                  "default": [],
+                  "description": "Specifies a timer policy to set custom timeouts and apply them to firewall rules or rule lists.\n",
+                  "items": {
+                    "allOf": [
+                      {
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "timeoutOption": {
+                                "enum": [
+                                  "specified"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "idleTimeout"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "timeoutOption": {
+                                "enum": [
+                                  "immediate",
+                                  "infinite",
+                                  "unspecified"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "ipProtocol": {
+                                "enum": [
+                                  "tcp",
+                                  "udp",
+                                  "sctp"
+                                ]
+                              }
+                            }
+                          },
+                          {
+                            "properties": {
+                              "destinationPorts": {
+                                "maxItems": 0
+                              },
+                              "ipProtocol": {
+                                "enum": [
+                                  "3pc",
+                                  "a/n",
+                                  "ah",
+                                  "all-other",
+                                  "argus",
+                                  "aris",
+                                  "ax.25",
+                                  "bbn-rcc",
+                                  "bna",
+                                  "br-sat-mon",
+                                  "cbt",
+                                  "cftp",
+                                  "chaos",
+                                  "compaq-peer",
+                                  "cphb",
+                                  "cpnx",
+                                  "crdup",
+                                  "crtp",
+                                  "dccp",
+                                  "dcn",
+                                  "ddp",
+                                  "ddx",
+                                  "dgp",
+                                  "dsr",
+                                  "egp",
+                                  "eigrp",
+                                  "emcon",
+                                  "encap",
+                                  "esp",
+                                  "etherip",
+                                  "fc",
+                                  "fire",
+                                  "ggp",
+                                  "gmtp",
+                                  "gre",
+                                  "hmp",
+                                  "hopopt",
+                                  "i-nlsp",
+                                  "iatp",
+                                  "icmp",
+                                  "idpr",
+                                  "idpr-cmtp",
+                                  "idrp",
+                                  "ifmp",
+                                  "igmp",
+                                  "igp",
+                                  "il",
+                                  "ip",
+                                  "ipcomp",
+                                  "ipcv",
+                                  "ipip",
+                                  "iplt",
+                                  "ippc",
+                                  "ipv6",
+                                  "ipv6-frag",
+                                  "ipv6-icmp",
+                                  "ipv6-nonxt",
+                                  "ipv6-opts",
+                                  "ipv6-route",
+                                  "ipx-in-ip",
+                                  "irtp",
+                                  "isis",
+                                  "iso-ip",
+                                  "iso-tp4",
+                                  "kryptolan",
+                                  "l2tp",
+                                  "larp",
+                                  "leaf-1",
+                                  "leaf-2",
+                                  "merit-inp",
+                                  "mfe-nsp",
+                                  "micp",
+                                  "mobile",
+                                  "mpls-in-ip",
+                                  "mtp",
+                                  "mux",
+                                  "narp",
+                                  "netblt",
+                                  "nsfnet-igp",
+                                  "nvp",
+                                  "ospf",
+                                  "pgm",
+                                  "pim",
+                                  "pipe",
+                                  "pnni",
+                                  "prm",
+                                  "ptp",
+                                  "pup",
+                                  "pvp",
+                                  "qnx",
+                                  "rdp",
+                                  "rsvp",
+                                  "rsvp-e2e-ignore",
+                                  "rvd",
+                                  "sat-expak",
+                                  "sat-mon",
+                                  "scc-sp",
+                                  "scps",
+                                  "sdrp",
+                                  "secure-vmtp",
+                                  "skip",
+                                  "sm",
+                                  "smp",
+                                  "snp",
+                                  "sprite-rpc",
+                                  "sps",
+                                  "srp",
+                                  "sscopmce",
+                                  "st",
+                                  "stp",
+                                  "sun-nd",
+                                  "swipe",
+                                  "tcf",
+                                  "tlsp",
+                                  "tp++",
+                                  "trunk-1",
+                                  "trunk-2",
+                                  "ttp",
+                                  "udplite",
+                                  "uti",
+                                  "vines",
+                                  "visa",
+                                  "vmtp",
+                                  "vrrp",
+                                  "wb-expak",
+                                  "wb-mon",
+                                  "wsn",
+                                  "xnet",
+                                  "xns-idp",
+                                  "xtp"
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "description": "Specifies the timer policy rule configuration for the custom timeouts.\n",
+                    "properties": {
+                      "destinationPorts": {
+                        "default": [],
+                        "description": "\"Specifies one or more ports to use. This parameter takes all ports as a default value.\"\n",
+                        "items": {
+                          "default": "all-other",
+                          "description": "Defines valid destination ports in the following formats: - A single numeric port (e.g., 80, 443, 65535) - A numeric port range (e.g., 1024-65535) - The special value \"all-other\" (default), representing all unspecified ports.\n",
+                          "maxLength": 11,
+                          "minLength": 1,
+                          "pattern": "^(all-other)$|^(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3})$|^(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3})-(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3})$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "idleTimeout": {
+                        "description": "\"Specifies the amount of idle time in seconds before connection is terminating. idleTimeout should be configured only if timeoutOption is specified, in all other cases default timeout values are passed from controller to TMM (unspecified - 0, immediate - 1, infinite - 4294967295)\"\n",
+                        "maximum": 4294967294,
+                        "minimum": 2,
+                        "type": "integer"
+                      },
+                      "ipProtocol": {
+                        "default": "all-other",
+                        "description": "Specifies the IP protocol against which the packet will be compared. The timer.destinationPorts field should only be used only when configured the ipProtocol as TCP, UDP, or SCTP.\n",
+                        "enum": [
+                          "3pc",
+                          "a/n",
+                          "ah",
+                          "all-other",
+                          "argus",
+                          "aris",
+                          "ax.25",
+                          "bbn-rcc",
+                          "bna",
+                          "br-sat-mon",
+                          "cbt",
+                          "cftp",
+                          "chaos",
+                          "compaq-peer",
+                          "cphb",
+                          "cpnx",
+                          "crdup",
+                          "crtp",
+                          "dccp",
+                          "dcn",
+                          "ddp",
+                          "ddx",
+                          "dgp",
+                          "dsr",
+                          "egp",
+                          "eigrp",
+                          "emcon",
+                          "encap",
+                          "esp",
+                          "etherip",
+                          "fc",
+                          "fire",
+                          "ggp",
+                          "gmtp",
+                          "gre",
+                          "hmp",
+                          "hopopt",
+                          "i-nlsp",
+                          "iatp",
+                          "icmp",
+                          "idpr",
+                          "idpr-cmtp",
+                          "idrp",
+                          "ifmp",
+                          "igmp",
+                          "igp",
+                          "il",
+                          "ip",
+                          "ipcomp",
+                          "ipcv",
+                          "ipip",
+                          "iplt",
+                          "ippc",
+                          "ipv6",
+                          "ipv6-frag",
+                          "ipv6-icmp",
+                          "ipv6-nonxt",
+                          "ipv6-opts",
+                          "ipv6-route",
+                          "ipx-in-ip",
+                          "irtp",
+                          "isis",
+                          "iso-ip",
+                          "iso-tp4",
+                          "kryptolan",
+                          "l2tp",
+                          "larp",
+                          "leaf-1",
+                          "leaf-2",
+                          "merit-inp",
+                          "mfe-nsp",
+                          "micp",
+                          "mobile",
+                          "mpls-in-ip",
+                          "mtp",
+                          "mux",
+                          "narp",
+                          "netblt",
+                          "nsfnet-igp",
+                          "nvp",
+                          "ospf",
+                          "pgm",
+                          "pim",
+                          "pipe",
+                          "pnni",
+                          "prm",
+                          "ptp",
+                          "pup",
+                          "pvp",
+                          "qnx",
+                          "rdp",
+                          "rsvp",
+                          "rsvp-e2e-ignore",
+                          "rvd",
+                          "sat-expak",
+                          "sat-mon",
+                          "scc-sp",
+                          "scps",
+                          "sctp",
+                          "sdrp",
+                          "secure-vmtp",
+                          "skip",
+                          "sm",
+                          "smp",
+                          "snp",
+                          "sprite-rpc",
+                          "sps",
+                          "srp",
+                          "sscopmce",
+                          "st",
+                          "stp",
+                          "sun-nd",
+                          "swipe",
+                          "tcf",
+                          "tcp",
+                          "tlsp",
+                          "tp++",
+                          "trunk-1",
+                          "trunk-2",
+                          "ttp",
+                          "udp",
+                          "udplite",
+                          "uti",
+                          "vines",
+                          "visa",
+                          "vmtp",
+                          "vrrp",
+                          "wb-expak",
+                          "wb-mon",
+                          "wsn",
+                          "xnet",
+                          "xns-idp",
+                          "xtp"
+                        ],
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Specifies the unique name identifier of the timer policy rule configuration.\n",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "pattern": "^[0-9a-zA-Z._-]+$",
+                        "type": "string"
+                      },
+                      "timeoutOption": {
+                        "default": "unspecified",
+                        "description": "\"Select Specified to specify an idle timeout, in seconds, for protocol and port pairs that match the timer policy rule.\n Select Immediate for no flow creation for protocol and port pairs that match the timer policy rule.\n Select Infinite to specify that this protocol and port pairs that match the timer policy rule never times out.\n Select Unspecified means the default timeout for the protocol and port pairs that match the timer policy rule is used\"\n",
+                        "enum": [
+                          "specified",
+                          "immediate",
+                          "infinite",
+                          "unspecified"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "ipProtocol",
+                      "timeoutOption"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object"
+            },
+            "status": {
+              "properties": {
+                "conditions": {
+                  "items": {
+                    "properties": {
+                      "lastTransitionTime": {
+                        "description": "latest time when this condition was updated",
+                        "type": "string"
+                      },
+                      "message": {
+                        "description": "Message describing status of this custom resource",
+                        "type": "string"
+                      },
+                      "observedGeneration": {
+                        "default": 0,
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "reason": {
+                        "description": "reason for the condition status",
+                        "type": "string"
+                      },
+                      "status": {
+                        "description": "Status of the current condition",
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "Current status of this custom resource",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "currentStatus": {
+                  "description": "DEPRECATED Current status of this custom resource",
+                  "enum": [
+                    "DEPLOYING",
+                    "WAITING",
+                    "SUCCESS",
+                    "FAILED"
+                  ],
+                  "type": "string"
+                },
+                "generationId": {
+                  "default": 0,
+                  "description": "DEPRECATED",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "message": {
+                  "description": "DEPRECATED Message describing status of this custom resource",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "f5-virtualservers.k8s.f5net.com/v1": {
+          "properties": {
+            "spec": {
+              "properties": {
+                "a2a": {
+                  "default": false,
+                  "description": "Toggle attachment of an A2A (Agent-to-Agent) profile. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "access": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "clientssl": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "connectionRateLimit": {
+                  "default": {},
+                  "description": "Specifies virtual server connection rate limit settings.",
+                  "properties": {
+                    "rateLimit": {
+                      "default": 0,
+                      "description": "Specifies the maximum number of connections per second allowed for a virtual server. Default value 0 means disabled.\n",
+                      "maximum": 4294967295,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "rateLimitDestinationMask": {
+                      "default": 0,
+                      "description": "Specifies a mask, in bits, to be applied to the destination address as part of the rate limiting. The default value is '0', which is equivalent to using the entire address '32' in IPv4, or '128' in IPv6.\n",
+                      "maximum": 128,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "rateLimitMode": {
+                      "default": "object",
+                      "description": "Indicates whether the rate limit is applied per virtual server or across all rate limiting virtual servers, per source address, per destination address, or some combination thereof. When object is set, applies connection rate limit to all incoming connections to this virtual server. When object-destination is set, applies connection rate limit destination mask\u00a0to the destination IP address and applies the rate limit to connections sharing the same subnet. When object-source-destination is set, applies connection rate limit source mask\u00a0and\u00a0connection rate limit destination mask to the source and destination IP address of incoming connections to this virtual server, and applies the rate limit to connections sharing the same subnet. The\u00a0connection rate limit source mask\u00a0and\u00a0connection rate limit destination mask\u00a0specify the number of bits in the IP addresses to use as a limit key.\n",
+                      "enum": [
+                        "source",
+                        "destination",
+                        "source-destination",
+                        "object",
+                        "object-source",
+                        "object-destination",
+                        "object-source-destination"
+                      ],
+                      "type": "string"
+                    },
+                    "rateLimitSourceMask": {
+                      "default": 0,
+                      "description": "Specifies a mask, in bits, to be applied to the source address as part of the rate limiting. The default value is '0', which is equivalent to using the entire address '32' in IPv4, or '128' in IPv6.\n",
+                      "maximum": 128,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
+                "ddosProfile": {
+                  "default": "",
+                  "description": "References a DDoS profile's name to utilize for this virtual server. The profile is then applied for this context (after the application of global DDoS policy).\n",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "destinationAddress": {
+                  "description": "IPv4 or IPv6 address for the virtual server to listen on for requests. May be a bare address (e.g. 10.0.0.1, 2001:db8::1) or CIDR notation to listen on a range of addresses (e.g. 10.0.0.0/24, 2001:db8::/64).\n",
+                  "oneOf": [
+                    {
+                      "pattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])(/([0-9]|[12][0-9]|3[0-2]))?$"
+                    },
+                    {
+                      "pattern": "^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))(/([0-9]|[1-9][0-9]|1[01][0-9]|12[0-8]))?$"
+                    }
+                  ],
+                  "type": "string"
+                },
+                "destinationPort": {
+                  "description": "TCP port that SPK listens on for requests",
+                  "maximum": 65535,
+                  "type": "integer"
+                },
+                "fastL4": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "ftp": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "description": "Specifies the FTP profile name.",
+                      "maxLength": 255,
+                      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "genericMessage": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "http": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    },
+                    "serverside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "http2": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    },
+                    "serverside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "http3": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    },
+                    "serverside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "httpCompression": {
+                  "default": false,
+                  "description": "Toggle attachment of an HTTP Compression profile. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "httpRouter": {
+                  "default": false,
+                  "description": "Toggle attachment of an HTTP Router profile. Required for HTTP/2 Full Proxy and HTTP/3. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "iRules": {
+                  "default": [],
+                  "description": "List of iRules to attach to the virtual server.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "ipfamilies": {
+                  "default": "IPv4",
+                  "enum": [
+                    "IPv4",
+                    "IPv6",
+                    "IPv4andIPv6"
+                  ],
+                  "type": "string"
+                },
+                "json": {
+                  "default": false,
+                  "description": "Toggle attachment of a JSON profile. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "loadBalancingMethod": {
+                  "default": "ROUND_ROBIN",
+                  "description": "How to choose a pool member.",
+                  "enum": [
+                    "ROUND_ROBIN",
+                    "RATIO_LEAST_CONN_MEMBER",
+                    "RATIO_MEMBER",
+                    "RATIO_SESSION"
+                  ],
+                  "type": "string"
+                },
+                "mcp": {
+                  "default": false,
+                  "description": "Toggle attachment of an MCP (Model Context Protocol) profile. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "namespace": {
+                  "default": "",
+                  "description": "The Tenant Namespace in which the virtual server was created.",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "persistence": {
+                  "default": "",
+                  "description": "The name of the persistence profile to attach to the virtual server.",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "pool": {
+                  "description": "Name of an existing Pool CR in the same namespace. Optional - not needed for gateway use cases.",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z][a-z0-9-]*$",
+                  "type": "string"
+                },
+                "protocol": {
+                  "default": "tcp",
+                  "enum": [
+                    "tcp",
+                    "udp"
+                  ],
+                  "type": "string"
+                },
+                "protocolProfile": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    },
+                    "serverside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "quic": {
+                  "properties": {
+                    "clientside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    },
+                    "serverside": {
+                      "default": "",
+                      "maxLength": 255,
+                      "pattern": "^[0-9a-zA-Z._-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "routeAdvertisement": {
+                  "default": false,
+                  "description": "Determines whether the route for the destinationAddress should be advertised to neighbouring routers.\n",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "serverssl": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "sip": {
+                  "default": "",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "site": {
+                  "default": "",
+                  "description": "The XC site on which the virtual server is advertised.",
+                  "maxLength": 255,
+                  "pattern": "^[0-9a-zA-Z._-]*$",
+                  "type": "string"
+                },
+                "snat": {
+                  "default": {},
+                  "properties": {
+                    "pool": {
+                      "default": "",
+                      "description": "Specifies the name of the SNAT pool to use. Can only be used with type snat.\n",
+                      "maxLength": 255,
+                      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "type": {
+                      "default": "none",
+                      "description": "Specifies which source address translation type should be used.\n",
+                      "enum": [
+                        "none",
+                        "snat",
+                        "automap"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "sourcePort": {
+                  "default": "preserve",
+                  "description": "Specifies whether the system preserves the source port of the connection.",
+                  "enum": [
+                    "preserve",
+                    "preserve-strict",
+                    "change"
+                  ],
+                  "type": "string"
+                },
+                "sse": {
+                  "default": false,
+                  "description": "Toggle attachment of an HTTP Server-Sent Event (SSE) transport profile. The default is disabled.",
+                  "enum": [
+                    true,
+                    false
+                  ],
+                  "type": "boolean"
+                },
+                "tenant": {
+                  "default": "",
+                  "description": "The name of the Tenant that owns the virtual server.",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "translateAddress": {
+                  "default": true,
+                  "description": "If set to true, the system translates the destination address of traffic passing through the virtual server to the server-side destination. If set to false, the destination address is not changed.\n",
+                  "type": "boolean"
+                },
+                "translatePort": {
+                  "default": true,
+                  "description": "If set to true, the system translates the destination port of traffic passing  through the virtual server to the server-side destination.  If set to false, the destination port is not changed.\n",
+                  "type": "boolean"
+                },
+                "vlans": {
+                  "properties": {
+                    "disableListedVlans": {
+                      "default": false,
+                      "type": "boolean"
+                    },
+                    "vlanList": {
+                      "default": [],
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                "vrf": {
+                  "default": "",
+                  "description": "The name of the VRF (tenant) this virtual server listens on. It is a soft-reference to a VRF CR. If not specified, the virtual server will listen in the default route domain.\n",
+                  "maxLength": 255,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destinationAddress",
+                "destinationPort"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "fastL4 and protocolProfile cannot be set simultaneously.",
+                  "rule": "!(\n  has(self.fastL4) &&\n  self.fastL4 != '' &&\n  has(self.protocolProfile) &&\n  (\n    self.protocolProfile.clientside != '' ||\n    self.protocolProfile.serverside != ''\n  )\n)\n"
+                },
+                {
+                  "message": "QUIC cannot be set on the serverside.",
+                  "rule": "!(has(self.quic) && self.quic.serverside != '')\n"
+                },
+                {
+                  "message": "QUIC requires httpRouter set to true",
+                  "rule": "!(\n  has(self.quic) && self.quic.clientside != '' &&\n  has(self.protocol) && self.protocol != 'udp'\n)\n"
+                },
+                {
+                  "message": "QUIC requires httpRouter set to true",
+                  "rule": "!(\n  has(self.quic) && self.quic.clientside != '' &&\n  has(self.httpRouter) && self.httpRouter != true\n)\n"
+                },
+                {
+                  "message": "HTTP requires protocol set to tcp",
+                  "rule": "!(\n  has(self.http) && self.http.clientside != '' &&\n  has(self.protocol) && self.protocol != 'tcp' &&\n  has(self.http3) && self.http3.clientside == ''\n)\n"
+                },
+                {
+                  "message": "HTTP/2 requires protocol set to tcp",
+                  "rule": "!(\n  has(self.http2) && (self.http2.clientside != '' || self.http2.serverside != '') &&\n  has(self.protocol) && self.protocol != 'tcp'\n)\n"
+                },
+                {
+                  "message": "HTTP/2 requires httpRouter set to true",
+                  "rule": "!(\n  has(self.http2) && (self.http2.clientside != '' || self.http2.serverside != '') &&\n  has(self.httpRouter) && self.httpRouter != true\n)\n"
+                },
+                {
+                  "message": "HTTP/2 requires an HTTP profile on the clientside",
+                  "rule": "!(\n  has(self.http2) && self.http2.clientside != '' &&\n  has(self.http) && self.http.clientside == ''\n)\n"
+                },
+                {
+                  "message": "HTTP/2 requires an HTTP profile on the serverside",
+                  "rule": "!(\n  has(self.http2) && self.http2.serverside != '' &&\n  has(self.http) && self.http.serverside == ''\n)\n"
+                },
+                {
+                  "message": "HTTP/3 cannot be set on the serverside.",
+                  "rule": "!(has(self.http3) && self.http3.serverside != '')\n"
+                },
+                {
+                  "message": "HTTP/3 requires protocol set to udp",
+                  "rule": "!(\n  has(self.http3) && self.http3.clientside != '' &&\n  has(self.protocol) && self.protocol != 'udp'\n)\n"
+                },
+                {
+                  "message": "HTTP/3 requires a QUIC profile",
+                  "rule": "!(\n  has(self.http3) && self.http3.clientside != '' &&\n  has(self.quic) && self.quic.clientside == ''\n)\n"
+                },
+                {
+                  "message": "HTTP/3 requires a ClientSSL profile",
+                  "rule": "!(\n  has(self.http3) && self.http3.clientside != '' &&\n  has(self.clientssl) && self.clientssl == ''\n)\n"
+                },
+                {
+                  "message": "HTTP/3 requires an HTTP profile",
+                  "rule": "!(\n  has(self.http3) && self.http3.clientside != '' &&\n  has(self.http) && self.http.clientside == ''\n)\n"
+                },
+                {
+                  "message": "SSE requires an HTTP profile on clientside and serverside",
+                  "rule": "!(\n  has(self.sse) && self.sse == true &&\n  has(self.http) && (self.http.clientside == '' || self.http.serverside == '')\n)\n"
+                },
+                {
+                  "message": "JSON requires an HTTP profile on clientside and serverside",
+                  "rule": "!(\n  has(self.json) && self.json == true &&\n  has(self.http) && (self.http.clientside == '' || self.http.serverside == '')\n)\n"
+                },
+                {
+                  "message": "\"When snat type is none, snat pool must not be specified\"\n",
+                  "rule": "!( self.snat.type == \"none\" && self.snat.pool != \"\")\n"
+                },
+                {
+                  "message": "\"When snat type is automap, snat pool must not be specified\"\n",
+                  "rule": "!(self.snat.type == \"automap\" && self.snat.pool != \"\")\n"
+                },
+                {
+                  "message": "\"When snat type is snat, a snat pool must be specified\"\n",
+                  "rule": "!(self.snat.type == \"snat\" && self.snat.pool == \"\")\n"
+                },
+                {
+                  "message": "FTP requires protocol set to tcp",
+                  "rule": "!(\n  has(self.ftp) && self.ftp.clientside != '' &&\n  ((has(self.protocol) && self.protocol != 'tcp') || !has(self.protocol))\n)\n"
+                },
+                {
+                  "message": "FTP requires tcp profile, fastL4 is not supported",
+                  "rule": "!(\n  has(self.ftp) && self.ftp.clientside != '' &&\n  has(self.fastL4) && self.fastL4 != ''\n)\n"
+                },
+                {
+                  "message": "FTP requires protocolProfile clientside tcp profile",
+                  "rule": "!(\n  has(self.ftp) && self.ftp.clientside != '' &&\n  (!has(self.protocolProfile) || self.protocolProfile.clientside == '')\n)\n"
+                }
+              ]
+            },
+            "status": {
+              "properties": {
+                "conditions": {
+                  "items": {
+                    "properties": {
+                      "lastTransitionTime": {
+                        "description": "latest time when this condition was updated",
+                        "type": "string"
+                      },
+                      "message": {
+                        "description": "Message describing status of this custom resource",
+                        "type": "string"
+                      },
+                      "observedGeneration": {
+                        "default": 0,
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "reason": {
+                        "description": "reason for the condition status",
+                        "type": "string"
+                      },
+                      "status": {
+                        "description": "Status of the current condition",
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "Current status of this custom resource",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "currentStatus": {
+                  "description": "DEPRECATED Current status of this custom resource",
+                  "enum": [
+                    "DEPLOYING",
+                    "WAITING",
+                    "SUCCESS",
+                    "FAILED"
+                  ],
+                  "type": "string"
+                },
+                "generationId": {
+                  "default": 0,
+                  "description": "DEPRECATED",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "message": {
+                  "description": "DEPRECATED Message describing status of this custom resource",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      }
+    },
+    "returncode": 0,
+    "script": "\nimport json, re, subprocess\npod = 'f5-tmm-7597dfff8b-28s9z'\nbase = ['kubectl', '--context=kind-vs']\ndef get(*args):\n    p = subprocess.run([*base, *args], capture_output=True, text=True, timeout=90)\n    if p.returncode:\n        raise RuntimeError(f'{args}: {p.stderr}')\n    return json.loads(p.stdout)\ndef identity():\n    p = get('-n', 'default', 'get', 'pod', pod, '-o', 'json')\n    return {'name': p['metadata']['name'], 'uid': p['metadata']['uid'],\n        'node': p['spec']['nodeName'], 'phase': p['status']['phase'],\n        'containers': p['status'].get('containerStatuses', [])}\nbefore = identity()\ncrds = get('get', 'crd', '-o', 'json')\ninventory, selected, hits = [], {}, []\npattern = re.compile(r'icap|adaptation|response.?adapt|request.?adapt|ext.?proc|external.?process|guardrail|inference', re.I)\ndef walk(value, path):\n    if isinstance(value, dict):\n        for k, v in value.items():\n            if pattern.search(k) or (isinstance(v, str) and pattern.search(v)):\n                hits.append({'path': path + '/' + k, 'value': v})\n            walk(v, path + '/' + k)\n    elif isinstance(value, list):\n        for i, v in enumerate(value):\n            walk(v, path + '/' + str(i))\nfor c in crds['items']:\n    name = c['metadata']['name']\n    inventory.append({'name': name, 'kind': c['spec']['names']['kind']})\n    for v in c['spec']['versions']:\n        if not v.get('served'):\n            continue\n        schema = v.get('schema', {}).get('openAPIV3Schema', {})\n        walk(schema, name + '/' + v['name'])\n        if name in ('f5-virtualservers.k8s.f5net.com', 'f5-big-http-settings.k8s.f5net.com',\n                    'f5-big-svc-policies.k8s.f5net.com'):\n            selected[name + '/' + v['name']] = schema\nruntime_script = '''\nimport hashlib, json, os, pathlib\npid = 24\nenv = pathlib.Path(f'/proc/{pid}/environ').read_bytes().split(b'\\\\0')\nring = pathlib.Path('/dev/shm/ls_tp_ring')\nst = ring.stat() if ring.exists() else None\nconsumers = []\nfor p in pathlib.Path('/proc').iterdir():\n    if p.name.isdigit():\n        try:\n            argv = (p / 'cmdline').read_bytes().split(b'\\\\0')\n            if argv and pathlib.Path(os.fsdecode(argv[0])).name == 'ls_drain':\n                consumers.append({'pid': p.name, 'argv': [os.fsdecode(v) for v in argv if v]})\n        except (OSError, ValueError):\n            pass\nprint(json.dumps({'pid': pid, 'runtime_sha256': hashlib.sha256(pathlib.Path(f'/proc/{pid}/exe').read_bytes()).hexdigest(),\n    'environment': [v.decode() for v in env if v.startswith((b'LS_TP', b'LS_VM', b'LS_SHIELD'))],\n    'ring': {'exists': st is not None, 'size': st.st_size if st else None, 'inode': st.st_ino if st else None},\n    'drainers_in_container_pid_namespace': consumers}))\n'''\nruntime = get('-n', 'default', 'exec', pod, '-c', 'f5-tmm', '--', 'python3', '-c', runtime_script)\nlistener = get('-n', 'default', 'get', 'f5-virtualservers', 'ai-traffic', '-o', 'json')\nprint(json.dumps({'identity_before': before, 'identity_after': identity(),\n    'runtime': runtime, 'crd_inventory': inventory, 'selected_schemas': selected,\n    'inspection_schema_hits': hits, 'baseline_listener': listener}, sort_keys=True))\n",
+    "stderr": ""
+  },
+  "driver_sha256": "194871213a466a30dfa9221eb9268e52bcbb32d3c4166a0193b006c8afb67de6",
+  "finished_utc": "2026-09-24T17:24:52.878836+00:00",
+  "scope": "read-only source/configuration inventory; no live inspection result",
+  "started_utc": "2026-09-24T17:24:49.433987+00:00"
+}

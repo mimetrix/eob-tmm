@@ -1,0 +1,81 @@
+=== 1. the DEB pair --- the index must come from what SHIPS, not the build tree
+  runtime   : tmm_10.207-3.HEAD.b13f8f034e_amd64.deb
+  debuginfo : tmm-debuginfo_10.207-3.HEAD.b13f8f034e_amd64.deb
+
+=== 1b. the receipt --- did packaging actually run for THESE DEBs?
+  receipt: package/build_id matches (b8dc27f34a93db91f91b60f0844105bfb30c6f90)
+
+=== 1b. derive THIS build's BTF and embed it into the runtime binary (.BTF section)
+  BTF: NOT embedded (the default). 6.5M kept on the build
+       box only; the shipped ELF carries no type information at all.
+       EVERY program must be relocated at sign time --- bnk-build-programs.sh
+       does that by default here. A program that was not will be REFUSED at
+       load, saying so. Set LS_EMBED_BTF=1 for the old behaviour.
+
+=== 2. generate the index (mk_hook_map.py checks the pair's build ids agree)
+  reloc coverage: 99.7% (73730 of 73981 functions in .text)
+  index         : /home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv  (71311 symbols)
+  build id      : b8dc27f34a93db91f91b60f0844105bfb30c6f90
+  ARMABLE TOTAL : 71,311
+  padded        : 41,912   <- armable via the compiler's nops
+    pad after endbr64 : 37,209
+    pad at entry      : 4,703   (no endbr64: direct-call-only, clones)
+  supported pad shapes: 41,912  --- ls_arm accepts both +4 and +0;
+    indexed eligibility is not a live attachment/coverage test.
+  no pad        : 32,183   <- other builds (OpenSSL etc.), inlined, folded
+    of those, DISPLACEABLE : 29,399  <- offline classification,
+      not supported by the deployed pad-only ARM path. This is the population
+      pad-based arming can never reach --- OpenSSL included.
+  padded but NOT relocatable : 0  (armable via the pad anyway;
+      recorded so a future displacement path refuses them)
+    of which start with a call: 1  (not armed --- a file has no armed state)
+  outside .text : 2
+  build id  : b8dc27f34a93db91f91b60f0844105bfb30c6f90
+  symbols   : 71311
+
+=== 2b. generate the SIGNATURE index --- one DWARF walk for every function
+    debuginfo : tmm64.no_pgo.debug  (of 2 candidates, selected by build id b8dc27f34a93)
+    build id  : b8dc27f34a93db91f91b60f0844105bfb30c6f90
+    functions : 63821 with at least one parameter
+    parameters: 160019
+    written   : /home/starin/config-io-20260925.039uaw/image-context/signatures.tsv (6469000 bytes)
+  build id  : b8dc27f34a93db91f91b60f0844105bfb30c6f90 (matches the hook index)
+wrote /home/starin/config-io-20260925.039uaw/image-context/types.json: 9152 structs
+  ctx offsets: no ls_ctx_parse_offsets.h in the staged tree.
+               If this TMM was built with the parse ctx builder then that build could
+               not have compiled --- the header has no fallback offsets by design. If it
+               was not, there is nothing to check here. Not guessing which.
+
+
+=== 2c. is the staged tree the one we think it is?
+  staged tree has no git history (a tar extract), so provenance cannot be read from it.
+  Verifying the tools the image will carry are the ones staged:
+  ls-load.py   : can send signatures
+
+=== 3. assemble the build context
+  ls_drain  : rebuilt from source (837880 bytes, static)
+  tmmtop    : staged (23952 bytes, parses)
+  context   : /home/starin/config-io-20260925.039uaw/image-context  (ls_drain 837880 B)
+
+=== 4. build the layer
+  #15 exporting manifest list sha256:9ea1df6af2494ebd313db9be895b39dfb03bd9bba111be114c191d4fc7d3b837
+  #15 exporting manifest list sha256:9ea1df6af2494ebd313db9be895b39dfb03bd9bba111be114c191d4fc7d3b837 0.0s done
+  #15 naming to docker.io/library/tmm:CONFIG-20260925 done
+  #15 unpacking to docker.io/library/tmm:CONFIG-20260925
+  #15 unpacking to docker.io/library/tmm:CONFIG-20260925 0.4s done
+  #15 DONE 3.8s
+
+=== 5. VERIFY THE RESULT, from inside the image --- not from this script's beliefs
+ls-tools: runtime identity matches, build b8dc27f34a93db91f91b60f0844105bfb30c6f90
+ls-tools: authenticated per-program targets; no bulk catalogs in /usr/share/ls
+PASS metadata layer audit: 16 layers, 7504 regular files, 1318 ELF files; no named bulk catalogs or ELF BTF
+
+=== 5b. does the binary TRUST the key the programs beside it were SIGNED with?
+  trusted key present in the binary: 1
+  MATCH --- this image's loader will accept programs signed with this key (loaded at runtime)
+
+=== 6. record what this stage produced
+  receipt: bake recorded (3 field(s)) in /home/starin/lstools/pipeline-receipt
+
+  Next: bnk-ship-image.sh verify tmm:CONFIG-20260925 'shape disagrees with the'
+        docker save tmm:CONFIG-20260925 | ssh -i ~/.ssh/id_datpush <datkube> 'cat > /tmp/tmm:CONFIG-20260925.tar'

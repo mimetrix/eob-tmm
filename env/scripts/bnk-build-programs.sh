@@ -281,6 +281,14 @@ for f in "$SRC"/*.bpf.c "$REPO/substrate/surfaces"/*.bpf.c; do
         RELNOTE=""
     fi
 
+    if [ "$want" = PASS ]; then
+        if [ "$ADMIT_STATE" != ready ] || ! python3 "$REPO/substrate/bind_target.py" \
+            --prog "$o" --index "${LS_HOOK_INDEX:-$HOME/lstools/hook-index.tsv}" \
+            --binary "$ADMIT_RT" --debug "$ADMIT_DB" --objcopy "$OBJCOPY"; then
+            echo "  *** $b: cannot bind to the packaged target; refusing to sign"
+            nbad=$((nbad + 1)); continue
+        fi
+    fi
     if "$PREVAIL" "$o" "$sec" --termination --strict --no-division-by-zero \
                   --stack-size 256 >"$TMP/v" 2>&1; then got=PASS; else got=REJECT; fi
 

@@ -9,11 +9,13 @@ a live TMM on BNK/datkube: a shield is loaded over a socket into an already-runn
 a function entry while traffic flows, and disarmed again — no rebuild, no restart. A hook armed on
 `http_parse_client_headers` fired exactly once per request across 16,000 requests through the proxy.
 The substrate splices **nothing into TMM's own logic** (startup registers through `INIT_FUNC`), but the
-tree does change. In the **substrate-only** tree: 36 files added (34 under `src/base/` — 14 `.c`,
-20 `.h` — and 2 whitelist config under `src/compile/`), three build-configuration files edited
-(`default_whitelist`, `debug_whitelist`, `filelist`), one compiler flag, ~8,300 lines. Authoritative
-count is `git status --porcelain src/` on the build-box TMM tree, re-verified **2026-09-04** — the
-added-file counts hold exactly.
+tree does change. The **substrate delta** adds 37 files (35 under `src/base/` — 14 `.c`,
+21 `.h` — and 2 whitelist config under `src/compile/`), edits three build-configuration files
+(`default_whitelist`, `debug_whitelist`, `filelist`), and adds one compiler flag. Authoritative
+count is `git status --porcelain src/` on the build-box TMM tree, re-verified **2026-09-24**:
+8,948 lines in the 35 added base files. September 4's 36 / 34 / 20 file counts held then;
+`ls_target.h` adds one header now. See `catalog-free-deployment.md` and cached
+`catalog-tree-20260924.log`.
 
 **But the modified-file count did not, and the tree is not substrate-only.** The same enumeration
 shows a **fourth** modified F5 file that no manifest recorded:
@@ -145,6 +147,20 @@ every deliverable to **repo-only**.
   URL the same way. Repoint every inbound link when retiring/renaming.
 
 ## 2. Engineering rigor: precision over polish
+
+**Write every reply and document according to ASD-STE100 (owner instruction, 2026-09-25).**
+The required writing standard is [ASD-STE100](https://www.asd-ste100.org/index.html),
+not a general preference for plain English. Apply its writing rules and approved dictionary.
+Use short sentences, common words and one clear name for each thing. State what changed
+and what the user can now do before giving implementation details. Use technical terms
+only when needed, and explain them on first use. Keep proven results and remaining work
+clear. Do not claim full compliance with the standard without checking its full rules
+and dictionary. Reading the website's overview does not mean the full standard was read.
+The full Issue 9 standard is saved in
+[`evidence/cache/ASD-STE100_ISSUE9.pdf`](evidence/cache/ASD-STE100_ISSUE9.pdf).
+Use this copy for the writing rules and approved dictionary. Its publisher URL and
+SHA-256 checksum are recorded in [`SOURCES.md`](SOURCES.md#asd-ste100-issue-9).
+Having the file does not mean that all rules or each document's compliance were checked.
 
 The audience is a skeptical engineering + security review; credibility comes from honest scoping.
 

@@ -1,0 +1,63 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "/home/starin/eob-tmm-staged/substrate/sign_shield.py",
+        "--key",
+        "/home/starin/.ls-signing/shield_sk.pem",
+        "--prog",
+        "/home/starin/eob-config-20260925/template-entry.bpf.o",
+        "--hook",
+        "http_parse_client_headers",
+        "--mode-ceiling",
+        "monitor",
+        "--build-min",
+        "0xb8dc27f3",
+        "--build-max",
+        "0xb8dc27f3",
+        "-o",
+        "/home/starin/eob-config-20260925/template-entry.bpf.sig"
+      ],
+      "returncode": 0,
+      "stdout": "  signed /home/starin/eob-config-20260925/template-entry.bpf.o\n    hook          : http_parse_client_headers\n    prog sha256   : 03b59cf881805f7918aab6962e4279ca48d3c0c70283ee790f7b382890f27ec2\n    mode ceiling  : monitor\n    ctx abi       : 3  (from shield_abi.h)\n    builds        : 0xb8dc27f3 .. 0xb8dc27f3\n    out           : /home/starin/eob-config-20260925/template-entry.bpf.sig  (112-byte binding + 64-byte signature)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "/home/starin/eob-tmm-staged/substrate/sign_shield.py",
+        "--key",
+        "/home/starin/.ls-signing/shield_sk.pem",
+        "--prog",
+        "/home/starin/eob-config-20260925/template-exit.bpf.o",
+        "--hook",
+        "http_parse_client_headers",
+        "--mode-ceiling",
+        "monitor",
+        "--build-min",
+        "0xb8dc27f3",
+        "--build-max",
+        "0xb8dc27f3",
+        "-o",
+        "/home/starin/eob-config-20260925/template-exit.bpf.sig"
+      ],
+      "returncode": 0,
+      "stdout": "  signed /home/starin/eob-config-20260925/template-exit.bpf.o\n    hook          : http_parse_client_headers\n    prog sha256   : 75bfc255ab446cafb195c5b110808f927610f8c101a741875e7a27f7f13a0858\n    mode ceiling  : monitor\n    ctx abi       : 3  (from shield_abi.h)\n    builds        : 0xb8dc27f3 .. 0xb8dc27f3\n    out           : /home/starin/eob-config-20260925/template-exit.bpf.sig  (112-byte binding + 64-byte signature)\n",
+      "stderr": ""
+    }
+  ],
+  "outputs": {
+    "template-entry.bpf.o": "03b59cf881805f7918aab6962e4279ca48d3c0c70283ee790f7b382890f27ec2",
+    "template-entry.bpf.sig": "6481127db92aa7615008cd370a3b01857c3695cbec9c664268f3d0f8097d4174",
+    "template-exit.bpf.o": "75bfc255ab446cafb195c5b110808f927610f8c101a741875e7a27f7f13a0858",
+    "template-exit.bpf.sig": "15ddfbc328ba638eab6bdb7753067293edd82fb1f5e3620f7970115edc70fcfa"
+  },
+  "bench_receipt_sha256": "b7b736f00ed9c702a327be1beed8261dc1ae50a03ebbe543c00051ed106771ce",
+  "runtime": {
+    "build_id": "b8dc27f34a93db91f91b60f0844105bfb30c6f90",
+    "sha256": "26e8f07b12a279e7d84f2328363db998a7dfa109a9b3c71847be408a6710a12c"
+  },
+  "entry": "0xccc600"
+}

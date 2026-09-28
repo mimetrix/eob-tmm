@@ -1,0 +1,78 @@
+Authoritative source inspection, 2026-09-24
+Host: starin@10.145.37.36
+Tree: /home/starin/code/tmm
+This is a selected transcript of read-only SSH inspection, not a live protocol test.
+
+git -C /home/starin/code/tmm rev-parse HEAD
+e2104734a940a099a9190eb84bfbea01fb4b81d4
+
+git -C /home/starin/code/tmm status --porcelain -- src/modules/hudfilter/a2a src/modules/hudfilter/aimcp
+(no output)
+
+SHA-256 of inspected source files:
+1e88f1047db7187fb79519878e24136889402f16365b3fb3096fc1412d7fdeee  src/modules/hudfilter/a2a/a2a.c
+95129b19974550aa4685dc0b749cd79c6491199b6fc39a0421f13a6f8b03a5a8  src/modules/hudfilter/a2a/a2a.h
+cc93baa04bc40a28286d09e397563db4f9fd82933ab135bf78785dc11828db7f  src/modules/hudfilter/aimcp/aimcp.c
+bff18fff0030c1c04b806282e871379dd7512b1d120288cabe2f80579dd248a2  src/modules/hudfilter/aimcp/aimcp.h
+
+Active src/compile/filelist entries (git grep):
+1125:modules/hudfilter/a2a/a2a.c
+1126:modules/hudfilter/a2a/a2a_cookie.c
+1174:modules/hudfilter/aimcp/aimcp.c
+
+src/modules/hudfilter/a2a/a2a.c (1471 lines), selected excerpts:
+32: #include <local/modules/hudfilter/json/json_parse.h>
+33: #include <local/modules/hudfilter/json/json_filter.h>
+34: #include <local/modules/hudfilter/sse/sse.h>
+52: #define A2A_VERSION_HEADER         "A2A-Version"
+142:     { SCL("SendStreamingMessage"), FALSE,
+154:     { SCL("GetTask"), FALSE,
+161:     { SCL("ListTasks"), FALSE,
+170:     { SCL("CancelTask"), FALSE,
+177:     { SCL("SubscribeToTask"), FALSE,
+189:     /* Push notification requests. Will respond with error not supported */
+305:     .name                = "A2A",
+552: a2a_lookup_method(const char *name, size_t len)
+579: a2a_get_subtree(struct hud_ref *msg, const char *key,
+722: a2a_walk_and_replace(struct tmm_json_value *val, struct a2a_walk_ctx *ctx,
+986: a2a_parse_version(struct http_data *hd, UINT32 *major, UINT32 *minor)
+1046:  * Handle HUDEVT_REQUEST: look up the JSON-RPC method, block
+1047:  * push-notification methods, and walk the params subtree to
+1048:  * decode any augmented ID cookies.
+1054: a2a_request(struct hudnode *node, union uflow *uf,
+1083:     err = a2a_get_subtree((struct hud_ref*)hd, A2A_JSONRPC_METHOD, &jv);
+1130:     err = a2a_get_subtree((struct hud_ref*)hd, A2A_JSONRPC_PARAMS, &jv);
+1186:  * Handle a response or SSE message: walk the result subtree to augment
+1187:  * all task/context ID fields with pool-member info cookies.
+1188:  * Called once for a normal response (with http_data), or per SSE message.
+1192: a2a_response(struct hudnode *node, union uflow *uf, struct hud_ref *msg)
+1220:     err = a2a_get_subtree(msg, A2A_JSONRPC_RESULT, &result_subtree);
+
+src/modules/hudfilter/aimcp/aimcp.c (891 lines), selected excerpts:
+8:  * AIMCP filter This hudfilter handles communication with
+9:  * MCP (Model Context Protocol for AI) peers and handles MCP persistence
+42: #define MCP_SESSION_ID "Mcp-Session-Id"
+139:         .name = "AIMCP",
+354: aimcp_parse_augmented_sessionid(struct aimcp_scb *scb,
+437: aimcp_decrypt_and_parse_sessionid(struct hudnode *node,
+535: aimcp_request(struct hudnode *node, union uflow *uf, void *data)
+545:     ci = http_header_cache_info(hd);
+546:     xb_hdr = http_header_xbuf(ci);
+548:     err = http_header_value(ci, &xc, &sid_len, SCL(MCP_SESSION_ID));
+564:     err = aimcp_decrypt_and_parse_sessionid(node, uf, data);
+575:     err = http_header_replace(ci,
+576:                               SCL(MCP_SESSION_ID),
+577:                               scb->parsed.mcp_session_id->string,
+578:                               scb->parsed.mcp_session_id->length);
+693:     pool_name = cf->pmbr->pool->name;
+694:     tuple = cf->pmbr->tuple;
+826:     case HUDEVT_REQUEST:
+827:         err = aimcp_request(node, uf, data);
+834:     case HUDCTL_RESPONSE:
+835:         err = hud_aimcp_add_persist(scb, data);
+
+Scope: source and active filelist entries confirmed. The AIMCP implementation
+inspected handles HTTP session-header persistence; this does not establish a
+complete MCP operation-body decoder (tools/call, resources/read, etc.). No live
+A2A/MCP request, configured listener, protocol conformance, or binary inclusion
+test was performed by this inspection.

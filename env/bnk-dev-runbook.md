@@ -37,6 +37,14 @@ with it rather than being chosen.
 
 ## 0 · Prerequisites — get these before touching anything
 
+**Current deployed baseline (2026-09-24):** `tmm:CATALOGFREE-20260924`, GNU build ID
+`c3b81927dfdcc31137cd8212b5e23bb85677a06c`, stable pod `f5-tmm-7597dfff8b-28s9z` on
+`vs-worker`, zero restarts in the recorded entry/exit test. Bulk catalogs now stay on the build
+box; programs require signed `.ls.target` metadata. Use
+[`catalog-free-deployment.md`](../catalog-free-deployment.md) for exact identity, current pipeline,
+live test commands and limits. Historical commands below that load old unbound objects or read
+gateway TSV catalogs describe the earlier images. The deliberate `http2.c` CVE revert remains.
+
 **Access.** All of it is one identity: **olympus LDAP**. Sign in at
 `https://gitswarm.f5net.com` with your **LDAP username, not your email**. A project you
 lack membership on returns **404, not 403**, so "not found" and "no access" look

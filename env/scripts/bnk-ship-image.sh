@@ -23,8 +23,8 @@
 # * kind does not share images between nodes, and imagePullPolicy must be Never or
 #   kubelet tries to pull `tmm:local` from a registry and fails.
 #
-# Addresses for arming come from bnk-entry-address.sh, never from the build tree:
-# packaging re-links the binary.
+# This verifies catalog-free tools images. ARM targets are bound on the build box
+# against the packaged runtime/debug pair; packaging re-links the binary.
 set -e
 
 MODE="${1:-verify}"
@@ -68,6 +68,12 @@ verify)
         exit 1
     }
 
+    docker run --rm --entrypoint sh "$TAG" /usr/share/ls/ls-verify-layer.sh
+    AUDIT=$(mktemp -d)
+    trap 'rm -rf "$AUDIT"' EXIT
+    docker save -o "$AUDIT/image.tar" "$TAG"
+    python3 "$(dirname "$0")/check-image-metadata.py" "$AUDIT/image.tar"
+
     echo "=== 1. what does /usr/bin/tmm actually resolve to?"
     # TEST WHAT tmm RESOLVES TO, not whether a debug binary exists. The earlier
     # version of this check called mere PRESENCE fatal, which is wrong twice over: an
@@ -95,19 +101,7 @@ verify)
           echo "  ok  no debug binary (production shape)"
         fi ;;
       esac
-      # And, when the image carries an index, that it describes THIS binary. A correct
-      # symlink over a stale index fails at arm time instead, which is later and less
-      # obvious.
-      if [ -f /usr/share/ls/hook-index.tsv ] && [ -f /usr/share/ls/ls_buildid.py ]; then
-        IDX=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/hook-index.tsv)
-        LIVE=$(python3 /usr/share/ls/ls_buildid.py "$R")
-        if [ "$IDX" = "$LIVE" ]; then
-          echo "  ok  hook index matches the running binary (build ${LIVE%%${LIVE#????????}}...)"
-        else
-          echo "  *** index build id $IDX != binary $LIVE --- arming by name will refuse"
-          exit 1
-        fi
-      fi'
+       '
 
     echo "=== 2. is the binary it resolves to actually padded?"
     # Check the binary tmm RESOLVES to, not a padded one that happens to be in
@@ -218,7 +212,7 @@ deploy)
         echo "  set image alone would change nothing and report success anyway."
         kubectl rollout restart deploy/f5-tmm >/dev/null
     fi
-    kubectl rollout status deploy/f5-tmm --timeout=180s 2>&1 | tail -2 | sed 's/^/  /'
+    kubectl rollout status deploy/f5-tmm --timeout=180s
     kubectl get pods -l app=f5-tmm -o wide --no-headers 2>/dev/null \
         | awk '{print "  "$1"  "$2"  "$3"  restarts="$4"  node="$7}'
     echo
@@ -243,24 +237,16 @@ deploy)
                  -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.deletionTimestamp}{"\n"}{end}' \
                | awk 'NF==1 {print $1}'); do
         printf "  %-26s " "$p"
-        out=$(kubectl exec -c f5-tmm "$p" -- sh -c '
-            R=$(readlink -f /usr/bin/tmm)
-            L=$(python3 /usr/share/ls/ls_buildid.py "$R")
-            H=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/hook-index.tsv 2>/dev/null)
-            S=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/signatures.tsv 2>/dev/null)
-            N=$(grep -vc "^#" /usr/share/ls/signatures.tsv 2>/dev/null || echo 0)
-            if [ "$L" = "$H" ] && [ "$L" = "$S" ]; then
-                echo "OK $L hook+sig match, $N signatures"
-            else
-                echo "BAD binary=$L hook=${H:-none} sig=${S:-none}"
-            fi' 2>&1 | tr -d '\r')
-        echo "$out"
-        case "$out" in OK*) ;; *) bad=$((bad + 1)) ;; esac
+        if kubectl exec -c f5-tmm "$p" -- sh /usr/share/ls/ls-verify-layer.sh; then
+            echo "OK runtime identity and catalog-free tools"
+        else
+            bad=$((bad + 1))
+        fi
     done
     [ "$bad" -eq 0 ] || {
         echo
         echo "*** $bad pod(s) carry artifacts that do not describe their own binary."
-        echo "    Arming by name will refuse there --- correct, and useless. Either the"
+        echo "    Runtime identity or catalog-free packaging failed. Either the"
         echo "    import did not reach that node's containerd, or the pod did not restart."
         exit 1
     }

@@ -1,0 +1,272 @@
+pinned pod identity: ('42259fbc-3303-492a-95b1-9146b4105583', 'containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63', 0, 'sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1')
+EXECUTING /proc/24/exe c3b81927dfdcc31137cd8212b5e23bb85677a06c BTF=absent sha256=a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7
+/tmp/ls_load.sock.24
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  wrong-build.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+PASS refusal: wrong-build
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  wrong-kind.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+PASS refusal: wrong-kind
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  wrong-address.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+PASS refusal: wrong-address
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  tampered-target.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+PASS refusal: tampered-target
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  ctx96-fentry.bpf.o --- 1008 bytes, slot 0, mode 2, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 9090909090
+PASS refusal: LOAD above signed monitor ceiling
+  ctx96-fentry.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+ERR arm: requested target differs from signed target
+PAD 0xccc604 9090909090
+ERR arm: requested target differs from signed target
+PAD 0xccc604 9090909090
+ERR mode exceeds signed ceiling or slot has no signed target
+OK ARMED LIVE entry=0xccc600 slot=0 kind=fentry (no restart)
+PAD 0xccc604 e8dd167b00
+OK armed=1 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  ctx96-fexit.bpf.o --- 984 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      984 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or u
+ 
+OK armed=1 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+PAD 0xccc604 e8dd167b00
+ERR disarm: no matching attached target
+PAD 0xccc604 e8dd167b00
+OK armed=1 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+ERR disarm: no matching attached target
+PAD 0xccc604 e8dd167b00
+OK armed=1 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+  ctx96-fentry.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+PAD 0xccc604 e8dd167b00
+OK armed=1 mode=1 gen=1 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=1 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+OK sample seq=24 len=96 verdict=1 ctx=c09c788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000006961743639787463
+OK sample seq=25 len=96 verdict=1 ctx=409e788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000006961743639787463
+OK sample seq=26 len=96 verdict=1 ctx=40989f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000006961743639787463
+OK sample seq=27 len=96 verdict=1 ctx=c0999f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000006961743639787463
+OK sample seq=28 len=96 verdict=1 ctx=8080788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000006961743639787463
+OK sample seq=29 len=96 verdict=1 ctx=0082788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000006961743639787463
+OK sample seq=30 len=96 verdict=1 ctx=409b9f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000006961743639787463
+OK sample seq=31 len=96 verdict=1 ctx=8083788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000006961743639787463
+OK DISARMED LIVE entry=0xccc600
+PAD 0xccc604 9090909090
+OK armed=1 mode=1 gen=1 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=1 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+PASS fentry: {'fired': 32, 'safe_returns': 32, 'errors': 0}; len=96; 8 post-disarm HTTP 200s, no fires
+OK disabled (not reclaimed --- see item 0c)
+  ctx96-fexit.bpf.o --- 984 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      984 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+ERR arm: requested target differs from signed target
+PAD 0xccc604 9090909090
+ERR arm: requested target differs from signed target
+PAD 0xccc604 9090909090
+ERR mode exceeds signed ceiling or slot has no signed target
+OK ARMED LIVE entry=0xccc600 slot=0 kind=fexit (no restart)
+PAD 0xccc604 e8251a7b00
+OK armed=1 mode=1 gen=2 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+  ctx96-fentry.bpf.o --- 1008 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      1008 bytes delivered on stdin -> ERR load refused (identity mismatch, malformed ELF, or 
+ 
+OK armed=1 mode=1 gen=2 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+PAD 0xccc604 e8251a7b00
+ERR disarm: no matching attached target
+PAD 0xccc604 e8251a7b00
+OK armed=1 mode=1 gen=2 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+ERR disarm: no matching attached target
+PAD 0xccc604 e8251a7b00
+OK armed=1 mode=1 gen=2 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+  ctx96-fexit.bpf.o --- 984 bytes, slot 0, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      984 bytes delivered on stdin -> OK loaded slot=0 mode=1 signature=verified
+PAD 0xccc604 e8251a7b00
+OK armed=1 mode=1 gen=3 fired=32 safe_returns=32 errors=0 cycles=18086 cycles_max=1188 cycles_min=214
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=64 safe_returns=64 errors=0 cycles=45270 cycles_max=2454 cycles_min=86
+OK sample seq=56 len=96 verdict=1 ctx=40989f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000000000000000000000
+OK sample seq=57 len=96 verdict=1 ctx=00470b89f13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000000000000000000000
+OK sample seq=58 len=96 verdict=1 ctx=c0969f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000000000000000000000
+OK sample seq=59 len=96 verdict=1 ctx=808c788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000000000000000000000
+OK sample seq=60 len=96 verdict=1 ctx=40959f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000000000000000000000
+OK sample seq=61 len=96 verdict=1 ctx=c0939f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000000000000000000000
+OK sample seq=62 len=96 verdict=1 ctx=008e788af13a00008000a085f13a00009c550e8af13a0000000000000000000000000000000000000000000000000000
+OK sample seq=63 len=96 verdict=1 ctx=40929f5bf13a000020c73f56f13a00009c17085bf13a0000000000000000000000000000000000000000000000000000
+OK DISARMED LIVE entry=0xccc600
+PAD 0xccc604 9090909090
+OK armed=1 mode=1 gen=3 fired=64 safe_returns=64 errors=0 cycles=45270 cycles_max=2454 cycles_min=86
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=64 safe_returns=64 errors=0 cycles=45270 cycles_max=2454 cycles_min=86
+PASS fexit: {'fired': 32, 'safe_returns': 32, 'errors': 0}; len=96; 8 post-disarm HTTP 200s, no fires
+OK disabled (not reclaimed --- see item 0c)
+ls_vm: init  build=Sep 24 2026 13:25:50  jit=1 fuel=0 timing=1
+ls_vm: signature verification ARMED --- unsigned programs are refused
+ls_vm: no built-in shield armed (LS_SHIELD_BUILTIN=0) --- socket load is the only arming path
+ls_vm: prepare handoff armed on tmm 0 (every 10 ticks)
+ls_vm: LOADER LISTENING on /tmp/ls_load.sock.24 --- programs are signature-checked, the PEER is not, and every operation is recorded (ls_audit:). Lab builds only.
+ls_vm: init  build=Sep 24 2026 13:25:50  jit=1 fuel=0 timing=1
+ls_vm: signature verification ARMED --- unsigned programs are refused
+ls_vm: no built-in shield armed (LS_SHIELD_BUILTIN=0) --- socket load is the only arming path
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- signed target/build/mode contract
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- signed target/build/mode contract
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- signed target/build/mode contract
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- signature is valid but the program body does not match the hash it commits to
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- signed target/build/mode contract
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=0 section=fentry/http_parse_client_headers function=check_ctx_live mode=1 bytes=1008 origin=builtin jit=1
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=984 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- disarm before changing target or kind
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fentry/http_parse_client_headers function=check_ctx_live mode=1 bytes=1008 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=1008 (previous VM leaked --- reclamation is item 0c)
+ls_vm: FIRST INVOCATION slot=0 --- the hook is reached
+ls_vm: slot=0 mode -> 0
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=984 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fexit/http_parse_client_headers function=check_ctx_live mode=1 bytes=984 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=984 (previous VM leaked --- reclamation is item 0c)
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=1008 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: LOAD REFUSED --- disarm before changing target or kind
+ls_vm: build gate OK --- signed for 0xc3b81927, running 0xc3b81927
+ls_vm: LOAD received on /tmp/ls_load.sock.24 --- hook=http_parse_client_headers bytes=984 (signature checked on the prepare thread; see the ls_sig: line that follows)
+ls_vm: no CO-RE records --- offsets are baked; the binary's own type information was not read
+ls_vm: ARMED slot=1 section=fexit/http_parse_client_headers function=check_ctx_live mode=1 bytes=984 origin=builtin jit=1
+ls_vm: RELOADED slot=0 mode=1 bytes=984 (previous VM leaked --- reclamation is item 0c)
+ls_vm: slot=0 mode -> 0
+PASS live entry/exit context contract; stable pod, no new restarts
+EXIT=0

@@ -1,0 +1,911 @@
+{
+  "role": "build",
+  "action": "inventory",
+  "host": "10.145.37.36",
+  "started": 1790597750.3766365,
+  "passed": true,
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "60d068f61cdf\n7a35704599ad\n479fb99d1ee8\nc34e915800df\n2583e7aa0c6a\n485d4916ffe7\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"state\":{{json .State}},\"restarts\":{{json .RestartCount}},\"mounts\":{{json .Mounts}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}",
+        "60d068f61cdf",
+        "7a35704599ad",
+        "479fb99d1ee8",
+        "c34e915800df",
+        "2583e7aa0c6a",
+        "485d4916ffe7",
+        "4d2afd1db4e7"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"60d068f61cdf407093e5ff73c98ab9e5abf6d88401f9731f5eeaa44b1cb85a0b\",\"name\":\"/eob-template-20260925-tmm-1\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":1812253,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T18:45:33.844301758Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_ls-stream\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Type\":\"volume\"},{\"Destination\":\"/opt/f5/mbip/fsm/certificates\",\"Driver\":\"local\",\"Mode\":\"ro\",\"Name\":\"eob-template-20260925_nats-certs\",\"Propagation\":\"\",\"RW\":false,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Type\":\"volume\"}],\"project\":\"eob-template-20260925\"}\n{\"id\":\"7a35704599add30291c85e55ba9cc6815498518772f75df0b847f211a6984da1\",\"name\":\"/eob-template-20260925-fixture-1\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-28T12:15:45.343065007Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:45.293687961Z\"},{\"End\":\"2026-09-28T12:15:47.388805143Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:47.344162802Z\"},{\"End\":\"2026-09-28T12:15:49.431655095Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:49.390265896Z\"},{\"End\":\"2026-09-28T12:15:51.476469Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:51.432947772Z\"},{\"End\":\"2026-09-28T12:15:53.522982739Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:53.477533069Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":1658347,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T17:33:18.381544034Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_ls-stream\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Type\":\"volume\"},{\"Destination\":\"/package/nats_certs/tmm\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_nats-certs\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Type\":\"volume\"},{\"Destination\":\"/work\",\"Mode\":\"ro\",\"Propagation\":\"rprivate\",\"RW\":false,\"Source\":\"/home/starin/eob-config-20260925\",\"Type\":\"bind\"},{\"Destination\":\"/evidence\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_evidence\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Type\":\"volume\"}],\"project\":\"eob-template-20260925\"}\n{\"id\":\"479fb99d1ee89fa9766922fd74c915d95cc6620ebb16bf7deea9e2f5876a3e1b\",\"name\":\"/eob-config-20260925-tmm-1\",\"image\":\"sha256:9ea1df6af2494ebd313db9be895b39dfb03bd9bba111be114c191d4fc7d3b837\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":1486244,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T14:57:00.090945018Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/opt/f5/mbip/fsm/certificates\",\"Driver\":\"local\",\"Mode\":\"ro\",\"Name\":\"eob-config-20260925_nats-certs\",\"Propagation\":\"\",\"RW\":false,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_ls-sockets\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_ls-stream\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data\",\"Type\":\"volume\"}],\"project\":\"eob-config-20260925\"}\n{\"id\":\"c34e915800df00cf4dd558870c1b188de601aa6ea21a9a659c6ff862867f4fa9\",\"name\":\"/eob-config-20260925-fixture-1\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-28T12:15:45.185814155Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:45.142713326Z\"},{\"End\":\"2026-09-28T12:15:47.229309801Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:47.186980966Z\"},{\"End\":\"2026-09-28T12:15:49.2714172Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:49.230937929Z\"},{\"End\":\"2026-09-28T12:15:51.311847809Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:51.272823397Z\"},{\"End\":\"2026-09-28T12:15:53.382445451Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:53.31261557Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":1472720,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T14:49:31.170240095Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/work\",\"Mode\":\"ro\",\"Propagation\":\"rprivate\",\"RW\":false,\"Source\":\"/home/starin/eob-config-20260925\",\"Type\":\"bind\"},{\"Destination\":\"/evidence\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_evidence\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_evidence/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_ls-sockets\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data\",\"Type\":\"volume\"},{\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_ls-stream\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data\",\"Type\":\"volume\"},{\"Destination\":\"/package/nats_certs/tmm\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-config-20260925_nats-certs\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data\",\"Type\":\"volume\"}],\"project\":\"eob-config-20260925\"}\n{\"id\":\"2583e7aa0c6a073131ad24831f4fa39649eb04f874a4519048080247105dbf9d\",\"name\":\"/eob-dlp-20260924-tmm-1\",\"image\":\"sha256:96336e4cd08c72b6180f22ae4f72e179907c4d419fc0af502bc261fd78ae659d\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":1376327,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T13:03:09.660955995Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/opt/f5/mbip/fsm/certificates\",\"Driver\":\"local\",\"Mode\":\"ro\",\"Name\":\"eob-dlp-20260924_nats-certs\",\"Propagation\":\"\",\"RW\":false,\"Source\":\"/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data\",\"Type\":\"volume\"}],\"project\":\"eob-dlp-20260924\"}\n{\"id\":\"485d4916ffe73e09e5eb3dec5cc9e0da05696b93b64356bf1996f379263a53e0\",\"name\":\"/eob-dlp-20260924-fixture-1\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-28T12:15:45.047664976Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:45.000225674Z\"},{\"End\":\"2026-09-28T12:15:47.091471303Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:47.049406031Z\"},{\"End\":\"2026-09-28T12:15:49.131467954Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:49.092843456Z\"},{\"End\":\"2026-09-28T12:15:51.173954338Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:51.132437309Z\"},{\"End\":\"2026-09-28T12:15:53.211332812Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-28T12:15:53.175508638Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":1367715,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-25T12:52:28.402554557Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/package/nats_certs/tmm\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-dlp-20260924_nats-certs\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data\",\"Type\":\"volume\"},{\"Destination\":\"/work\",\"Mode\":\"ro\",\"Propagation\":\"rprivate\",\"RW\":false,\"Source\":\"/home/starin/eob-dlp-20260924\",\"Type\":\"bind\"},{\"Destination\":\"/evidence\",\"Driver\":\"local\",\"Mode\":\"rw\",\"Name\":\"eob-dlp-20260924_evidence\",\"Propagation\":\"\",\"RW\":true,\"Source\":\"/var/lib/docker/volumes/eob-dlp-20260924_evidence/_data\",\"Type\":\"volume\"}],\"project\":\"eob-dlp-20260924\"}\n{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":37331,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-08-21T18:14:16.71521944Z\",\"Status\":\"running\"},\"restarts\":0,\"mounts\":[{\"Destination\":\"/tmm\",\"Mode\":\"\",\"Propagation\":\"rprivate\",\"RW\":true,\"Source\":\"/home/starin/code/tmm\",\"Type\":\"bind\"},{\"Destination\":\"/var/run/docker.sock\",\"Mode\":\"\",\"Propagation\":\"rprivate\",\"RW\":true,\"Source\":\"/var/run/docker.sock\",\"Type\":\"bind\"}],\"project\":null}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "--format",
+        "{{json .}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"CreatedAt\":\"2026-08-21 18:01:12.471955645 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"295cf3c2ff5d\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"bridge\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 14:49:30.819136855 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"e2ddd3aad435\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=30456e6f9a443b99235ec7dad184d6ba7fc0a57df9251fdc6f5e40f74cb9fc74,com.docker.compose.network=data,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-config-20260925_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 14:49:30.819595695 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"121680cc194b\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=a3ca78e56c047a0a270835c115754520c6e2fb504fc11d5682c4bb6e086ab2f5,com.docker.compose.network=management,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-config-20260925_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 12:49:53.198652366 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"c64fa57c4943\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=86970b92e159fda2f17d8f670204ab9c59f9f10c6907d1b505b976341547c59d,com.docker.compose.network=data,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0\",\"Name\":\"eob-dlp-20260924_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 12:49:53.198445804 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"0723ec0e7818\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=361ca2188d256719f2e475d27c0c177c1373bdb9cb69e6058a142a42479528fe,com.docker.compose.network=management,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0\",\"Name\":\"eob-dlp-20260924_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 17:33:18.034275022 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"c49b5d8aeadd\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=d4fe139291f7373374e589c6b7d3ca58e963e7194d9c86abe49c3ab5a38abdc8,com.docker.compose.network=data,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-template-20260925_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 17:33:18.034069302 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"e9517d604a9e\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=f52e0208f86603f89a0ce15797b5eae7f52e7395b836c7e1e183191e893afe99,com.docker.compose.network=management,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-template-20260925_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-08-21 18:01:12.466050958 +0000 UTC\",\"Driver\":\"host\",\"ID\":\"070ea04c208e\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"host\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-08-21 18:01:12.453245811 +0000 UTC\",\"Driver\":\"null\",\"ID\":\"94f86e9308e4\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"none\",\"Scope\":\"local\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "ls",
+        "--format",
+        "{{json .}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=14ad4bf03e0570adcc4f5bef4a73b2e72d3565cb311807b6140babfac312a264,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_evidence/_data\",\"Name\":\"eob-config-20260925_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=74cc8d652b3e6eb49380fb3a5235e6909daa3be360114ff9cf5f4efcee8715fa,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-sockets\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data\",\"Name\":\"eob-config-20260925_ls-sockets\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=1af35f349eba2cd6d8c989645fad3aeb2d51346174cc46f0e6fc3a4647c7acc2,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-stream\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data\",\"Name\":\"eob-config-20260925_ls-stream\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=936995699f24c8a17b05cc19019a1b2b02b9c766c983d8b726c153fa132342bb,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data\",\"Name\":\"eob-config-20260925_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=79437e8e9c4bfa684cde916e5e1bc7c3ab664840819eb4588c359d408ff43746,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-dlp-20260924_evidence/_data\",\"Name\":\"eob-dlp-20260924_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=3ed713b3d542d6b3410d70a6a58760fd91e7d93bcfe70f3f23b3ce5b9de3a882,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data\",\"Name\":\"eob-dlp-20260924_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=a7ef37c4ef32f6b42a729c01dc2a3246afcbeda975822752e0bd660ef7988d3f,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\"Name\":\"eob-template-20260925_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=f5bd7ce6820e94421ab4646fe98dcb27260bb43572cf2fc845727973e6c4c73b,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-sockets\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=1546c9db0e6ef2351433142d1886731216257ed476e375e92feded0bdebd8574,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-stream\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Name\":\"eob-template-20260925_ls-stream\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=199bd9f2d5b209c7b8cb3213aa1e2174577b281c30ea0049c39458a72b7bdbe7,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Name\":\"eob-template-20260925_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "-c",
+        "import json,os,pathlib\nrows=[]\nfor p in pathlib.Path(\"/proc\").iterdir():\n if not p.name.isdigit() or int(p.name)==os.getpid(): continue\n try:\n  name=(p/\"comm\").read_text().strip()\n  if any(s in name.lower() for s in (\"python\",\"tmm\",\"kubectl\",\"tcpdump\",\"drain\",\"tao\",\"icap\")):\n   args=(p/\"cmdline\").read_bytes().split(b\"\\0\")\n   markers=[s for s in (\"ai-traffic\", \"attribution\", \"request_scope\", \"scope-live\", \"config_live\", \"template_suite\", \"icap_suite\", \"port-forward\", \"ls-drain\", \"ls_drain\") if any(s.encode() in a for a in args)]\n   rows.append({\"pid\":int(p.name),\"comm\":name,\"test_markers\":markers})\n except (FileNotFoundError,PermissionError,ProcessLookupError): pass\nfiles=[]\nfor parent in (pathlib.Path(\"/tmp\"),pathlib.Path(\"/home/starin\")):\n for p in parent.iterdir():\n  if p.name.startswith((\"eob-\",\"ai-traffic\",\"scope-\",\"template-\",\"observability-\",\"config-\",\"tmm\")):\n   s=p.lstat();files.append({\"path\":str(p),\"bytes\":s.st_size,\"directory\":p.is_dir(),\"mtime\":s.st_mtime})\nprint(json.dumps({\"processes\":rows,\"candidate_paths\":files}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"processes\": [{\"pid\": 1376408, \"comm\": \"tmm.0\", \"test_markers\": []}, {\"pid\": 1486306, \"comm\": \"tmm.0\", \"test_markers\": []}, {\"pid\": 1812314, \"comm\": \"tmm.0\", \"test_markers\": []}], \"candidate_paths\": [{\"path\": \"/tmp/tmmtrace-buildbox.sh\", \"bytes\": 1857, \"directory\": false, \"mtime\": 1788093317.5415542}, {\"path\": \"/tmp/tmm-catalogfree-20260924.tar\", \"bytes\": 333572608, \"directory\": false, \"mtime\": 1790257334.406205}, {\"path\": \"/tmp/tmm-ctx96-20260923.tar\", \"bytes\": 335083008, \"directory\": false, \"mtime\": 1790183312.4399538}, {\"path\": \"/tmp/tmmtrace-pre-catalog-20260924\", \"bytes\": 1857, \"directory\": false, \"mtime\": 1790257445.8871262}, {\"path\": \"/tmp/tmmtrace\", \"bytes\": 4320, \"directory\": false, \"mtime\": 1788092123.866386}, {\"path\": \"/tmp/tmmtrace-arm.sh\", \"bytes\": 2181, \"directory\": false, \"mtime\": 1788093318.1015613}, {\"path\": \"/tmp/tmmx\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1787747257.0}, {\"path\": \"/tmp/tmmtop\", \"bytes\": 9793, \"directory\": false, \"mtime\": 1788525593.282298}, {\"path\": \"/tmp/tmm-ls.tar\", \"bytes\": 336943616, \"directory\": false, \"mtime\": 1788448360.3909354}, {\"path\": \"/tmp/tmmtrace-toolbox.tar\", \"bytes\": 192032256, \"directory\": false, \"mtime\": 1788349838.514935}, {\"path\": \"/tmp/tmmtrace.py\", \"bytes\": 27159, \"directory\": false, \"mtime\": 1788357565.490646}, {\"path\": \"/tmp/tmmtrace-run.sh\", \"bytes\": 3816, \"directory\": false, \"mtime\": 1788002652.0277243}, {\"path\": \"/tmp/eob-staged-pre-ctx96-20260923.tgz\", \"bytes\": 651942, \"directory\": false, \"mtime\": 1790182361.573844}, {\"path\": \"/home/starin/eob-dlp-20260924\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790343433.7238398}, {\"path\": \"/home/starin/ai-traffic-jig\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790261715.6169674}, {\"path\": \"/home/starin/tmmtrace\", \"bytes\": 3174, \"directory\": false, \"mtime\": 1790257445.8941262}, {\"path\": \"/home/starin/config-io-20260925.039uaw\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790348364.8723357}, {\"path\": \"/home/starin/observability-20260925\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790361731.406839}, {\"path\": \"/home/starin/eob-config-20260925\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790596759.4996336}, {\"path\": \"/home/starin/eob-tmm-staged\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790347075.968483}, {\"path\": \"/home/starin/template-20260925\", \"bytes\": 4096, \"directory\": true, \"mtime\": 1790361811.0678205}]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "df",
+        "-B1",
+        "/"
+      ],
+      "rc": 0,
+      "stdout": "Filesystem        1B-blocks        Used    Available Use% Mounted on\n/dev/vda1      258906374144 84019744768 174869852160  33% /\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ss",
+        "-ltnp"
+      ],
+      "rc": 0,
+      "stdout": "State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\nLISTEN 0      4096      127.0.0.54:53         0.0.0.0:*          \nLISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:43189      0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:111        0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:22         0.0.0.0:*          \nLISTEN 0      4096            [::]:111           [::]:*          \nLISTEN 0      4096            [::]:22            [::]:*          \nLISTEN 0      4096            [::]:49637         [::]:*          \n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "ls",
+        "--format",
+        "json"
+      ],
+      "rc": 0,
+      "stdout": "[{\"Name\":\"eob-config-20260925\",\"Status\":\"running(2)\",\"ConfigFiles\":\"/home/starin/eob-config-20260925/icap-compose.yaml,/home/starin/eob-config-20260925/config-compose.yaml\"},{\"Name\":\"eob-dlp-20260924\",\"Status\":\"running(2)\",\"ConfigFiles\":\"/home/starin/eob-dlp-20260924/icap-compose.yaml\"},{\"Name\":\"eob-template-20260925\",\"Status\":\"running(2)\",\"ConfigFiles\":\"/home/starin/eob-config-20260925/icap-compose.yaml,/home/starin/eob-config-20260925/config-compose.yaml,/home/starin/eob-config-20260925/observability-compose.yaml\"}]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "60d068f61cdf407093e5ff73c98ab9e5abf6d88401f9731f5eeaa44b1cb85a0b",
+        "python3",
+        "-c",
+        "import json,runpy\nm=runpy.run_path(\"/usr/bin/ls-load.py\")\nprint(json.dumps({str(i):m[\"send\"](m[\"msg\"](3,slot=i)) for i in range(12)}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"0\": \"OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"1\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"2\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"3\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"4\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"5\": \"OK armed=1 mode=0 gen=5 fired=187 safe_returns=16 errors=0 cycles=8058202 cycles_max=4348870 cycles_min=1516\", \"6\": \"OK armed=1 mode=0 gen=2 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"7\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"8\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"9\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"10\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"11\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "7a35704599add30291c85e55ba9cc6815498518772f75df0b847f211a6984da1",
+        "du",
+        "-sh",
+        "/evidence"
+      ],
+      "rc": 0,
+      "stdout": "1.4M\t/evidence\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "479fb99d1ee89fa9766922fd74c915d95cc6620ebb16bf7deea9e2f5876a3e1b",
+        "python3",
+        "-c",
+        "import json,runpy\nm=runpy.run_path(\"/usr/bin/ls-load.py\")\nprint(json.dumps({str(i):m[\"send\"](m[\"msg\"](3,slot=i)) for i in range(12)}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"0\": \"OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"1\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"2\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"3\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"4\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"5\": \"OK armed=1 mode=0 gen=5 fired=112 safe_returns=0 errors=0 cycles=2449516 cycles_max=1342182 cycles_min=2838\", \"6\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"7\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"8\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"9\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"10\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"11\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "c34e915800df00cf4dd558870c1b188de601aa6ea21a9a659c6ff862867f4fa9",
+        "du",
+        "-sh",
+        "/evidence"
+      ],
+      "rc": 0,
+      "stdout": "708K\t/evidence\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "2583e7aa0c6a073131ad24831f4fa39649eb04f874a4519048080247105dbf9d",
+        "python3",
+        "-c",
+        "import json,runpy\nm=runpy.run_path(\"/usr/bin/ls-load.py\")\nprint(json.dumps({str(i):m[\"send\"](m[\"msg\"](3,slot=i)) for i in range(12)}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"0\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"1\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"2\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"3\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"4\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"5\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"6\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"7\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"8\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"9\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"10\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\", \"11\": \"OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "485d4916ffe73e09e5eb3dec5cc9e0da05696b93b64356bf1996f379263a53e0",
+        "du",
+        "-sh",
+        "/evidence"
+      ],
+      "rc": 0,
+      "stdout": "176K\t/evidence\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "inspect",
+        "eob-config-20260925_evidence",
+        "eob-config-20260925_ls-sockets",
+        "eob-config-20260925_ls-stream",
+        "eob-config-20260925_nats-certs"
+      ],
+      "rc": 0,
+      "stdout": "[\n    {\n        \"CreatedAt\": \"2026-09-25T14:49:30Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"14ad4bf03e0570adcc4f5bef4a73b2e72d3565cb311807b6140babfac312a264\",\n            \"com.docker.compose.project\": \"eob-config-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"evidence\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-config-20260925_evidence/_data\",\n        \"Name\": \"eob-config-20260925_evidence\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T14:49:30Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"74cc8d652b3e6eb49380fb3a5235e6909daa3be360114ff9cf5f4efcee8715fa\",\n            \"com.docker.compose.project\": \"eob-config-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"ls-sockets\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data\",\n        \"Name\": \"eob-config-20260925_ls-sockets\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T14:49:30Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"1af35f349eba2cd6d8c989645fad3aeb2d51346174cc46f0e6fc3a4647c7acc2\",\n            \"com.docker.compose.project\": \"eob-config-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"ls-stream\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data\",\n        \"Name\": \"eob-config-20260925_ls-stream\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T14:49:30Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"936995699f24c8a17b05cc19019a1b2b02b9c766c983d8b726c153fa132342bb\",\n            \"com.docker.compose.project\": \"eob-config-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"nats-certs\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data\",\n        \"Name\": \"eob-config-20260925_nats-certs\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    }\n]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "inspect",
+        "eob-template-20260925_evidence",
+        "eob-template-20260925_ls-sockets",
+        "eob-template-20260925_ls-stream",
+        "eob-template-20260925_nats-certs"
+      ],
+      "rc": 0,
+      "stdout": "[\n    {\n        \"CreatedAt\": \"2026-09-25T17:33:18Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"a7ef37c4ef32f6b42a729c01dc2a3246afcbeda975822752e0bd660ef7988d3f\",\n            \"com.docker.compose.project\": \"eob-template-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"evidence\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\n        \"Name\": \"eob-template-20260925_evidence\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T17:33:18Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"f5bd7ce6820e94421ab4646fe98dcb27260bb43572cf2fc845727973e6c4c73b\",\n            \"com.docker.compose.project\": \"eob-template-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"ls-sockets\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\n        \"Name\": \"eob-template-20260925_ls-sockets\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T17:33:18Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"1546c9db0e6ef2351433142d1886731216257ed476e375e92feded0bdebd8574\",\n            \"com.docker.compose.project\": \"eob-template-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"ls-stream\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\n        \"Name\": \"eob-template-20260925_ls-stream\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T17:33:18Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"199bd9f2d5b209c7b8cb3213aa1e2174577b281c30ea0049c39458a72b7bdbe7\",\n            \"com.docker.compose.project\": \"eob-template-20260925\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"nats-certs\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\n        \"Name\": \"eob-template-20260925_nats-certs\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    }\n]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "inspect",
+        "eob-dlp-20260924_evidence",
+        "eob-dlp-20260924_nats-certs"
+      ],
+      "rc": 0,
+      "stdout": "[\n    {\n        \"CreatedAt\": \"2026-09-25T12:49:53Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"79437e8e9c4bfa684cde916e5e1bc7c3ab664840819eb4588c359d408ff43746\",\n            \"com.docker.compose.project\": \"eob-dlp-20260924\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"evidence\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-dlp-20260924_evidence/_data\",\n        \"Name\": \"eob-dlp-20260924_evidence\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    },\n    {\n        \"CreatedAt\": \"2026-09-25T12:49:53Z\",\n        \"Driver\": \"local\",\n        \"Labels\": {\n            \"com.docker.compose.config-hash\": \"3ed713b3d542d6b3410d70a6a58760fd91e7d93bcfe70f3f23b3ce5b9de3a882\",\n            \"com.docker.compose.project\": \"eob-dlp-20260924\",\n            \"com.docker.compose.version\": \"5.5.0\",\n            \"com.docker.compose.volume\": \"nats-certs\"\n        },\n        \"Mountpoint\": \"/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data\",\n        \"Name\": \"eob-dlp-20260924_nats-certs\",\n        \"Options\": null,\n        \"Scope\": \"local\"\n    }\n]\n",
+      "stderr": ""
+    }
+  ],
+  "driver_sha256": "20ee5bfade3bd31685462a280c142acc2d8e4052b6170c6b0c45b073c2c06462",
+  "driver_source": "#!/usr/bin/env python3\n\"\"\"Record and remove the September 24\u201328 disposable lab fixtures only.\"\"\"\nimport argparse\nimport hashlib\nimport json\nfrom pathlib import Path\nimport shlex\nimport subprocess\nimport time\n\nROOT = Path(__file__).resolve().parents[2]\nHOSTS = {\"build\": \"10.145.37.36\", \"deploy\": \"10.145.40.193\"}\nPROJECTS = (\"eob-config-20260925\", \"eob-template-20260925\", \"eob-dlp-20260924\")\nRESOURCE_TYPES = \"configmaps,pods,f5-big-cne-pools,f5-virtualservers\"\nLABEL = \"app.kubernetes.io/managed-by=eob-ai-traffic-jig\"\nINSPECT = '''{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"state\":{{json .State}},\"restarts\":{{json .RestartCount}},\"mounts\":{{json .Mounts}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}'''\nPROBES = '''import json,runpy\nm=runpy.run_path(\"/usr/bin/ls-load.py\")\nprint(json.dumps({str(i):m[\"send\"](m[\"msg\"](3,slot=i)) for i in range(12)}))\n'''\nHOST_SCAN = '''import json,os,pathlib\nrows=[]\nfor p in pathlib.Path(\"/proc\").iterdir():\n if not p.name.isdigit() or int(p.name)==os.getpid(): continue\n try:\n  name=(p/\"comm\").read_text().strip()\n  if any(s in name.lower() for s in (\"python\",\"tmm\",\"kubectl\",\"tcpdump\",\"drain\",\"tao\",\"icap\")):\n   args=(p/\"cmdline\").read_bytes().split(b\"\\\\0\")\n   markers=[s for s in (\"ai-traffic\", \"attribution\", \"request_scope\", \"scope-live\", \"config_live\", \"template_suite\", \"icap_suite\", \"port-forward\", \"ls-drain\", \"ls_drain\") if any(s.encode() in a for a in args)]\n   rows.append({\"pid\":int(p.name),\"comm\":name,\"test_markers\":markers})\n except (FileNotFoundError,PermissionError,ProcessLookupError): pass\nfiles=[]\nfor parent in (pathlib.Path(\"/tmp\"),pathlib.Path(\"/home/starin\")):\n for p in parent.iterdir():\n  if p.name.startswith((\"eob-\",\"ai-traffic\",\"scope-\",\"template-\",\"observability-\",\"config-\",\"tmm\")):\n   s=p.lstat();files.append({\"path\":str(p),\"bytes\":s.st_size,\"directory\":p.is_dir(),\"mtime\":s.st_mtime})\nprint(json.dumps({\"processes\":rows,\"candidate_paths\":files}))\n'''\nPOD_VIEW = '''import json,sys\ndoc=json.load(sys.stdin)\nprint(json.dumps([{\"name\":p[\"metadata\"][\"name\"],\"uid\":p[\"metadata\"][\"uid\"],\"node\":p[\"spec\"].get(\"nodeName\"),\"containers\":[{k:s.get(k) for k in (\"name\",\"containerID\",\"imageID\",\"restartCount\",\"ready\")} for s in p[\"status\"].get(\"containerStatuses\",[])]} for p in doc[\"items\"]]))\n'''\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"role\", choices=HOSTS)\n    parser.add_argument(\"action\", choices=(\"inventory\", \"cleanup\"))\n    parser.add_argument(\"--output\", type=Path, required=True)\n    args = parser.parse_args()\n    record = {\"role\": args.role, \"action\": args.action, \"host\": HOSTS[args.role],\n              \"started\": time.time(), \"passed\": False, \"commands\": [],\n              \"driver_sha256\": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),\n              \"driver_source\": Path(__file__).read_text()}\n    ssh = [\"ssh\", \"-o\", \"BatchMode=yes\", \"-o\", \"ConnectTimeout=12\", \"-o\",\n           \"IdentitiesOnly=yes\", \"-i\", \"/home/claude/.ssh/id_ed25519\",\n           \"starin@\" + HOSTS[args.role]]\n\n    def run(*argv, check=True):\n        result = subprocess.run(ssh + [shlex.join(argv)], text=True,\n                                capture_output=True, timeout=300, check=False)\n        record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                   \"stdout\": result.stdout, \"stderr\": result.stderr})\n        if check:\n            result.check_returncode()\n        return result.stdout\n\n    def kube(*argv):\n        return run(\"kubectl\", \"--context=kind-vs\", \"-n\", \"default\", *argv)\n\n    def snapshot():\n        result = {}\n        ids = run(\"docker\", \"ps\", \"-aq\").split()\n        result[\"containers\"] = [json.loads(line) for line in run(\n            \"docker\", \"inspect\", \"--format\", INSPECT, *ids).splitlines()] if ids else []\n        result[\"networks\"] = run(\"docker\", \"network\", \"ls\", \"--format\", \"{{json .}}\")\n        result[\"volumes\"] = run(\"docker\", \"volume\", \"ls\", \"--format\", \"{{json .}}\")\n        result[\"host_scan\"] = json.loads(run(\"python3\", \"-c\", HOST_SCAN))\n        result[\"disk\"] = run(\"df\", \"-B1\", \"/\")\n        result[\"listeners\"] = run(\"ss\", \"-ltnp\")\n        if args.role == \"build\":\n            result[\"compose\"] = json.loads(run(\"docker\", \"compose\", \"ls\", \"--format\", \"json\"))\n            result[\"probes\"] = {}\n            for item in result[\"containers\"]:\n                if item[\"project\"] in PROJECTS and item[\"name\"].endswith(\"-tmm-1\"):\n                    result[\"probes\"][item[\"name\"]] = json.loads(run(\n                        \"docker\", \"exec\", item[\"id\"], \"python3\", \"-c\", PROBES))\n                if item[\"project\"] in PROJECTS and item[\"name\"].endswith(\"-fixture-1\"):\n                    run(\"docker\", \"exec\", item[\"id\"], \"du\", \"-sh\", \"/evidence\")\n            for project in PROJECTS:\n                names = [json.loads(line)[\"Name\"] for line in result[\"volumes\"].splitlines()\n                         if json.loads(line)[\"Name\"].startswith(project + \"_\")]\n                if names:\n                    run(\"docker\", \"volume\", \"inspect\", *names)\n        else:\n            # Record identity/status only. Do not export pod environment or secrets.\n            script = \"import subprocess;\" + \"d=subprocess.check_output(\" + repr([\n                \"kubectl\", \"--context=kind-vs\", \"-n\", \"default\", \"get\", \"pods\", \"-o\", \"json\"]) + \");\" + \"subprocess.run(['python3','-c',\" + repr(POD_VIEW) + \"],input=d,check=True)\"\n            result[\"pods\"] = json.loads(run(\"python3\", \"-c\", script))\n            result[\"owned\"] = json.loads(kube(\"get\", RESOURCE_TYPES, \"-l\", LABEL, \"-o\", \"json\"))\n            result[\"routes\"] = json.loads(kube(\"get\", \"f5-big-cne-pools,f5-virtualservers\", \"-o\", \"json\"))\n            result[\"probes\"] = {}\n            for pod in result[\"pods\"]:\n                if any(c[\"name\"] == \"f5-tmm\" for c in pod[\"containers\"]):\n                    result[\"probes\"][pod[\"name\"]] = json.loads(kube(\n                        \"exec\", pod[\"name\"], \"-c\", \"f5-tmm\", \"--\", \"python3\", \"-c\", PROBES))\n            run(\"sha256sum\", \"/home/starin/ai-traffic-jig/jig.py\",\n                \"/home/starin/ai-traffic-jig/backend.py\", \"/home/starin/ai-traffic-jig/client.py\")\n        return result\n\n    with args.output.open(\"x\") as receipt:\n        try:\n            record[\"before\"] = snapshot()\n            if args.action == \"cleanup\":\n                raise RuntimeError(\"Cleanup actions must be added after inventory review\")\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            record[\"finished\"] = time.time()\n            json.dump(record, receipt, indent=2)\n            receipt.write(\"\\n\")\n    print(json.dumps({\"role\": args.role, \"action\": args.action, \"passed\": True,\n                      \"receipt\": str(args.output)}))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "before": {
+    "containers": [
+      {
+        "id": "60d068f61cdf407093e5ff73c98ab9e5abf6d88401f9731f5eeaa44b1cb85a0b",
+        "name": "/eob-template-20260925-tmm-1",
+        "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1812253,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T18:45:33.844301758Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/run/ls",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_ls-sockets",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls-stream",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_ls-stream",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/opt/f5/mbip/fsm/certificates",
+            "Driver": "local",
+            "Mode": "ro",
+            "Name": "eob-template-20260925_nats-certs",
+            "Propagation": "",
+            "RW": false,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-template-20260925"
+      },
+      {
+        "id": "7a35704599add30291c85e55ba9cc6815498518772f75df0b847f211a6984da1",
+        "name": "/eob-template-20260925-fixture-1",
+        "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "Health": {
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "End": "2026-09-28T12:15:45.343065007Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:45.293687961Z"
+              },
+              {
+                "End": "2026-09-28T12:15:47.388805143Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:47.344162802Z"
+              },
+              {
+                "End": "2026-09-28T12:15:49.431655095Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:49.390265896Z"
+              },
+              {
+                "End": "2026-09-28T12:15:51.476469Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:51.432947772Z"
+              },
+              {
+                "End": "2026-09-28T12:15:53.522982739Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:53.477533069Z"
+              }
+            ],
+            "Status": "healthy"
+          },
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1658347,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T17:33:18.381544034Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/run/ls-stream",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_ls-stream",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/package/nats_certs/tmm",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_nats-certs",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/work",
+            "Mode": "ro",
+            "Propagation": "rprivate",
+            "RW": false,
+            "Source": "/home/starin/eob-config-20260925",
+            "Type": "bind"
+          },
+          {
+            "Destination": "/evidence",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_evidence",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_evidence/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-template-20260925_ls-sockets",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-template-20260925"
+      },
+      {
+        "id": "479fb99d1ee89fa9766922fd74c915d95cc6620ebb16bf7deea9e2f5876a3e1b",
+        "name": "/eob-config-20260925-tmm-1",
+        "image": "sha256:9ea1df6af2494ebd313db9be895b39dfb03bd9bba111be114c191d4fc7d3b837",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1486244,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T14:57:00.090945018Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/opt/f5/mbip/fsm/certificates",
+            "Driver": "local",
+            "Mode": "ro",
+            "Name": "eob-config-20260925_nats-certs",
+            "Propagation": "",
+            "RW": false,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_ls-sockets",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls-stream",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_ls-stream",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-config-20260925"
+      },
+      {
+        "id": "c34e915800df00cf4dd558870c1b188de601aa6ea21a9a659c6ff862867f4fa9",
+        "name": "/eob-config-20260925-fixture-1",
+        "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "Health": {
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "End": "2026-09-28T12:15:45.185814155Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:45.142713326Z"
+              },
+              {
+                "End": "2026-09-28T12:15:47.229309801Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:47.186980966Z"
+              },
+              {
+                "End": "2026-09-28T12:15:49.2714172Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:49.230937929Z"
+              },
+              {
+                "End": "2026-09-28T12:15:51.311847809Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:51.272823397Z"
+              },
+              {
+                "End": "2026-09-28T12:15:53.382445451Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:53.31261557Z"
+              }
+            ],
+            "Status": "healthy"
+          },
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1472720,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T14:49:31.170240095Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/work",
+            "Mode": "ro",
+            "Propagation": "rprivate",
+            "RW": false,
+            "Source": "/home/starin/eob-config-20260925",
+            "Type": "bind"
+          },
+          {
+            "Destination": "/evidence",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_evidence",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_evidence/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_ls-sockets",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/run/ls-stream",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_ls-stream",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/package/nats_certs/tmm",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-config-20260925_nats-certs",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-config-20260925"
+      },
+      {
+        "id": "2583e7aa0c6a073131ad24831f4fa39649eb04f874a4519048080247105dbf9d",
+        "name": "/eob-dlp-20260924-tmm-1",
+        "image": "sha256:96336e4cd08c72b6180f22ae4f72e179907c4d419fc0af502bc261fd78ae659d",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1376327,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T13:03:09.660955995Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/opt/f5/mbip/fsm/certificates",
+            "Driver": "local",
+            "Mode": "ro",
+            "Name": "eob-dlp-20260924_nats-certs",
+            "Propagation": "",
+            "RW": false,
+            "Source": "/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-dlp-20260924"
+      },
+      {
+        "id": "485d4916ffe73e09e5eb3dec5cc9e0da05696b93b64356bf1996f379263a53e0",
+        "name": "/eob-dlp-20260924-fixture-1",
+        "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "Health": {
+            "FailingStreak": 0,
+            "Log": [
+              {
+                "End": "2026-09-28T12:15:45.047664976Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:45.000225674Z"
+              },
+              {
+                "End": "2026-09-28T12:15:47.091471303Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:47.049406031Z"
+              },
+              {
+                "End": "2026-09-28T12:15:49.131467954Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:49.092843456Z"
+              },
+              {
+                "End": "2026-09-28T12:15:51.173954338Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:51.132437309Z"
+              },
+              {
+                "End": "2026-09-28T12:15:53.211332812Z",
+                "ExitCode": 0,
+                "Output": "",
+                "Start": "2026-09-28T12:15:53.175508638Z"
+              }
+            ],
+            "Status": "healthy"
+          },
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 1367715,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-09-25T12:52:28.402554557Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/package/nats_certs/tmm",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-dlp-20260924_nats-certs",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data",
+            "Type": "volume"
+          },
+          {
+            "Destination": "/work",
+            "Mode": "ro",
+            "Propagation": "rprivate",
+            "RW": false,
+            "Source": "/home/starin/eob-dlp-20260924",
+            "Type": "bind"
+          },
+          {
+            "Destination": "/evidence",
+            "Driver": "local",
+            "Mode": "rw",
+            "Name": "eob-dlp-20260924_evidence",
+            "Propagation": "",
+            "RW": true,
+            "Source": "/var/lib/docker/volumes/eob-dlp-20260924_evidence/_data",
+            "Type": "volume"
+          }
+        ],
+        "project": "eob-dlp-20260924"
+      },
+      {
+        "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+        "name": "/10.207.3-HEAD.b13f8f034e",
+        "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+        "state": {
+          "Dead": false,
+          "Error": "",
+          "ExitCode": 0,
+          "FinishedAt": "0001-01-01T00:00:00Z",
+          "OOMKilled": false,
+          "Paused": false,
+          "Pid": 37331,
+          "Restarting": false,
+          "Running": true,
+          "StartedAt": "2026-08-21T18:14:16.71521944Z",
+          "Status": "running"
+        },
+        "restarts": 0,
+        "mounts": [
+          {
+            "Destination": "/tmm",
+            "Mode": "",
+            "Propagation": "rprivate",
+            "RW": true,
+            "Source": "/home/starin/code/tmm",
+            "Type": "bind"
+          },
+          {
+            "Destination": "/var/run/docker.sock",
+            "Mode": "",
+            "Propagation": "rprivate",
+            "RW": true,
+            "Source": "/var/run/docker.sock",
+            "Type": "bind"
+          }
+        ],
+        "project": null
+      }
+    ],
+    "networks": "{\"CreatedAt\":\"2026-08-21 18:01:12.471955645 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"295cf3c2ff5d\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"bridge\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 14:49:30.819136855 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"e2ddd3aad435\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=30456e6f9a443b99235ec7dad184d6ba7fc0a57df9251fdc6f5e40f74cb9fc74,com.docker.compose.network=data,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-config-20260925_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 14:49:30.819595695 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"121680cc194b\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=a3ca78e56c047a0a270835c115754520c6e2fb504fc11d5682c4bb6e086ab2f5,com.docker.compose.network=management,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-config-20260925_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 12:49:53.198652366 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"c64fa57c4943\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=86970b92e159fda2f17d8f670204ab9c59f9f10c6907d1b505b976341547c59d,com.docker.compose.network=data,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0\",\"Name\":\"eob-dlp-20260924_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 12:49:53.198445804 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"0723ec0e7818\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=361ca2188d256719f2e475d27c0c177c1373bdb9cb69e6058a142a42479528fe,com.docker.compose.network=management,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0\",\"Name\":\"eob-dlp-20260924_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 17:33:18.034275022 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"c49b5d8aeadd\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=d4fe139291f7373374e589c6b7d3ca58e963e7194d9c86abe49c3ab5a38abdc8,com.docker.compose.network=data,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-template-20260925_data\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-09-25 17:33:18.034069302 +0000 UTC\",\"Driver\":\"bridge\",\"ID\":\"e9517d604a9e\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"com.docker.compose.config-hash=f52e0208f86603f89a0ce15797b5eae7f52e7395b836c7e1e183191e893afe99,com.docker.compose.network=management,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0\",\"Name\":\"eob-template-20260925_management\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-08-21 18:01:12.466050958 +0000 UTC\",\"Driver\":\"host\",\"ID\":\"070ea04c208e\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"host\",\"Scope\":\"local\"}\n{\"CreatedAt\":\"2026-08-21 18:01:12.453245811 +0000 UTC\",\"Driver\":\"null\",\"ID\":\"94f86e9308e4\",\"IPv4\":\"true\",\"IPv6\":\"false\",\"Internal\":\"false\",\"Labels\":\"\",\"Name\":\"none\",\"Scope\":\"local\"}\n",
+    "volumes": "{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=14ad4bf03e0570adcc4f5bef4a73b2e72d3565cb311807b6140babfac312a264,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_evidence/_data\",\"Name\":\"eob-config-20260925_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=74cc8d652b3e6eb49380fb3a5235e6909daa3be360114ff9cf5f4efcee8715fa,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-sockets\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_ls-sockets/_data\",\"Name\":\"eob-config-20260925_ls-sockets\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=1af35f349eba2cd6d8c989645fad3aeb2d51346174cc46f0e6fc3a4647c7acc2,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-stream\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_ls-stream/_data\",\"Name\":\"eob-config-20260925_ls-stream\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=936995699f24c8a17b05cc19019a1b2b02b9c766c983d8b726c153fa132342bb,com.docker.compose.project=eob-config-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-config-20260925_nats-certs/_data\",\"Name\":\"eob-config-20260925_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=79437e8e9c4bfa684cde916e5e1bc7c3ab664840819eb4588c359d408ff43746,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-dlp-20260924_evidence/_data\",\"Name\":\"eob-dlp-20260924_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=3ed713b3d542d6b3410d70a6a58760fd91e7d93bcfe70f3f23b3ce5b9de3a882,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-dlp-20260924_nats-certs/_data\",\"Name\":\"eob-dlp-20260924_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=a7ef37c4ef32f6b42a729c01dc2a3246afcbeda975822752e0bd660ef7988d3f,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=evidence\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\"Name\":\"eob-template-20260925_evidence\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=f5bd7ce6820e94421ab4646fe98dcb27260bb43572cf2fc845727973e6c4c73b,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-sockets\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=1546c9db0e6ef2351433142d1886731216257ed476e375e92feded0bdebd8574,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=ls-stream\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Name\":\"eob-template-20260925_ls-stream\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\",\"Labels\":\"com.docker.compose.config-hash=199bd9f2d5b209c7b8cb3213aa1e2174577b281c30ea0049c39458a72b7bdbe7,com.docker.compose.project=eob-template-20260925,com.docker.compose.version=5.5.0,com.docker.compose.volume=nats-certs\",\"Links\":\"N/A\",\"Mountpoint\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Name\":\"eob-template-20260925_nats-certs\",\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\"}\n",
+    "host_scan": {
+      "processes": [
+        {
+          "pid": 1376408,
+          "comm": "tmm.0",
+          "test_markers": []
+        },
+        {
+          "pid": 1486306,
+          "comm": "tmm.0",
+          "test_markers": []
+        },
+        {
+          "pid": 1812314,
+          "comm": "tmm.0",
+          "test_markers": []
+        }
+      ],
+      "candidate_paths": [
+        {
+          "path": "/tmp/tmmtrace-buildbox.sh",
+          "bytes": 1857,
+          "directory": false,
+          "mtime": 1788093317.5415542
+        },
+        {
+          "path": "/tmp/tmm-catalogfree-20260924.tar",
+          "bytes": 333572608,
+          "directory": false,
+          "mtime": 1790257334.406205
+        },
+        {
+          "path": "/tmp/tmm-ctx96-20260923.tar",
+          "bytes": 335083008,
+          "directory": false,
+          "mtime": 1790183312.4399538
+        },
+        {
+          "path": "/tmp/tmmtrace-pre-catalog-20260924",
+          "bytes": 1857,
+          "directory": false,
+          "mtime": 1790257445.8871262
+        },
+        {
+          "path": "/tmp/tmmtrace",
+          "bytes": 4320,
+          "directory": false,
+          "mtime": 1788092123.866386
+        },
+        {
+          "path": "/tmp/tmmtrace-arm.sh",
+          "bytes": 2181,
+          "directory": false,
+          "mtime": 1788093318.1015613
+        },
+        {
+          "path": "/tmp/tmmx",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1787747257.0
+        },
+        {
+          "path": "/tmp/tmmtop",
+          "bytes": 9793,
+          "directory": false,
+          "mtime": 1788525593.282298
+        },
+        {
+          "path": "/tmp/tmm-ls.tar",
+          "bytes": 336943616,
+          "directory": false,
+          "mtime": 1788448360.3909354
+        },
+        {
+          "path": "/tmp/tmmtrace-toolbox.tar",
+          "bytes": 192032256,
+          "directory": false,
+          "mtime": 1788349838.514935
+        },
+        {
+          "path": "/tmp/tmmtrace.py",
+          "bytes": 27159,
+          "directory": false,
+          "mtime": 1788357565.490646
+        },
+        {
+          "path": "/tmp/tmmtrace-run.sh",
+          "bytes": 3816,
+          "directory": false,
+          "mtime": 1788002652.0277243
+        },
+        {
+          "path": "/tmp/eob-staged-pre-ctx96-20260923.tgz",
+          "bytes": 651942,
+          "directory": false,
+          "mtime": 1790182361.573844
+        },
+        {
+          "path": "/home/starin/eob-dlp-20260924",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790343433.7238398
+        },
+        {
+          "path": "/home/starin/ai-traffic-jig",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790261715.6169674
+        },
+        {
+          "path": "/home/starin/tmmtrace",
+          "bytes": 3174,
+          "directory": false,
+          "mtime": 1790257445.8941262
+        },
+        {
+          "path": "/home/starin/config-io-20260925.039uaw",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790348364.8723357
+        },
+        {
+          "path": "/home/starin/observability-20260925",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790361731.406839
+        },
+        {
+          "path": "/home/starin/eob-config-20260925",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790596759.4996336
+        },
+        {
+          "path": "/home/starin/eob-tmm-staged",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790347075.968483
+        },
+        {
+          "path": "/home/starin/template-20260925",
+          "bytes": 4096,
+          "directory": true,
+          "mtime": 1790361811.0678205
+        }
+      ]
+    },
+    "disk": "Filesystem        1B-blocks        Used    Available Use% Mounted on\n/dev/vda1      258906374144 84019744768 174869852160  33% /\n",
+    "listeners": "State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\nLISTEN 0      4096      127.0.0.54:53         0.0.0.0:*          \nLISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:43189      0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:111        0.0.0.0:*          \nLISTEN 0      4096         0.0.0.0:22         0.0.0.0:*          \nLISTEN 0      4096            [::]:111           [::]:*          \nLISTEN 0      4096            [::]:22            [::]:*          \nLISTEN 0      4096            [::]:49637         [::]:*          \n",
+    "compose": [
+      {
+        "Name": "eob-config-20260925",
+        "Status": "running(2)",
+        "ConfigFiles": "/home/starin/eob-config-20260925/icap-compose.yaml,/home/starin/eob-config-20260925/config-compose.yaml"
+      },
+      {
+        "Name": "eob-dlp-20260924",
+        "Status": "running(2)",
+        "ConfigFiles": "/home/starin/eob-dlp-20260924/icap-compose.yaml"
+      },
+      {
+        "Name": "eob-template-20260925",
+        "Status": "running(2)",
+        "ConfigFiles": "/home/starin/eob-config-20260925/icap-compose.yaml,/home/starin/eob-config-20260925/config-compose.yaml,/home/starin/eob-config-20260925/observability-compose.yaml"
+      }
+    ],
+    "probes": {
+      "/eob-template-20260925-tmm-1": {
+        "0": "OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "1": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "2": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "3": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "4": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "5": "OK armed=1 mode=0 gen=5 fired=187 safe_returns=16 errors=0 cycles=8058202 cycles_max=4348870 cycles_min=1516",
+        "6": "OK armed=1 mode=0 gen=2 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "7": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "8": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "9": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "10": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "11": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0"
+      },
+      "/eob-config-20260925-tmm-1": {
+        "0": "OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "1": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "2": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "3": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "4": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "5": "OK armed=1 mode=0 gen=5 fired=112 safe_returns=0 errors=0 cycles=2449516 cycles_max=1342182 cycles_min=2838",
+        "6": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "7": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "8": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "9": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "10": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "11": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0"
+      },
+      "/eob-dlp-20260924-tmm-1": {
+        "0": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "1": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "2": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "3": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "4": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "5": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "6": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "7": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "8": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "9": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "10": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0",
+        "11": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0"
+      }
+    }
+  },
+  "finished": 1790597776.637686
+}

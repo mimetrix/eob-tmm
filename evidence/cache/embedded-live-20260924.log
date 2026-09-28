@@ -1,0 +1,285 @@
+kind-vs
+PINNED f5-tmm-7597dfff8b-28s9z ('42259fbc-3303-492a-95b1-9146b4105583', 'containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63', 0, 'sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1')
+c3b81927dfdcc31137cd8212b5e23bb85677a06c a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7 bulk catalogs absent
+OK armed=1 mode=0 gen=2 fired=32 safe_returns=32 errors=0 cycles=1607624 cycles_max=1099896 cycles_min=1192
+9090909090
+configmap/ctx-contract-test created
+pod/ctx-contract-test created
+f5bigcnepool.k8s.f5net.com/ctx-contract-test created
+f5virtualserver.k8s.f5net.com/ctx-contract-test created
+pod/ctx-contract-test condition met
+apiVersion: k8s.f5net.com/v1
+kind: F5VirtualServer
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"k8s.f5net.com/v1","kind":"F5VirtualServer","metadata":{"annotations":{},"name":"ctx-contract-test","namespace":"default"},"spec":{"destinationAddress":"11.11.11.99","destinationPort":18081,"http":{"clientside":"sys-default-http","serverside":"sys-default-http"},"httpRouter":true,"ipfamilies":"IPv4","loadBalancingMethod":"ROUND_ROBIN","pool":"ctx-contract-test","protocol":"tcp","protocolProfile":{"clientside":"sys-default-tcp","serverside":"sys-default-tcp"},"snat":{"pool":"","type":"automap"},"sourcePort":"preserve","translateAddress":true,"translatePort":true,"vlans":{"disableListedVlans":false,"vlanList":["tmm-client"]}}}
+  creationTimestamp: "2026-09-24T14:36:55Z"
+  finalizers:
+  - handletmmconfig_inconsistency
+  generation: 1
+  name: ctx-contract-test
+  namespace: default
+  resourceVersion: "3606386"
+  uid: e34b3269-811f-433d-a306-58081975c42d
+spec:
+  a2a: false
+  access: ""
+  clientssl: ""
+  connectionRateLimit:
+    rateLimit: 0
+    rateLimitDestinationMask: 0
+    rateLimitMode: object
+    rateLimitSourceMask: 0
+  ddosProfile: ""
+  destinationAddress: 11.11.11.99
+  destinationPort: 18081
+  fastL4: ""
+  genericMessage: ""
+  http:
+    clientside: sys-default-http
+    serverside: sys-default-http
+  httpCompression: false
+  httpRouter: true
+  iRules: []
+  ipfamilies: IPv4
+  json: false
+  loadBalancingMethod: ROUND_ROBIN
+  mcp: false
+  namespace: ""
+  persistence: ""
+  pool: ctx-contract-test
+  protocol: tcp
+  protocolProfile:
+    clientside: sys-default-tcp
+    serverside: sys-default-tcp
+  routeAdvertisement: false
+  serverssl: ""
+  sip: ""
+  site: ""
+  snat:
+    pool: ""
+    type: automap
+  sourcePort: preserve
+  sse: false
+  tenant: ""
+  translateAddress: true
+  translatePort: true
+  vlans:
+    disableListedVlans: false
+    vlanList:
+    - tmm-client
+  vrf: ""
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-24T14:36:55Z"
+    message: ""
+    observedGeneration: 0
+    reason: Accepted
+    status: "True"
+    type: Accepted
+  - lastTransitionTime: "2026-09-24T14:36:55Z"
+    message: CR config sent to all grpc endpoints
+    observedGeneration: 3
+    reason: Programmed
+    status: "True"
+    type: Programmed
+  generationId: 0
+ctx96
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
+100     6 100     6   0     0  3016     0  --:--:-- --:--:-- --:--:--  6000
+default via 169.254.1.1 dev eth0 
+22.22.22.0/24 dev server-net proto kernel scope link src 22.22.22.113 
+169.254.1.1 dev eth0 scope link 
+WARMUP 1 0 ctx96
+ *   Trying 11.11.11.99:18081...
+* Established connection to 11.11.11.99 (11.11.11.99 port 18081) from 11.11.11.100 port 49518 
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: 11.11.11.99:18081
+> User-Agent: curl/8.17.0
+> Accept: */*
+> Connection: close
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Server: BaseHTTP/0.6 Python/3.12.12
+< Date: Thu, 24 Sep 2026 14:37:07 GMT
+< Content-Length: 6
+< 
+{ [6 bytes data]
+* Connection #0 to host 11.11.11.99:18081 left intact
+
+SERVER-SIDE CAPTURE tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tmm-server, link-type EN10MB (Ethernet), snapshot length 65535 bytes
+0 packets captured
+0 packets received by filter
+0 packets dropped by kernel
+
+command terminated with exit code 124
+
+BACKEND CAPTURE tcpdump: WARNING: any: That device doesn't support promiscuous mode
+(Promiscuous mode not supported on the "any" device)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+14:37:07.539729 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 80: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [S], seq 3887498256, win 23360, options [mss 1460,nop,wscale 0,sackOK,TS val 3554232402 ecr 0], length 0
+14:37:07.539751 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype ARP (0x0806), length 48: Request who-has 22.22.22.150 tell 22.22.22.113, length 28
+14:37:07.540991 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype ARP (0x0806), length 48: Reply 22.22.22.150 is-at 02:30:76:e6:9d:80, length 28
+14:37:07.540995 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype IPv4 (0x0800), length 80: 22.22.22.113.18081 > 22.22.22.150.49518: Flags [S.], seq 3787394482, ack 3887498257, win 31856, options [mss 1460,sackOK,TS val 4290696762 ecr 3554232402,nop,wscale 7], length 0
+14:37:07.541462 server-net In  ifindex 4 22:d1:90:5b:dd:9d ethertype ARP (0x0806), length 48: Reply 22.22.22.150 is-at 22:d1:90:5b:dd:9d, length 28
+14:37:07.542145 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 72: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [.], ack 1, win 23360, options [nop,nop,TS val 3554232404 ecr 4290696762], length 0
+14:37:07.542172 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 172: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [P.], seq 1:101, ack 1, win 23360, options [nop,nop,TS val 3554232404 ecr 4290696762], length 100
+14:37:07.542177 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype IPv4 (0x0800), length 72: 22.22.22.113.18081 > 22.22.22.150.49518: Flags [.], ack 101, win 249, options [nop,nop,TS val 4290696764 ecr 3554232404], length 0
+14:37:07.542976 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype IPv4 (0x0800), length 184: 22.22.22.113.18081 > 22.22.22.150.49518: Flags [P.], seq 1:113, ack 101, win 249, options [nop,nop,TS val 4290696765 ecr 3554232404], length 112
+14:37:07.543028 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype IPv4 (0x0800), length 78: 22.22.22.113.18081 > 22.22.22.150.49518: Flags [FP.], seq 113:119, ack 101, win 249, options [nop,nop,TS val 4290696765 ecr 3554232404], length 6
+14:37:07.543295 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 72: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [.], ack 113, win 23472, options [nop,nop,TS val 3554232406 ecr 4290696765], length 0
+14:37:07.543302 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 72: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [.], ack 120, win 23478, options [nop,nop,TS val 3554232406 ecr 4290696765], length 0
+14:37:07.545628 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 72: 22.22.22.150.49518 > 22.22.22.113.18081: Flags [F.], seq 101, ack 120, win 23478, options [nop,nop,TS val 3554232409 ecr 4290696765], length 0
+14:37:07.545638 server-net Out ifindex 4 1e:20:f5:a2:ac:b5 ethertype IPv4 (0x0800), length 72: 22.22.22.113.18081 > 22.22.22.150.49518: Flags [.], ack 102, win 249, options [nop,nop,TS val 4290696768 ecr 3554232409], length 0
+14:37:17.020184 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 80: 10.244.236.192.35758 > 10.244.236.242.18081: Flags [S], seq 2652979162, win 33120, options [mss 1440,sackOK,TS val 1603757113 ecr 0,nop,wscale 7], length 0
+14:37:17.020198 eth0  Out ifindex 3 0e:72:68:e1:24:a1 ethertype IPv4 (0x0800), length 80: 10.244.236.242.18081 > 10.244.236.192.35758: Flags [S.], seq 2480900922, ack 2652979163, win 32844, options [mss 1440,sackOK,TS val 3108174782 ecr 1603757113,nop,wscale 7], length 0
+14:37:17.020220 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 72: 10.244.236.192.35758 > 10.244.236.242.18081: Flags [.], ack 1, win 259, options [nop,nop,TS val 1603757113 ecr 3108174782], length 0
+14:37:17.020298 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 72: 10.244.236.192.35758 > 10.244.236.242.18081: Flags [F.], seq 1, ack 1, win 259, options [nop,nop,TS val 1603757114 ecr 3108174782], length 0
+14:37:17.020749 eth0  Out ifindex 3 0e:72:68:e1:24:a1 ethertype IPv4 (0x0800), length 72: 10.244.236.242.18081 > 10.244.236.192.35758: Flags [F.], seq 1, ack 2, win 257, options [nop,nop,TS val 3108174783 ecr 1603757114], length 0
+14:37:17.020789 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 20 packets captured
+20 packets received by filter
+0 packets dropped by kernel
+72: 10.244.236.192.35758 > 10.244.236.242.18081: Flags [.], ack 2, win 259, options [nop,nop,TS val 1603757114 ecr 3108174783], length 0
+
+command terminated with exit code 124
+
+200
+200
+200
+200
+200
+200
+200
+200
+CASE nested SHA256 1d717cc63687dd3b6468cfb1951aff358c84c186c66c03f77625899b65987169
+  nested.bpf.o --- 4344 bytes, slot 2, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      4344 bytes delivered on stdin -> OK loaded slot=2 mode=1 signature=verified
+OK ARMED LIVE entry=0xccc600 slot=2 kind=fexit (no restart)
+e8751a7b00
+OK armed=1 mode=1 gen=3 fired=32 safe_returns=32 errors=0 cycles=1607624 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=48 safe_returns=48 errors=0 cycles=1689522 cycles_max=1099896 cycles_min=1192
+DELTA nested {'fired': 16, 'safe_returns': 16, 'errors': 0}
+OK DISARMED LIVE entry=0xccc600
+9090909090
+OK armed=1 mode=1 gen=3 fired=48 safe_returns=48 errors=0 cycles=1689522 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=3 fired=48 safe_returns=48 errors=0 cycles=1689522 cycles_max=1099896 cycles_min=1192
+OK disabled (not reclaimed --- see item 0c)
+PASS nested 16 HTTP 200s; restored NOPs; 8 post-disarm HTTP 200s without fires
+CASE nested-control SHA256 252862ed842cc4a9dbb2fddcc269e2984398b1885011fb8fe944a4dc98f0d1b0
+  nested-control.bpf.o --- 4256 bytes, slot 2, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      4256 bytes delivered on stdin -> OK loaded slot=2 mode=1 signature=verified
+OK ARMED LIVE entry=0xccc600 slot=2 kind=fexit (no restart)
+e8751a7b00
+OK armed=1 mode=1 gen=4 fired=48 safe_returns=48 errors=0 cycles=1689522 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=4 fired=64 safe_returns=48 errors=0 cycles=1738516 cycles_max=1099896 cycles_min=1192
+DELTA nested-control {'fired': 16, 'safe_returns': 0, 'errors': 0}
+OK DISARMED LIVE entry=0xccc600
+9090909090
+OK armed=1 mode=1 gen=4 fired=64 safe_returns=48 errors=0 cycles=1738516 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=4 fired=64 safe_returns=48 errors=0 cycles=1738516 cycles_max=1099896 cycles_min=1192
+OK disabled (not reclaimed --- see item 0c)
+PASS nested-control 16 HTTP 200s; restored NOPs; 8 post-disarm HTTP 200s without fires
+CASE embedded-pointer SHA256 2ffad48f0038475085e4d78c992af37b0fb48be34f87e7cea15b4d915c9a6471
+  embedded-pointer.bpf.o --- 4576 bytes, slot 2, mode 1, SIGNED for build 0xc3b81927..0xc3b81927
+       the signed binding is installed verbatim: hook, build range, ctx abi and mode ceiling all come from it, not from this client
+    f5-tmm-7597dfff8b-28s9z      4576 bytes delivered on stdin -> OK loaded slot=2 mode=1 signature=verified
+OK ARMED LIVE entry=0xccc600 slot=2 kind=fentry (no restart)
+e869177b00
+OK armed=1 mode=1 gen=5 fired=64 safe_returns=48 errors=0 cycles=1738516 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=5 fired=80 safe_returns=64 errors=0 cycles=1782996 cycles_max=1099896 cycles_min=1192
+DELTA embedded-pointer {'fired': 16, 'safe_returns': 16, 'errors': 0}
+OK DISARMED LIVE entry=0xccc600
+9090909090
+OK armed=1 mode=1 gen=5 fired=80 safe_returns=64 errors=0 cycles=1782996 cycles_max=1099896 cycles_min=1192
+200
+200
+200
+200
+200
+200
+200
+200
+OK armed=1 mode=1 gen=5 fired=80 safe_returns=64 errors=0 cycles=1782996 cycles_max=1099896 cycles_min=1192
+OK disabled (not reclaimed --- see item 0c)
+PASS embedded-pointer 16 HTTP 200s; restored NOPs; 8 post-disarm HTTP 200s without fires
+configmap "ctx-contract-test" deleted from default namespace
+pod "ctx-contract-test" deleted from default namespace
+f5bigcnepool.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+f5virtualserver.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+OK armed=1 mode=0 gen=5 fired=80 safe_returns=64 errors=0 cycles=1782996 cycles_max=1099896 cycles_min=1192
+9090909090
+PASS P17 live HTTP/1 probes: stable pod, zero restarts, slot 2 disabled, fixture deleted

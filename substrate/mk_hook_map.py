@@ -433,15 +433,15 @@ def main():
         print(f"    pad after endbr64 : {e4:,}", file=sys.stderr)
         print(f"    pad at entry      : {e0:,}   (no endbr64: direct-call-only, clones)",
               file=sys.stderr)
-        print(f"  armable by ls_arm TODAY: {e4:,}  --- it requires endbr64 and arms at entry+4;",
+        print(f"  supported pad shapes: {e4 + e0:,}  --- ls_arm accepts both +4 and +0;",
               file=sys.stderr)
-        print(f"    the other {e0:,} need ls_arm to honour pad_offset (it refuses them now).",
+        print("    indexed eligibility is not a live attachment/coverage test.",
               file=sys.stderr)
         print(f"  no pad        : {unpadded:,}   <- other builds (OpenSSL etc.), inlined, folded",
               file=sys.stderr)
-        print(f"    of those, DISPLACEABLE : {displaceable:,}  <- armable without a pad,",
+        print(f"    of those, DISPLACEABLE : {displaceable:,}  <- offline classification,",
               file=sys.stderr)
-        print(f"      by copying their leading bytes verbatim. This is the population",
+        print(f"      not supported by the deployed pad-only ARM path. This is the population",
               file=sys.stderr)
         print(f"      pad-based arming can never reach --- OpenSSL included.", file=sys.stderr)
         nonreloc = sum(1 for h in padded if not h["relocatable"])

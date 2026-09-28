@@ -1,0 +1,35 @@
+{
+  "scope": "TMM toolchain build and artifact checks only",
+  "started": 1790347151.5968359,
+  "passed": true,
+  "sources": {
+    "ls_config.h": "bb65ba7a79f5d615f91b7927605de37d16f0ec1ad0ccbe2f2bbd621f571618ff",
+    "ls_map_glue.h": "af849d3fc34df486f7de343f5f0f121018d6466e6251ebb18870ae18826bae36",
+    "ls_vm.c": "19fc19500d909167db81c52ca1f3755e519774b32c40180c0b6f0330447260eb",
+    "ls_vm_load.c": "da76eafbdeac4ada80116e06cc8a18fc21fde51c4ea939f85d0bc2c12e4e247d",
+    "shield_abi.h": "3d0d88022f436ee9a6d6e203180009305a9d498764b7006f8a925d79c178f484",
+    "ls_audit.c": "14a4d1c6041789966e39729c55cdf833bfc79ab11fdfa810fc754fa9fce127db",
+    "ls_sig_pubkey.h": "41e7867cdb7ee5a5f4ff027b1f8b167e741bc67b0073e6ec817a2e42204290db",
+    "default_whitelist_x86_64": "0328819cad5754b6ab7aed222b46d230cab99c4883949ee3eb3083f4b6d7116a",
+    "debug_whitelist_x86_64": "c224ae3a10fd0ac986c3010ae5a9a802ca8b2ed02d72b4f85f961a45d482143a"
+  },
+  "command": [
+    "script",
+    "-qec",
+    "make tmm",
+    "/home/starin/config-io-20260925.039uaw/build.log"
+  ],
+  "returncode": 0,
+  "artifact": {
+    "path": "/home/starin/code/tmm/src/compile/obj_x86_64.no_pgo/tmm.no_pgo",
+    "sha256": "a1236133ec68010c44cebf6501e613d1ce51535f6153b611cc2ffe45f4ccf3b3",
+    "mtime": 1790347204.8024783,
+    "bytes": 203493480,
+    "config_symbols": [
+      "0000000004279680 B g_ls_config",
+      "000000000091a070 B g_ls_config_view"
+    ],
+    "elf_notes": "\nDisplaying notes found in: .note\n  Owner                Data size \tDescription\n  GNU                  0x00000010\tNT_GNU_ABI_TAG (ABI version tag)\n    OS: Linux, ABI: 3.2.0\n  GNU                  0x00000010\tNT_GNU_PROPERTY_TYPE_0\n      Properties: x86 ISA needed: x86-64-baseline\n\nDisplaying notes found in: .note.gnu.build-id\n  Owner                Data size \tDescription\n  GNU                  0x00000014\tNT_GNU_BUILD_ID (unique build ID bitstring)\n    Build ID: a361c87ff9852ad80b46b661a6401f7fecad2b01\n"
+  },
+  "finished": 1790347209.1577358
+}

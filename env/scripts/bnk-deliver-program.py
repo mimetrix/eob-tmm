@@ -16,14 +16,15 @@ THAT IS ALSO THE PRODUCTION SHAPE, which is why it is worth having rather than b
 trick: in a shipped system a control plane pushes a SIGNED program object over this same
 socket.
 
-STALE CLAIM CORRECTED 2026-09-04. This used to end "what is missing is the signature
+STALE CLAIM CORRECTED 2026-09-24. This used to end "what is missing is the signature
 (scope item 4, unbuilt --- the loader accepts anything and says so on every load)."
 Signatures shipped on 2026-08-20: every load is verified and a build with no key refuses
-all of them (GROUND_TRUTH.md, `make -C substrate check-sig`). What is missing now is
-narrower and worth stating precisely: nothing authenticates the PEER on the socket, and
-this script sends a zeroed binding, so it carries no signature of its own and depends on
-the loader's signature enforcement being off. It is a lab delivery tool, not the
-production path it resembles.
+all of them (GROUND_TRUTH.md, `make -C substrate check-sig`). The subsequent correction
+also went stale: it said this script sent only a zeroed binding. Its signed path reads
+the adjacent .sig and sends the binding/signature verbatim. Unsigned lab delivery is
+still a separate explicit option. Caller authentication on the socket remains separate
+from authenticating the program. The current target contract also requires build-side
+target binding before final verification/signing.
 
     bnk-deliver-program.py <prog.bpf.o> <slot> <mode> [hook]
 

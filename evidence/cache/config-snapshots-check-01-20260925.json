@@ -1,0 +1,112 @@
+{
+  "scope": "P21 build-box bench and socket harness; no live TMM",
+  "commands": [
+    {
+      "argv": [
+        "clang-18",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/code/tmm/.ubpf",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/eob-tmm-staged/ebpf-verifier",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "06769f7b508214e63b97905d275920f7e90182fa\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "clang-18",
+        "-O2",
+        "-g",
+        "-target",
+        "bpf",
+        "-c",
+        "/home/starin/config-io-20260925.039uaw/substrate/surfaces/config_threshold.bpf.c",
+        "-o",
+        "/tmp/ls-config-ai5gcfrd/config.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/tmp/ls-config-ai5gcfrd/config.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/tmp/ls-config-ai5gcfrd/config.bpf.o",
+        "fentry/config_fixture",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 1,
+      "stdout": "FAIL: fentry/config_fixture/config_threshold\n7: Invalid type (r1.type == map_fd)\n\nHint: run with --failure-slice for a causal trace, or -v for full invariants.\n",
+      "stderr": ""
+    }
+  ],
+  "checks": [],
+  "passed": false,
+  "source_sha256": {
+    "ls_config.h": "540c7a006426160e4ab94f1d536610a0daa12804eaeddf51acce2d3ca37b3336",
+    "config_snapshot.bpf.h": "55f33faebb51ce11056c1e364fe8e6e0ea9e51761c568913e42e47f92b67f60a",
+    "ls_map.h": "af4f112a1156bd112a2432fe0c72f666420019766f3775758c65de074f0b039b",
+    "ls_map_glue.h": "02afe1b575a36503650c41e5253e53c8ff042f3c2b556791ace0b0c31b2db426",
+    "ls_vm.c": "d909469655029009c3acf64239b2a2dd384a29b281da1ebabbb583ec4361abc6",
+    "ls_vm_load.c": "af537a418e1d58abe172fc5276ab680fe16ee4e1b30ac428a303de5e7a4eb4c3",
+    "shield_abi.h": "3d0d88022f436ee9a6d6e203180009305a9d498764b7006f8a925d79c178f484",
+    "ls_audit.c": "14a4d1c6041789966e39729c55cdf833bfc79ab11fdfa810fc754fa9fce127db",
+    "check_config.c": "8e4038b4e8998a826988d9ebbd70e2f74f4c5d1556fa11f5453742e8d6136113",
+    "check_config_socket.c": "36590595d105c8254e0c3cd7c519c29291493124f8b1be16b217bd1e46572b42",
+    "check_config.py": "6b9d6a8469abc3dc520d97318004276d1e49c6a3ece054334a72b8db85d11b16",
+    "surfaces/config_threshold.bpf.c": "ddc2b0750073c151b221ef0a5b028f2e178c126ff4b305d3c11fc2fa491c4f46",
+    "../env/scripts/ls-load.py": "700b2f5333f161da00bd97eaa77cd59489812e36ba047ed3d2f39a415f0ef052"
+  },
+  "tool_sha256": {
+    "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail": "d9d84cb0c474016d7cffc31c71e62892f52c327e660248275f3e955f1b7cbea2",
+    "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a": "340cc6bb2855db63e225cd92ce6e36704244b801469fe0571963f54f03802ff1"
+  },
+  "error": "Command '['/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail', '/tmp/ls-config-ai5gcfrd/config.bpf.o', 'fentry/config_fixture', '--termination', '--strict', '--no-division-by-zero', '--stack-size', '256']' returned non-zero exit status 1."
+}

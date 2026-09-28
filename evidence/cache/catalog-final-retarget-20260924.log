@@ -1,0 +1,6 @@
+PAD 9090909090
+OK armed=1 mode=0 gen=7 fired=128 safe_returns=128 errors=0 cycles=82990 cycles_max=2454 cycles_min=86
+configmap "ctx-contract-test" deleted from default namespace
+pod "ctx-contract-test" deleted from default namespace
+f5bigcnepool.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+f5virtualserver.k8s.f5net.com "ctx-contract-test" deleted from default namespace

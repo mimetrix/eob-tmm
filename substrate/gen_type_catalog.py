@@ -8,9 +8,9 @@ per-build artifacts; this produces the second from the baked BTF.
     gen_type_catalog.py <tmm.btf> [out.json]     default out: types.json
 
 Output: { "<struct>": { "<field>": "u8"|"u16"|"u32"|"u64", ... }, ...,
-           "__ptr_targets__": {...}, "__bitfields__": {...} }
-Only SCALAR/POINTER fields are kept --- those are what a probe reads and returns.
-Struct/union/array fields are skipped (a nested read is a future path form).
+            "__ptr_targets__": {...}, "__embedded__": {...}, "__bitfields__": {...} }
+The flat fields remain SCALAR/POINTER widths. Named embedded structs are edges in
+__embedded__; unions, arrays and anonymous aggregates remain unsupported.
 
 Parses `bpftool btf dump ... format raw` rather than `format c`: the raw form
 lists each struct's members flatly with type ids, so nested/anonymous members do
@@ -44,7 +44,7 @@ import sys
 
 def build(btf):
     raw = subprocess.run(["bpftool", "btf", "dump", "file", btf, "format", "raw"],
-                         capture_output=True, text=True).stdout
+                         capture_output=True, text=True, check=True).stdout
     types = {}
     cur = None
     hdr = re.compile(r"^\[(\d+)\]\s+(\w+)\s+'([^']*)'(.*)$")
@@ -117,14 +117,28 @@ def build(btf):
             return pt["name"]
         return None
 
+    def embedded_target(tid, depth=0):
+        """Peel typedef/qualifier wrappers, but never peel a pointer or array."""
+        if tid is None or depth > 12:
+            return None
+        t = types.get(tid)
+        if not t:
+            return None
+        if t["kind"] in ("TYPEDEF", "CONST", "VOLATILE", "RESTRICT", "TYPE_TAG"):
+            return embedded_target(t["ref"], depth + 1)
+        if t["kind"] == "STRUCT" and re.fullmatch(r"[A-Za-z_]\w*", t["name"]):
+            return t["name"]
+        return None
+
     W = {1: "u8", 2: "u16", 4: "u32", 8: "u64"}
     cat = {}
     ptrs = {}
     bits = {}
+    embedded = {}
     for t in types.values():
         if t["kind"] != "STRUCT" or not t["name"]:
             continue
-        fields, edges, bfs = {}, {}, {}
+        fields, edges, bfs, members = {}, {}, {}, {}
         for fname, ftid, boff, bsz in t["members"]:
             s = size_of(ftid)
             if bsz:
@@ -143,6 +157,9 @@ def build(btf):
             tgt = ptr_target(ftid)
             if tgt:
                 edges[fname] = tgt
+            target = embedded_target(ftid)
+            if target and re.fullmatch(r"[A-Za-z_]\w*", t["name"]) and re.fullmatch(r"[A-Za-z_]\w*", fname):
+                members[fname] = target
         # keep the richest definition when a struct name repeats (fwd decls, dups)
         if fields and (t["name"] not in cat or len(fields) > len(cat[t["name"]])):
             cat[t["name"]] = fields
@@ -150,10 +167,14 @@ def build(btf):
             ptrs[t["name"]] = edges
         if bfs and (t["name"] not in bits or len(bfs) > len(bits[t["name"]])):
             bits[t["name"]] = bfs
+        if members and (t["name"] not in embedded or len(members) > len(embedded[t["name"]])):
+            embedded[t["name"]] = members
+            cat.setdefault(t["name"], {})
     # pointer edges live under a reserved key so the flat {struct: {field: width}} shape
     # every existing consumer expects is unchanged.
     cat["__ptr_targets__"] = ptrs
     cat["__bitfields__"] = bits
+    cat["__embedded__"] = embedded
     return cat
 
 

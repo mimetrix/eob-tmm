@@ -31,13 +31,13 @@
  * way; that is the whole point of writing to stdout.
  *   ls_drain --segment /dev/shm/ls_tp_ring > records.jsonl
  *
- * DELIVERY IS AT-LEAST-ONCE. Records are written BEFORE consumer_pos advances,
- * so a crash mid-batch re-delivers rather than loses. Consumers dedupe on
- * (slot, seq); seq is atomic in the producer precisely so that pair is unique.
- * `slot` was called `tmm` until 2026-08-18 and always carried the slot number ---
- * the producer passes (unsigned)slot and always did. The key was a false claim.
- * The other order --- acknowledge then publish --- loses records silently on a
- * crash, which is the worse failure for an analytics feed.
+ * DELIVERY CORRECTION, 2026-09-28. The old at-least-once claim was false:
+ * ls_ring_consume advances consumer_pos BEFORE these output calls. A crash or
+ * output failure can lose an already consumed record. The pinned /dev/full test
+ * also shows exit zero despite failed output. See CONTESTED-PREMISES.md section 30.
+ * Use ls_stream plus the acknowledged journal collector for commit-before-cursor
+ * handoff. Its replay is limited by retention and source qualification. Slot and
+ * sequence alone are not a globally unique identity across producer lifetimes.
  *
  * A HOSTILE OR BUGGY CONSUMER, stated plainly because it is a real boundary:
  * this process maps the segment read-write, because advancing consumer_pos
@@ -494,10 +494,8 @@ main(int argc, char **argv)
             }
         }
 
-        /* Records reach stdout BEFORE the next poll observes the acknowledgement,
-         * and fflush here is what makes at-least-once real rather than nominal:
-         * an unflushed buffer lost on a crash is a record acknowledged and never
-         * delivered, which is the failure this ordering exists to prevent. */
+        /* The cursor has already advanced. This flush neither reverses that
+         * acknowledgement nor establishes durable downstream acceptance. */
         fflush(stdout);
 
         if (!quiet_stats && drops != last_drops) {

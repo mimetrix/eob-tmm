@@ -3,12 +3,11 @@
 How the TMM image is built and what our adjustments are. Everything here is **build-time**:
 it produces the image a pod runs.
 
-**[`pipeline.svg`](pipeline.svg) is this page in one picture** — every stage, which of the
-three machines it runs on, the artifact it emits, and what has to pass. Read it first; the
-sections below are the detail behind each row.
+The earlier [`pipeline.svg`](pipeline.svg) predates catalog-free packaging. The current
+zoned contract and evidence are in [`catalog-free-deployment.md`](../catalog-free-deployment.md).
 
 > **What this delivers:** a TMM image whose binary carries the eBPF VM and the entry pads
-> that make live arming possible — and, since 2026-09-04, **no type information at all**.
+> that make live arming possible — and, since 2026-09-04, **no embedded BTF**.
 > Field offsets are resolved at sign time instead, so the shipped ELF holds 0 bytes of
 > `.BTF` (it was 6,711,805 — 41,710 function names and 16,006 struct layouts) in a binary
 > F5 already ships `stripped`. Validated end to end: a shield loads, arms and runs on such a
@@ -19,6 +18,10 @@ sections below are the detail behind each row.
 > and that separation now has a constraint on it: the program build reads the **packaged**
 > binary to bake offsets and pin the build range, so it must run *after* packaging. See
 > step 4b.
+>
+> **2026-09-24:** the tools layer also drops bulk TSV/JSON catalogs. Build-side resolution
+> produces an authenticated per-program target; the saved-image audit checks every layer.
+> Removing BTF alone had left deployed function/signature catalogs intact.
 
 ## Boxes
 
@@ -44,11 +47,13 @@ the far end by content, and removes stale files (this is what clears retired sub
 
 ## The pipeline
 
-```
-bnk-stage.sh ──▶ bnk-sync-substrate.sh ──▶ make tmm-gdb ──▶ receipt ──▶ bnk-bake-tools.sh ──▶ ship ──▶ deploy
-   stage repo      sync substrate→tree     build TMM+VM     package    derive+embed .BTF,     ctr      roll pods,
-   (both copies)   (src/base)              (our adjustments) provenance  bake artifacts-only    import   verify
-```
+| Zone | Pipeline | Output |
+|---|---|---|
+| Workstation → build box | stage → sync | Content-checked sources |
+| Build box | `bnk-package.sh` | Runtime/debug DEBs and receipt |
+| Build box | `bnk-bake-tools.sh --btf-only` → build programs | Detached BTF/index; bound, verified, signed programs |
+| Build box | full bake → saved-layer audit | Catalog-free TMM image |
+| Datkube | import every active-cluster node → deploy → verify executing ELF | Identified live process; separate signed program delivery |
 
 ### 1 · Stage + sync
 ```bash
@@ -65,7 +70,9 @@ sudo rm -f ~/code/tmm/src/compile/obj_x86_64.*/ls_*.o   # no .d files here; inva
 rm -f ~/code/tmm/src/compile/filelist.mk                # generated; delete to regenerate
 script -qec "make tmm-gdb" /dev/null                    # the standard debug build
 ```
-`make tmm-gdb` is the **standard** TMM build. Our adjustments to it, and nothing else in F5 source:
+`make tmm-gdb` is the **standard** TMM build. The substrate's adjustments are below.
+The current tree separately carries the deliberate CVE-2025-41414 revert in `http2.c`;
+it produces vulnerable demo binaries (`CONTESTED-PREMISES.md` §16).
 
 - **Substrate sources in `src/compile/filelist`** — the 12 general-mechanism files compiled into TMM
   (`ls_vm{,_config,_load}.c`, `ls_tramp{,_asm}.c`/`ls_swap`/`ls_arm`, `ls_prep`, `ls_sig`, `ls_audit`,
@@ -78,7 +85,7 @@ script -qec "make tmm-gdb" /dev/null                    # the standard debug bui
   TMM" possible; see [The 5-byte pad](#the-5-byte-pad-is-required) below.
 - **uBPF** built by the same toolchain (`.ubpf/build/lib/libubpf.a`, via `Makefile.overrides`).
 
-No existing F5 function body is edited (startup registers through `INIT_FUNC`). The build produces
+The substrate edits no existing F5 function body (startup registers through `INIT_FUNC`). The build produces
 the stripped runtime binary (`/usr/bin/tmm64.no_pgo`) and the `tmm-debuginfo` package (its DWARF).
 
 ### 3 · Provenance receipt
@@ -89,32 +96,26 @@ The bake refuses a DEB pair with no packaging receipt (this is what catches a st
 image). `bnk-package.sh` is the full verified packaging run that records this itself; a plain
 `make tmm-gdb` build records the receipt with `source=make-tmm-gdb`, disclosing what it was.
 
-### 4 · Derive + embed the BTF (the type artifact)
+### 4 · Derive detached BTF (the build-side type artifact)
 The kernel embeds its BTF as a `.BTF` section in `vmlinux` (pahole at build) and re-exposes it via
 `/sys/kernel/btf/vmlinux` only because userspace can't read kernel memory (cached kernel docs in
-`SOURCES.md`). TMM is a userspace process, so its equivalent is to carry `.BTF` in its own binary and
-read it back from `/proc/self/exe`. `bnk-bake-tools.sh` step **1b** does this:
+`SOURCES.md`). TMM originally carried `.BTF` in its binary and read it from `/proc/self/exe`.
+Since September 4 the normal pipeline retains detached BTF on the build box:
 ```bash
 PAHOLE=$(substrate/toolchain/build-pahole.sh)          # patched pahole, idempotent build
 "$PAHOLE" --lang_exclude=c++ --btf_encode_detached=tmm.btf <tmm64.no_pgo.debug>
-objcopy --add-section .BTF=tmm.btf --set-section-flags .BTF=readonly,data \
-        tmm64.no_pgo tmm64.no_pgo.embedded
 ```
 - **`build-pahole.sh`** builds pahole (dwarves v1.29) with a one-line patch mapping the `_Atomic`
   qualifier → `BTF_KIND_VOLATILE` (BTF has no atomic kind; layout-identical and CO-RE-transparent).
   Patch: `substrate/toolchain/pahole-atomic-qualifier.patch`.
 - **`--lang_exclude=c++`** skips the Tcl/STL C++ compilation units BTF can't represent (TMM embeds
   Tcl for iRules). The surface structs are all C and are kept.
-- **`objcopy --add-section` preserves the GNU build-id** (verified), so embedding is invisible to the
-  arming build-id gate. The BTF travels *inside* the exact binary that runs — it cannot drift. That
-  non-drift property is real, and it is what `LS_EMBED_BTF=0` gives up in exchange for the section
-  not being there at all.
-- **The binary ships with no type information — this is the default since 2026-09-04.** It keeps
+- **The binary ships with no embedded BTF — this is the default since 2026-09-04.** It keeps
   6,711,805 bytes naming 41,710 functions and 16,006 struct layouts out of an image whose binaries
   F5 already ships `stripped`. It requires every program to have been relocated at sign time (step
   4b); a program still carrying `.BTF.ext` is **refused at load with the cause named on the log**,
-  which is what makes the default safe rather than merely desirable. `LS_EMBED_BTF=1` restores the
-  old behaviour. Measured: `bnk-test-btfless.sh` 6/6 — a shield loads, arms and runs
+  which makes unresolved programs fail closed. `LS_EMBED_BTF=1` is a legacy path and now fails the
+  catalog-free image audit. Historical measurement: `bnk-test-btfless.sh` 6/6 — a shield loads, arms and runs
   (`fired 145,850 → 211,836 in 3 s`) on a binary with 0 bytes of `.BTF`.
 
 ### 4b · Build the programs — **and this now has to come AFTER packaging**
@@ -131,7 +132,7 @@ field offsets and to pin `build_min`/`build_max`, so running it before `bnk-pack
 artifacts pinned to the *previous* build. They will then be refused at load by the build gate, which
 is the gate working correctly and an annoying way to discover a pipeline-order mistake.
 
-So: **`bnk-package.sh` → `bnk-build-programs.sh` → `bnk-bake-tools.sh`.** Packaging re-links the
+So: **package → `bnk-bake-tools.sh --btf-only` → build programs → full bake.** Packaging re-links the
 binary and the build id differs from `make tmm`'s, which is exactly why the programs must be signed
 against the packaged one.
 
@@ -143,7 +144,8 @@ against the packaged one.
 >
 > The derivation is not really part of imaging: it is a per-build artifact two other stages consume
 > (`gen_type_catalog.py` needs it for `tmmtrace` as well). **It belongs in its own step before the
-> program build** — `bnk-bake-tools.sh --btf-only` stops after step 1b for exactly this. Using the
+> program build** — `bnk-bake-tools.sh --btf-only` now generates detached BTF **and the current
+> hook index/map**, then stops before image construction. Using the
 > *previous* build's BTF here is the failure mode to avoid: the offsets would be baked from the wrong
 > layout and every gate downstream would pass, because the signature and the proof would both cover
 > the wrong-but-consistent bytes. The build gate catches the mismatch only because the range is
@@ -156,32 +158,36 @@ range to bind it to — baked offsets vouched for on every build are a silent wr
 ```bash
 env/scripts/bnk-bake-tools.sh                          # BASE=tmm:local → OUT=tmm:ls
 ```
-`Dockerfile.ls-tools` layers on the base image and installs **only build artifacts**:
-- the `.BTF`-embedded binary (over `/usr/bin/tmm64.no_pgo`),
-- `hook-index.tsv` (name → entry address + build id; `ls-load.py` arms by name against it),
-- `signatures.tsv` (every function's parameter types; from the debuginfo),
-- `ls-load.py` (loader client) and `ls_drain` (ring reader).
+`Dockerfile.ls-tools` layers on the base image and installs:
+- the packaged binary **without BTF** (over `/usr/bin/tmm64.no_pgo`),
+- `runtime-identity.json` (full build ID and SHA-256),
+- `ls-load.py`, `ls_drain`, `tmmtop`, and identity/verification helpers.
 
-**No bytecode is baked.** The bake verifies index build-id == binary build-id (arming works) and that
-the binary trusts the signing key (loaded programs will be accepted). Bytecode is compiled/verified/
+The previous image shipped `hook-index.tsv` and `signatures.tsv`; the catalog-free image does
+not. These and `hook-map.json`, `types.json`, `tmm.btf` stay on the build box. Every layer in
+`docker save` is checked for the named catalogs and ELF BTF, including files later deleted.
+
+**No bytecode is baked.** The bake checks runtime identity, the admission-code token, and the trusted
+public key. Those checks do not replace live loading/arming. Bytecode is compiled/verified/
 signed independently and arrives over the socket — see `BYTECODE-BUILD.md`.
 
 ### 6 · Ship + deploy
 ```bash
 # build box: save + push (id_datpush)
+env/scripts/bnk-ship-image.sh verify tmm:ls 'ls_vm: LOAD REFUSED --- signed target/build/mode contract'
 docker save tmm:ls -o /tmp/tmm-ls.tar
 scp -i ~/.ssh/id_datpush /tmp/tmm-ls.tar starin@10.145.40.193:/tmp/
 # datkube: kind load fails ("failed to detect containerd snapshotter") — import per node
-for n in datkube-control-plane datkube-worker; do
+for n in $(kind get nodes --name "$(kubectl config current-context | sed 's/^kind-//')"); do
   docker exec -i $n ctr --namespace=k8s.io images import - < /tmp/tmm-ls.tar
 done
-kubectl delete pods -l app=f5-tmm            # roll onto the new image (imagePullPolicy: Never)
+env/scripts/bnk-ship-image.sh deploy tmm:ls
 ```
-Verify the new pods run the new binary and carry `.BTF`:
+Verify the selected stable pod's executing `/proc/<pid>/exe` against the full build ID/hash.
+For live entry/exit validation use `bnk-test-ctx-contract.py` (see `catalog-free-deployment.md`).
+The image-path check alone is:
 ```bash
-POD=$(kubectl get pods -l app=f5-tmm -o name | head -1)
-kubectl exec $POD -c f5-tmm -- python3 /usr/share/ls/ls_buildid.py "$(readlink -f /usr/bin/tmm)"
-# build-id must equal the baked image's; .BTF section present in /usr/bin/tmm64.no_pgo
+kubectl exec "$POD" -c f5-tmm -- sh /usr/share/ls/ls-verify-layer.sh
 ```
 
 ## Tools
@@ -194,7 +200,7 @@ kubectl exec $POD -c f5-tmm -- python3 /usr/share/ls/ls_buildid.py "$(readlink -
 | `make tmm-gdb` | 2 | the standard TMM debug build + our filelist/whitelist/pad adjustments |
 | `bnk-receipt.sh` / `bnk-package.sh` | 3 | packaging provenance the bake requires |
 | `substrate/toolchain/build-pahole.sh` | 4 | build the patched pahole (dwarves v1.29 + atomic patch) |
-| `bnk-bake-tools.sh` | 4–5 | derive+embed `.BTF`, generate hook-index/signatures, bake artifacts-only image |
+| `bnk-bake-tools.sh` | 4–5 | derive off-box metadata, bake tools/runtime image, audit every saved layer |
 | `ctr … images import` per node | 6 | load the image into `kind` (the `kind load` workaround) |
 
 ## The 5-byte pad is required
@@ -205,10 +211,10 @@ trampoline can overwrite it with a `JMP rel32` (5 bytes) at runtime — that is 
 function on a running TMM, no restart" possible. Dropping it would mean a different, worse attach
 mechanism (breakpoint/trap, or inline rewriting). It stays.
 
-**Caution:** the pad, the embedded `.BTF`, and arming must all land on the **same binary variant**.
+**Caution:** the pad, detached BTF, signed target, and arming must describe the **same binary variant**.
 TMM ships several (`tmm64.no_pgo`, `tmm64.debug`, PGO); the debug binary has **no pads** (a "no pad"
 arming failure has shipped repeatedly). The Dockerfile repoints `/usr/bin/tmm` at the padded
-`tmm.default` → `tmm64.no_pgo`, and that is the binary the `.BTF` is embedded in.
+`tmm.default` → `tmm64.no_pgo`; its matching debug package supplies the detached BTF.
 
 ## Build assumptions (factored in)
 
@@ -216,7 +222,6 @@ arming failure has shipped repeatedly). The Dockerfile repoints `/usr/bin/tmm` a
   BTF → no CO-RE.
 - **BTF generation is pinned-toolchain-sensitive** — pahole choked on `_Atomic` and C++ references; a
   clang/toolchain bump can surface new DWARF forms. Re-validate on any toolchain change (rule 5).
-- **Embed on the build box, not in the image** — `objcopy`/binutils are on the build box; a
-  data-plane container may not have them.
+- **Resolve on the build box** — detached BTF, catalogs and compiler tools stay off the gateway.
 - **Struct layout is ABI-stable** across PGO/`-O` variants (relocator offsets match the `pahole -C`
   oracle). *Risk not yet triggered:* LTO could drop/merge types — revisit if a build enables it.

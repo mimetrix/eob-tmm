@@ -1,5 +1,14 @@
 # Reproducing the live result
 
+**Configuration input (2026-09-25):** [configuration-snapshots.md](configuration-snapshots.md)
+contains the ABI, SDK example, controller commands, pinned build-box checks and isolated
+SSA/Tao lifecycle reproduction. Bench/socket and live integration pass; cost remains unmeasured.
+
+**AI traffic fixture (2026-09-24):** for synthetic MCP/A2A/inference flows through the current
+HTTP proxy, use the step-by-step [`env/ai-traffic/README.md`](env/ai-traffic/README.md).
+It includes deployment, replay, expected results, evidence collection and cleanup. The older
+eBPF-mechanism reproduction procedure below has the dated limitations stated in its status note.
+
 > **Status: partially stale, and the specific gaps are listed here rather than left to be
 > discovered.** This page was last tested 2026-08-14. Since then arming moved from a
 > hand-typed hex address to a symbol name resolved through a baked-in index and gated on

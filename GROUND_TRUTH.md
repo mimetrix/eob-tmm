@@ -29,12 +29,240 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 ## Mechanism
 
+**2026-09-28 — controlled correlation gaps: MEASURED, with a coverage limit.**
+The new collector guard invalidates a whole result window after a controller-reported
+hook detach or tracking-capacity diagnostic. Resuming hooks cannot restore that
+window. Four-VM native interpreter/JIT tests reproduce an apparently closed stream
+with a stale lifetime after both boundaries are omitted. The old join accepts that
+native trace; the guard refuses it after a reported break. This is a lifetime-scope
+counterexample, not a measured wrong-agent assignment. Seven guard checks per mode
+and the candidate/lifetime limits 127/128 and 256/257 pass. PREVAIL rechecks all four
+unchanged signed programs.
+
+The five-window live test completes 150 accepted HTTP requests and reconciles
+1,023 hook calls/records. Baseline gives two matches. Missed-boundary and pause
+windows each give two unknown observations; one paused request has no observation.
+All 140 capacity-window observations are unknown. Full reload with new instances
+and a new run token gives two fresh-request matches; a retained connection stays
+unknown. Live stale lifetime reuse is observed, but the old consumer already
+refuses that live window because other evidence is missing. No wrong-agent match
+is observed. All four sites are restored, process/binary identity is stable, restart
+count is zero, and no drops/refusals/new errors/selections are reported.
+
+Witnesses: SELF for controller, clients, authority, program counters and native
+assertions; INDEPENDENT for PREVAIL; KERNEL for process and hook bytes. Final source
+checks pass. All four slots are disabled and configuration status refuses. Cleanup
+archives 25 checked files and removes the isolated fixture; toolchain identity/state
+is unchanged. The pre-attachment encoding-lint failure remains recorded.
+
+**Limit:** `controlled_gap_guard_validated=true`, `request_scope_validated=false`.
+The controller must report its changes. Silent hook bypass, missing controller
+history and stale collector restart remain unvalidated. The guard is off the TMM
+data path, not a host-enforced coverage guarantee. It discards earlier valid results
+with an invalid window. Multiple workers, production ledger provenance, unique
+visibility and data-path cost remain open.
+[Contract/results](env/ai-traffic/GAPS.md),
+[receipts](SOURCES.md#controlled-correlation-gaps-2026-09-28).
+
+**2026-09-28 — bounded live request correlation: MEASURED in one HTTP/1 fixture.**
+Four signed monitor programs produce 313 records for 313 calls. The added reader
+extracts 47 complete path/nonce candidates. Of 51 completed client-header
+observations, 42 match accepted authority operations, one matches an authenticated
+rejection and eight remain unknown. The unknowns are three missing initializations,
+three colliding candidates (A, B, A replay), one short nonce and one forged proof.
+A false actor claim does not replace authenticated A. A delegated operation retains
+actor A, originator B and B's accepted parent. Reversing ledger order preserves
+results. Five removed/invalid-evidence checks each stop all attribution.
+
+All 71 observed positive lifetimes close. There are 66 address-reuse pairs and
+53 HTTP responses (50 accepted, three intended rejections; two accepted requests
+are outside the armed window). Pinned PREVAIL and native interpreter/JIT checks
+pass. Counters, client checks, authority decisions and native assertions are SELF;
+PREVAIL is INDEPENDENT. KERNEL reads show four restored hook sites and a stable
+binary/process. Restart count stays zero; no drops, output refusals, new VM errors
+or verdict selections are reported. Final source checks pass; slots 5–8 are disabled
+and configuration status refuses. Nine evidence files are archived and checked.
+The isolated fixture is removed; the build toolchain retains its identity/state.
+
+**The new limit:** `bounded_join_validated=true`, but `request_scope_validated=false`.
+Identity comes from the trusted fixture ledger, not from the header values. The
+reader admits canonical fixture paths, at most 512 header bytes and lifetimes
+1–127 in fresh maps. This closed-window result does not validate general request
+identity, production ledger provenance, missing-boundary recovery, native AI
+filters, HTTP/2, multiple workers, unique visibility, output pressure or data-path
+cost. The failed five-map build, method-signature lint check and pre-attachment formatting
+check remain recorded. [Contract/results](env/ai-traffic/CORRELATION.md),
+[receipts](SOURCES.md#bounded-request-correlation-2026-09-28).
+
+**2026-09-28 — observed parser lifetimes: MEASURED in one HTTP/1 fixture.**
+Three signed monitor programs produce 204 records for 204 calls: 71 initializations,
+58 client-parser exits and 75 cleanups. All 71 observed positive lifetimes close.
+There are 66 observed address-reuse pairs; each new initialization gets a new number.
+The parser exits contain 48 known completed header attempts, three unknown completed
+attempts and seven partial returns. Late attachment and deliberately missed
+initialization leave three completed attempts unknown. Four cleanup calls also lack
+an observed initialization. One cleanup reports an incomplete header.
+The authored client and authority agree on 53 responses: 52 accepted operations and
+one intended replay rejection. These are SELF witnesses, as are program events and
+slot counters. Pinned PREVAIL is INDEPENDENT; interpreter/JIT checks pass on the build
+VM. KERNEL memory reads show two CALL/NOP cycles at init and one each at parse/fini,
+restored bytes and a stable executing binary/process. Restart count stays zero;
+there are no reported drops, output refusals, new errors or verdict selections.
+All three programs end disabled. **This advances parser-interval observation, not
+authenticated request attribution.** In this earlier run, no ledger correlation value is extracted;
+`request_scope_validated=false`. Other callers, missing-boundary combinations,
+HTTP/2, multiple workers, run-token reuse and data-path cost remain unvalidated.
+After the run, eight fixture evidence files were archived and checked. The
+recreated fixture's two containers, two networks and four volumes were removed.
+The build toolchain container retained its identity and state.
+[Contract/results](env/ai-traffic/LIFETIME.md),
+[receipts](SOURCES.md#parser-lifetime-2026-09-28).
+
+**2026-09-28 — lab fixture cleanup: MEASURED.**
+Six build-box containers, six project networks and ten volumes were removed.
+All 177 evidence files were archived and checked before removal. The deployment
+jig's five owned resources were removed from `kind-vs/default`. Docker and
+Kubernetes records show the remaining toolchain/cluster identities are stable.
+The shared TMM retained its process, binary and zero restart count. Loaded test
+programs were already disabled (SELF status); the parser pad was unpatched
+(KERNEL memory read). These fixtures must be recreated for another run.
+This is a cleanup result, not a new traffic or performance result.
+[Record](env/ai-traffic/CLEANUP-20260928.md),
+[receipts](SOURCES.md#lab-fixture-cleanup-2026-09-28).
+
+**2026-09-28 — live attribution parser-scope gate: MEASURED, with failed shortcuts.**
+On repaired build `ca69b84f…`, 61 HTTP responses reconcile with the destination
+ledger: 54 accepted fixture operations and seven intended rejections. While armed,
+66 parser calls produce 66 unsampled records: 59 successful header parses and
+seven partial returns. Each of three fragmented requests produces three calls.
+Eight address tags appear across multiple independently opened client connections.
+A successful header parse is observed before the paced body is sent. Thus raw
+call count is not request count, address equality is not a connection lifetime,
+and header completion is not destination acceptance. All 59 attempted joins remain
+unknown; the driver keeps request scope unvalidated. No authenticated TMM request
+ID or differentiated internal visibility is established. SELF witnesses are the
+program/counters and authored client/authority ledger; INDEPENDENT PREVAIL passes;
+KERNEL witnesses show the packaged executable, one call/NOP cycle, stable process
+and zero restarts. There are no reported drops, output refusals, new VM errors or
+new selections. The first test's absolute-counter assertion failed and is retained.
+The later lifetime result above bounds observed initialization/cleanup in this
+HTTP/1 fixture. General request lifetime, HTTP/2, multiple workers and cost remain open.
+[Contract/results](env/ai-traffic/ATTRIBUTION.md#live-parser-scope-experiment),
+[receipts](SOURCES.md#attribution-parser-scope-2026-09-28).
+
+**2026-09-25 — unsampled tutorial and host repairs: MEASURED.**
+Schema 2 attempts one metadata record on every call. The optional interval is
+removed; the previous default was already zero (unsampled). The host now handles
+small HASH tables and collision chains after deletion. Generation-tagged map
+references prevent stale references from reaching replacement storage. Registry
+reset refuses active readers and is attempted only when all slots are disabled
+and preparation is idle. Revoking a second loaded slot preserves the active slot's
+map state. Output delivery returns zero; a full-ring drop or disabled output
+returns a negative value.
+
+Pinned host checks pass for all 256 capacities, two threads across 100 map
+replacements, stale references and busy reset. Configuration regressions pass.
+Both tutorial variants pass PREVAIL, interpreter/JIT, field relocation, packaged
+binding and signing with a one-entry HASH. In the isolated live fixture, repaired
+build `ca69b84f4f5c9e225813b2ed3997c59f18ba2a31` gives 126 exact HTTP responses:
+112 tutorial calls produce 112 records; eight precursor calls produce 16 records
+and initialize both output-map indices before replacement. The test observes
+16 monitor SAFE_RETURN selections, zero reported errors/drops, three call/NOP
+cycles, stable process state and zero restarts. Slots 5 and 6 finish disabled;
+configuration queries refuse. Witnesses: **SELF** counters/native assertions,
+**INDEPENDENT** PREVAIL and HTTP checks, **KERNEL** executable hash and patch bytes.
+The changed runtime source hashes agree across native tests, build and snapshot.
+Per-call cost, sustained output pressure and multi-worker live behavior remain
+unmeasured. Reset adds shared atomic operations; this is not a cost result.
+[Receipts and exact source snapshot](SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
+**Earlier 2026-09-25 — new-user tutorial: MEASURED, with live failures.**
+`substrate/template.c` has entry/exit variants, configuration input, mutable state,
+clock-based sampling and event output. Entry uses all six general helpers,
+four named-field relocations, a two-hop read and optional SAFE_RETURN selection.
+Both variants pass PREVAIL and interpreter/JIT execution. Native layout checks
+and an unrelocated negative test check the field reads. The final objects bind
+to packaged build `b8dc27f3…`; exit return/unwind admission and final verification
+pass. Witnesses: SELF bench and INDEPENDENT PREVAIL. Output uses a test sink.
+The later live test completes entry and exit variants on packaged TMM, in monitor
+mode: 118 exact HTTP responses, 112 hook calls and 112 program records. Configuration
+revisions, threshold changes, counting, reset, delete/re-enable and 16 entry verdict
+selections are observed. Exit results are zero in this fixture; exit selects no action.
+SELF witnesses are program events, counters and test assertions. KERNEL witnesses
+show the executable hash, two call/NOP cycles, stable process/container and zero restarts.
+**Full tutorial success is FALSIFIED:** both sampling phases emit eight records
+instead of zero. The real output bridge reverses success/drop results. Its bench
+test sink did not model this defect. A previous live run also fails after a different
+map layout: revoke resets the registry but leaves stale per-thread storage.
+Both defects have pinned build-box reproducers and were unfixed in that image. Live attempt 03
+has `completed=true`, `passed=false`; it is not a passing test. No enforcement outcome,
+request identity or cost result is claimed.
+The first one-entry hash-map declaration exposed a host lookup fault; the tutorial
+then used 256 entries. See [tutorial](docs/EBPF-TUTORIAL.md),
+[receipts](SOURCES.md#ebpf-tutorial-2026-09-25), and contested premises §§22–24.
+
+**2026-09-25 — configuration input snapshots: MEASURED (pinned bench and isolated live TMM).**
+P21 implements an instance-bound, versioned input ARRAY independently of mutable hash maps.
+Pinned clang-18/PREVAIL, actual uBPF interpreter/JIT, four-reader concurrency, invocation-copy
+write isolation, withdrawal and stale identity/revision refusals pass. The actual loader's
+configuration handler passes fragmented/truncated/trailing stream and controller CLI checks;
+changed translation units syntax-check, and existing cross-TU map/helper regressions pass.
+Witness: **SELF** test assertions plus **INDEPENDENT** PREVAIL admission. Static map symbols
+failed the first admission attempt; that failure is retained. The subsequent packaged image
+`b8dc27f3…` passes the signed LOAD → missing input → publish/update → empty withdrawal →
+same-bytecode reload/new instance → REVOKE lifecycle. Six phases reconcile 48 armed requests,
+48 counter increments and 48 events, with zero reported drops/errors/safe returns; all 52
+HTTP responses including baseline/disarmed requests are exact. Five stale publications refuse.
+**KERNEL** witnesses bind `/proc/7/exe` to the packaged SHA and capture two `e8` call/NOP
+cycles, with unchanged process starttime/container state and restart count 0. The first outer
+recorder's wrong `e9` expectation is retained separately from its passing fixture.
+Live publication pressure, cross-UID authorization rejection and data-path cost remain unvalidated.
+The policy publisher is the local socket-owner UID; configuration bodies are not signed.
+[Contract](configuration-snapshots.md), [receipts](SOURCES.md#configuration-snapshots-2026-09-25).
+
+**2026-09-25 — agent attribution baseline: MEASURED (destination-side fixture).**
+The owner selected attribution as the primary AI-security experiment. `attribution-01` through
+the isolated SSA/Tao TMM passed 23 expected outcomes: 17 accepted operations, six intended
+rejections, 15 attempts on one reused backend connection and eight interleaved across two more.
+Independently provisioned fixture credentials distinguish A/B despite identical caller IDs.
+Spoofed identity metadata does not change the verified actor; forged credentials stay unknown;
+replay and invalid delegation fail; valid delegation preserves B as executor and A as originator.
+Witness: **SELF**, authored client expectations and authentication ledger, independent of eBPF
+but not an independent security audit. The configured principal mapping and HMAC protocol are test
+assumptions; verification/enforcement run at the synthetic destination. No native MCP/A2A filtering,
+TMM-internal attribution join, differentiated visibility or capture/publication cost is established.
+The executing binary matches pinned `c3b81927…` by SHA-256 against the packaged ELF; two recorder
+failures are retained. [Contract/results](env/ai-traffic/ATTRIBUTION.md),
+[receipts](SOURCES.md#agent-attribution-fixture-2026-09-25).
+
+**Attribution follow-up — MEASURED, SELF join-consumer fixture:** 21 adversarial checks
+pass against the retained ledger and explicitly synthetic observations. Unique accepted
+matches preserve actor/delegation; both replay candidates and an unauthenticated attempt
+remain unknown (16 attributed, four rejected, three unknown). A separately verified A/B
+shared-nonce case plus replay also remains entirely unknown. Missing scope/accounting,
+loss and ambiguous/incomplete data fail closed; reordering either input preserves results.
+This establishes consumer behavior, **not
+a live TMM request identity or attribution join**; the live producer gate remains open.
+[Contract and receipt](env/ai-traffic/ATTRIBUTION.md#consumer-result--attribution-join-01).
+
+**2026-09-25 — isolated inspection fixture: MEASURED (bounded unarmed outcomes).**
+`gate-03` on the build-box SSA/Tao fixture delivered the identical 33-byte paced body after
+delayed allow, substituted exactly the 18-byte HTTP 403 denial body on deny, and delivered zero
+response bytes before a connection reset on inspector silence. One request per case; 4,096-byte
+whole-message preview and a configured 3,000 ms timeout. Witness: authored client/inspector socket
+instrumentation independent of the substrate, using one monotonic clock; not a packet-level
+release witness. The allow read completed after the inspector's verdict write. No eBPF program
+was attached; internal-state visibility advantage and incremental cost remain unmeasured.
+Failed fixture attempts are retained in [SOURCES.md](SOURCES.md#isolated-inspection-fixture-2026-09-25).
+This supersedes the earlier preflight's **unrun allow/deny/timeout** status for this bounded
+isolated fixture only. See [`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPECTION.md).
+
 | claim | tier | witness | anchor |
 |---|---|---|---|
 | A verified program loads into a running TMM and arms at a function entry, no rebuild, no restart | MEASURED | KERNEL | entry bytes read from `/proc/<pid>/mem` before and after; `load-path-scope.md` |
 | Disarming restores the entry byte-for-byte | MEASURED | KERNEL | `90 90 90 90 90` → `e8 …` → `90 90 90 90 90`, read from process memory, both pods |
 | Five bytes change; nothing is displaced | MEASURED | KERNEL | `endbr64` and the first real instruction read unchanged either side of the pad |
-| A hook fires exactly once per event | MEASURED | SELF | `fired` counter 1:1 with request count across 16,000 requests. **Self-reported** — the counter is ours |
+| The HTTP hook fired once per request in the recorded 16,000-request workload | MEASURED | SELF | `fired` counter 1:1 in that workload. **Self-reported** — the counter is ours. The 2026-09-28 fragment test gives multiple calls per request; see the parser-scope result above and `CONTESTED-PREMISES.md` §26 |
 | …corroborated independently | MEASURED | INDEPENDENT | packet capture carried the same cause string and line number as the record, via code sharing nothing with the hook |
 | Arming by name is gated on build identity | MEASURED | KERNEL | build ID read from `/proc/<pid>/exe`; mismatch refused. `rst_why` occupied 4 distinct addresses across 4 builds of identical source |
 | Records identify the function that produced them | MEASURED | SELF | was FALSIFIED before 2026-08-19 — see `CONTESTED-PREMISES.md` #1 |
@@ -60,6 +288,16 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 | claim | tier | witness | anchor |
 |---|---|---|---|
+| Application-metadata hook shortlist checked against the repaired package | **MEASURED (source and packaged-binary inspection only), 2026-09-28** | TOOL (build-box source, hook index, ELF notes and disassembly) | [Probe contract](env/ai-traffic/METADATA.md), [receipts](SOURCES.md#application-metadata-hook-discovery-2026-09-28). Build `ca69b84f…`: padded `hud_a2a_handler`, `hud_aimcp_handler`, `a2a_response`, MCP persistence clones and JSON accessors. No exact or clone-prefixed index entries for `a2a_request`, `a2a_lookup_method`, `aimcp_request`. Source describes lazy JSON parsing and escaped, length-delimited strings. Handler reachability and one method-field path are now measured below; session fields remain pending. |
+| Native-handler event-code extraction | **MEASURED, 2026-09-28** | INDEPENDENT (PREVAIL); SELF (native checks, clients, counters and records); KERNEL (hook bytes and process identity) | [Receipts](SOURCES.md#native-handler-event-probes-2026-09-28). Pinned interpreter/JIT and live native-filter checks passed. Eight requests, 192 records / 192 calls, 96 records and 22 codes per handler; no reported loss, new VM errors or restart. Pads restored; fixture removed. These records contain event code, presence bits and probe provenance, **not method names or session IDs**. The unfamiliar method was forwarded, not extracted. These counts did not satisfy the application-field goal; the next row records the subsequent value-comparison test. |
+| Root-object method-field extraction at JSON getter return | **MEASURED, 2026-09-28** | INDEPENDENT (PREVAIL); SELF (native objects/output sink, clients, comparisons and counters); KERNEL (hook bytes and stable process) | [Receipts](SOURCES.md#root-object-method-extraction-2026-09-28), [scope](env/ai-traffic/METADATA.md#7-field-result--measured-on-the-pinned-build). Build 01 exceeded the 256-byte stack limit; build 02 passed the same limit and exit admission. Interpreter/JIT: 40 records, exact bytes, guarded buffers, failures, scope and budget. Live: six exact value/prefix comparisons, getter error and budget exhaustion; eight calls/eight records from ten requests. No reported loss/new VM errors/restart; restored pad and removed fixture. **Limits:** escaped bytes, at most 64 copied; four-member walk; only values the application getter consumes. Nested-only and AIMCP inputs produced no getter calls. No MCP method/session extraction, protocol/request identity or data-path cost claim. |
+| Continuous local journal and replay for method metadata | **MEASURED (bounded native and one-worker live tests), 2026-09-28** | SELF (test source, journal/API checks, clients and counters); KERNEL (source mappings, process identity and hook bytes) | [Contract/results](env/ai-traffic/COLLECTOR.md), [receipts](SOURCES.md#continuous-metadata-collector-2026-09-28). Ten native checks cover pre-ACK replay, post-commit deduplication, locks, source replacement, storage pressure and consumers. Legacy drain at-least-once claim falsified by failed output to `/dev/full`. First live attempt starts before the lazy ring exists; corrected bounded startup passes. Eight method records from ten requests reach two HTTP consumers through ten committed journal events. Exact bytes/statuses agree; no reported loss/new errors/restart; clean stop, restored hook and fixture removal. Limits: finite retention, unverified general program binding, same-lifetime segment reset, silent observation gaps, multiworker ownership, power loss and sustained cost. |
+| Separate collector container and independent replacement | **MEASURED (one-worker isolated fixture), 2026-09-28** | SELF (traffic, API comparisons and assertions); KERNEL/TOOL (process, hook, mappings and container state) | [Contract/results](env/ai-traffic/COLLECTOR-CONTAINER.md), [receipts](SOURCES.md#separate-collector-container-2026-09-28). Eleven native checks and a dedicated image; 0.5 CPU, 128 MiB RAM/swap limit, 32-process limit, separate journal and API volumes. Normal stop and SIGKILL each followed by collector replacement while TMM stays armed. One request during each outage forwards; both queued values reach two separate API-only test consumer containers. Ten requests, eight method records, ten unique journal events; stable TMM process/container/binary and restored hook. Final controller key error retained and corrected by evidence-only recovery, with no new traffic. Limits: shared TMM PID namespace, `SYS_PTRACE` and unconfined AppArmor; operational separation, not strong security isolation. Production load, power loss, multiworker ownership and silent gaps remain unvalidated. |
+| Production streaming service for extracted metadata | **IDEA, 2026-09-28** | NONE (production service contract) | [Contract](env/ai-traffic/PRODUCTION-STREAM.md), pre-registered in P20. Local handoff/replay and separate-container replacement are now measured above. Production multiworker identity, attachment/health history, authenticated off-box transport and sustained cost/throughput remain unvalidated. Collector-side ZeroMQ is a possible adapter. |
+| Synthetic AI message flows traverse the current TMM HTTP proxy | **MEASURED (scoped live fixture), 2026-09-24** | SELF fixture + TOOL/KERNEL | P19, [`env/ai-traffic/README.md`](env/ai-traffic/README.md). Run `ai-4f9fb0add705` on build `c3b81927…`: 51/51 exchanges from three concurrent workers; MCP-shaped sessions/tool/resource calls/errors, A2A-shaped task get/cancel/SSE, inference JSON/SSE and client retry. Six streams preserve pacing; exact request/response body-hash and ID reconciliation. Backend sees TMM SNAT, selected-TMM packet capture confirms listener, stable pod/container and zero restarts. Cleartext HTTP/1 with native AI filters disabled; synthetic peers, not protocol conformance, real AI execution or eBPF metadata. |
+| Response-adaptation sources provide an inspection-gate lead; the original P19 forwarding fixture has no inspection gate | **MEASURED (source/configuration preflight), 2026-09-24; bounded isolated outcomes added 2026-09-25** | TOOL/KERNEL + SELF fixture | [`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPECTION.md), receipts registered in `SOURCES.md`. Build-box source/test examples and packaged hook candidates exist; the installed virtual-server schema has no adaptation-profile field. iRules already exposes ordinary adaptation verdict/timeout/action. Inference response egress is passthrough with a lossy analyzer mirror, not a response-DLP hold. **Earlier unrun status superseded:** the separate SSA fixture now measures bounded allow/deny/timeout outcomes, as recorded above. Unique-state observation and incremental cost remain unrun under P20/P16. |
+| The current upstream TMM tree already contains A2A and AI MCP processing | **MEASURED (source inventory only), 2026-09-24** | TOOL (build-box source inspection) | Tree `/home/starin/code/tmm`, HEAD `e2104734a940a099a9190eb84bfbea01fb4b81d4`: clean tracked `src/modules/hudfilter/a2a/` and `aimcp/`, both with active `src/compile/filelist` entries. A2A walks JSON-RPC method/params/result and SSE messages, handles task/context ID persistence and rejects push-notification methods. AIMCP parses/rewrites `Mcp-Session-Id` for persistence; this is not evidence of a complete MCP operation-body decoder. No live protocol or binary-inclusion validation in this inspection. Source hashes/excerpts: `evidence/cache/ai-protocol-source-20260924.txt`, registered in `SOURCES.md`. Proposed semantic eBPF events/actions remain IDEA. |
+| Named embedded structures can be mixed with pointer edges in the DSL | **MEASURED (fixtures + scoped live probes), 2026-09-24** | SELF + TOOL/KERNEL | [`embedded-traversal-validation.md`](embedded-traversal-validation.md), P17. Native C offsets/known values checked through pinned PREVAIL, uBPF interpreter and JIT, including declines/refusals and legacy catalogs; real-TMM independent relocation check agrees 12/12. Build-box authoring catalog updated with all old keys preserved. Three signed HTTP/1 monitor probes on build `c3b81927…` produce 16/16, 0/16, 16/16 matches; HTTP 200 throughout, independent NOP restoration, no post-disarm fires, stable pod and zero restarts. HTTP/2 pointer→embedded expression only verified/signed; no universal coverage or cost claim. |
 | ~41k functions armable via the pad; ~30k need displacement | MEASURED | KERNEL | generated per build from the packaged binary. **Counts move every build** — 41,148 then 41,160. Count from the image, per `env/bnk-dev-runbook.md` §12f |
 | OpenSSL's 1,781 linked symbols are unreachable | MEASURED | KERNEL | no entry padding outside TMM core; the index records them as displacement-only |
 | Displacement reaches them | ROADMAP | — | designed, unimplemented |
@@ -90,6 +328,9 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 | claim | tier | witness | anchor |
 |---|---|---|---|
+| A signed LOAD hook name and mode ceiling constrained the separate ARM/SET_MODE requests | **FALSIFIED (authoritative source review), 2026-09-24** | SELF/TOOL (source comparison, not live attack) | `CONTESTED-PREMISES.md` §18; the pre-correction `ls_vm_load.c` and `ls_arm.c` in the build tree matched HEAD `f08a820` by SHA-256. ARM accepted a separate address without matching it to the signed hook; LOAD/SET_MODE did not compare the signed ceiling. The correction's per-program target binding and mode ceilings are now deployed and live-validated under P18; see [`catalog-free-deployment.md`](catalog-free-deployment.md) for tested refusals and scope. |
+| A TMM image can omit bulk attachment/type catalogs while signed entry/exit programs still run | **MEASURED (live + full saved-image audit), 2026-09-24** | SELF + TOOL/KERNEL | [`catalog-free-deployment.md`](catalog-free-deployment.md), P18. Build `c3b81927dfdcc31137cd8212b5e23bb85677a06c`, image `tmm:CATALOGFREE-20260924`: 16 layers / 7,504 files / 1,318 ELFs audited, no named bulk catalogs or ELF BTF. Build-box discovery preserved. Live signed context probes: 32 entry + 32 exit HTTP 200s with exact deltas, no errors; same-target reload accepted while attached; wrong-full-build/kind/address/tamper and attached-kind reload refused; ARM/DISARM ownership and monitor ceilings exercised. Independent NOP restoration, 8 zero-fire HTTP 200s after each disarm, stable pod and zero restarts. DSL entry/exit probes each counted 16/16 requests. One function/one pod; no cost, concurrency, symbol-concealment or reduced-exploitability claim. |
+| Removing embedded BTF removes the shipped function catalog | **FALSIFIED as an inference, 2026-09-24** | TOOL/KERNEL | Targeted inspection of stable pod `f5-tmm-59696979b6-6xv8n`, executing build `5c76bc3a6069d7aa2aea51d32b69a2742563ddc4`: no `.BTF` sections in `/proc/24/exe`, but `/usr/share/ls/hook-index.tsv` (3,409,257 bytes) and `signatures.tsv` (6,467,602 bytes) are present, both with matching build headers. These expose function names/addresses and parameter/type descriptions outside the ELF. `env/docker/Dockerfile.ls-tools` explicitly ships both. BTF removal moves field resolution off-box; it is not function-name concealment or evidence of reduced exploitability. See [`broader-coverage-roadmap.md`](broader-coverage-roadmap.md) §4. Full-image metadata inventory remains separate work. |
 | Entry/exit contexts cover PREVAIL's 96-byte tracing region and zero the unused tail | **MEASURED (live TMM + off-TMM harness), 2026-09-23; deployed build `5c76bc3a`** | SELF (verdicts/samples/JIT logs) + TOOL/KERNEL (sanitizers, PREVAIL, curl, `/proc` reads, pod identity) | [`ctx-contract-validation.md`](ctx-contract-validation.md), cached receipts; `CONTESTED-PREMISES.md` §17. Both contexts are 96 bytes; argument offsets and exit `ret` at 40 are preserved. Build-box harnesses pass with clang-18 + ASan/UBSan and GCC; pinned PREVAIL accepts 88–95 and refuses 96–103 for both hook kinds. **Live:** signed monitor-mode JIT probes on `http_parse_client_headers`, 32 entry + 32 exit requests, all zero-tail verdicts after repeated tail poisoning, `len=96`, HTTP 200, errors=0, restarts=0. After each disarm, `/proc/24/mem` shows five restored NOPs and eight requests cause no fires. One stable `kind-vs` pod, BTF-less executing ELF matched by full build ID and SHA-256. Used a temporary HTTP/1 fixture because shared `:8081` points at an HTTP/2 backend. **Added hot-path cost remains unmeasured; benchmark/self-test contexts are enlarged but not exercised live in this run.** September 18's failure below is the retained pre-fix record. |
 | **The context PREVAIL verifies against is the context the trampoline passes** | **FALSIFIED, 2026-09-18** | TOOL (PREVAIL, pinned clang-18 on the build box) | `fentry/` selects PREVAIL's `tracing` type, whose context is **96 bytes**; `ls_tramp.c:107` passes `&ctx, sizeof ctx` where ctx is `struct { uint64_t arg[5]; }` — **40 bytes**. Measured both ways: a read at bytes 88–95 **PASSES**, 96–103 is refused. So **bytes 40–95 are verifiable but unallocated** — 56 bytes of the trampoline's own stack frame (saved registers, return address, locals) that a PREVAIL-verified, F5-signed, build-pinned program can read with **every gate passing**. The 96-byte number was already measured and documented in six places, but as a *capacity ceiling* ("your ctx may be up to 96 bytes"), never as a read-past-the-end gap |
 | The NULL-context hazard in `ubpf/docs/VerifiedPrograms.md` applies to us | **NO — structurally impossible** | SELF (source read) | The documented failure is a verified program dereferencing a NULL `r1` because uBPF permits a NULL `mem`. Our context is a **local struct in the trampoline's own frame**, passed as `&ctx, sizeof ctx`; no code path can supply NULL or a mismatched length. Satisfied by construction rather than by a check — see `evidence/cache/ubpf-c900ed9f-VerifiedPrograms.md` |

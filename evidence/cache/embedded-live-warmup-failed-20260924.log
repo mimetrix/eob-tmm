@@ -1,0 +1,54 @@
+kind-vs
+PINNED f5-tmm-7597dfff8b-28s9z ('42259fbc-3303-492a-95b1-9146b4105583', 'containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63', 0, 'sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1')
+c3b81927dfdcc31137cd8212b5e23bb85677a06c a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7 bulk catalogs absent
+OK armed=1 mode=0 gen=2 fired=32 safe_returns=32 errors=0 cycles=1607624 cycles_max=1099896 cycles_min=1192
+9090909090
+configmap/ctx-contract-test created
+pod/ctx-contract-test created
+f5bigcnepool.k8s.f5net.com/ctx-contract-test created
+f5virtualserver.k8s.f5net.com/ctx-contract-test created
+pod/ctx-contract-test condition met
+WARMUP 1 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 2 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 3 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 4 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 5 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 6 28  curl: (28) Operation timed out after 2003 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 7 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 8 28  curl: (28) Operation timed out after 2001 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 9 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 10 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 11 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 12 28  curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+configmap "ctx-contract-test" deleted from default namespace
+pod "ctx-contract-test" deleted from default namespace
+f5bigcnepool.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+f5virtualserver.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+Traceback (most recent call last):
+  File "/tmp/embedded-live-driver-20260924.py", line 97, in <module>
+    raise AssertionError("HTTP/1 fixture did not become reachable during bounded warm-up")
+AssertionError: HTTP/1 fixture did not become reachable during bounded warm-up

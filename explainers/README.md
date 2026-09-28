@@ -1,9 +1,14 @@
 # Explainers — index
 
+**New evidence view, 2026-09-25:** [Agent attribution — recorded experiment](agent-attribution-evidence.html).
+Actual `attribution-01` delegation IDs, spoofing records, all 23 outcomes, code and raw receipts.
+MEASURED destination-side fixture; the TMM-internal attribution join remains unrun. Repo-only.
+
 ## Publication tracking — EMPTY, and that is the finding
 
 | page | published? | artifact URL | published from commit |
 |---|---|---|---|
+| `agent-attribution-evidence.html` | no — repo-only | — | — |
 | `cve-mitigation.html` | unknown | — | — |
 | `status-one-pager.html` | unknown | — | — |
 | `programmable-dataplane-engine.html` | unknown | — | — |

@@ -45,7 +45,7 @@ import sys
 import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CLANG = os.environ.get("CLANG", "clang-14")
+CLANG = os.environ.get("CLANG", "clang-18")
 PREVAIL = os.environ.get("PREVAIL", os.path.join(REPO, "ebpf-verifier", "bin", "prevail"))
 SIGS = os.environ.get("LS_SIGS", os.path.expanduser("~/lstools/signatures.tsv"))
 TYPES = os.environ.get("LS_TYPES", os.path.expanduser("~/lstools/types.json"))
@@ -63,7 +63,7 @@ _FIELD = re.compile(
 _ARG = re.compile(r"^arg([0-4])$")
 _ARGSDOT = re.compile(r"^args\.([A-Za-z_]\w*)$")
 _ARGNDOT = re.compile(r"^arg([0-4])\.([A-Za-z_]\w*)$")
-# multi-hop: args.a.b.c / argN.a.b.c --- a pointer chase through connection state, which is
+# multi-hop: args.a.b.c / argN.a.b.c --- pointer/embedded traversal through connection state, which is
 # where most real CVE preconditions live (e.g. sc->sp->hs->ks_ext_brainpoolp256_sz).
 _ARGSPATH = re.compile(r"^args\.([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)$")
 _ARGNPATH = re.compile(r"^arg([0-4])\.([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)$")
@@ -131,6 +131,11 @@ def _ptr_edges():
     return _types().get("__ptr_targets__", {})
 
 
+def _embedded_edges():
+    """Named by-value struct members; absent in legacy pointer-only catalogs."""
+    return _types().get("__embedded__", {})
+
+
 def _bitfields():
     """{struct: {field: {unit, byte, shift, width}}} --- bitfields, from the BTF catalog.
 
@@ -163,10 +168,11 @@ def _bitfield_refusal(struct, field):
 def resolve_path(hook, argidx, parts):
     """Resolve args.a.b.c to a chain of reads.
 
-    -> ('chain', arg_index, [(struct, field, 'ptr', target), ..., (struct, field, 'scalar', ctype)])
+    -> ('chain', arg_index, [(struct, field, 'ptr'|'embedded', target),
+                            ..., (struct, field, 'scalar', ctype)])
 
-    Every hop but the last must be a POINTER field whose target the catalog knows; the last
-    must be a scalar. Tries each struct-typed argument unless one was named explicitly.
+    Intermediate hops are pointer or named embedded-struct edges; the last is a scalar.
+    Tries each struct-typed argument unless one was named explicitly.
     """
     params = hook_params(hook)
     if params is None:
@@ -192,13 +198,22 @@ def resolve_path(hook, argidx, parts):
                 hops.append((cur, f, "scalar", CTYPE[ty]))
             else:
                 tgt = _ptr_edges().get(cur, {}).get(f)
-                if not tgt:
-                    tried.append("%s has no pointer field '%s'" % (cur, f)); ok = False; break
-                hops.append((cur, f, "ptr", tgt))
+                member = _embedded_edges().get(cur, {}).get(f)
+                if tgt and member:
+                    raise DslError("ambiguous pointer/embedded metadata for %s.%s" % (cur, f))
+                if not tgt and not member:
+                    bfmsg = _bitfield_refusal(cur, f)
+                    if bfmsg:
+                        raise DslError(bfmsg)
+                    tried.append("%s has no pointer or named embedded struct field '%s'" % (cur, f))
+                    ok = False
+                    break
+                kind, tgt = ("ptr", tgt) if tgt else ("embedded", member)
+                hops.append((cur, f, kind, tgt))
                 cur = tgt
         if ok:
             return ("chain", i, hops)
-    raise DslError("could not resolve path '%s' at %s (%s). Needs pointer targets in the "
+    raise DslError("could not resolve path '%s' at %s (%s). Needs pointer/embedded targets in the "
                    "catalog --- regenerate types.json with gen_type_catalog.py"
                    % (".".join(parts), hook, "; ".join(tried[:3])))
 
@@ -249,7 +264,7 @@ def _read(val, k, reg):
     declaration per (struct, field) pair produced `error: redefinition of 'xbuf'` the
     moment two fields of the same struct were referenced, which a multi-hop chain does
     by construction. `preserve_access_index` means the local layout is irrelevant:
-    clang emits a CO-RE relocation per field and the loader patches the real offset.
+    clang emits CO-RE relocations and the build-side relocator patches the real offsets.
     """
     if val[0] == "scalar":
         return "", "c->arg[%d]" % val[1]
@@ -259,8 +274,10 @@ def _read(val, k, reg):
         lines, src = [], "c->arg[%d]" % n
         for h, (struct, field, kind, extra) in enumerate(hops):
             pv = "p%d_%d" % (k, h)
-            reg(struct, field, "__u64" if kind == "ptr" else extra)
+            ct = "__u64" if kind == "ptr" else "struct " + extra if kind == "embedded" else extra
+            reg(struct, field, ct)
             lines.append("    struct %s *%s = (struct %s *)(%s);" % (struct, pv, struct, src))
+            lines.append("    if (%s == 0) return 0ull;" % pv)
             if kind == "ptr":
                 hv = "h%d_%d" % (k, h)
                 lines.append("    __u64 %s = 0;" % hv)
@@ -268,6 +285,9 @@ def _read(val, k, reg):
                              % (hv, hv, pv, field, hv))
                 lines.append("        return 0ull;   /* unreadable or NULL hop --- decline */")
                 src = hv
+            elif kind == "embedded":
+                # Address computation only: inline member bytes are NOT a pointer.
+                src = "&%s->%s" % (pv, field)
             else:
                 vv = "v%d" % k
                 lines.append("    %s %s = 0;" % (extra, vv))
@@ -302,6 +322,9 @@ def codegen(expr):
     sfields, code, k = {}, [], 0        # struct -> {field: ctype}, accumulated
 
     def reg(struct, field, ctype):
+        old = sfields.get(struct, {}).get(field)
+        if old is not None and old != ctype:
+            raise DslError("conflicting field types for %s.%s" % (struct, field))
         sfields.setdefault(struct, {})[field] = ctype
 
     def take(tok):
@@ -383,10 +406,27 @@ def codegen(expr):
         else:
             ret = "    return %s;                 /* value; host samples it */" % ex
 
-    # one declaration per struct, carrying every field the program touches
-    structs = ["struct %s { %s } __attribute__((preserve_access_index));"
-               % (st, " ".join("%s %s;" % (ct, f) for f, ct in sorted(fl.items())))
-               for st, fl in sorted(sfields.items())]
+    # By-value members require complete types: emit embedded dependencies first.
+    # Pointer fields stay scalar addresses and add no declaration dependency.
+    structs, visiting, emitted = [], set(), set()
+
+    def emit(st):
+        if st in emitted:
+            return
+        if st in visiting or st not in sfields:
+            raise DslError("incomplete or cyclic embedded struct metadata: " + st)
+        visiting.add(st)
+        fl = sfields[st]
+        for ct in fl.values():
+            if ct.startswith("struct "):
+                emit(ct[len("struct "):])
+        structs.append("struct %s { %s } __attribute__((preserve_access_index));"
+                       % (st, " ".join("%s %s;" % (ct, f) for f, ct in sorted(fl.items()))))
+        visiting.remove(st)
+        emitted.add(st)
+
+    for st in sorted(sfields):
+        emit(st)
     lines = head + structs + [ctxdef, "",
                               '__attribute__((section("%s/%s"), used))' % (section, hook),
                               "__u64 %s(struct %s *c)" % (fn, ctx), "{"] \

@@ -2,7 +2,7 @@
 # Bake the live-surface tools into a built TMM image. RUNS ON THE BUILD BOX.
 #
 #   bnk-bake-tools.sh [base-tag] [out-tag]      default: tmm:local -> tmm:ls
-#   bnk-bake-tools.sh --btf-only                stop after deriving $CTX/tmm.btf
+#   bnk-bake-tools.sh --btf-only                derive BTF + build-side hook index
 #
 # --btf-only EXISTS TO BREAK A CIRCULAR DEPENDENCY, added 2026-09-04. Step 1b below
 # derives this build's BTF, and since sign-time relocation
@@ -162,17 +162,6 @@ else
     echo "       struct layouts in a binary F5 otherwise ships stripped. Deliberate?"
 fi
 
-if [ -n "$BTF_ONLY" ]; then
-    echo
-    echo "=== --btf-only: stopping here ==="
-    echo "  $CTX/tmm.btf  ($(wc -c < "$CTX/tmm.btf") bytes, build ${BID_BEFORE%${BID_BEFORE#????????}})"
-    echo
-    echo "  Next: TMM_BTF=$CTX/tmm.btf env/scripts/bnk-build-programs.sh"
-    echo "        then bnk-bake-tools.sh --- which ships a binary with NO type"
-    echo "        information by default. LS_EMBED_BTF=1 for the old behaviour."
-    exit 0
-fi
-
 echo
 echo "=== 2. generate the index (mk_hook_map.py checks the pair's build ids agree)"
 python3 "$REPO/substrate/mk_hook_map.py" --debs "$DEBS" \
@@ -182,6 +171,13 @@ N=$(grep -vc '^#' "$CTX/hook-index.tsv")
 [ -n "$BID" ] || fail "the generated index carries no build id"
 echo "  build id  : $BID"
 echo "  symbols   : $N"
+
+if [ -n "$BTF_ONLY" ]; then
+    echo "=== --btf-only: BTF and attachment index ready for this packaged build ==="
+    echo "  $CTX/tmm.btf; $CTX/hook-index.tsv; build $BID"
+    echo "  Next: TMM_BTF=$CTX/tmm.btf env/scripts/bnk-build-programs.sh"
+    exit 0
+fi
 
 echo
 echo "=== 2b. generate the SIGNATURE index --- one DWARF walk for every function"
@@ -211,6 +207,7 @@ SBID=$(awk -F'\t' '/^#build_id/{print $2}' "$CTX/signatures.tsv")
     signatures.tsv  $SBID
     Two tools read what should be one binary and got different answers. Do not bake this."
 echo "  build id  : $SBID (matches the hook index)"
+python3 "$REPO/substrate/gen_type_catalog.py" "$CTX/tmm.btf" "$CTX/types.json"
 
 # 2b-bis. THE OFFSETS HEADER MUST DESCRIBE THIS BINARY TOO.
 #
@@ -327,6 +324,13 @@ cp "$REPO/env/docker/ls-verify-layer.sh" "$CTX/ls-verify-layer.sh"
 # env/docker/ and it carried the segment-only parse that truncates a 20-byte id to 16 on the
 # PGO debug build. One file, copied here, is the fix --- see substrate/ls_buildid.py.
 cp "$REPO/substrate/ls_buildid.py"       "$CTX/ls_buildid.py"
+python3 - "$CTX" "$BID" <<'PY'
+import hashlib, json, pathlib, sys
+ctx = pathlib.Path(sys.argv[1])
+identity = {'build_id': sys.argv[2],
+            'sha256': hashlib.sha256((ctx / 'tmm64.no_pgo').read_bytes()).hexdigest()}
+(ctx / 'runtime-identity.json').write_text(json.dumps(identity, sort_keys=True) + '\n')
+PY
 grep -q "ls-verify-layer.sh" "$CTX/Dockerfile" || fail "the Dockerfile at
     $REPO/env/docker/Dockerfile.ls-tools does not reference ls-verify-layer.sh.
     It is stale, or its assertion was removed. Either way the build-id check would not
@@ -343,45 +347,11 @@ docker build --build-arg "BASE=$BASE" -t "$OUT" "$CTX" 2>&1 | tail -6 | sed 's/^
 
 echo
 echo "=== 5. VERIFY THE RESULT, from inside the image --- not from this script's beliefs"
-# The index's build id must match the binary that /usr/bin/tmm RESOLVES to. Checking
-# the index alone would pass on an image whose tmm points at the padless debug build.
-docker run --rm --entrypoint sh "$OUT" -c '
-  R=$(readlink -f /usr/bin/tmm)
-  echo "  tmm resolves to : $R"
-  IDX=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/hook-index.tsv)
-  echo "  index build id  : $IDX"
-  LIVE=$(python3 - "$R" <<'"'"'PY'"'"'
-import struct, sys
-f = open(sys.argv[1], "rb"); e = f.read(64)
-phoff, = struct.unpack_from("<Q", e, 0x20)
-pes, pn = struct.unpack_from("<HH", e, 0x36)
-for i in range(pn):
-    f.seek(phoff + i*pes); ph = f.read(pes)
-    if struct.unpack_from("<I", ph, 0)[0] != 4: continue
-    off, = struct.unpack_from("<Q", ph, 0x08); sz, = struct.unpack_from("<Q", ph, 0x20)
-    f.seek(off); n = f.read(sz); j = 0
-    while j + 12 <= len(n):
-        ns, ds, t = struct.unpack_from("<III", n, j)
-        nm = n[j+12:j+12+ns].rstrip(b"\x00"); d = j+12+((ns+3)&~3)
-        if t == 3 and nm == b"GNU": print(n[d:d+ds].hex()); sys.exit(0)
-        j = d + ((ds+3)&~3)
-PY
-)
-  echo "  binary build id : $LIVE"
-  if [ "$IDX" = "$LIVE" ]; then
-    echo "  MATCH --- arming by name will work in this image"
-  else
-    echo "  *** MISMATCH. ls-load.py will refuse to arm, which is correct but useless."
-    echo "      The index describes a different binary than the one this image runs."
-    exit 1
-  fi
-  SIG=$(awk -F"\t" "/^#build_id/{print \$2}" /usr/share/ls/signatures.tsv)
-  if [ "$SIG" != "$LIVE" ]; then
-    echo "  *** signatures.tsv build id $SIG describes a different binary."
-    exit 1
-  fi
-  echo "  signatures      : $(grep -vc "^#" /usr/share/ls/signatures.tsv) functions, build id matches"
-'
+docker run --rm --entrypoint sh "$OUT" /usr/share/ls/ls-verify-layer.sh
+# Check layers, not just the merged filesystem. A catalog in BASE survives a
+# later deletion and must prevent publication of this image.
+docker save -o "$RT/catalog-audit.tar" "$OUT"
+python3 "$REPO/env/scripts/check-image-metadata.py" "$RT/catalog-audit.tar"
 
 echo
 echo "=== 5b. does the binary TRUST the key the programs beside it were SIGNED with?"

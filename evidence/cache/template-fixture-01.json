@@ -1,0 +1,28 @@
+{
+  "passed": false,
+  "commands": [
+    {
+      "command": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/eob-tmm-staged/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "/home/starin/eob-config-20260925/check_map_reuse.c",
+        "-o",
+        "/home/starin/eob-config-20260925/check-map-reuse"
+      ],
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "In file included from /home/starin/eob-tmm-staged/substrate/ls_map_glue.h:35,\n                 from /home/starin/eob-config-20260925/check_map_reuse.c:5:\n/home/starin/code/tmm/.ubpf/vm/inc/ubpf.h:28:10: fatal error: ubpf_config.h: No such file or directory\n   28 | #include <ubpf_config.h>\n      |          ^~~~~~~~~~~~~~~\ncompilation terminated.\n"
+    }
+  ],
+  "sources": {
+    "/home/starin/eob-tmm-staged/substrate/ls_map.h": "af4f112a1156bd112a2432fe0c72f666420019766f3775758c65de074f0b039b",
+    "/home/starin/eob-tmm-staged/substrate/ls_map_glue.h": "af849d3fc34df486f7de343f5f0f121018d6466e6251ebb18870ae18826bae36",
+    "/home/starin/eob-config-20260925/check_map_reuse.c": "67c5863a4c7f7fabdf8b178e35a46e462c15ef9fd61934aea21929817755d62f"
+  },
+  "error": "AssertionError({'command': ['gcc', '-O2', '-Wall', '-Wextra', '-Werror', '-I/home/starin/eob-tmm-staged/substrate', '-I/home/starin/code/tmm/.ubpf/vm/inc', '/home/starin/eob-config-20260925/check_map_reuse.c', '-o', '/home/starin/eob-config-20260925/check-map-reuse'], 'returncode': 1, 'stdout': '', 'stderr': 'In file included from /home/starin/eob-tmm-staged/substrate/ls_map_glue.h:35,\\n                 from /home/starin/eob-config-20260925/check_map_reuse.c:5:\\n/home/starin/code/tmm/.ubpf/vm/inc/ubpf.h:28:10: fatal error: ubpf_config.h: No such file or directory\\n   28 | #include <ubpf_config.h>\\n      |          ^~~~~~~~~~~~~~~\\ncompilation terminated.\\n'})"
+}

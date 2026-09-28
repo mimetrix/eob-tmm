@@ -1,0 +1,127 @@
+{
+  "source": "#!/usr/bin/env python3\n\"\"\"Retain process-access checks after the first separate-container refusal.\"\"\"\nimport json\nfrom pathlib import Path\nimport subprocess\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\nIMAGE = \"sha256:9df8cd780e6c5ef1d58cdc3a0057875e759e35dcaa55d6df7d64ba9f45dfff94\"\nSOURCE = str(ROOT / \"collector-source-01\")\nTMM = \"eob-template-20260925-tmm-1\"\nIDENTITY = '''import json,pathlib\np=pathlib.Path(\"/proc\")\nprint(json.dumps({\"self_profile\":(p/\"self/attr/current\").read_text(),\n \"target_profile\":(p/\"7/attr/current\").read_text(),\n \"self_security\":[l for l in (p/\"self/status\").read_text().splitlines() if l.startswith((\"Cap\",\"Seccomp\",\"NoNewPrivs\"))]}))\n'''\n\n\ndef main():\n    record = {\"source\": Path(__file__).read_text(), \"commands\": []}\n    base = [\"docker\", \"run\", \"--rm\", \"--network\", \"none\", \"--pid\", \"container:\" + TMM,\n            \"--cap-drop\", \"ALL\", \"--cap-add\", \"SYS_PTRACE\", \"--security-opt\", \"no-new-privileges\",\n            \"-v\", SOURCE + \":/source:ro\"]\n    commands = [\n        [\"docker\", \"inspect\", TMM, \"--format\", \"{{json .AppArmorProfile}}\"],\n        base + [\"--entrypoint\", \"python3\", IMAGE, \"-c\", IDENTITY],\n        base + [\"--security-opt\", \"apparmor=unconfined\", \"--entrypoint\", \"python3\", IMAGE, \"-c\", IDENTITY],\n        base + [\"--security-opt\", \"apparmor=unconfined\", IMAGE, \"--check-source\"],\n        base + [\"--security-opt\", \"apparmor=unconfined\", IMAGE, \"--source\", \"/source/wrong-start.json\", \"--check-source\"],\n    ]\n    with (ROOT / \"collector-container-diagnostic-01.json\").open(\"x\") as output:\n        try:\n            for command in commands:\n                row = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)\n                record[\"commands\"].append({\"argv\": command, \"rc\": row.returncode,\n                                           \"stdout\": row.stdout, \"stderr\": row.stderr})\n        finally:\n            json.dump(record, output, indent=2)\n    print(json.dumps(record[\"commands\"], indent=2))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "eob-template-20260925-tmm-1",
+        "--format",
+        "{{json .AppArmorProfile}}"
+      ],
+      "rc": 0,
+      "stdout": "\"unconfined\"\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--pid",
+        "container:eob-template-20260925-tmm-1",
+        "--cap-drop",
+        "ALL",
+        "--cap-add",
+        "SYS_PTRACE",
+        "--security-opt",
+        "no-new-privileges",
+        "-v",
+        "/home/starin/eob-config-20260925/collector-source-01:/source:ro",
+        "--entrypoint",
+        "python3",
+        "sha256:9df8cd780e6c5ef1d58cdc3a0057875e759e35dcaa55d6df7d64ba9f45dfff94",
+        "-c",
+        "import json,pathlib\np=pathlib.Path(\"/proc\")\nprint(json.dumps({\"self_profile\":(p/\"self/attr/current\").read_text(),\n \"target_profile\":(p/\"7/attr/current\").read_text(),\n \"self_security\":[l for l in (p/\"self/status\").read_text().splitlines() if l.startswith((\"Cap\",\"Seccomp\",\"NoNewPrivs\"))]}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"self_profile\": \"docker-default (enforce)\\n\", \"target_profile\": \"unconfined\\n\", \"self_security\": [\"CapInh:\\t0000000000000000\", \"CapPrm:\\t0000000000080000\", \"CapEff:\\t0000000000080000\", \"CapBnd:\\t0000000000080000\", \"CapAmb:\\t0000000000000000\", \"NoNewPrivs:\\t1\", \"Seccomp:\\t2\", \"Seccomp_filters:\\t1\"]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--pid",
+        "container:eob-template-20260925-tmm-1",
+        "--cap-drop",
+        "ALL",
+        "--cap-add",
+        "SYS_PTRACE",
+        "--security-opt",
+        "no-new-privileges",
+        "-v",
+        "/home/starin/eob-config-20260925/collector-source-01:/source:ro",
+        "--security-opt",
+        "apparmor=unconfined",
+        "--entrypoint",
+        "python3",
+        "sha256:9df8cd780e6c5ef1d58cdc3a0057875e759e35dcaa55d6df7d64ba9f45dfff94",
+        "-c",
+        "import json,pathlib\np=pathlib.Path(\"/proc\")\nprint(json.dumps({\"self_profile\":(p/\"self/attr/current\").read_text(),\n \"target_profile\":(p/\"7/attr/current\").read_text(),\n \"self_security\":[l for l in (p/\"self/status\").read_text().splitlines() if l.startswith((\"Cap\",\"Seccomp\",\"NoNewPrivs\"))]}))\n"
+      ],
+      "rc": 0,
+      "stdout": "{\"self_profile\": \"unconfined\\n\", \"target_profile\": \"unconfined\\n\", \"self_security\": [\"CapInh:\\t0000000000000000\", \"CapPrm:\\t0000000000080000\", \"CapEff:\\t0000000000080000\", \"CapBnd:\\t0000000000080000\", \"CapAmb:\\t0000000000000000\", \"NoNewPrivs:\\t1\", \"Seccomp:\\t2\", \"Seccomp_filters:\\t1\"]}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--pid",
+        "container:eob-template-20260925-tmm-1",
+        "--cap-drop",
+        "ALL",
+        "--cap-add",
+        "SYS_PTRACE",
+        "--security-opt",
+        "no-new-privileges",
+        "-v",
+        "/home/starin/eob-config-20260925/collector-source-01:/source:ro",
+        "--security-opt",
+        "apparmor=unconfined",
+        "sha256:9df8cd780e6c5ef1d58cdc3a0057875e759e35dcaa55d6df7d64ba9f45dfff94",
+        "--check-source"
+      ],
+      "rc": 0,
+      "stdout": "{\"source_checked\": {\"pid\": \"7\", \"start\": \"328011354\", \"boot\": \"1a72f705-086c-4243-968e-8b96a03e4770\", \"pid_namespace\": \"4026532592\", \"sha256\": \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\"}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--pid",
+        "container:eob-template-20260925-tmm-1",
+        "--cap-drop",
+        "ALL",
+        "--cap-add",
+        "SYS_PTRACE",
+        "--security-opt",
+        "no-new-privileges",
+        "-v",
+        "/home/starin/eob-config-20260925/collector-source-01:/source:ro",
+        "--security-opt",
+        "apparmor=unconfined",
+        "sha256:9df8cd780e6c5ef1d58cdc3a0057875e759e35dcaa55d6df7d64ba9f45dfff94",
+        "--source",
+        "/source/wrong-start.json",
+        "--check-source"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"/app/collector_container.py\", line 75, in <module>\n    main()\n  File \"/app/collector_container.py\", line 33, in main\n    source = source_check(args.source)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/app/collector_container.py\", line 24, in source_check\n    raise ValueError(\"source binding mismatch\")\nValueError: source binding mismatch\n"
+    }
+  ]
+}

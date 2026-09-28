@@ -250,6 +250,8 @@ ls_audit_opname(unsigned int op)
     case SHIELD_OP_SET_MODE: return "SET_MODE";
     case SHIELD_OP_STATUS:   return "STATUS";
     case SHIELD_OP_REVOKE:   return "REVOKE";
+    case SHIELD_OP_CONFIG_STATUS: return "CONFIG_STATUS";
+    case SHIELD_OP_CONFIG_PUBLISH: return "CONFIG_PUBLISH";
     /* ls_vm_load.c's implementation ops, by the numbers its switch uses. */
     case 0x1001:             return "BENCH";
     case 0x1002:             return "SAMPLES";

@@ -8,6 +8,354 @@ Ordered newest first.
 
 ---
 
+## 31 · Separate collector permissions and report assumptions — corrected
+
+**2026-09-28.** The first container plan expected shared PID namespace plus
+`SYS_PTRACE` to permit source checks. Attempt 01 still gets permission denied when
+reading `/proc/7/exe`. The collector uses AppArmor `docker-default`; the privileged
+TMM is unconfined. A targeted diagnostic retains both profiles and the capability
+mask. With `apparmor=unconfined`, the exact source passes and a wrong start time
+is refused. Seccomp and no-new-privileges remain active.
+
+**Replacement limit:** this deployment separates container lifecycle, storage and
+resource limits. It does not establish strong security isolation from TMM. A
+restricted process-access policy or different source-registration design remains
+work for Threat Model Analysis. The test does not silently omit source checks.
+
+Two controller assumptions also failed. Attempt 02 expected Docker to report
+`SYS_PTRACE`; the report uses `CAP_SYS_PTRACE`. Attempt 03 completed the ten traffic
+requests and both collector replacements, then expected `event_id` on every event.
+Source boundaries carry `source_id`. The correction checks every cursor and each
+record's `event_id`. Evidence-only recovery validates the saved pages, journal,
+fixture reports and kernel state. It sends no new traffic. The failed receipt and
+its exact driver remain immutable; the working driver includes the correction.
+
+[Receipts](SOURCES.md#separate-collector-container-2026-09-28),
+[container scope](env/ai-traffic/COLLECTOR-CONTAINER.md).
+
+## 30 · Legacy drain at-least-once delivery — FALSIFIED
+
+**2026-09-28, pinned native test.** `ls_drain.c` said records were written before
+`consumer_pos` advanced. It also said `fflush()` made this delivery guarantee real.
+The actual order is `ls_ring_consume()` (which advances the cursor), output, then
+flush. Build 02 sends the real drain's stdout to `/dev/full`. The cursor advances
+to the producer position, no output can be stored, and the drain returns zero.
+Build 01 separately tests the consuming helper before any downstream acceptance.
+The original source comments remain in both cached build receipts.
+
+The new `ls_stream` reader waits for a matching acknowledgement. The separate
+collector commits the record and checkpoint to SQLite before sending that ACK.
+Process tests retain the same record before ACK and suppress a duplicate after
+commit but before ACK. Two consumers read independently from the committed journal.
+
+**Replacement limit:** replay applies after successful local commit, within finite
+retention. Ring overflow before acceptance can lose observations. Old consumer
+cursors receive explicit retention gaps. These tests do not establish power-loss
+durability, complete observation history, source reset safety or production cost.
+The legacy drain still has its consuming behavior; its delivery comments are corrected.
+
+**Additional failed assumption:** live attempt 01 expected a ring before the first
+output. TMM creates that segment on first use. The collector now has a bounded
+startup wait. Live attempt 02 records that the segment was absent at startup, then
+compares eight method records through the journal and two HTTP consumers.
+
+[Receipts](SOURCES.md#continuous-metadata-collector-2026-09-28),
+[collector scope](env/ai-traffic/COLLECTOR.md).
+
+## 29 · Event counts as completion of metadata extraction — rejected scope
+
+**2026-09-28.** The owner asked: “are we just counting things or extracting the
+metadata”. The first native-handler probe had emitted 192 records from 192 calls.
+Those records contained event codes, argument-presence bits and probe identity.
+They contained no method or session values. Reachability and output accounting
+were valid results, but they did not complete the requested field-extraction work.
+
+The correction was an exact-value test at `tmm_json_value_get_string` return.
+The probe checks owner/member links before copying a root object's `method`
+value. Live comparisons passed for known, unfamiliar, empty, escaped, exact-limit
+and truncated values. Error and budget-exhausted cases retained status records.
+The first field build's stack-limit failure also remains in the record.
+
+**Replacement limit:** this hook observes only values the application getter
+consumes. The live AIMCP request did not call it and produced no method value.
+The four-member walk and 64-byte prefix are explicit bounds. There is no general
+MCP/session extraction, protocol/request identity or cost claim. Field results,
+not counts, must support each new extraction claim.
+
+See [probe contract/results](env/ai-traffic/METADATA.md),
+[event receipts](SOURCES.md#native-handler-event-probes-2026-09-28) and
+[field receipts](SOURCES.md#root-object-method-extraction-2026-09-28).
+
+## 28 · "Complete output proves continuous boundary observation" — FALSIFIED
+
+**2026-09-28, controlled-gap native test.** This was a candidate inference, not
+a guarantee of the earlier bounded join. Four real VMs share the pinned host maps.
+The test omits cleanup and initialization at a reused address. Later parser calls
+retain the old lifetime number. The event sequence is contiguous, both header
+attempts complete, and a later cleanup closes the stale interval. The old consumer
+accepts two synthetic-ledger matches. Nothing in that stream reveals the omitted
+invocations. Interpreter and JIT agree.
+
+The request markers still distinguish A and B. This test falsifies inferred
+lifetime continuity, **not authenticated actor correctness**. In the separate
+live test, stale lifetime reuse also occurs, but another missing cleanup causes
+the old consumer to refuse the window. Do not turn these different results into
+a claim that a live request was assigned to the wrong agent.
+
+The new collector guard receives notification before the test controller detaches
+a hook. It refuses the whole window permanently. Fresh recovery requires a full
+reload, new loaded instances and a new run token. Native guard checks and the
+five-window live test pass, including tracking exhaustion and a retained connection.
+
+**The new limit:** this is controller-reported gap handling. Silent bypass,
+unreported changes and missing controller history are not detected. All earlier
+valid observations in an invalid window also become unknown. There is no general
+streaming identity or data-path cost result.
+[Contract](env/ai-traffic/GAPS.md),
+[evidence](SOURCES.md#controlled-correlation-gaps-2026-09-28).
+
+---
+
+## 27 · "The five-map reader fits the pinned host" — FALSIFIED
+
+**2026-09-28, correlation build attempt 01.** The first reader used five maps.
+That implementation assumed more registry capacity than the pinned host provides.
+PREVAIL accepted the program, but its native extraction test failed. The event
+reported MAP_FAILED (32), not a complete candidate. `LS_MAP_MAX` is four across
+the shared registry. Verifier acceptance did not establish successful map loading.
+
+The corrected reader shares the lifetime counter, object and output maps. One
+new map holds two rows per lifetime. The native test also checks loader-map errors.
+Build 02 passes pinned interpreter/JIT and PREVAIL checks. The later four-program
+live test reconciles all 313 calls and records.
+
+**The new limit:** extraction accepts only lifetimes 1–127 in a fresh registry;
+higher numbers are unavailable. This is not a request-capacity or rollover proof.
+The failed build and its exact source remain cached. `ask` returned NO RECORD for
+the failed assertion and the map-limit query.
+[Contract](env/ai-traffic/CORRELATION.md),
+[evidence](SOURCES.md#bounded-request-correlation-2026-09-28).
+
+---
+
+## 26 · "Parser calls or address tags can stand in for requests" — FALSIFIED
+
+**2026-09-28, parser-scope live attempt 02.** This was a registered candidate
+shortcut, not a validated attribution claim. On the pinned repaired TMM, three
+fragmented requests each produce two partial parser returns and one successful
+return. The full armed window has 66 calls for 59 completed request headers,
+including one incomplete header followed by close. The earlier 16,000-request
+one-call result remains a result for that workload; it does not generalize to
+fragmented headers.
+
+The probe assigns anonymous tags to addresses without exporting the addresses.
+Eight tags occur across multiple independently opened client connections. One
+shared keep-alive connection also carries 19 requests under one tag while the
+authenticated actor and acceptance result change. Address equality supplies
+neither a connection lifetime nor an agent identity.
+
+A successful parser return also occurs before the client sends a paced body.
+At that point the destination has not recorded the operation. Header completion
+is not body completion or authenticated acceptance.
+
+**What remains:** all 59 attempted joins stay unknown. Observe object
+initialization/cleanup, qualify request boundaries and collect a bounded
+correlation candidate before enabling a credential-validated join. HTTP/2,
+multiple workers, differentiated visibility and cost remain unvalidated.
+[Exact receipts and source](SOURCES.md#attribution-parser-scope-2026-09-28).
+
+---
+
+## 25 · "A new load starts with zero slot counters" — FALSIFIED
+
+**2026-09-28, parser-scope live attempt 01.** The test required the absolute
+SAFE_RETURN count to be zero. The slot retained 16 selections from the earlier
+tutorial. The new probe's first call changed `fired` from 120 to 121, but left
+`safe_returns` at 16 and `errors` at zero. It produced one diagnostic record.
+The test stopped on its assertion, then disarmed and revoked. Kernel memory
+showed the original patch bytes, with stable process/container identity and no
+restart. The failed receipt and original test source are retained.
+
+`ask` returned NO RECORD for the exact assertion. The corrected test compares
+before/after counts in each window and checks unchanged generation. It also
+reconciles the full armed window. This correction does not establish request
+lifetime or authenticated attribution.
+[Evidence](SOURCES.md#attribution-parser-scope-2026-09-28).
+
+---
+
+## 24 · "The bench output sink represents the live helper result" — FALSIFIED
+
+**2026-09-25, tutorial live attempts 02–03.** The template bench passed sampling
+with a substitute output sink. On the real binary, both variants emit eight
+records in a phase that requires zero. The other 12 phases complete. The final
+test keeps `passed=false`; completing the test is not a pass.
+
+`ls_tp_ring_publish` returns 1 for delivery and 0 for a drop. The bridge in
+`ls_tp_publish_raw` converts these to -1 and 0. This is the reverse of its stated
+contract. The program saves its last output time only on success, so the real
+bridge prevents sampling after delivery. Under a full-ring drop it can instead
+report success. `check_output_result.c` includes the real bridge and checks both
+cases against ring consumption/drop counters. On the pinned build box it returns
+1: delivered result -1, eight bytes consumed, dropped result 0, one counted drop.
+
+`ask` returned NO RECORD for `assert len(events) == (0 if sampled else 8)`.
+**Remaining work:** correct the bridge result conversion, test delivery/drop/off
+paths, rebuild/package, and repeat the live tutorial. Program-side compensation
+would encode the host defect into every program. No host fix was made in this
+verification task. [Receipts](SOURCES.md#ebpf-tutorial-2026-09-25).
+
+**Later repair, 2026-09-25 — MEASURED:** both raw and shield output bridges now
+convert delivery to zero and a drop to -1. The real raw bridge passes native
+delivery, full-ring and disabled-output checks. The new packaged tutorial passes
+live. Its schema 2 has no sampling option: every call attempts output, including
+diagnostics. The schema-1 default had already been zero; the failed interval tests
+had explicitly enabled sampling. Prior failures remain recorded above. Sustained
+output pressure and per-call cost remain unmeasured.
+[Repair receipts](SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
+---
+
+## 23 · "Revoke makes map indices safe to reuse" — FALSIFIED
+
+**2026-09-25, tutorial live attempt 01.** The earlier configuration observer used
+an output map at index zero. After revoke, the tutorial registers a HASH at index
+zero and reports `MAP_FAILED` on every enabled call. Its 256-entry map has already
+passed the bench. Thus the small-table defect in §22 does not explain this case.
+
+`ls_map_reset_shapes` clears names and the global count. It leaves each thread's
+map-set count and storage intact. `ls_map_current` only adds higher indices; it
+does not rebuild reused indices. `check_map_reuse.c` reproduces the sequence on
+the pinned build box: registered type 1 (HASH), actual ring storage, update -1.
+The claim in the reset function's comment that storage rebuilds is false.
+
+`ask` found §22 for `MAP_FAILED`, but returned NO RECORD for `ls_map_reset_shapes`.
+The remaining tutorial checks use a separate SSA fixture with the same packaged
+image. Both variants share the same map layout there. This is a test limit, not
+a repair. **Remaining work:** define map-generation/ownership handling, check
+active-slot interactions, and test replacement against retained thread storage.
+[Failed live run and build-box falsifier](SOURCES.md#ebpf-tutorial-2026-09-25).
+
+**Later repair, 2026-09-25 — MEASURED:** references now carry a registry generation.
+Each thread clears its retained map set when that generation changes. Reset
+refuses active readers. The loader attempts reset only when preparation is idle
+and all slots are disabled. Native checks pass across two threads and 100
+replacements. The repaired live run first uses output maps at both indices, then
+replaces them with the tutorial's output map and one-entry HASH. Both variants
+work. Revoking a second loaded, unattached slot preserves the attached slot's
+count. Same-name maps still share state; this is not per-program isolation.
+If a reset is busy, storage is retained and revoke can be retried after calls
+finish. Safe VM-memory reclamation remains separate work. The new shared atomic
+operations and first-call storage clear have no measured data-path cost.
+[Repair receipts](SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
+---
+
+## 22 · "An admitted one-entry hash map can hold the tutorial counter" — FALSIFIED
+
+**2026-09-25, pinned build-box tutorial bench.** The initial `template.c` declared
+one hash-map entry. PREVAIL passed, but execution reported `MAP_FAILED` (`flags=8`).
+Attempts 02 and 03 retain the failure. `ask` returned NO RECORD for the mismatch
+and for `ls_map_lookup returns NULL after successful update with max_entries=1`.
+
+`ls_map_slot` computes positions in a 256-entry space, then skips positions outside
+the declared smaller table. Inserting key zero into a one-entry table falls back
+to index zero. Lookup starts at a different hash position, skips it, and misses
+the inserted value. Descriptor admission did not establish usable lookup behavior.
+
+The tutorial uses the full 256-entry shape. Attempt 04 then passes the entry and
+exit interpreter/JIT checks. Attempt 05 adds the final target and I/O checks.
+**Remaining work:** fix and test small-table lookup in the host. This tutorial
+change does not repair it. The earlier missing-header staging failure is also
+retained. [Receipts](SOURCES.md#ebpf-tutorial-2026-09-25).
+
+**Later repair, 2026-09-25 — MEASURED:** probing now uses the declared capacity.
+Lookup continues across deletion holes; insertion uses the first empty position
+only after checking for an existing key. Tests fill, delete, update and refill
+all capacities from 1 through 256 without an eviction. The tutorial again uses
+one entry and passes pinned interpreter/JIT and live checks. Host attempt 01
+also exposed a compiler bounds warning for an invalid reference; an explicit
+`LS_MAP_MAX` check fixes it. Host attempt 02 stopped at a legacy generator whose
+default source is absent. Attempt 03 uses the existing generated shield blob and
+passes the selected regressions. Those failed attempts remain in the
+[repair snapshot](SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
+---
+
+## 21 · "The armed pad must contain a jump" — wrong recorder expectation
+
+**2026-09-25, isolated P21 lifecycle.** The fixture's first JSON and Tao XML passed,
+but the outer recorder rejected its kernel witness because it expected `e9` (jump).
+The observed bytes were `f30f1efae8fb227b0041544989d45548`: `endbr64` plus the implemented
+`e8` **call rel32**. `ask` on that literal returned NO RECORD. This was already explicit
+in `ls_arm.c` and the ground-truth disarm row; a guessed assertion created a false failure.
+
+The recorder now requires the call encoding and captures fixture files before checking it.
+The second run passes all gates: executable hash, two call/NOP cycles, stable process and
+container, 52 exact HTTP responses and 48 armed calls/events. First receipt and both fixture
+runs remain [cached](SOURCES.md#configuration-snapshots-2026-09-25). This does not measure
+publication-pressure behavior or per-call cost.
+
+---
+
+## 20 · "A static map declaration is equivalent for admission" — FALSIFIED for P21
+
+**2026-09-25, pinned build-box clang-18/PREVAIL.** The first configuration example
+declared its maps `static`. PREVAIL refused with `Invalid type (r1.type == map_fd)`.
+`ask` returned NO RECORD. Keeping the map objects as global ELF symbols fixed admission
+without changing the helper or the map layout. The failed receipt is retained beside the
+successful interpreter/JIT and socket runs in [SOURCES.md](SOURCES.md#configuration-snapshots-2026-09-25).
+The SDK now makes this linkage requirement explicit. Verification still does not establish
+live TMM integration, runtime write protection or cost; those require separate evidence.
+
+---
+
+## 19 · "The runner/recorder succeeded, so the result is established" — FALSIFIED twice
+
+**2026-09-25, isolated SSA/Tao fixture.** `tao_runner` returned zero for both failed ICAP
+attempts (`gate-01`, `gate-02`). Their JSON/XML records showed failure. The shell result was not
+a test verdict. The wrapper now requires successful JSON and a nonempty error/failure/skip-free
+XML report, recording the runner and checked statuses separately. The checker rejects both old
+failures and accepts gate-03 and attribution-01 in the recorded regression.
+
+During the attribution evidence audit, `SOURCES.md` briefly described an executing-ELF identity
+that the snapshot had not actually captured: its list was `[]`. The collector omitted
+`tmm64.no_pgo`; correcting that exposed another swallowed error, because the runtime image has
+no `readelf`. A command returning zero with an empty observation is not verification. The fixed
+collector requires one executing TMM record, hashes `/proc/6/exe`, and records build-box ELF notes
+for the byte-identical packaged runtime. It propagates command failures while preserving receipts.
+
+**What survives:** all 23 expected attribution outcomes and the three bounded ICAP outcomes,
+with their original unchanged test receipts. The executing runtime now has the required identity
+evidence. No TMM-internal attribution or cost result follows. Both failed runtime inventories,
+the correction and result-check regression are [cached and registered](SOURCES.md#agent-attribution-fixture-2026-09-25).
+
+---
+
+## 18 · "A signed hook name binds the live ARM address" — the source did not connect them
+
+**2026-09-24, source finding in the authoritative build tree.** During catalog-removal work,
+`ls_vm_load.c` and `ls_arm.c` were compared by SHA-256 with HEAD `f08a820` and matched. LOAD
+verified the binding/program hash and selected the signed hook's ELF section. ARM separately
+parsed an address from its request, checked for a loaded slot, and called the pad writer.
+There was no comparison between that address and the signed LOAD hook. The client-side
+catalog/build-ID check guarded operator mistakes; it did not authenticate the runtime target.
+
+The same review found that the signed mode ceiling was not compared at LOAD or SET_MODE;
+`ls_vm_set_mode` stored the requested mode. A test showing that changing a signed field breaks
+its signature does **not** show that an independent unsigned operation obeys that field.
+This is the same category of error as §15, in two more places.
+
+**Correction deployed and exercised, 2026-09-24:** a build-resolved `.ls.target` record inside the authenticated program
+hash, full-build/entry/kind validation before publication, tracked attachment ownership, same-target
+reload constraints, and LOAD/SET_MODE ceiling checks. `catalog-free-deployment.md` records the
+contract, source hashes and validation gates; P18 pre-registers its falsifiers. Build-box fixture
+tests are recorded separately from live entry/exit and refusal results on build `c3b81927…`.
+No live adversarial reproduction of the previous
+ARM/ceiling behavior was attempted, and no broad concurrency or reduced-exploitability claim follows.
+
+---
+
 ## 17 · "The 96-byte context ceiling is a capacity limit" — TRUE, AND IT IS ALSO A GAP WE HAD NOT NAMED
 
 **Claimed**, in six documents since the `fentry/` → `tracing` discovery: the context ceiling is

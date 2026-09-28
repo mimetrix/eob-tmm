@@ -1,0 +1,94 @@
+{
+  "apiVersion": "k8s.f5net.com/v1",
+  "kind": "F5VirtualServer",
+  "metadata": {
+    "creationTimestamp": "2026-09-24T14:55:39Z",
+    "finalizers": [
+      "handletmmconfig_inconsistency"
+    ],
+    "generation": 1,
+    "labels": {
+      "app.kubernetes.io/managed-by": "eob-ai-traffic-jig"
+    },
+    "name": "ai-traffic",
+    "namespace": "default",
+    "resourceVersion": "3608272",
+    "uid": "a67faa33-2f33-487c-9ba9-58feac916b95"
+  },
+  "spec": {
+    "a2a": false,
+    "access": "",
+    "clientssl": "",
+    "connectionRateLimit": {
+      "rateLimit": 0,
+      "rateLimitDestinationMask": 0,
+      "rateLimitMode": "object",
+      "rateLimitSourceMask": 0
+    },
+    "ddosProfile": "",
+    "destinationAddress": "11.11.11.99",
+    "destinationPort": 18090,
+    "fastL4": "",
+    "genericMessage": "",
+    "http": {
+      "clientside": "sys-default-http",
+      "serverside": "sys-default-http"
+    },
+    "httpCompression": false,
+    "httpRouter": true,
+    "iRules": [],
+    "ipfamilies": "IPv4",
+    "json": false,
+    "loadBalancingMethod": "ROUND_ROBIN",
+    "mcp": false,
+    "namespace": "",
+    "persistence": "",
+    "pool": "ai-traffic",
+    "protocol": "tcp",
+    "protocolProfile": {
+      "clientside": "sys-default-tcp",
+      "serverside": "sys-default-tcp"
+    },
+    "routeAdvertisement": false,
+    "serverssl": "",
+    "sip": "",
+    "site": "",
+    "snat": {
+      "pool": "",
+      "type": "automap"
+    },
+    "sourcePort": "preserve",
+    "sse": false,
+    "tenant": "",
+    "translateAddress": true,
+    "translatePort": true,
+    "vlans": {
+      "disableListedVlans": false,
+      "vlanList": [
+        "tmm-client"
+      ]
+    },
+    "vrf": ""
+  },
+  "status": {
+    "conditions": [
+      {
+        "lastTransitionTime": "2026-09-24T14:55:39Z",
+        "message": "",
+        "observedGeneration": 0,
+        "reason": "Accepted",
+        "status": "True",
+        "type": "Accepted"
+      },
+      {
+        "lastTransitionTime": "2026-09-24T14:55:40Z",
+        "message": "CR config sent to all grpc endpoints",
+        "observedGeneration": 2,
+        "reason": "Programmed",
+        "status": "True",
+        "type": "Programmed"
+      }
+    ],
+    "generationId": 0
+  }
+}

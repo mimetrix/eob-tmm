@@ -436,6 +436,8 @@ ls_vm_bench_program(const void *elf, size_t elf_len,
         goto out;
     if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
         goto out;
+    if (g_ls_config.load_error)
+        goto out;
 
     /* Its own stack: the shared one belongs to the data path, and this runs on
      * the loader thread. */
@@ -753,6 +755,10 @@ ls_vm_arm(const void *elf, size_t elf_len,
      * check above, which is what makes passing `function` safe. */
     if (ubpf_load_elf_ex(vm, elf, elf_len, function, &err) < 0)
         goto fail;
+    if (g_ls_config.load_error) {
+        fprintf(stderr, "ls_vm: refusing --- invalid configuration map declaration\n");
+        goto fail;
+    }
 
     /* Fuel. Works in the interpreter; documented as having no effect once
      * compiled to native code, which is the other half of why this is the
@@ -963,6 +969,8 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     if (slot < 0 || slot >= LS_MAX_SLOTS)
         return LS_FALLTHROUGH;
 
+    if (ls_map_enter() != 0)
+        return LS_FALLTHROUGH;
     struct ls_slot *s = &g_slots[slot];
 
     /* Both of these can be replaced under us by the loader thread, so read each
@@ -970,8 +978,10 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * program's VM with another's expectations. */
     enum ls_mode mode = __atomic_load_n(&s->mode, __ATOMIC_ACQUIRE);
     void *vm = __atomic_load_n(&s->vm, __ATOMIC_ACQUIRE);
-    if (!s->armed || vm == NULL || mode == LS_MODE_DISABLE)
+    if (!s->armed || vm == NULL || mode == LS_MODE_DISABLE) {
+        ls_map_leave();
         return LS_FALLTHROUGH;
+    }
 
     /* PUBLISH WHICH SLOT IS RUNNING, for helpers that need it and cannot be told.
      * uBPF's external_function_t has no context parameter, so bpf_ringbuf_output has no
@@ -980,6 +990,7 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * any instant. Set AFTER the early returns so a disabled or unarmed slot never
      * leaves a stale value behind, and cleared on every exit path below. */
     g_ls_cur_slot = slot;
+    ls_config_begin(&g_ls_config_view, (unsigned)slot);
 
     /* A non-zero return from ubpf_exec is an execution fault --- fuel exhausted,
      * or a bounds check the interpreter enforces at run time. Fall through: a
@@ -997,6 +1008,9 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     } else {
         rc = ubpf_exec_ex(vm, ctx, ctx_len, &ret, g_prog_stack, LS_PROG_STACK_SIZE);
     }
+    g_ls_config_view.active = 0;
+    g_ls_cur_slot = -1;
+    ls_map_leave();
     if (g_cfg.timing) {
         uint64_t d = ls_cycles() - t0;
         s->cycles += d;

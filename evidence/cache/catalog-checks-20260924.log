@@ -1,0 +1,97 @@
+make: Entering directory '/home/starin/eob-tmm-staged/substrate'
+  bound fentry/victim -> 0x401120 (+4 pad), full build 464031f0f2af0ca871e636ef8907e90473dbf893
+  Run PREVAIL on these final bytes, then sign.
+PASS: fentry/victim/probe (terminates within 0 loop iterations)
+  bound fentry/victim -> 0x401120 (+0 pad), full build ec3a274d285cbe7c2a58aefdef240bc002337b78
+  Run PREVAIL on these final bytes, then sign.
+exit-admit: victim
+  #5 return type : int --- int (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fexit/victim -> 0x401120 (+0 pad), full build ec3a274d285cbe7c2a58aefdef240bc002337b78
+  Run PREVAIL on these final bytes, then sign.
+PASS: fexit/victim/probe (terminates within 0 loop iterations)
+ok    compiler-produced eligible target
+ok    wrong full build, same 32-bit prefix
+ok    wrong section/hook
+ok    bad version
+ok    wrong kind
+ok    unsupported kind
+ok    unsupported pad
+ok    reserved bits
+ok    address outside text
+ok    patch address instead of entry
+ok    section table overflow
+ok    truncated ELF 0
+ok    truncated ELF 63
+ok    truncated ELF 743
+ok    compiler-produced +0 pad
+ok    fexit with return/unwind admission
+PASS target-record fixture checks (ASan/UBSan); no live-TMM claim
+ok    clean
+ok    catalog
+ok    deleted lower-layer catalog
+ok    renamed catalog backup
+ok    ELF BTF
+PASS image-layer audit fixtures
+ls_sig: verifying binding 0dbf4924 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig da60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig 00000000 key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig 2b63169f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 0dbf4924 sig db60793f key 1cd12794 prog 824 bytes
+ls_sig: verifying binding c11ce0c0 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 04bf2456 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding e12346e9 sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 3046165a sig db60793f key 1cd12794 prog 848 bytes
+ls_sig: verifying binding 69d487c1 sig db60793f key 1cd12794 prog 848 bytes
+  key in this build: present
+  ok    F6b  a validly signed program is admitted                  ok
+  ok    F6a  one flipped bit in the signature                      signature is INVALID for these bytes and this key
+  ok    F6a  one flipped bit in the signature's last byte          signature is INVALID for these bytes and this key
+  ok    F6a  an all-zero signature (i.e. none supplied)            signature is INVALID for these bytes and this key
+  ok    F6a  one flipped bit in the program body                   signature is valid but the program body does not match the hash it commits to
+  ok    F6a  a signature from a DIFFERENT key                      signature is INVALID for these bytes and this key
+  ok    F6c  the signature cannot be replayed onto another program signature is valid but the program body does not match the hash it commits to
+  ok    F6d  altering hook name invalidates the signature          signature is INVALID for these bytes and this key
+  ok    F6d  altering build_min invalidates the signature          signature is INVALID for these bytes and this key
+  ok    F6d  altering build_max invalidates the signature          signature is INVALID for these bytes and this key
+  ok    F6d  altering mode_ceiling invalidates the signature       signature is INVALID for these bytes and this key
+  ok    F6d  altering expires_with invalidates the signature       signature is INVALID for these bytes and this key
+  ok    a short binding is refused, not zero-padded                malformed request (length or pointer)
+  ok    a short signature is refused                               malformed request (length or pointer)
+  ok    an empty program is refused                                malformed request (length or pointer)
+  ok    a NULL binding is refused                                  malformed request (length or pointer)
+  ok    check_sig: 16 assertions, every registered falsifier for P6 exercised
+  ok    keyless build refuses even a VALIDLY signed program        no public key is baked into this build
+  ok    check_sig: 1 assertion, fail-closed default confirmed
+rst_why -> 0x144e3c0  (pad, pad_offset=4, build 337d65cf0002)
+ssl__err -> 0xa1b2c3  (pad, pad_offset=0, build 337d65cf0002)
+some_unpadded -> 0xdeadbe  (displace, pad_offset=-, build 337d65cf0002)
+warning: raw address --- NOT checked against the running binary's build id. A stale address arms whatever is there, and a nop pad exists in plenty of wrong places.
+only_one -> 0xcccc  (pad, pad_offset=4, build 337d65cf0002)
+  ok    elf_build_id agrees with readelf on 4 binaries
+  ok    a non-ELF returns None --- no exception, no invented id
+  ok    resolves by name when the build id matches (pad and displace)
+  ok    REFUSED  build id mismatch              (BUILD ID MISMATCH)
+  ok    REFUSED  symbol not in the index        (not in the index)
+  ok    REFUSED  index file missing             (no hook index)
+  ok    REFUSED  index carries no build id      (no #build_id)
+  ok    REFUSED  no running tmm under /proc     (cannot find the running tmm)
+  ok    a raw 0x address is still accepted, and warns that it is unchecked
+  ok    REFUSED  neither hex nor a symbol       (not a hex address)
+  ok    REFUSED  a name with two entries        (AMBIGUOUS)
+  ok    an ambiguous name REFUSES; a unique one in the same index resolves
+  ok    build-id readers agree on 4 binaries, 4 cross-checked against readelf
+  ok    (a) straddle, mirroring tmm64.debug    old parse: 47a10fc43398caa9af9dddbd8bed82ce (32 hex)  now: full 40 hex
+  ok    (b) 8-aligned property note            old parse: None (0 hex)                               now: full 40 hex
+  ok    the hook name is READ FROM the object's fentry/ section, not defaulted
+OK
+OK
+OK
+OK
+  ok    arm/disarm CLI sends target requests without a catalog lookup
+  ok    check_ls_load: 40 assertions, 7 of them refusals
+make: Leaving directory '/home/starin/eob-tmm-staged/substrate'

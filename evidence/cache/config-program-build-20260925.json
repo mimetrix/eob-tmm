@@ -1,0 +1,113 @@
+{
+  "passed": true,
+  "inputs": {
+    "/home/starin/config-io-20260925.039uaw/substrate/surfaces/config_observe.bpf.c": "7969cbe3e5e594c3e39aa3a76c3a2785733d7b31d10ed44e84ac308be7cbe57d",
+    "/home/starin/config-io-20260925.039uaw/substrate/config_snapshot.bpf.h": "e31cf99fd4dbe9023885d5716065d18d69f88026f8193ee079c7dca8222cf61c",
+    "/home/starin/config-io-20260925.039uaw/image-context/tmm64.no_pgo": "26e8f07b12a279e7d84f2328363db998a7dfa109a9b3c71847be408a6710a12c",
+    "/home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv": "e4f06de90774fb76d74c7591f4e3d8b6f71ee0935f0f523131591e304429a90e",
+    "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail": "d9d84cb0c474016d7cffc31c71e62892f52c327e660248275f3e955f1b7cbea2"
+  },
+  "commands": [
+    {
+      "command": [
+        "clang-18",
+        "--version"
+      ],
+      "returncode": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "clang-18",
+        "-target",
+        "bpf",
+        "-O2",
+        "-g",
+        "-c",
+        "/home/starin/config-io-20260925.039uaw/substrate/surfaces/config_observe.bpf.c",
+        "-o",
+        "/home/starin/eob-config-20260925/config-observe.bpf.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/eob-config-20260925/config-observe.bpf.o"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "/home/starin/eob-tmm-staged/substrate/bind_target.py",
+        "--prog",
+        "/home/starin/eob-config-20260925/config-observe.bpf.o",
+        "--binary",
+        "/home/starin/config-io-20260925.039uaw/image-context/tmm64.no_pgo",
+        "--index",
+        "/home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv",
+        "--objcopy",
+        "/usr/lib/llvm-18/bin/llvm-objcopy"
+      ],
+      "returncode": 0,
+      "stdout": "  bound fentry/http_parse_client_headers -> 0xccc600 (+4 pad), full build b8dc27f34a93db91f91b60f0844105bfb30c6f90\n  Run PREVAIL on these final bytes, then sign.\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/eob-config-20260925/config-observe.bpf.o",
+        "fentry/http_parse_client_headers",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "returncode": 0,
+      "stdout": "PASS: fentry/http_parse_client_headers/config_observe (terminates within 0 loop iterations)\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "/home/starin/eob-tmm-staged/substrate/sign_shield.py",
+        "--key",
+        "/home/starin/.ls-signing/shield_sk.pem",
+        "--prog",
+        "/home/starin/eob-config-20260925/config-observe.bpf.o",
+        "--hook",
+        "http_parse_client_headers",
+        "--mode-ceiling",
+        "monitor",
+        "--build-min",
+        "0xb8dc27f3",
+        "--build-max",
+        "0xb8dc27f3",
+        "-o",
+        "/home/starin/eob-config-20260925/config-observe.bpf.sig"
+      ],
+      "returncode": 0,
+      "stdout": "  signed /home/starin/eob-config-20260925/config-observe.bpf.o\n    hook          : http_parse_client_headers\n    prog sha256   : 82fb7618a6204e999dc1a8138f92fc304f039f7f7d04ee9fffa8649778073381\n    mode ceiling  : monitor\n    ctx abi       : 3  (from shield_abi.h)\n    builds        : 0xb8dc27f3 .. 0xb8dc27f3\n    out           : /home/starin/eob-config-20260925/config-observe.bpf.sig  (112-byte binding + 64-byte signature)\n",
+      "stderr": ""
+    }
+  ],
+  "outputs": {
+    "config-observe.bpf.o": "82fb7618a6204e999dc1a8138f92fc304f039f7f7d04ee9fffa8649778073381",
+    "config-observe.bpf.sig": "795e8bd193bc4c03801f82e35c47377cae4824c880c8878a3d9b9fe13ee0605e",
+    "ls_drain": "08bdcdb0b2f59699086e4c5e314d3f93e8c7c0ce48bf5913878bd93ee75dbef0"
+  },
+  "runtime": {
+    "build_id": "b8dc27f34a93db91f91b60f0844105bfb30c6f90",
+    "sha256": "26e8f07b12a279e7d84f2328363db998a7dfa109a9b3c71847be408a6710a12c"
+  }
+}

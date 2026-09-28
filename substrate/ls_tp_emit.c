@@ -149,7 +149,7 @@ ls_tp_publish_raw(int slot, const void *rec, unsigned long len)
                                                         memory_order_relaxed),
                               (unsigned long long)ts.tv_sec * 1000000000ull
                                   + (unsigned long long)ts.tv_nsec,
-                              rec, (unsigned int)len) == 0 ? 0 : -1;
+                              rec, (unsigned int)len) ? 0 : -1;
 }
 
 /*
@@ -202,5 +202,5 @@ ls_tp_emit_shield(int slot, unsigned int gen, unsigned int mode,
                                                         memory_order_relaxed),
                               (unsigned long long)ts.tv_sec * 1000000000ull
                                   + (unsigned long long)ts.tv_nsec,
-                              &ev, (unsigned int)sizeof ev) == 0 ? 0 : -1;
+                              &ev, (unsigned int)sizeof ev) ? 0 : -1;
 }

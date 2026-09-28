@@ -1,0 +1,41 @@
+Script started on 2026-09-25 14:38:14+00:00 [COMMAND="ssh-agent bash -c 'ssh-add /home/claude/.ssh/id_ed25519 && sh env/scripts/bnk-sync-substrate.sh'" <not executed on terminal>]
+Identity added: /home/claude/.ssh/id_ed25519 (e.starin@H65J9C93HL)
+=== 1. check sync FIRST --- after the copy the evidence is gone
+    repo : /home/claude/eob-tmm/substrate
+    tree : starin@10.145.37.36:$HOME/code/tmm/src
+  
+    DIFFERS        ls_audit.c               repo=430   tree=428    base/ls_audit.c
+    DIFFERS        ls_map_glue.h            repo=748   tree=712    base/ls_map_glue.h
+    DIFFERS (gen)  ls_sig_pubkey.h          regenerate, do not hand-merge
+    DIFFERS        ls_vm.c                  repo=1156  tree=1147   base/ls_vm.c
+    DIFFERS        ls_vm_load.c             repo=1177  tree=1072   base/ls_vm_load.c
+    ONLY IN REPO   ls_config.h              <-- never copied to the tree, so never built
+    DELTA: IN THE MANIFEST, NOT IN THE TREE (stale manifest, or a change reverted):
+      ?? src/base/ls_config.h
+  
+    VERDICT : DIVERGED.  differs/only-in-tree/only-in-repo above
+              (0 only-in-tree, 1 only-in-repo)
+  
+        Resolve every line before building. In particular, DO NOT copy the repo
+        over the tree while anything reads DIFFERS or ONLY IN TREE -- that copy is
+        exactly what deleted the map registration calls, and it left no trace.
+  
+        To see what would be lost:   env/scripts/bnk-check-tree-sync.sh -v
+        To carry a tree-side change back:
+            scp starin@10.145.37.36:$HOME/code/tmm/src/<file> /home/claude/eob-tmm/substrate/<file>
+
+=== 2. copy the substrate sources into their include worlds
+  extra (non-ls_*) headers from the manifest: shield_abi.h vm_stack_policy.h 
+  copied (base/ only --- ssl-module ctx files retired)
+  stamped commit f08a820-dirty
+
+=== 3. INVALIDATE the objects --- the step whose absence caused the bug
+  removed 0 substrate objects across all build variants (verified: 0 remain)
+  (no .d files exist here, so make cannot see header changes itself)
+
+  Next: on the build box,  cd ~/code/tmm && script -qec 'make tmm' /dev/null
+  Then VERIFY THE BINARY, never the build log:
+      nm src/compile/obj_x86_64.no_pgo/tmm.no_pgo | grep ' [bBdD] g_ls_'
+      env/scripts/bnk-verify-artifact.sh <tag> '<a string unique to your change>'
+
+Script done on 2026-09-25 14:38:25+00:00 [COMMAND_EXIT_CODE="0"]

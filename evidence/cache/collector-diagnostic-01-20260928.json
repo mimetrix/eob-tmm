@@ -1,0 +1,46 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "-c",
+        "import sys; print(sys.executable); print(sys.version)"
+      ],
+      "rc": 0,
+      "stdout": "/usr/bin/python3\n3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "-c",
+        "import pathlib; p=pathlib.Path(\"/run/ls-stream/collector-live-01/collector.log\"); print(repr(p.read_bytes())); print(list(p.parent.iterdir()))"
+      ],
+      "rc": 0,
+      "stdout": "b'ls_stream: invalid segment file\\nTraceback (most recent call last):\\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 333, in <module>\\n    main()\\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 327, in main\\n    (collect if args.command == \"collect\" else serve)(args)\\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 199, in collect\\n    raise RuntimeError(\"reader stopped with an error; source continuity is unknown\")\\nRuntimeError: reader stopped with an error; source continuity is unknown\\n'\n[PosixPath('/run/ls-stream/collector-live-01/journal.sqlite.lock'), PosixPath('/run/ls-stream/collector-live-01/collector.log'), PosixPath('/run/ls-stream/collector-live-01/journal.sqlite')]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "/tmp/collector-live-01-collector/stream_collector.py",
+        "collect",
+        "--once",
+        "--journal",
+        "/run/ls-stream/collector-diagnostic-01.sqlite",
+        "--reader",
+        "/tmp/collector-live-01-collector/ls_stream",
+        "--segment",
+        "/run/ls-stream/ls_tp_ring",
+        "--pid",
+        "7",
+        "--start",
+        "327796383"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "ls_stream: invalid segment file\nTraceback (most recent call last):\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 333, in <module>\n    main()\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 327, in main\n    (collect if args.command == \"collect\" else serve)(args)\n  File \"/tmp/collector-live-01-collector/stream_collector.py\", line 199, in collect\n    raise RuntimeError(\"reader stopped with an error; source continuity is unknown\")\nRuntimeError: reader stopped with an error; source continuity is unknown\n"
+    }
+  ],
+  "source": "#!/usr/bin/env python3\n\"\"\"Retain the first isolated collector startup failure and its direct retry.\"\"\"\nimport json\nfrom pathlib import Path\nimport subprocess\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\n\n\ndef main():\n    result = {\"commands\": [], \"source\": Path(__file__).read_text()}\n    commands = [\n        [\"python3\", \"-c\", \"import sys; print(sys.executable); print(sys.version)\"],\n        [\"python3\", \"-c\", 'import pathlib; p=pathlib.Path(\"/run/ls-stream/collector-live-01/collector.log\"); print(repr(p.read_bytes())); print(list(p.parent.iterdir()))'],\n        [\"python3\", \"/tmp/collector-live-01-collector/stream_collector.py\", \"collect\", \"--once\",\n         \"--journal\", \"/run/ls-stream/collector-diagnostic-01.sqlite\",\n         \"--reader\", \"/tmp/collector-live-01-collector/ls_stream\",\n         \"--segment\", \"/run/ls-stream/ls_tp_ring\", \"--pid\", \"7\", \"--start\", \"327796383\"],\n    ]\n    with (ROOT / \"collector-diagnostic-01.json\").open(\"x\") as output:\n        try:\n            for command in commands:\n                row = subprocess.run([\"docker\", \"exec\", \"eob-template-20260925-tmm-1\"] + command,\n                                     capture_output=True, text=True, timeout=20, check=False)\n                result[\"commands\"].append({\"argv\": command, \"rc\": row.returncode,\n                                           \"stdout\": row.stdout, \"stderr\": row.stderr})\n        finally:\n            json.dump(result, output, indent=2)\n    print(json.dumps(result[\"commands\"], indent=2))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+}

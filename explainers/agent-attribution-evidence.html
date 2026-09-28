@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<!-- Frozen view of attribution-01, not a live dashboard.
+     Source: evidence/cache/ai-attribution-runtime-02-20260925.json
+     SHA-256: d9643e82345dd346a44e560c8d55a7724235ba089eedf46501ce46ef47d61673
+     Decode result.records[1].stdout, then /evidence/attribution-01/result.json.
+     Evidence JSON blocks are field projections of clients[].result, keyed by data-case.
+     No credentials, remote assets, network requests, or client-side scripts. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Agent attribution — the recorded experiment</title>
+  <style>
+    :root {
+      --bg: #fbfaf8; --panel: #fff; --soft: #f3f1ed; --line: #dedad3;
+      --ink: #1b1917; --muted: #59534b; --accent: #4255a0;
+      --a: #216a54; --a-bg: #e9f3ed; --b: #58469b; --b-bg: #efeaf9;
+      --warn: #87571b; --warn-bg: #fcf2df;
+      --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121316; --panel: #1b1d22; --soft: #24262c; --line: #393c44;
+        --ink: #efeeeb; --muted: #bab8b2; --accent: #a9b8ff;
+        --a: #8bd2ad; --a-bg: #17382a; --b: #c5b5f3; --b-bg: #312747;
+        --warn: #e4bd7e; --warn-bg: #352a1a;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+    main { max-width: 1100px; margin: auto; padding: 40px 28px 64px; }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    a:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .eyebrow, .label { font: 600 12px/1.5 var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    .eyebrow { color: var(--accent); }
+    h1 { font-size: clamp(32px, 5.8vw, 58px); line-height: 1.08; letter-spacing: -.035em; margin: 18px 0; max-width: 820px; }
+    h2 { font-size: 26px; line-height: 1.25; letter-spacing: -.02em; margin: 8px 0 18px; }
+    h3 { font-size: 18px; line-height: 1.35; margin: 8px 0 12px; }
+    p { margin: 0 0 16px; color: var(--muted); }
+    strong { color: var(--ink); }
+    .lede { font-size: 20px; max-width: 790px; }
+    nav { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+    section { padding: 34px 0; border-bottom: 1px solid var(--line); }
+    .status { border-left: 4px solid var(--accent); padding: 14px 18px; background: var(--soft); margin: 24px 0; }
+    .status p, .card p:last-child { margin-bottom: 0; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 24px 0; }
+    .metric, .card { padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); min-width: 0; }
+    .metric b { display: block; font-size: 38px; line-height: 1.15; font-weight: 600; }
+    .metric span { font-size: 13px; color: var(--muted); }
+    .zones, .chain { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 12px; align-items: stretch; }
+    .arrow { align-self: center; color: var(--muted); font-size: 24px; }
+    .zone { border-top: 3px solid var(--line); }
+    .zone.active { border-top-color: var(--a); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .actor { padding: 2px 8px; border-radius: 5px; font-family: var(--mono); white-space: nowrap; }
+    .actor.a { background: var(--a-bg); color: var(--a); }
+    .actor.b { background: var(--b-bg); color: var(--b); }
+    .outcome { font: 600 12px/1.5 var(--mono); color: var(--a); }
+    .outcome.reject { color: var(--warn); }
+    code { font: .86em/1.6 var(--mono); overflow-wrap: anywhere; }
+    pre { background: var(--soft); padding: 16px; border-radius: 7px; font: 12px/1.65 var(--mono); overflow-x: auto; margin: 16px 0 0; }
+    .note { font-size: 13px; margin-top: 12px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; font-size: 12px; color: var(--muted); }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr.highlight { background: var(--b-bg); }
+    tbody tr.rejection { background: var(--warn-bg); }
+    caption { text-align: left; color: var(--muted); padding-bottom: 12px; }
+    details { padding: 18px 0; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+    dl { margin: 0; }
+    dt { font-weight: 650; margin-top: 14px; }
+    dd { margin: 4px 0 0; color: var(--muted); }
+    .files { padding-left: 20px; }
+    .files li { margin-bottom: 12px; }
+    footer { padding-top: 24px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 720px) {
+      main { padding: 24px 18px 40px; }
+      .metrics, .two { grid-template-columns: 1fr 1fr; }
+      .zones, .chain { grid-template-columns: 1fr; }
+      .arrow { text-align: center; transform: rotate(90deg); }
+      .two { grid-template-columns: 1fr; }
+      th, td { padding: 9px 8px; }
+    }
+    @media print {
+      main { max-width: none; padding: 0; }
+      nav { display: none; }
+      .card, pre { break-inside: avoid; }
+      .table-wrap { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Recorded experiment · attribution-01 · 25 September 2026</div>
+    <h1>Who acted,<br>and on whose behalf?</h1>
+    <p class="lede">Two credential identities, a shared connection, and a delegated tool call. Here are the actual outcomes and the records behind them.</p>
+    <div class="status">
+      <p><strong>MEASURED: destination-side authentication and delegation fixture.</strong><br>
+      Witness: our client expectations and authentication ledger (SELF), independent of the eBPF substrate.
+      <strong>The TMM-internal attribution join remains unrun.</strong></p>
+    </div>
+    <nav aria-label="Evidence sections">
+      <a href="#path">Where it ran</a><a href="#delegation">Actual delegation</a>
+      <a href="#attacks">Spoofing records</a><a href="#results">All 23 outcomes</a>
+      <a href="#implementation">Code &amp; receipts</a>
+    </nav>
+    <div class="metrics" aria-label="Recorded totals">
+      <div class="metric"><b>23 / 23</b><span>expected outcomes matched</span></div>
+      <div class="metric"><b>17</b><span>accepted operations</span></div>
+      <div class="metric"><b>6</b><span>intended rejections</span></div>
+      <div class="metric"><b>15</b><span>attempts on one backend connection</span></div>
+    </div>
+    <p class="note">Synthetic operations, including one grant issuance. The identities use separate per-run keys in one fixture process; they are not autonomous agent processes or production identity-provider accounts. <a href="../SOURCES.md#agent-attribution-fixture-2026-09-25">Evidence registration</a>.</p>
+  </header>
+
+  <section id="path" aria-labelledby="path-title">
+    <div class="label">01 / Execution boundary</div>
+    <h2 id="path-title">Identity is checked at the destination.</h2>
+    <div class="zones">
+      <article class="card zone">
+        <div class="label">Fixture · client side</div>
+        <h3><span class="actor a">agent-A</span> <span class="actor b">agent-B</span></h3>
+        <p>Separate keyed request proofs; deliberately colliding caller IDs.</p>
+        <p><code>JSON-RPC id: 7<br>operation: same-operation<br>session: same-session<br>task: same-task</code></p>
+      </article>
+      <span class="arrow" aria-hidden="true">→</span>
+      <article class="card zone">
+        <div class="label">Isolated running TMM</div>
+        <h3>HTTP/1.1 forwarding</h3>
+        <p><code>10.203.72.50:18092</code></p>
+        <p>Proxies the requests. No eBPF program attached for this run; native MCP/A2A filtering is not exercised.</p>
+      </article>
+      <span class="arrow" aria-hidden="true">→</span>
+      <article class="card zone active">
+        <div class="label">Fixture · destination side</div>
+        <h3>Verify → authorize → record</h3>
+        <p><code>10.203.72.11:18092</code></p>
+        <p>Checks proof, nonce and delegation; accepts or rejects a synthetic operation and returns its ledger record.</p>
+      </article>
+    </div>
+    <p class="note">Every origin peer was TMM self-IP <code>10.203.72.10</code>. Runtime hash matches packaged build <code>c3b81927dfdcc31137cd8212b5e23bb85677a06c</code>. Authentication uses a fixture HMAC (keyed hash) protocol, not a proposed production standard.</p>
+  </section>
+
+  <section id="delegation" aria-labelledby="delegation-title">
+    <div class="label">02 / One actual accepted chain</div>
+    <h2 id="delegation-title">B executed. A remained the originator.</h2>
+    <div class="chain">
+      <article class="card">
+        <div class="label">root-A · HTTP 200</div>
+        <h3><span class="actor a">agent-A</span> starts a task</h3>
+        <p><code>SendMessage</code> receives server operation:</p>
+        <code>ccb2129036eb41d694824fcadf48416e</code>
+      </article>
+      <span class="arrow" aria-hidden="true">→</span>
+      <article class="card">
+        <div class="label">delegate-A-to-B · HTTP 200</div>
+        <h3>A obtains a scoped grant</h3>
+        <p>Recipient: <strong>agent-B</strong><br>Scope: <code>tools/call</code><br>Parent: A's accepted operation.</p>
+        <p class="note">Grant credentials are excluded from receipts.</p>
+      </article>
+      <span class="arrow" aria-hidden="true">→</span>
+      <article class="card">
+        <div class="label">delegated-tool · HTTP 200</div>
+        <h3><span class="actor b">agent-B</span> performs the call</h3>
+        <p>New server operation:</p>
+        <code>55c6ac57f8694713b5ffbd89ce51e5d0</code>
+        <p class="note">Actor B. Originator A. Parent exactly matches the root operation.</p>
+      </article>
+    </div>
+    <details open>
+      <summary>Recorded fields: delegated-tool</summary>
+      <pre class="evidence-json" data-case="delegated-tool">{
+  "actor": "agent-B",
+  "originator": "agent-A",
+  "method": "tools/call",
+  "parent": "ccb2129036eb41d694824fcadf48416e",
+  "operation": "55c6ac57f8694713b5ffbd89ce51e5d0",
+  "accepted": true,
+  "reason": "accepted",
+  "connection": "888f591f111e4790955bdadad63b2181"
+}</pre>
+    </details>
+    <p class="note">Exact field projection from the cached destination record. Parent and operation IDs are actual run values, not illustrative labels.</p>
+  </section>
+
+  <section id="attacks" aria-labelledby="attacks-title">
+    <div class="label">03 / Two different identity attacks</div>
+    <h2 id="attacks-title">A claim does not change the verified actor.</h2>
+    <div class="two">
+      <article class="card">
+        <div class="outcome">spoof-claim · HTTP 200 · accepted as A</div>
+        <h3>A signs; the metadata claims B</h3>
+        <p>The operation is permitted as A. The discrepancy is recorded; the actor is not rewritten to B.</p>
+        <pre class="evidence-json" data-case="spoof-claim">{
+  "claimed_actor": "agent-B",
+  "actor": "agent-A",
+  "claim_mismatch": true,
+  "accepted": true,
+  "reason": "accepted",
+  "connection": "888f591f111e4790955bdadad63b2181"
+}</pre>
+      </article>
+      <article class="card">
+        <div class="outcome reject">forged-credential · HTTP 401 · rejected</div>
+        <h3>A's key selects B's identity</h3>
+        <p>The signature fails under B's verification key. The record assigns no actor, even on the same connection.</p>
+        <pre class="evidence-json" data-case="forged-credential">{
+  "actor": null,
+  "originator": null,
+  "accepted": false,
+  "reason": "invalid_request_proof",
+  "connection": "888f591f111e4790955bdadad63b2181"
+}</pre>
+      </article>
+    </div>
+  </section>
+
+  <section id="results" aria-labelledby="results-title">
+    <div class="label">04 / Complete recorded case list</div>
+    <h2 id="results-title">Every expected rejection counts as a passed test.</h2>
+    <p>The first 15 attempts share backend connection <code>888f591f111e4790955bdadad63b2181</code>.
+    The final eight interleave over two more connections, four per identity.</p>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="All recorded attribution outcomes">
+      <table id="case-results">
+        <caption>Original case names and recorded outcomes, in client-receipt order. “—” means null in the record.</caption>
+        <thead><tr><th scope="col">Case</th><th scope="col">HTTP</th><th scope="col">Actor</th><th scope="col">Originator</th><th scope="col">Reason</th></tr></thead>
+        <tbody>
+          <tr><td>root-A</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>root-B</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+          <tr><td>tool-A</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>tool-B</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+          <tr><td>spoof-claim</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr class="rejection"><td>forged-credential</td><td>401</td><td>—</td><td>—</td><td>invalid_request_proof</td></tr>
+          <tr><td>before-replay</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr class="rejection"><td>replay</td><td>403</td><td>agent-A</td><td>—</td><td>replayed_nonce</td></tr>
+          <tr><td>fresh-retry</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>delegate-A-to-B</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr class="highlight"><td>delegated-tool</td><td>200</td><td>agent-B</td><td>agent-A</td><td>accepted</td></tr>
+          <tr class="rejection"><td>wrong-recipient</td><td>403</td><td>agent-A</td><td>—</td><td>wrong_grant_recipient</td></tr>
+          <tr class="rejection"><td>out-of-scope</td><td>403</td><td>agent-B</td><td>—</td><td>grant_scope</td></tr>
+          <tr class="rejection"><td>tampered-grant</td><td>403</td><td>agent-B</td><td>—</td><td>invalid_grant_signature</td></tr>
+          <tr class="rejection"><td>foreign-parent</td><td>403</td><td>agent-B</td><td>—</td><td>parent_not_owned</td></tr>
+          <tr><td>concurrent-agent-A-0</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-B-0</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-A-1</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-B-1</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-A-2</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-B-2</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-A-3</td><td>200</td><td>agent-A</td><td>agent-A</td><td>accepted</td></tr>
+          <tr><td>concurrent-agent-B-3</td><td>200</td><td>agent-B</td><td>agent-B</td><td>accepted</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">On the rejected replay, <code>actor=agent-A</code> identifies the original proof's verified key; it does not identify who replayed it. No second operation was accepted. The fresh-nonce retry receives a new server operation ID, not an exactly-once execution guarantee.</p>
+  </section>
+
+  <section id="implementation" aria-labelledby="implementation-title">
+    <div class="label">05 / Inspect the implementation and evidence</div>
+    <h2 id="implementation-title">The files behind this page</h2>
+    <div class="two">
+      <article class="card">
+        <h3>Executable fixture</h3>
+        <ul class="files">
+          <li><a href="../env/ai-traffic/attribution.py">attribution.py</a><br>Request proofs, replay cache, delegation checks, keep-alive transport and destination ledger.</li>
+          <li><a href="../env/ai-traffic/attribution_suite.py">attribution_suite.py</a><br>The 23 cases, expected actors/statuses, shared-connection check and exact client/server reconciliation.</li>
+          <li><a href="../env/ai-traffic/icap_suite.py">icap_suite.py</a><br>Isolated TMM configuration and asynchronous acknowledgement checks.</li>
+          <li><a href="../env/ai-traffic/icap_check_result.py">icap_check_result.py</a><br>Requires both JSON and Tao XML success; the runner's exit code alone was insufficient.</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h3>Raw records and reproduction</h3>
+        <ul class="files">
+          <li><a href="../evidence/cache/ai-attribution-runtime-02-20260925.json">Complete cached snapshot — JSON</a><br>Original client/server results, configuration ACKs, source hashes, runtime identity and checks.</li>
+          <li><a href="../env/ai-traffic/ATTRIBUTION.md">Contract, falsifiers and repeat command</a></li>
+          <li><a href="../SOURCES.md#agent-attribution-fixture-2026-09-25">Registered hashes and retained recorder failures</a></li>
+          <li><a href="../CONTESTED-PREMISES.md">Audit trail, §19</a><br>False-success runner status and incomplete runtime-inventory corrections.</li>
+        </ul>
+      </article>
+    </div>
+    <details>
+      <summary>How to locate these rows inside the raw snapshot</summary>
+      <pre>snapshot = json.load(open("ai-attribution-runtime-02-20260925.json"))
+files = json.loads(snapshot["result"]["records"][1]["stdout"])
+run = json.loads(files["/evidence/attribution-01/result.json"])
+# run["clients"]: case, expected_actor, expected_status, status, result
+# run["server"]: complete destination ledger
+# run["summary"]: recorded totals</pre>
+      <p class="note">Snapshot SHA-256:<br><code>d9643e82345dd346a44e560c8d55a7724235ba089eedf46501ce46ef47d61673</code></p>
+    </details>
+  </section>
+
+  <section aria-labelledby="remaining-title">
+    <div class="label">06 / The next evidence to earn</div>
+    <h2 id="remaining-title">The internal attribution experiment is still ahead.</h2>
+    <dl>
+      <dt>Bind this identity ledger to a TMM-observed request/attempt.</dt>
+      <dd>Challenge reused connections, repeated nonces and object lifetimes. A missing or ambiguous join must remain unknown.</dd>
+      <dt>Establish the additional security fact.</dt>
+      <dd>Demonstrate an actual upstream association or routing decision unavailable through the relevant iRules/WASM interface at the required boundary.</dd>
+      <dt>Measure capture and publication under traffic.</dt>
+      <dd>Compare unarmed, armed without publication, armed with publication, and a slow/stopped consumer. No attribution-feed cost result is established here.</dd>
+    </dl>
+    <p class="note">Separate supporting work: <a href="../env/ai-traffic/INSPECTION.md">bounded ICAP allow/deny/timeout outcomes</a> and a <a href="../env/ai-traffic/icap_state.bpf.c">verified, signed ICAP monitor source</a>. That monitor has not been loaded or armed and is not an agent-attribution probe.</p>
+  </section>
+  <footer>Frozen run evidence · MEASURED / SELF fixture · <a href="../GROUND_TRUTH.md">Ground truth</a> · Self-contained HTML, automatic light/dark theme, no live data fetching.</footer>
+</main>
+</body>
+</html>

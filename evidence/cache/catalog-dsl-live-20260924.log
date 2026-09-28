@@ -1,0 +1,18 @@
+hook  : http_parse_client_headers   pod: f5-tmm-7597dfff8b-28s9z   slot: 2
+armed. driving 16 requests ...
+----------------------------------------
+  fired (hook hits) : 16
+  matched (count)   : 16
+  match rate        : 100.0%
+----------------------------------------
+OK disabled (not reclaimed --- see item 0c)
+disarmed and disabled slot 2.
+hook  : http_parse_client_headers   pod: f5-tmm-7597dfff8b-28s9z   slot: 2
+armed. driving 16 requests ...
+----------------------------------------
+  fired (hook hits) : 16
+  matched (count)   : 16
+  match rate        : 100.0%
+----------------------------------------
+OK disabled (not reclaimed --- see item 0c)
+disarmed and disabled slot 2.

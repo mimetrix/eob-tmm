@@ -1,0 +1,35 @@
+Script started on 2026-09-25 14:40:00+00:00 [COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i /home/claude/.ssh/id_ed25519 starin@10.145.37.36 'PYTHONDONTWRITEBYTECODE=1 make -C /home/starin/eob-tmm-staged/substrate check-header check-audit check-ls-load'" <not executed on terminal>]
+make: Entering directory '/home/starin/eob-tmm-staged/substrate'
+ok    shield_abi.h  (syntax)
+ok    shield_abi.h  (include guard + wire-layout asserts)
+ok    ls_audit.c  (21 assertions: injection, truncation, peer creds, build id, op naming)
+rst_why -> 0x144e3c0  (pad, pad_offset=4, build 337d65cf0002)
+ssl__err -> 0xa1b2c3  (pad, pad_offset=0, build 337d65cf0002)
+some_unpadded -> 0xdeadbe  (displace, pad_offset=-, build 337d65cf0002)
+warning: raw address --- NOT checked against the running binary's build id. A stale address arms whatever is there, and a nop pad exists in plenty of wrong places.
+only_one -> 0xcccc  (pad, pad_offset=4, build 337d65cf0002)
+  ok    elf_build_id agrees with readelf on 4 binaries
+  ok    a non-ELF returns None --- no exception, no invented id
+  ok    resolves by name when the build id matches (pad and displace)
+  ok    REFUSED  build id mismatch              (BUILD ID MISMATCH)
+  ok    REFUSED  symbol not in the index        (not in the index)
+  ok    REFUSED  index file missing             (no hook index)
+  ok    REFUSED  index carries no build id      (no #build_id)
+  ok    REFUSED  no running tmm under /proc     (cannot find the running tmm)
+  ok    a raw 0x address is still accepted, and warns that it is unchecked
+  ok    REFUSED  neither hex nor a symbol       (not a hex address)
+  ok    REFUSED  a name with two entries        (AMBIGUOUS)
+  ok    an ambiguous name REFUSES; a unique one in the same index resolves
+  ok    build-id readers agree on 4 binaries, 4 cross-checked against readelf
+  ok    (a) straddle, mirroring tmm64.debug    old parse: 47a10fc43398caa9af9dddbd8bed82ce (32 hex)  now: full 40 hex
+  ok    (b) 8-aligned property note            old parse: None (0 hex)                               now: full 40 hex
+  ok    the hook name is READ FROM the object's fentry/ section, not defaulted
+OK
+OK
+OK
+OK
+  ok    arm/disarm CLI sends target requests without a catalog lookup
+  ok    check_ls_load: 40 assertions, 7 of them refusals
+make: Leaving directory '/home/starin/eob-tmm-staged/substrate'
+
+Script done on 2026-09-25 14:40:02+00:00 [COMMAND_EXIT_CODE="0"]

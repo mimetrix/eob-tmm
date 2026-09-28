@@ -1,0 +1,46 @@
+ M src/compile/debug_whitelist_x86_64
+ M src/compile/default_whitelist_x86_64
+ M src/compile/filelist
+ M src/modules/hudfilter/http2/http2.c
+?? src/base/harness.c
+?? src/base/ls_arm.c
+?? src/base/ls_arm.h
+?? src/base/ls_audit.c
+?? src/base/ls_audit.h
+?? src/base/ls_build_gate.h
+?? src/base/ls_core_relo.c
+?? src/base/ls_core_relo.h
+?? src/base/ls_fexit.c
+?? src/base/ls_fexit.h
+?? src/base/ls_json.h
+?? src/base/ls_map.h
+?? src/base/ls_map_glue.h
+?? src/base/ls_prep.c
+?? src/base/ls_ring.h
+?? src/base/ls_shield_blob.h
+?? src/base/ls_sig.c
+?? src/base/ls_sig.h
+?? src/base/ls_sig_pubkey.h
+?? src/base/ls_swap.c
+?? src/base/ls_target.h
+?? src/base/ls_tp.h
+?? src/base/ls_tp_emit.c
+?? src/base/ls_tp_http.h
+?? src/base/ls_tp_ring.h
+?? src/base/ls_tp_shield.h
+?? src/base/ls_tramp.c
+?? src/base/ls_tramp_asm.c
+?? src/base/ls_vm.c
+?? src/base/ls_vm.h
+?? src/base/ls_vm_config.c
+?? src/base/ls_vm_config.h
+?? src/base/ls_vm_load.c
+?? src/base/shield_abi.h
+?? src/base/vm_stack_policy.h
+?? src/compile/debug_whitelist_x86_64.pre-ubpf
+?? src/compile/default_whitelist_x86_64.pre-ubpf
+073e9717ed444b9f838842df0440cd1e677c72d28ed8cb84d07a95f4e42498fa  /home/starin/code/tmm/src/base/ls_vm_load.c
+37e0e03cc42bc0dcb454044a707ce2845dda6c6c783967c51702e62003aca4eb  /home/starin/code/tmm/src/base/ls_target.h
+073e9717ed444b9f838842df0440cd1e677c72d28ed8cb84d07a95f4e42498fa  /home/starin/eob-tmm-staged/substrate/ls_vm_load.c
+37e0e03cc42bc0dcb454044a707ce2845dda6c6c783967c51702e62003aca4eb  /home/starin/eob-tmm-staged/substrate/ls_target.h
+BASE_COUNTS {'.c': 14, '.h': 21} LINES 8948

@@ -1,5 +1,10 @@
 # Surfaces — portable CO-RE bytecode, one per surface
 
+**New users:** use [`../template.c`](../template.c) and the
+[current tutorial](../../docs/EBPF-TUTORIAL.md). The older examples below
+predate build-side relocation. Current programs are relocated, target-bound,
+verified and signed before delivery; deployed TMM does not need the type catalog.
+
 Each program is portable bytecode: it names TMM fields by struct+field, carries
 `.BTF.ext` relocation records, and is relocated to the running build's byte
 offsets at load (`ls_core_relo.c`) before verify+JIT. No baked offsets, no

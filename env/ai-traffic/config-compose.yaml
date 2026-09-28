@@ -1,0 +1,20 @@
+# Layer over icap-compose.yaml with --env-file config-fixture.env and
+# --project-name eob-config-20260925. Separate networks, volumes and image.
+services:
+  fixture:
+    environment:
+      LS_LOAD_SOCKET: /run/ls/ls_load.sock
+    volumes:
+      - ls-sockets:/run/ls
+      - ls-stream:/run/ls-stream
+  tmm:
+    image: tmm:CONFIG-20260925
+    environment:
+      LS_LOAD_SOCKET: /run/ls/ls_load.sock
+      LS_TP_RING: /run/ls-stream/ls_tp_ring
+    volumes:
+      - ls-sockets:/run/ls
+      - ls-stream:/run/ls-stream
+volumes:
+  ls-sockets:
+  ls-stream:

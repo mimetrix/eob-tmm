@@ -1,0 +1,25 @@
+=== 1. clear the version-stamped packaging chain
+  stale artifacts: 5 -> 0
+
+=== 2. make container
+  exit: 0   log: /tmp/bnk-package.1335317.log
+
+=== 3. VERIFY FRESHNESS --- does the packaged binary contain what was just built?
+  debuginfo : tmm64.no_pgo.debug  (build c3b81927dfdcc31137cd8212b5e23bb85677a06c)
+  newest source : ls_vm_load.c  2026-09-24 13:23:48
+  runtime DEB   : 2026-09-24 13:28:25
+  ok --- the package is newer than every substrate source
+  linked id     : 0d6bcf33824ba8fb31f980fbf3b68e027fe707bf  (informational)
+  packaged id   : c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  expected  : 40 non-static substrate function(s), read from the sources
+  present   : 40
+  MATCH --- the packaged binary contains every non-static substrate function
+
+  Both checks passed: the package is newer than every substrate source (A), and it
+  contains every substrate function the sources define (B).
+
+=== 4. record what this stage produced
+  commit  : f08a820-dirty (from .staged-commit, written by bnk-stage.sh)
+  receipt: package recorded (3 field(s)) in /home/starin/lstools/pipeline-receipt
+
+  Next: bnk-bake-tools.sh   (it regenerates both indexes from these DEBs)

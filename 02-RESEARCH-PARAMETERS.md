@@ -482,6 +482,365 @@ before execution. Existing microbenchmark floors do not discharge this question.
 
 ---
 
+### P17 · Does embedded-structure DSL traversal preserve the intended field access?
+
+**Claim under test:** named embedded structs can be traversed alongside pointer edges without
+mistaking inline bytes for a pointer; generated CO-RE accessors resolve to the intended scalar
+and the relocated program passes the pinned verifier. See
+[`broader-coverage-roadmap.md`](broader-coverage-roadmap.md) §5.
+
+**Falsified if:** nested-only or mixed embedded/pointer access resolves the wrong field or offset;
+an embedded edge adds a pointer dereference; NULL/unreadable pointer hops continue instead of
+declining; or a bitfield/unsupported aggregate silently becomes a scalar. Require multiple fields,
+typedef/qualifier wrappers, legacy pointer-only catalogs, and unchanged scalar behavior. Compare
+relocations with independent expected offsets and execute fixtures where available; PREVAIL alone
+cannot establish semantic correctness. Use build-box clang-18 and pinned PREVAIL on relocated bytes.
+
+**Status:** exercised 2026-09-24. Native-offset/value fixtures pass pinned PREVAIL and both uBPF
+engines; real-TMM objects agree on 12/12 independently checked relocations and pass final binding,
+verification and signing. Updated authoring code/catalog installed on the build box. Three live
+HTTP/1 probes yield 16/16, 0/16 and 16/16 matches, with independent pad restoration, successful
+post-disarm traffic and zero restarts. See [`embedded-traversal-validation.md`](embedded-traversal-validation.md)
+for separate fixture/real-TMM scopes, failed network preflights and limits; the HTTP/2
+pointer→embedded expression was verified/signed but not executed live.
+
+---
+
+### P18 · Can the deployed image omit bulk catalogs without losing target binding?
+
+**Claim under test:** build-side discovery resolves an eligible target into a small record inside
+the signed program; the runtime admits only the exact full GNU build ID and that target/kind.
+Entry and exit probes still load, arm, fire and disarm with no deployed hook/type catalogs or BTF.
+
+**Falsified if:** a wrong-build record (including the same 32-bit prefix), a changed target/kind,
+or an unauthenticated alteration is accepted; an already attached slot can be retargeted by reload;
+disarm writes to an untracked address; or bulk catalogs/BTF survive in any distributable image
+layer. Independently read patch bytes and exercise HTTP traffic; status counters alone do not
+establish attachment/disarm. Preserve build-box `tmmtrace list`. Run pinned-toolchain admission
+and signature tests before the live experiment. This is not a claim of concealed symbols or
+reduced exploitability.
+
+**Status:** exercised 2026-09-24 on build `c3b81927dfdcc31137cd8212b5e23bb85677a06c`.
+Saved-layer audit, pinned fixtures, build-side discovery and live signed entry/exit checks passed;
+wrong-build/kind/address/tamper, attached-kind and valid different-target reload were refused, with independent patch
+readback and zero restarts. See [`catalog-free-deployment.md`](catalog-free-deployment.md) for
+the exact cases, witnesses and limits; this is not universal coverage or a concurrency proof.
+
+---
+
+### P19 · Can synthetic AI exchanges traverse the deployed HTTP proxy intact?
+
+**Claim under test:** an isolated fixture can pass MCP-shaped JSON-RPC initialization, sessioned
+tool/resource calls and errors; A2A-shaped task creation/get/cancel and SSE; and inference-style
+JSON/SSE plus a retry through the identified TMM. This first baseline uses HTTP/1 with the native
+AI filters disabled. It tests forwarding, not protocol conformance or AI execution.
+
+**Falsified if:** client/backend request IDs or body hashes differ, RPC/session/task assertions fail,
+expected error/retry outcomes change, paced SSE arrives wholly buffered, any exchange bypasses the
+proxy, or TMM restarts. Require 17 exchanges per worker, three concurrent workers, exact ledger
+agreement, backend observation of the TMM SNAT IP, and a packet capture on the selected TMM.
+SSE first-to-last event arrival must span at least 150 ms for deliberately 200 ms-paced events;
+this is a buffering check, not a production latency budget. Record sources and runtime identity.
+
+**Status:** exercised 2026-09-24, run `ai-4f9fb0add705`, build `c3b81927…`: 51/51 exchanges from
+three concurrent workers reconciled, six paced SSE streams passed, expected errors/retries
+preserved, backend SNAT and selected-TMM packet witnesses, stable pod and zero restarts.
+See [`env/ai-traffic/README.md`](env/ai-traffic/README.md) for receipts and scope. The later eBPF
+phase will compare its observations with these independent-of-substrate client/backend records.
+
+---
+
+### P20 · Can existing HTTP hooks produce a continuously drained, correctly correlated feed?
+
+**Claim under test:** monitor-only eBPF records from supported HTTP hooks can be continuously
+drained, decoded under an explicit schema and reconciled with the independent P19 fixture ledgers,
+while delivering a useful internal signal unavailable through the relevant exposed iRules/WASM
+interfaces within a pre-registered incremental poll-loop cost budget. Completed-request-header
+observations at `fexit/http_parse_client_headers` are a calibration step; select the distinctive
+signal by diagnostic value and demonstrated API-access gap. Validate response boundaries
+separately. See [`ai-gateway-tracepoints.md`](ai-gateway-tracepoints.md)
+§8.1 for the proposed hook shortlist, record contract and experiment order.
+
+**Falsified if:** parser attempts are reported as distinct completed requests; any record joins the
+wrong request/run; failed reads become plausible valid values; control traffic contaminates the
+51-exchange count; schema/attachment changes silently mislabel records; or missing/duplicate records
+are hidden. Request-header completion must be distinguished from response completion. Require a
+single-run reconciliation first, then ten consecutive 51-exchange runs with one continuously
+running collector and an intervening idle interval. Archive raw records, decoded records, source/
+program identities, attachment history, ring counters and independent fixture receipts.
+
+**Value/cost falsifiers, added 2026-09-24:** the selected supposedly unique observation is already
+available through a relevant iRules/WASM interface at the required timing/granularity; the feed
+cannot distinguish the internal condition it claims to explain; or the full capture/publication
+path exceeds the pre-registered cost budget or waits for its consumer. Check interface coverage
+with cached evidence. Compare unarmed, armed/no-publication, armed/publication and slow/stopped
+consumer under P16 as part of the first signal's acceptance, not a deferred production exercise.
+Successful export of ordinary HTTP fields alone does not satisfy this milestone.
+
+**Security-use-case priority, clarified 2026-09-24:** select the first signal from
+`ai-gateway-tracepoints.md` §8.2: control bypass/fail-open evidence, agent/session routing integrity,
+inspection/release coverage or explanatory red-team evidence. The earlier streaming-stall
+recommendation is superseded as the primary goal. Require controlled security-relevant positive
+and negative cases, an independent outcome witness and the specific iRules/WASM visibility gap;
+generic operational diagnostics alone do not complete P20. Proposed guardrail/policy fields require
+an actual integration contract, not an assumption that they exist in the current TMM.
+
+**Scope gates:** validate helper return semantics and collector consume/acknowledge/flush behavior
+on the authoritative build box before assigning delivery guarantees. Keep-alive, fragmented headers,
+concurrency and object reuse must challenge correlation before generalization beyond P19's current
+one-connection-per-exchange workload. Response/stream/abort boundaries need separate cardinality
+rules and independent expected outcomes. P13 covers broader semantic correlation; P16 separately
+gates slow-consumer behavior, resource bounds and production performance claims.
+
+**Status:** unrun, IDEA, registered 2026-09-24. No AI metadata probe or collector was deployed by
+this planning update. Existing mechanism and traffic receipts establish prerequisites only.
+
+**Previous selection, 2026-09-24:** delayed DLP allow/deny/timeout on the same paced
+synthetic response, with host-enforced hold-until-allow and an independent client-content witness.
+The [integration preflight](env/ai-traffic/INSPECTION.md) is MEASURED source/configuration inventory,
+not an execution of P20. Adaptation/ICAP is a source lead; its ordinary result/timeout/action is
+already exposed to iRules. Inference's analyzer-stream hold does not hold customer response data.
+Establish a supported gate configuration and the specific visibility gap before implementation;
+numeric workload/cost budgets are still unset. This choice supersedes the earlier routing-first
+recommendation without claiming a DLP result.
+
+**Priority changed by owner, 2026-09-25:** agent attribution is now primary. Register the
+trust contract and adversarial cases in [`env/ai-traffic/ATTRIBUTION.md`](env/ai-traffic/ATTRIBUTION.md):
+two authenticated agents, shared connections/concurrency, caller-ID collisions, spoofing, replay,
+retries and scoped delegation. Authentication evidence supplies identity; an internal routing or
+session binding alone does not. The first destination-side authentication fixture establishes an
+independent ledger, not TMM authentication enforcement or differentiated eBPF visibility.
+ICAP's bounded unarmed allow/deny/timeout cases have since passed (`GROUND_TRUTH.md`); retain
+them as supporting outcome evidence. P20's attributed internal feed and P16's cost tests remain unrun.
+
+**Prerequisite result, 2026-09-25 — MEASURED, SELF fixture:** `attribution-01` passes 23 expected
+outcomes through the isolated TMM, including 15 attempts on one reused backend connection.
+Authentication/delegation run at the destination; the principal map is configured fixture data.
+This supplies the comparison ledger, not a completion of P13/P20 or a native-filter result.
+See the [registered receipts](SOURCES.md#agent-attribution-fixture-2026-09-25) and attribution
+contract for the six rejection cases and remaining trust/correlation limits.
+
+**Consumer follow-up, same day — MEASURED, SELF:** the conservative ledger join passes
+21 checks with synthetic candidate observations, including real fixture-proof A/B nonce
+collision and replay, missing/lossy evidence and duplicate request identities. It refuses
+ambiguous matches rather than joining by order. This advances the consumer only; a live
+TMM request-lifetime/cardinality gate and differentiated internal facts remain unproven.
+See [consumer contract/results](env/ai-traffic/ATTRIBUTION.md#consumer-result--attribution-join-01).
+
+**Live scope follow-up, 2026-09-28 — MEASURED prerequisite, not P20 completion.**
+The [registered parser-scope gate](env/ai-traffic/ATTRIBUTION.md#live-parser-scope-experiment)
+now has a pinned live result: 66 calls/records for 59 completed headers; fragments
+and an aborted header account for seven partial returns. Eight address tags span
+multiple client connections. Header completion occurs before a paced body is sent.
+These results falsify raw call count, address equality and header completion as
+substitutes for request count, connection lifetime and accepted operation. All 59
+attempted joins remain unknown. The next prerequisite is joint initialization,
+cleanup and request-boundary observation with explicit missing-evidence cases.
+No native AI-filter result, differentiated visibility or cost result is established.
+[Receipts](SOURCES.md#attribution-parser-scope-2026-09-28).
+
+**Lifetime follow-up, 2026-09-28 — MEASURED prerequisite, not P20 completion.**
+The [registered three-hook gate](env/ai-traffic/LIFETIME.md) closes 71 observed
+parser intervals in one HTTP/1 worker. It records 66 address-reuse pairs and
+reconciles all 204 calls with output. Partial headers retain their attempt number;
+an aborted header has an incomplete cleanup. Late/missed initialization keeps three
+completed header attempts unknown. KERNEL witnesses show restored hook bytes and a
+stable process. The next prerequisite is a bounded correlation value from a known
+header attempt, joined to the authenticated authority ledger without using order,
+address or time. Register that test before implementation. `request_scope_validated`
+stays false; other parser callers, HTTP/2, multiple workers and cost remain open.
+[Receipts](SOURCES.md#parser-lifetime-2026-09-28).
+
+**Correlation follow-up, 2026-09-28 — MEASURED bounded join, not P20 completion.**
+The [registered four-hook experiment](env/ai-traffic/CORRELATION.md) records
+313 calls/events and 51 completed header observations. The join gives 42 accepted
+operation matches, one authenticated rejection and eight unknowns. Missing births,
+colliding nonces, a short nonce and forged authentication do not acquire guessed
+actors. Reordered ledger input preserves results; five removed/invalid-evidence
+checks stop attribution. All four hook sites are restored, with stable process
+identity and zero restarts. Failed build/lint/formatting attempts are retained.
+
+The result qualifies only canonical fixture HTTP/1 requests in a closed window:
+512 header bytes, lifetimes 1–127, one worker and a trusted destination ledger.
+It sets `bounded_join_validated=true` but leaves `request_scope_validated=false`.
+The next work must register tests for missing-boundary recovery and broader
+request/worker scope before generalizing. A specific internal fact unavailable
+through existing surfaces and measured data-path cost are still required for P20.
+[Receipts](SOURCES.md#bounded-request-correlation-2026-09-28).
+
+**Controlled-gap follow-up, 2026-09-28 — MEASURED bounded recovery.**
+The [registered gap tests](env/ai-traffic/GAPS.md) show why complete event output
+does not prove that every boundary hook ran. A collector guard makes reported
+breaks permanent for a result window. Native interpreter/JIT and live checks pass.
+All 150 live requests complete; 1,023 calls reconcile with records. Missing-boundary,
+pause and capacity windows stay unknown. After full reload, two new requests match;
+a connection retained across reload stays unknown. No wrong-agent match is observed.
+
+The live controller reports its own changes. Silent bypass, unreported changes,
+missing controller history and stale collector restart remain unvalidated.
+`request_scope_validated=false` remains required. P20 still needs a specific useful
+internal fact beyond existing surfaces, broader worker/request scope and measured
+data-path cost. Any stronger coverage claim needs a separately registered witness
+that can detect the changes this collector cannot see.
+[Receipts](SOURCES.md#controlled-correlation-gaps-2026-09-28).
+
+**Owner direction, corrected 2026-09-28 — observe before choosing workload tests.**
+The first response to the coverage request selected a 24-request wave: three agents,
+two simulated instances each and four concurrent requests per instance. The owner
+rejected that assumption-led approach before implementation or execution. The
+proposal is withdrawn, not recorded as a failed measurement.
+
+The next response made a real deployment a prerequisite for progress. The owner
+corrected that too: **first design the probe and establish application-metadata
+extraction; analytics follows later.** The [probe contract](env/ai-traffic/METADATA.md)
+now specifies hook selection, readable values, field provenance, bounded reads,
+availability and unsampled output attempts. Handler event codes and metadata
+must remain visible without known agent semantics or fixture markers.
+
+Source and packaged-binary discovery is MEASURED, with
+[receipts](SOURCES.md#application-metadata-hook-discovery-2026-09-28). Three source
+leads have no hook-index entries; the surrounding A2A/AIMCP handlers have padded
+entries. Source also establishes lazy JSON parsing: not all fields are already
+materialized. Handler event extraction and one root-object method-field path are
+now MEASURED. The [field receipts](SOURCES.md#root-object-method-extraction-2026-09-28)
+record exact live values, truncation, getter failure and budget exhaustion. The
+AIMCP input did not call this getter and produced no method value. Event counts
+alone did not meet the extraction goal; this correction remains in the probe record.
+Falsifiers still include wrong or stale values, unknown events excluded, hidden
+truncation, missing values called absent, application changes and loss presented
+as complete capture. Other fields and broader extraction coverage remain pending.
+
+The [later discovery plan](env/ai-traffic/COVERAGE.md) uses real activity to derive
+representative tests. Selecting that deployment does not block probe design.
+
+**Production streaming requirement, 2026-09-28 — IDEA.** The owner requires
+continuous output for streaming analytics workflows. The
+[service contract](env/ai-traffic/PRODUCTION-STREAM.md) places collection and
+publication outside TMM. It proposes independent consumers, replay after durable
+acceptance, bounded queues and explicit observation gaps. Pre-registered checks
+cover multiple producers, process/collector replacement, queue/storage pressure,
+schema changes, replay and sustained cost. Falsifiers are blocked forwarding,
+unbounded buffering, wrong source identity, hidden loss or unavailable fields
+presented as absent. The one-worker field test does not settle these questions.
+
+**Local collector follow-up, 2026-09-28 — MEASURED subset, not P20 completion.**
+The [pre-registered gate](env/ai-traffic/COLLECTOR.md) now has ten native checks
+and a live method-value comparison. Commit precedes ring ACK; crash-window replay,
+duplicate suppression, bounded retention, page-limit refusal and independent
+HTTP consumers pass their stated tests. The legacy drain's delivery claim is
+falsified, not inherited. One startup failure is retained: the ring is created on
+first output. The corrected live run delivers eight method records to both
+consumers and archives the ten-event journal before removing the fixture.
+Multiworker ownership, silent-gap detection, authenticated publication, power-loss
+durability, useful analytics and data-path cost remain open.
+[Receipts](SOURCES.md#continuous-metadata-collector-2026-09-28).
+
+**Separate-container follow-up, 2026-09-28 — MEASURED subset.** The
+[registered container gate](env/ai-traffic/COLLECTOR-CONTAINER.md) now has eleven
+native checks and one live traffic/replacement test. Normal stop and SIGKILL each
+leave TMM forwarding. Both queued method values are recovered after collector
+replacement. Two separate API-only consumers agree on eight method records and
+ten journal events. A final controller key error is retained; evidence-only recovery
+checks the journal and results without new traffic. The fixture is archived and
+removed. Shared PID namespace, `SYS_PTRACE` and unconfined AppArmor limit security
+isolation. Production ownership, full health history and sustained cost remain open.
+[Receipts](SOURCES.md#separate-collector-container-2026-09-28).
+
+---
+
+### P21 · Controller-published configuration snapshots — implementation in progress
+
+Pre-registered 2026-09-25, before validation. A dedicated `ls_config_v1` ARRAY
+view supplies bounded controller input independently of the legacy hash-map registry.
+One invocation must see a complete, single revision or explicit unavailability;
+program stores must never change the published image. Updates bind to a process
+session, loaded-program instance and SHA-256, with compare-and-publish revisions.
+
+**Falsifiers:** mixed records/revisions under concurrent publication; one invocation
+switching revisions; program writes reaching another invocation/thread; a stale
+session/instance/hash/expected revision accepted; malformed lengths or map shapes
+accepted; an old program reading a replacement's configuration; a failed publication
+changing the previous image; lookup allocating, waiting or retrying without a bound.
+Exercise actual pinned clang-18/PREVAIL and uBPF interpreter/JIT, not just host helpers.
+Socket framing and client error exit status are part of the contract. Bench evidence
+does not establish live TMM integration or per-call cost. Armed/no-publication,
+armed/publication and consumer-pressure cost budgets remain unset and unmeasured.
+
+**2026-09-25 result — MEASURED, pinned build-box bench:** interpreter/JIT consistency,
+10,000 concurrent publications/four readers, copy-write isolation, empty withdrawal,
+sticky unavailability, stale/malformed refusals, socket fragmentation/truncation and CLI
+failure exits pass. Existing map/helper regressions pass. The first PREVAIL refusal with
+static map symbols is retained. [Contract](configuration-snapshots.md),
+[receipts](SOURCES.md#configuration-snapshots-2026-09-25).
+
+**Later the same day — MEASURED, isolated live SSA/Tao:** rebuilt/packaged `b8dc27f3…`
+passes signed-load, missing-input, two revisions, five stale publication refusals, empty
+withdrawal, identical-bytecode reload/new instance and revoke. Six armed phases total
+48 requests/counter increments/events, zero reported drops/errors/safe returns; 52 exact
+HTTP responses including baseline/disarmed requests. Kernel executable hash and two
+call/NOP transitions corroborate the running binary and attachment, with no restart.
+The wrong-opcode recorder failure is preserved. Live publication pressure, cross-UID
+negative tests, failure-path initialization/reclamation and performance remain open gates.
+
+### P22 · New-user eBPF tutorial
+
+Registered 2026-09-25 before running the tutorial checks. The original `substrate/template.c`
+combined configuration, mutable maps, named-field reads, clock-based sampling,
+event output and entry verdict selection. An exit build reads the return value.
+
+**Falsifiers:** either variant fails pinned PREVAIL; interpreter and JIT disagree;
+unresolved field offsets produce the expected native values; missing/invalid input
+selects SAFE_RETURN; sampling changes the verdict; an output refusal stops policy
+evaluation; a reset/reload inherits the old count; exit bytecode dereferences an
+argument object or selects SAFE_RETURN. Test native layouts that differ from the
+program's local declarations. Keep bench and target-binding results separate from
+live traffic and cost claims. The tutorial does not establish request identity.
+
+**Result — MEASURED, pinned bench and target binding:** both variants pass
+PREVAIL and interpreter/JIT checks. Four relocated offsets match native C
+offsets. The unrelocated negative fails as expected. Input generation, event
+decoding and malformed-length refusal pass. Packaged entry and exit binding,
+exit admission and final PREVAIL pass. A one-entry hash-map lookup failed;
+the template then used 256 entries. All attempts are
+[retained](SOURCES.md#ebpf-tutorial-2026-09-25).
+
+**Later live result — MEASURED; full success FALSIFIED:** entry and exit complete
+14 phases on the packaged TMM. All 118 HTTP responses are exact; 112 armed calls
+produce 112 program records. Configuration, counters, reset, deletion, monitor
+selection and cleanup checks pass. Both sampling phases fail: eight records appear
+where zero are required. The output bridge reports failure after delivery and
+success after a full-ring drop. The earlier bench used a substitute output sink.
+An existing fixture also exposes stale map storage after revoke and a changed map
+layout. A separate fixture permits the remaining checks; it does not fix reuse.
+Build-box reproducers confirm both host defects. Keep these tests failing until
+the host is corrected and the packaged live path is tested again. Cost remains
+unmeasured. See contested premises §§23–24 and the same receipt table.
+
+**Revised contract, registered before the repaired live run, 2026-09-25:**
+the owner requires unsampled observability. Schema 2 removes the optional
+interval. The program must attempt one record per call, including diagnostic
+paths. Schema 1 and a nonzero reserved interval word must be refused as input.
+The default interval in schema 1 was already zero; sampling was not the default.
+
+**Repair falsifiers:** a small HASH table loses an inserted key; deleting a key
+breaks lookup or update of a colliding key; an old map reference reaches a new
+generation; reset succeeds beneath an active reader; replacing two output maps
+with the one-entry tutorial HASH fails; revoking a second slot changes the active
+slot's count; successful output returns an error; dropped or disabled output
+returns success. In the isolated live run, require 112 tutorial calls and 112
+decoded tutorial records, plus eight precursor calls and 16 precursor records.
+Require 126 exact HTTP responses, three observed call/NOP cycles, zero reported
+errors or drops, and a stable process. Any mismatch fails the run. This count
+test does not establish a loss-free transport under pressure or a per-call cost.
+
+**Repair result — MEASURED:** pinned host and configuration checks pass. Both
+one-entry tutorial variants pass interpreter/JIT, PREVAIL and packaged binding.
+The isolated live run passes every count and state check registered above:
+126 HTTP responses, 112 tutorial records, 16 precursor records, three restored
+hook cycles and no restart. The output bridge's delivery/drop/off results are
+tested natively against the real bridge. Live output-pressure and cost tests
+remain open. [Retained records](SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
 ## Retired
 
 ### R1 · "Per-call cost cannot be obtained from a live TMM" — RETIRED

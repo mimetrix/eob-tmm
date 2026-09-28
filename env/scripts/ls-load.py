@@ -22,13 +22,10 @@ slot 0 while reporting success, so a load landed where nothing ran.
   arm   <slot> <name|0xaddr>  0x1003  patch a live function entry
   disarm      <name|0xaddr>   0x1004  restore the nops
 
-ARM BY NAME, NOT BY ADDRESS --- and the build-id gate is the reason this exists.
-A bare hex address is still accepted, and still prints a warning, because it
-cannot be checked against anything. Passing a NAME resolves it through the index
-baked into the image ($LS_HOOK_INDEX, default /usr/share/ls/hook-index.tsv),
-whose header carries the build id of the binary it was generated from. That is
-compared against the build id of the binary THIS PROCESS IS ACTUALLY RUNNING,
-read out of /proc/<pid>/exe, and a mismatch is refused.
+CATALOG-FREE ARMING. `arm <slot>` uses the target authenticated at LOAD from the
+program's .ls.target record. An optional name or function-entry address must match
+that record; it cannot redirect it. DISARM accepts a name/address only if the
+runtime actually attached that target. Neither CLI path reads a deployed catalog.
 
 Two real failures this closes, both of which reported success at the time:
 
@@ -58,6 +55,7 @@ import os
 import socket
 import struct
 import sys
+import json
 
 HDR = 192
 OFF_OP, OFF_EPOCH, OFF_MODE, OFF_PROGLEN, OFF_HOOK = 0, 4, 8, 12, 48
@@ -79,6 +77,7 @@ OFF_CTX_ABI = 16 + 105
 CTX_ABI_VERSION = 3
 
 OP_LOAD, OP_SET_MODE, OP_STATUS, OP_REVOKE = 1, 2, 3, 4
+OP_CONFIG_STATUS, OP_CONFIG_PUBLISH = 5, 6
 # DEVELOPMENT ops, deliberately far from the real ones. A control plane would not expose
 # "benchmark this program" on the load path, and the numbering says so.
 OP_BENCH = 0x1001
@@ -324,7 +323,10 @@ def entry_bytes(addr, n=5):
 
 
 def resolve_hook(spec):
-    """A name -> a checked address. A 0x... address -> itself, with a warning.
+    """Legacy catalog resolver, retained for older tooling and its regression tests.
+
+    The deployed arm/disarm CLI no longer calls this function. The runtime's signed
+    target record is now the authority, including for explicitly supplied addresses.
 
     Refuses rather than guesses on every failure. An unresolvable name that fell
     back to *something* would reproduce the exact bug this closes.
@@ -493,6 +495,61 @@ def msg(op, slot=0, mode=0, hook=b"", prog=b"", epoch=None, binding=None, sig=No
     return bytes(b) + prog
 
 
+def config_body(document):
+    """Encode configuration v1; opaque rows are exactly 32 bytes, never padded."""
+    fields = {"abi", "schema", "session", "instance", "expected_revision", "revision",
+              "program_sha256", "rows"}
+    if not isinstance(document, dict) or set(document) != fields:
+        raise ValueError("configuration requires exactly: " + ", ".join(sorted(fields)))
+
+    def integer(name, low, high):
+        value = document[name]
+        if type(value) is not int or not low <= value <= high:
+            raise ValueError("invalid configuration " + name)
+        return value
+
+    def hexadecimal(value, size, name):
+        if not isinstance(value, str) or len(value) != size * 2 or any(
+                c not in "0123456789abcdefABCDEF" for c in value):
+            raise ValueError("invalid configuration " + name)
+        return bytes.fromhex(value)
+
+    abi = integer("abi", 1, 1)
+    schema = integer("schema", 1, 0xffffffff)
+    expected = integer("expected_revision", 0, 0xffffffffffffffff)
+    revision = integer("revision", 1, 0xffffffffffffffff)
+    if revision <= expected:
+        raise ValueError("revision must exceed expected_revision")
+    session = int.from_bytes(hexadecimal(document["session"], 8, "session"), "big")
+    instance = int.from_bytes(hexadecimal(document["instance"], 8, "instance"), "big")
+    if not session or not instance & (1 << 63):
+        raise ValueError("invalid session or instance")
+    sha = hexadecimal(document["program_sha256"], 32, "program_sha256")
+    rows = document["rows"]
+    if not isinstance(rows, list) or len(rows) > 16:
+        raise ValueError("rows must be a list of at most 16 records")
+    data = b"".join(hexadecimal(row, 32, "row") for row in rows)
+    return struct.pack("<IIQQQQII32s", abi, schema, session, instance, expected,
+                       revision, len(rows), 0, sha) + data
+
+
+def _unique_config_fields(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate configuration field " + key)
+        result[key] = value
+    return result
+
+
+def config_send(payload):
+    """An error/timeout/empty response must not yield a successful CLI exit."""
+    response = send(payload)
+    if not response.startswith("OK config ") or "\n" in response:
+        raise ValueError(response or "empty configuration response; outcome unknown")
+    return response
+
+
 def send(payload):
     path = sock()
     try:
@@ -532,12 +589,14 @@ def send(payload):
 #
 # (min, max, "usage") --- max None means unbounded.
 _ARGS = {
-    "arm":     (2, 2, "arm <slot> <symbol-or-0xADDR>"),
+    "arm":     (1, 2, "arm <slot> [signed-symbol-or-entry-address]"),
     "disarm":  (1, 1, "disarm <symbol-or-0xADDR>          # a NAME, not a slot"),
     "load":    (2, 4, "load <slot> <file.bpf.o> [mode]   # mode 1=MONITOR 2=ENFORCE.\n"
                       "               Needs <file>.sig beside it --- the hook comes from the\n"
                       "               signed binding, not from an argument"),
     "status":  (1, 1, "status <slot>"),
+    "config-status": (1, 1, "config-status <slot>"),
+    "config-publish": (2, 2, "config-publish <slot> <snapshot.json>"),
     "samples": (1, 1, "samples <slot>"),
     "mode":    (2, 2, "mode <slot> <1|2>"),
     "revoke":  (1, 1, "revoke <slot>"),
@@ -571,7 +630,7 @@ def _check_args(cmd, rest):
                  "    whatever is at that address instead." % (rest[0], usage))
     # A slot where a slot is expected. int() on a symbol name raises ValueError, which is a
     # traceback again.
-    if cmd in ("arm", "load", "status", "mode", "revoke"):    # not bench: file comes first
+    if cmd in ("arm", "load", "status", "mode", "revoke", "config-status", "config-publish"):
         try:
             int(rest[0])
         except ValueError:
@@ -588,47 +647,38 @@ def main():
     cmd = a[0]
     _check_args(cmd, a[1:])
 
-    if cmd == "arm":
-        # The address goes in binding.hook AS TEXT --- the loader strtoull()s it.
-        # resolve_hook turns a symbol name into that text, or exits.
-        slot, addr = int(a[1]), resolve_hook(a[2])
-        # LOOK AT THE ENTRY BEFORE WRITING TO IT.
-        #
-        # Arming an already-armed entry fails, correctly --- the pad no longer holds nops. But
-        # the failure came back as "no pad, out of rel32 range, or swap refused", a catch-all
-        # naming three unrelated causes, and the first of them is wrong in a way that reads
-        # like a stale address. It cost a diagnosis: I went looking at the bytecode.
-        #
-        # More importantly this catches the case that actually hurt this project. On
-        # 2026-08-17 a stale address armed a nop pad 64 bytes past rst_why: the patch
-        # succeeded, OK ARMED LIVE printed, and nothing fired across 16,000 requests. The
-        # index's build-id gate closes that for named lookups. This closes it for a raw
-        # 0x address, which the gate cannot check --- if the five bytes are not a pad and not
-        # an existing hook, do not write to them.
-        pre = entry_bytes(addr)
-        if pre is not None:
-            if pre == b"\x90" * 5:
-                pass                                   # a clean pad, as expected
-            elif pre[0] == 0xe8:
-                sys.exit("*** %s is ALREADY ARMED --- its entry holds %s, a call, not a pad.\n"
-                         "    Disarm it first. Arming over an armed entry would overwrite the\n"
-                         "    displacement to the current trampoline with another one, and the\n"
-                         "    original instruction bytes would be lost."
-                         % (a[2], " ".join("%02x" % x for x in pre)))
+    if cmd in ("config-status", "config-publish"):
+        try:
+            slot = int(a[1])
+            if not 0 <= slot < 64:
+                raise ValueError("configuration slot must be 0..63")
+            if cmd == "config-status":
+                response = config_send(msg(OP_CONFIG_STATUS, slot=slot))
+                print(json.dumps(json.loads(response[len("OK config "):]), indent=2))
             else:
-                sys.exit("*** %s (%s) does not hold a five-byte nop pad. It holds %s.\n"
-                         "    REFUSING to write. This is the check that was missing when a\n"
-                         "    stale address armed a pad 64 bytes past rst_why, printed OK, and\n"
-                         "    fired zero times across 16,000 requests.\n"
-                         "    If you are certain, disarm whatever is there rather than\n"
-                         "    overwriting it."
-                         % (a[2], addr, " ".join("%02x" % x for x in pre)))
-        print(send(msg(OP_ARM, slot=slot, hook=addr.encode())))
+                with open(a[2], encoding="utf-8") as f:
+                    text = f.read(16385)
+                if len(text) > 16384:
+                    raise ValueError("configuration JSON exceeds 16 KiB")
+                document = json.loads(text, object_pairs_hook=_unique_config_fields)
+                body = config_body(document)
+                response = config_send(msg(OP_CONFIG_PUBLISH, slot=slot, prog=body))
+                expected = "OK config published slot=%d revision=%d" % (slot, document["revision"])
+                if response != expected:
+                    raise ValueError("unexpected publication response: " + response)
+                print(response)
+        except (OSError, ValueError) as exc:
+            sys.exit("*** " + str(exc))
+        return
+
+    if cmd == "arm":
+        # TMM uses the authenticated per-program target. A supplied name/address
+        # is a consistency check, never a second authority or a catalog lookup.
+        spec = a[2] if len(a) > 2 else ""
+        print(send(msg(OP_ARM, slot=int(a[1]), hook=spec.encode())))
     elif cmd == "disarm":
-        # Disarm resolves the same way. It MUST, or the demo arms by name and
-        # disarms by a hand-typed address --- restoring nops over whatever is at
-        # that address instead, which is a write into live .text.
-        print(send(msg(OP_DISARM, hook=resolve_hook(a[1]).encode())))
+        # Only a target actually attached by this loader may be restored.
+        print(send(msg(OP_DISARM, hook=a[1].encode())))
     elif cmd == "load":
         slot, path = int(a[1]), a[2]
         mode = int(a[3]) if len(a) > 3 else 2

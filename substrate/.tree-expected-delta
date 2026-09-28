@@ -61,6 +61,8 @@
 ?? src/base/ls_arm.h
 ?? src/base/ls_map.h
 ?? src/base/ls_map_glue.h
+# P21 source addition; requires rebuild, not present in the 2026-09-24 image.
+?? src/base/ls_config.h
 ?? src/base/ls_prep.c
 ?? src/base/ls_ring.h
 ?? src/base/ls_shield_blob.h
@@ -102,3 +104,4 @@ M src/modules/hudfilter/http2/http2.c
 # clean for that file and this manifest must say so, or the both-ways check fails on an
 # entry the tree no longer has. The substrate now modifies THREE F5 files, all of them
 # build configuration: two whitelists and filelist. No F5 source file is modified.
+?? src/base/ls_target.h

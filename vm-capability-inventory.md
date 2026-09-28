@@ -8,6 +8,11 @@ the comparison because it is the mature implementation of the same idea.
 **Every number below was read out of the source or the shipped binary.** Where something
 is unmeasured it says so.
 
+**Reading this August inventory in September:** the hook/context/helper sections below
+retain their historical state; consult `GROUND_TRUTH.md` for subsequent measurements.
+The maps section is corrected below, including the new, bench-validated configuration
+input interface. Its source is not yet validated in live TMM.
+
 ---
 
 ## 1. Hook types — one event source
@@ -55,22 +60,25 @@ rather than a line of config.
 
 ---
 
-## 3. Maps — one type, and the limits are real
+## 3. Maps — mutable state, output handles and configuration input
 
 | property | value | source |
 |---|---|---|
-| Types | **hash only** (`BPF_MAP_TYPE_HASH`) | `ls_map.h:72` |
-| Maps per program | **4** | `LS_MAP_MAX` |
+| Mutable type | `BPF_MAP_TYPE_HASH` (1) | `substrate/ls_map.h` |
+| Legacy named-map descriptors | **4 process-global**, not per program; output handles consume slots too | `LS_MAP_MAX`, `g_ls_shapes` |
 | Entries per map | **256** | `LS_MAP_ENTRIES` |
 | Key size | ≤ **16** bytes | `LS_MAP_KEY_MAX` |
 | Value size | ≤ **32** bytes | `LS_MAP_VAL_MAX` |
 | Storage | **per TMM thread**, mmap'd, never grown | lock-free by construction |
 | Collision policy | **evict the incumbent, counted** | a bounded table that blocked would put an attacker in control of the data path |
 | Identity | the **symbol name** (since 2026-08-18) | same name+shape shares deliberately; same name+different shape is refused |
+| Output | PERF_EVENT_ARRAY (4), helper 25; RINGBUF (27) descriptor accepted but helper 130 unregistered | `ls_map_glue.h`; output handles are not key/value arrays |
+| Configuration input | Dedicated `ls_config_v1` ARRAY (2), 32-byte metadata + up to 16 × 32-byte rows; instance-scoped, separate from the four-slot registry | **MEASURED bench, live TMM pending**, [P21 contract/evidence](configuration-snapshots.md) |
 
 **Missing, in value order:**
 
-- **Array maps.** Trivial — index, no hashing, no eviction — and the right shape for what
+- **General-purpose ARRAY maps.** Still absent; the P21 configuration view is special-cased.
+  Indexed state is the right shape for what
   the two newest programs actually want: count by TLS alert code, count by
   `enum http2_error`. A 256-entry hash table over a dense 16-value key space is the wrong
   tool and burns the table.

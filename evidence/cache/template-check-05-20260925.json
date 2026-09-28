@@ -1,0 +1,488 @@
+{
+  "passed": true,
+  "scope": "pinned bench; no live TMM; packaged target relocation/binding and verification",
+  "commands": [
+    {
+      "argv": [
+        "clang-18",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "gcc",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/code/tmm/.ubpf",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/eob-tmm-staged/ebpf-verifier",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "06769f7b508214e63b97905d275920f7e90182fa\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-g",
+        "-gbtf",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "/home/starin/template-20260925/check_template.c",
+        "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a",
+        "-lm",
+        "-o",
+        "/home/starin/template-20260925/check-05/native"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--dump-section=.BTF=/home/starin/template-20260925/check-05/fixture.btf",
+        "/home/starin/template-20260925/check-05/native"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/native",
+        "--offsets"
+      ],
+      "rc": 0,
+      "stdout": "{\"http_parse_ctx\":{\"version_num\":31,\"parser\":16},\"http_parser\":{\"header_count\":24},\"xbuf\":{\"len\":16}}\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-DLS_CORE_RELO_TEST",
+        "/home/starin/template-20260925/ls_core_relo.c",
+        "-o",
+        "/home/starin/template-20260925/check-05/relo"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "clang-18",
+        "-O2",
+        "-g",
+        "-target",
+        "bpf",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-DTEMPLATE_EXIT=0",
+        "-c",
+        "/home/starin/template-20260925/template.c",
+        "-o",
+        "/home/starin/template-20260925/check-05/entry.local.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/relo",
+        "/home/starin/template-20260925/check-05/entry.local.o",
+        "/home/starin/template-20260925/check-05/fixture.btf",
+        "/home/starin/template-20260925/check-05/entry.bench.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "target BTF: 299 types\nls_core_relocate rc=0, 4 relo(s)\nwrote relocated object: /home/starin/template-20260925/check-05/entry.bench.o\n",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/template-20260925/check-05/entry.bench.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/template-20260925/check-05/entry.bench.o",
+        "fentry/http_parse_client_headers",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fentry/http_parse_client_headers/template (terminates within 0 loop iterations)\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/native",
+        "/home/starin/template-20260925/check-05/entry.bench.o",
+        "entry"
+      ],
+      "rc": 0,
+      "stdout": "PASS interpreter entry: input, revision, fields, count, reset, delete, sampling, output refusal, verdict, stale state\nPASS JIT entry: input, revision, fields, count, reset, delete, sampling, output refusal, verdict, stale state\nEVENT {\"hook\":\"prog\",\"slot\":5,\"len\":88,\"data\":\"314d4d5401000000450000000000008008000000000000001fabae6746bb0a0001000000000000007b00000000000000640000000000000000000000000000000100000000000000010000005b0000000100000000000000\"}\n",
+      "stderr": "ls_map: reloc tutorial_state -> idx 0 (key=4 val=32 max=256)\nls_map: reloc tutorial_events -> idx 1 (key=4 val=4 max=1)\n",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/template_io.py",
+        "decode"
+      ],
+      "rc": 0,
+      "stdout": "{\"transport\": {\"hook\": \"prog\", \"slot\": 5, \"len\": 88}, \"tutorial\": {\"magic\": 1414352177, \"abi\": 1, \"instance\": 9223372036854775877, \"revision\": 8, \"monotonic_ns\": 3020660828711711, \"seen\": 1, \"observed\": 123, \"threshold\": 100, \"result\": 0, \"kind\": 1, \"flags\": 0, \"version\": 1, \"header_count\": 91, \"matched\": 1, \"verdict\": 0}}\n",
+      "stderr": "",
+      "stdin": "{\"hook\":\"prog\",\"slot\":5,\"len\":88,\"data\":\"314d4d5401000000450000000000008008000000000000001fabae6746bb0a0001000000000000007b00000000000000640000000000000000000000000000000100000000000000010000005b0000000100000000000000\"}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/template_io.py",
+        "decode"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "unexpected tutorial event size\n",
+      "stdin": "{\"hook\": \"prog\", \"slot\": 5, \"len\": 1, \"data\": \"314d4d5401000000450000000000008008000000000000001fabae6746bb0a0001000000000000007b00000000000000640000000000000000000000000000000100000000000000010000005b0000000100000000000000\"}\n"
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/template-20260925/check-05/entry.unrelocated.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/native",
+        "/home/starin/template-20260925/check-05/entry.unrelocated.o",
+        "entry"
+      ],
+      "rc": 1,
+      "stdout": "MISMATCH native fields: ret=0 emissions=1 flags=4 observed=0 seen=1 version=0 headers=0\n",
+      "stderr": "ls_map: reloc tutorial_state -> idx 0 (key=4 val=32 max=256)\nls_map: reloc tutorial_events -> idx 1 (key=4 val=4 max=1)\n",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/relo",
+        "/home/starin/template-20260925/check-05/entry.local.o",
+        "/home/starin/config-io-20260925.039uaw/image-context/tmm.btf",
+        "/home/starin/template-20260925/check-05/template-entry.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "target BTF: 116739 types\nls_core_relocate rc=0, 4 relo(s)\nwrote relocated object: /home/starin/template-20260925/check-05/template-entry.bpf.o\n",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/template-20260925/check-05/template-entry.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/bind_target.py",
+        "--prog",
+        "/home/starin/template-20260925/check-05/template-entry.bpf.o",
+        "--binary",
+        "/home/starin/config-io-20260925.039uaw/image-context/tmm64.no_pgo",
+        "--index",
+        "/home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv",
+        "--debug",
+        "/home/starin/template-20260925/debug/usr/lib/debug/usr/bin/tmm64.no_pgo.debug",
+        "--objcopy",
+        "/usr/lib/llvm-18/bin/llvm-objcopy"
+      ],
+      "rc": 0,
+      "stdout": "  bound fentry/http_parse_client_headers -> 0xccc600 (+4 pad), full build b8dc27f34a93db91f91b60f0844105bfb30c6f90\n  Run PREVAIL on these final bytes, then sign.\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/template-20260925/check-05/template-entry.bpf.o",
+        "fentry/http_parse_client_headers",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fentry/http_parse_client_headers/template (terminates within 0 loop iterations)\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "clang-18",
+        "-O2",
+        "-g",
+        "-target",
+        "bpf",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-DTEMPLATE_EXIT=1",
+        "-c",
+        "/home/starin/template-20260925/template.c",
+        "-o",
+        "/home/starin/template-20260925/check-05/exit.local.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/template-20260925/check-05/exit.bench.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/template-20260925/check-05/exit.bench.o",
+        "fexit/http_parse_client_headers",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fexit/http_parse_client_headers/template (terminates within 0 loop iterations)\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-05/native",
+        "/home/starin/template-20260925/check-05/exit.bench.o",
+        "exit"
+      ],
+      "rc": 0,
+      "stdout": "PASS interpreter exit: input, revision, fields, count, reset, delete, sampling, output refusal, verdict, stale state\nPASS JIT exit: input, revision, fields, count, reset, delete, sampling, output refusal, verdict, stale state\nEVENT {\"hook\":\"prog\",\"slot\":5,\"len\":88,\"data\":\"314d4d540100000045000000000000800800000000000000d25b988146bb0a0001000000000000007b0000000000000064000000000000007b00000000000000020000000000000000000000000000000100000000000000\"}\n",
+      "stderr": "ls_map: reloc tutorial_state -> idx 0 (key=4 val=32 max=256)\nls_map: reloc tutorial_events -> idx 1 (key=4 val=4 max=1)\n",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/template_io.py",
+        "decode"
+      ],
+      "rc": 0,
+      "stdout": "{\"transport\": {\"hook\": \"prog\", \"slot\": 5, \"len\": 88}, \"tutorial\": {\"magic\": 1414352177, \"abi\": 1, \"instance\": 9223372036854775877, \"revision\": 8, \"monotonic_ns\": 3020661263457234, \"seen\": 1, \"observed\": 123, \"threshold\": 100, \"result\": 123, \"kind\": 2, \"flags\": 0, \"version\": 0, \"header_count\": 0, \"matched\": 1, \"verdict\": 0}}\n",
+      "stderr": "",
+      "stdin": "{\"hook\":\"prog\",\"slot\":5,\"len\":88,\"data\":\"314d4d540100000045000000000000800800000000000000d25b988146bb0a0001000000000000007b0000000000000064000000000000007b00000000000000020000000000000000000000000000000100000000000000\"}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/template_io.py",
+        "decode"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "unexpected tutorial event size\n",
+      "stdin": "{\"hook\": \"prog\", \"slot\": 5, \"len\": 1, \"data\": \"314d4d540100000045000000000000800800000000000000d25b988146bb0a0001000000000000007b0000000000000064000000000000007b00000000000000020000000000000000000000000000000100000000000000\"}\n"
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/home/starin/template-20260925/check-05/template-exit.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/bind_target.py",
+        "--prog",
+        "/home/starin/template-20260925/check-05/template-exit.bpf.o",
+        "--binary",
+        "/home/starin/config-io-20260925.039uaw/image-context/tmm64.no_pgo",
+        "--index",
+        "/home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv",
+        "--debug",
+        "/home/starin/template-20260925/debug/usr/lib/debug/usr/bin/tmm64.no_pgo.debug",
+        "--objcopy",
+        "/usr/lib/llvm-18/bin/llvm-objcopy"
+      ],
+      "rc": 0,
+      "stdout": "exit-admit: http_parse_client_headers\n  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)\n  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)\n  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here\n  VERDICT        : ADMIT\n  bound fexit/http_parse_client_headers -> 0xccc600 (+4 pad), full build b8dc27f34a93db91f91b60f0844105bfb30c6f90\n  Run PREVAIL on these final bytes, then sign.\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/template-20260925/check-05/template-exit.bpf.o",
+        "fexit/http_parse_client_headers",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fexit/http_parse_client_headers/template (terminates within 0 loop iterations)\n",
+      "stderr": "",
+      "stdin": null
+    },
+    {
+      "argv": [
+        "python3",
+        "/home/starin/template-20260925/template_io.py",
+        "policy",
+        "--identity",
+        "/home/starin/template-20260925/check-05/example-identity.json",
+        "--threshold",
+        "123",
+        "--interval-ns",
+        "99",
+        "--reset-token",
+        "5",
+        "--request-safe-return"
+      ],
+      "rc": 0,
+      "stdout": "{\n  \"abi\": 1,\n  \"schema\": 1,\n  \"session\": \"000000000000002a\",\n  \"instance\": \"8000000000000045\",\n  \"program_sha256\": \"abababababababababababababababababababababababababababababababab\",\n  \"expected_revision\": 7,\n  \"revision\": 8,\n  \"rows\": [\n    \"7b00000000000000630000000000000005000000000000000300000000000000\"\n  ]\n}\n",
+      "stderr": "",
+      "stdin": null
+    }
+  ],
+  "sources": {
+    "template.c": "fc6ed3a93ef3785dac4f3c884c7560fbbc760a92600671c03a877d6602cb2832",
+    "template_io.py": "e0a6433f5324971cf38ed9af7cb77927c4bd048032fc8b8ec47b8988c2d64721",
+    "check_template.c": "ec85715c3ea93603d39034bb952ffbb16901450aa70f6b1ff0e0e8f9ccfc18ab",
+    "check_template.py": "df921c2e959b3cc35ea5cf5fa510be410ce6a616e78f368cd9c5b97a0dae1ef8",
+    "check_relo_baked.py": "f31c663917729199e4337942cefbfa11be93d5945b8ff7651a9e03fc9689cd59",
+    "ls_core_relo.c": "659aec53fe1d2b31710bf9cf82080994c43d3641b50ab96814358a2880217bb9",
+    "ls_core_relo.h": "74bad83112c18d55aba9b3b01b2490095234d3d2a1af398c9c84e0964be15303",
+    "ls_map_glue.h": "af849d3fc34df486f7de343f5f0f121018d6466e6251ebb18870ae18826bae36",
+    "ls_map.h": "af4f112a1156bd112a2432fe0c72f666420019766f3775758c65de074f0b039b",
+    "ls_config.h": "bb65ba7a79f5d615f91b7927605de37d16f0ec1ad0ccbe2f2bbd621f571618ff",
+    "config_snapshot.bpf.h": "e31cf99fd4dbe9023885d5716065d18d69f88026f8193ee079c7dca8222cf61c",
+    "ls_tp.h": "14b63bd33316132f77996913b8d72756a3e273c6f6526ff42474f8fa0aa0da84",
+    "bind_target.py": "2cc65c48d7b2320892c74b6fb3411b9d8e3d5857cf12ba7160f521fd0e118d2c",
+    "ls_buildid.py": "fa8ad7304fb5740302ace8fe11bb8e4ebe2a7fb03a316ffe123108185305a2b9",
+    "exit_admit.py": "3b0819dd302fe4fd8c3c376e3d40e35f7b68b67a14865c837f4f463eb9ee341e"
+  },
+  "tools": {
+    "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail": "d9d84cb0c474016d7cffc31c71e62892f52c327e660248275f3e955f1b7cbea2",
+    "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a": "340cc6bb2855db63e225cd92ce6e36704244b801469fe0571963f54f03802ff1"
+  },
+  "native_offsets": {
+    "http_parse_ctx": {
+      "version_num": 31,
+      "parser": 16
+    },
+    "http_parser": {
+      "header_count": 24
+    },
+    "xbuf": {
+      "len": 16
+    }
+  },
+  "objects": {
+    "entry.bench.o": "49caf326f37bdc504d38059edfd4280730374c9920c8c5acd93173cbb1dd3910",
+    "template-entry.bpf.o": "03b59cf881805f7918aab6962e4279ca48d3c0c70283ee790f7b382890f27ec2",
+    "exit.bench.o": "9ffd852df52d47b0e3497dbb6144bcad2e2359031cec2bb152800cf78468f387",
+    "template-exit.bpf.o": "75bfc255ab446cafb195c5b110808f927610f8c101a741875e7a27f7f13a0858"
+  },
+  "native_offset_checks": 4,
+  "unrelocated_falsifier": "MISMATCH native fields",
+  "target_inputs": {
+    "/home/starin/config-io-20260925.039uaw/image-context/tmm64.no_pgo": "26e8f07b12a279e7d84f2328363db998a7dfa109a9b3c71847be408a6710a12c",
+    "/home/starin/config-io-20260925.039uaw/image-context/tmm.btf": "90ed00ddb749911337cf94420572dad8970f800934fd476ef4370464c5cc26d3",
+    "/home/starin/config-io-20260925.039uaw/image-context/hook-index.tsv": "e4f06de90774fb76d74c7591f4e3d8b6f71ee0935f0f523131591e304429a90e",
+    "/home/starin/template-20260925/debug/usr/lib/debug/usr/bin/tmm64.no_pgo.debug": "ace870d6098ea25cfac5fecb0627d599a69ec773d390d78d0ac26795c535fd34"
+  }
+}

@@ -1,0 +1,64 @@
+Script started on 2026-09-25 14:37:46+00:00 [COMMAND="ssh-agent bash -c 'ssh-add /home/claude/.ssh/id_ed25519 && env/scripts/bnk-stage.sh && env/scripts/bnk-sync-substrate.sh'" <not executed on terminal>]
+Identity added: /home/claude/.ssh/id_ed25519 (e.starin@H65J9C93HL)
+=== 1. provenance of what is about to be staged
+  HEAD      : f08a820
+  uncommitted in substrate env/scripts env/docker: 40 file(s)
+     M env/docker/Dockerfile.ls-tools
+     M env/docker/ls-verify-layer.sh
+     M env/scripts/bnk-bake-tools.sh
+     M env/scripts/bnk-build-ctx-test.sh
+     M env/scripts/bnk-build-programs.sh
+     M env/scripts/bnk-deliver-program.py
+     M env/scripts/bnk-ship-image.sh
+     M env/scripts/bnk-test-ctx-contract.py
+     M env/scripts/ls-load.py
+     M env/scripts/tmmtrace-arm.sh
+     M env/scripts/tmmtrace-buildbox.sh
+     M substrate/.tree-expected-delta
+     M substrate/Makefile
+     M substrate/TMM-TREE-DELTA.md
+     M substrate/check_glue_owner.c
+     M substrate/check_ls_load.py
+     M substrate/gen_type_catalog.py
+     M substrate/ls_audit.c
+     M substrate/ls_map_glue.h
+     M substrate/ls_vm.c
+     M substrate/ls_vm_load.c
+     M substrate/mk_hook_map.py
+     M substrate/shield_abi.h
+     M substrate/tmmtrace.py
+    ?? env/scripts/check-config-integration.py
+    ?? env/scripts/check-image-metadata.py
+    ?? substrate/bind_target.py
+    ?? substrate/check_config.c
+    ?? substrate/check_config.py
+    ?? substrate/check_config_socket.c
+    ?? substrate/check_embedded.c
+    ?? substrate/check_embedded.py
+    ?? substrate/check_image_metadata.py
+    ?? substrate/check_target.c
+    ?? substrate/check_target.py
+    ?? substrate/config_snapshot.bpf.h
+    ?? substrate/ls_config.h
+    ?? substrate/ls_target.h
+    ?? substrate/make_target_negatives.py
+    ?? substrate/surfaces/config_threshold.bpf.c
+  -> staging the WORKING TREE, stamped f08a820-dirty
+
+=== 2. send
+  staged substrate env/scripts env/docker -> starin@10.145.37.36:~/eob-tmm-staged
+  stamped f08a820-dirty
+
+=== 3. VERIFY the copy, from the far end --- not from this script's belief that scp worked
+  local  : 29e1a467f3b666ed
+  staged : 29e1a467f3b666ed
+  MATCH --- every staged file has the bytes the repo has
+
+=== 4. the specific capability whose absence cost a cycle
+  ls-load.py : can send a signature
+  sign_shield.py : reads the context ABI from the header, not hardcoded
+
+  Next: bnk-sync-substrate.sh  (the OTHER copy --- the sources compiled into TMM)
+bash: line 1: env/scripts/bnk-sync-substrate.sh: Permission denied
+
+Script done on 2026-09-25 14:38:01+00:00 [COMMAND_EXIT_CODE="126"]

@@ -34,6 +34,11 @@ spec:
     - name: backend
       image: artifactory.f5net.com/f5-positron-docker/testing-utils:v1.1.2
       command: ["python3", "/opt/ctx/backend.py"]
+      # The P17 driver pins this disposable pod's neighbor to the selected TMM
+      # when another MAC answers for the same lab SNAT IP (2026-09-24).
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN"]
       readinessProbe:
         tcpSocket:
           port: 18081

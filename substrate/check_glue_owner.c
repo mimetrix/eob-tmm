@@ -64,13 +64,13 @@ main(void)
      * map=0. That program loads, verifies and runs with maps always empty. */
     reset();
     assert(owner_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 h112 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
     printf("ok    install order: %s\n", calls);
 
     /* --- 3. the non-owning TU installs identically ------------------------- */
     reset();
     assert(user_install(&fake_vm) == 0);
-    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 h112 ") == 0);
+    assert(strcmp(calls, "reloc bounds h1 h2 h3 h4 h5 h25 ") == 0);
     printf("ok    non-owning TU installs identically (no divergence by includer)\n");
 
     /* --- 4. a NULL vm is refused before anything is registered ------------- */
@@ -124,7 +124,7 @@ main(void)
 
         /* First reference to "rate" takes an index. */
         i0 = ls_map_reloc(NULL, sec, sizeof sec, "rate", 0, sizeof a);
-        assert(i0 < LS_MAP_MAX);
+        assert((i0 & 255u) < LS_MAP_MAX);
 
         /* Second reference to the SAME name and shape resolves to the SAME index
          * --- this is the within-program dedup, still required. */
@@ -135,7 +135,7 @@ main(void)
          * shared storage. */
         i1 = ls_map_reloc(NULL, sec, sizeof sec, "resets_seen",
                           1 * sizeof a, sizeof a);
-        assert(i1 < LS_MAP_MAX);
+        assert((i1 & 255u) < LS_MAP_MAX);
         assert(i1 != i0);
 
         /* Same name, DIFFERENT shape: refused, never shared. Two programs that
@@ -203,9 +203,9 @@ main(void)
         /* A RINGBUF descriptor must be ADMITTED: key_size and value_size are 0, which the
          * hash checks correctly refuse, so it needs its own path. */
         ring_idx = ls_map_reloc(NULL, sec, sizeof sec, "ring", 0, sizeof rb);
-        assert(ring_idx < LS_MAP_MAX);
+        assert((ring_idx & 255u) < LS_MAP_MAX);
         hash_idx = ls_map_reloc(NULL, sec, sizeof sec, "counts", sizeof rb, sizeof hs);
-        assert(hash_idx < LS_MAP_MAX && hash_idx != ring_idx);
+        assert((hash_idx & 255u) < LS_MAP_MAX && hash_idx != ring_idx);
 
         ls_tp_publish_calls = 0;
         g_ls_cur_slot = 5;

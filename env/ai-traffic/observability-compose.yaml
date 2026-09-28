@@ -1,0 +1,4 @@
+# Repaired test image for the isolated tutorial fixture only.
+services:
+  tmm:
+    image: tmm:OBSERVABILITY-20260925

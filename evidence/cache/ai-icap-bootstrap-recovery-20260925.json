@@ -1,0 +1,87 @@
+{
+  "command": "ssh -o BatchMode=yes -o ConnectTimeout=12 -o IdentitiesOnly=yes -i /home/claude/.ssh/id_ed25519 starin@10.145.37.36 'python3 -'",
+  "driver_sha256": "5e921ad30aa2f9355ba30ac1c042f433d933fd0e0407bf01f5eb4d3a99b11b8a",
+  "result": {
+    "records": [
+      {
+        "argv": [
+          "docker",
+          "compose",
+          "-f",
+          "/home/starin/eob-dlp-20260924/icap-compose.yaml",
+          "ps",
+          "-a",
+          "--format",
+          "json"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "{\"Command\":\"\\\"/bin/bash /work/ica\u2026\\\"\",\"CreatedAt\":\"2026-09-25 12:52:28 +0000 UTC\",\"Engine\":\"\",\"ExitCode\":0,\"Health\":\"healthy\",\"ID\":\"485d4916ffe7\",\"Image\":\"artifactory.f5net.com/f5-tmm-docker/f5-tmm-test-image/tao@sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"Labels\":\"org.opencontainers.image.ref.name=ubuntu,org.opencontainers.image.source=19618,com.docker.compose.config-hash=57e592c2d6f80eb182c3160aa4047d2af1102bfa6a3e0aaf746b235b4db5eeac,com.docker.compose.container-number=1,com.docker.compose.image=sha256:e4c40fc92b175ada3ec0da3160d098d5279604933d4150bb2c0b99aba5335f0d,com.docker.compose.project=eob-dlp-20260924,com.docker.compose.project.working_dir=/home/starin/eob-dlp-20260924,com.docker.compose.replace=fixture-1,com.docker.compose.service=fixture,org.opencontainers.image.version=22.04,com.docker.compose.depends_on=,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/starin/eob-dlp-20260924/icap-compose.yaml,com.docker.compose.version=5.5.0\",\"LocalVolumes\":\"2\",\"Mounts\":\"eob-dlp-202609\u2026,eob-dlp-202609\u2026,/home/starin/e\u2026\",\"Name\":\"eob-dlp-20260924-fixture-1\",\"Names\":\"eob-dlp-20260924-fixture-1\",\"Networks\":\"eob-dlp-20260924_data,eob-dlp-20260924_management\",\"Ports\":\"\",\"Project\":\"eob-dlp-20260924\",\"Publishers\":[],\"RunningFor\":\"5 minutes ago\",\"Service\":\"fixture\",\"Size\":\"0B\",\"State\":\"running\",\"Status\":\"Up 5 minutes (healthy)\"}\n"
+      },
+      {
+        "argv": [
+          "docker",
+          "logs",
+          "eob-dlp-20260924-fixture-1"
+        ],
+        "returncode": 0,
+        "stderr": "+ echo 'MODULAR_BIP_URL: https://artifactory.f5net.com/artifactory/f5-apis-npm/@f5-apis/mbip-apis-pb/-/@f5-apis/mbip-apis-pb-303.43.0.tgz'\n+ echo 'TMM_INTERNAL_SCHEMA_URL: '\n+ echo 'NJIG_TOOLS_URL: '\n+ echo 'STATS_SCHEMA_URL: '\n+ echo 'WITH_STATS_SCHEMA: false'\n+ echo 'TM_STATS_URL: '\n+ echo 'WITH_TM_STATS: false'\n+ mkdir -p /package\n+ cd /package\n+ mkdir -p proto /package/proto/package/py/stats /package/py_libs/mbip /package/py_libs/tmos tmos\n+ '[' false = true ']'\n+ export PYTHONPATH=/package/proto/package/py/:/package:/package/py_libs/mbip:/package/proto/package/py/stats:/tests/:/package/py_libs\n+ PYTHONPATH=/package/proto/package/py/:/package:/package/py_libs/mbip:/package/proto/package/py/stats:/tests/:/package/py_libs\n+ create_modularbip_schema\n+ '[' -f /package/py_libs/mbip/grpc_webscale_pb2.py ']'\n+ echo 'MBIP stubs already exist, skipping schema download'\n+ return 0\n+ '[' false = true ']'\n+ '[' false = true ']'\n+ '[' false = true ']'\n+ create_njig_commands\n+ '[' -z '' ']'\n+ echo 'NJIG_TOOLS_URL is not set.'\n+ return\n+ run_nats_gen_certs\n+ '[' -z /package/nats_certs ']'\n+ cd /\n+ echo 'NATS_CERTS_PATH is set to /package/nats_certs'\n+ bash /package/nats_certs_gen.sh /package/nats_certs\nCertificate request self-signature ok\nsubject=CN = f5-fsm-tmm\nCertificate request self-signature ok\nsubject=CN = f5-csm-icb\nCertificate request self-signature ok\nsubject=CN = f5-cmsg-mq\n+ run_tmm_tao_gen_cert\n+ '[' -z '' ']'\n+ echo 'Not running TMM_TAO, not generating related certificate'\n+ return\n+ case \"$DEPLOYMENT\" in\n+ tail -f /dev/null\n",
+        "stdout": "Pinned API schema: 702364ce971c6353e7d15532a6be576aae56e5d85bc48f1e1099e5af3d7afe99\nMODULAR_BIP_URL: https://artifactory.f5net.com/artifactory/f5-apis-npm/@f5-apis/mbip-apis-pb/-/@f5-apis/mbip-apis-pb-303.43.0.tgz\nTMM_INTERNAL_SCHEMA_URL: \nNJIG_TOOLS_URL: \nSTATS_SCHEMA_URL: \nWITH_STATS_SCHEMA: false\nTM_STATS_URL: \nWITH_TM_STATS: false\nMBIP stubs already exist, skipping schema download\nNJIG_TOOLS_URL is not set.\nNATS_CERTS_PATH is set to /package/nats_certs\nUpdating certificates in /etc/ssl/certs...\n0 added, 0 removed; done.\nRunning hooks in /etc/ca-certificates/update.d...\ndone.\nNot running TMM_TAO, not generating related certificate\n"
+      },
+      {
+        "argv": [
+          "docker",
+          "inspect",
+          "eob-dlp-20260924-fixture-1",
+          "--format",
+          "{{json .State}} {{json .Image}} {{json .NetworkSettings.Networks}}"
+        ],
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "{\"Status\":\"running\",\"Running\":true,\"Paused\":false,\"Restarting\":false,\"OOMKilled\":false,\"Dead\":false,\"Pid\":1367715,\"ExitCode\":0,\"Error\":\"\",\"StartedAt\":\"2026-09-25T12:52:28.402554557Z\",\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"Status\":\"healthy\",\"FailingStreak\":0,\"Log\":[{\"Start\":\"2026-09-25T12:57:49.961401229Z\",\"End\":\"2026-09-25T12:57:50.002232591Z\",\"ExitCode\":0,\"Output\":\"\"},{\"Start\":\"2026-09-25T12:57:52.00309943Z\",\"End\":\"2026-09-25T12:57:52.043272817Z\",\"ExitCode\":0,\"Output\":\"\"},{\"Start\":\"2026-09-25T12:57:54.044363205Z\",\"End\":\"2026-09-25T12:57:54.084587933Z\",\"ExitCode\":0,\"Output\":\"\"},{\"Start\":\"2026-09-25T12:57:56.086177572Z\",\"End\":\"2026-09-25T12:57:56.127091957Z\",\"ExitCode\":0,\"Output\":\"\"},{\"Start\":\"2026-09-25T12:57:58.128653396Z\",\"End\":\"2026-09-25T12:57:58.168374838Z\",\"ExitCode\":0,\"Output\":\"\"}]}} \"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\" {\"eob-dlp-20260924_data\":{\"IPAMConfig\":{\"IPv4Address\":\"10.203.72.11\"},\"Links\":null,\"Aliases\":[\"eob-dlp-20260924-fixture-1\",\"fixture\"],\"DriverOpts\":null,\"GwPriority\":0,\"NetworkID\":\"c64fa57c49437dbdc9211d72a6e9d8b20deb7fa55073043b2cae3ba037271794\",\"EndpointID\":\"d9081680ff0e9c82b0bf4125269c70c0c6a2e9771d30ecdff7cf8506c60858ce\",\"Gateway\":\"10.203.72.1\",\"IPAddress\":\"10.203.72.11\",\"MacAddress\":\"8e:59:2e:07:31:76\",\"IPPrefixLen\":24,\"IPv6Gateway\":\"\",\"GlobalIPv6Address\":\"\",\"GlobalIPv6PrefixLen\":0,\"DNSNames\":[\"eob-dlp-20260924-fixture-1\",\"fixture\",\"485d4916ffe7\"]},\"eob-dlp-20260924_management\":{\"IPAMConfig\":{\"IPv4Address\":\"10.203.71.11\"},\"Links\":null,\"Aliases\":[\"eob-dlp-20260924-fixture-1\",\"fixture\"],\"DriverOpts\":null,\"GwPriority\":0,\"NetworkID\":\"0723ec0e7818fc6702cc71542a5dc123da722fe3b4c1aa0ab87300f1b9a5132b\",\"EndpointID\":\"7e62a612a0e132e769536b6715c7ecdc601954c3abffe57e4deb3f673cb226cd\",\"Gateway\":\"10.203.71.1\",\"IPAddress\":\"10.203.71.11\",\"MacAddress\":\"e6:96:34:f8:61:ce\",\"IPPrefixLen\":24,\"IPv6Gateway\":\"\",\"GlobalIPv6Address\":\"\",\"GlobalIPv6PrefixLen\":0,\"DNSNames\":[\"eob-dlp-20260924-fixture-1\",\"fixture\",\"485d4916ffe7\"]}}\n"
+      },
+      {
+        "argv": [
+          "docker",
+          "logs",
+          "eob-dlp-20260924-tmm-1"
+        ],
+        "returncode": 1,
+        "stderr": "Error response from daemon: No such container: eob-dlp-20260924-tmm-1\n",
+        "stdout": ""
+      },
+      {
+        "argv": [
+          "docker",
+          "inspect",
+          "eob-dlp-20260924-tmm-1",
+          "--format",
+          "{{json .State}} {{json .Image}} {{json .NetworkSettings.Networks}}"
+        ],
+        "returncode": 1,
+        "stderr": "error: no such object: eob-dlp-20260924-tmm-1\n",
+        "stdout": "\n"
+      }
+    ],
+    "sources": {
+      "icap-bootstrap.sh": {
+        "sha256": "895732ab0437af246059fdb46738f1be7b963bc26f8ec5071f11f08399a63c5f",
+        "size": 914,
+        "text": "#!/bin/bash\n# Reuse the exact API schema already cached by the authoritative TMM build.\n# The upstream image's normal entrypoint downloads it with authentication.\nset -eu\n\npython3 - <<'PY'\nimport hashlib\nfrom pathlib import Path\npath = Path('/work/mbip-apis-pb-303.43.0.tgz')\nexpected = '702364ce971c6353e7d15532a6be576aae56e5d85bc48f1e1099e5af3d7afe99'\nactual = hashlib.sha256(path.read_bytes()).hexdigest()\nif actual != expected:\n    raise SystemExit(f'API schema hash mismatch: {actual}')\nprint(f'Pinned API schema: {actual}', flush=True)\nPY\n\nmkdir -p /package/proto /package/py_libs/mbip\ntar -xf /work/mbip-apis-pb-303.43.0.tgz -C /package/proto \\\n  --no-same-owner --no-same-permissions\npython3 -m grpc_tools.protoc -I=/package/proto/package/proto/ \\\n  --python_out=/package/py_libs/mbip --grpc_python_out=/package/py_libs/mbip \\\n  /package/proto/package/proto/grpc_webscale.proto\nexec /package/entrypoint.sh\n"
+      },
+      "icap-compose.yaml": {
+        "sha256": "f13d28ac645127353dc7829879190b3d43b48e39f90d1fa986c3ecbb891c5647",
+        "size": 2858,
+        "text": "# Isolated build-box fixture. Explicit project name prevents overlap with other tests.\n# The TMM image is reused; this file does not change or rebuild TMM source.\nname: eob-dlp-20260924\n\nservices:\n  fixture:\n    image: artifactory.f5net.com/f5-tmm-docker/f5-tmm-test-image/tao@sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\n    entrypoint: [/bin/bash, /work/icap-bootstrap.sh]\n    environment:\n      DEPLOYMENT: development\n      MODULAR_BIP_URL: https://artifactory.f5net.com/artifactory/f5-apis-npm/@f5-apis/mbip-apis-pb/-/@f5-apis/mbip-apis-pb-303.43.0.tgz\n      WITH_GRPC: \"false\"\n      CONF_TRANSPORT: nats-tls\n      NATS_CERTS_PATH: /package/nats_certs\n      ICB_ASYNCAPI_PROTO_VERSION: v2\n      PYTHONUNBUFFERED: \"1\"\n    volumes:\n      - nats-certs:/package/nats_certs/tmm\n      - .:/work:ro\n      - evidence:/evidence\n    networks:\n      management:\n        ipv4_address: 10.203.71.11\n        priority: 100\n      data:\n        ipv4_address: 10.203.72.11\n        priority: 50\n    cap_add: [NET_ADMIN]\n    healthcheck:\n      test: [CMD-SHELL, \"test -f /package/nats_certs/tmm/ca.pem && test -f /package/proto/package/py/profile_responseadapt_pb2.py\"]\n      interval: 2s\n      timeout: 2s\n      retries: 90\n\n  tmm:\n    image: tmm:CATALOGFREE-20260924\n    pull_policy: never\n    entrypoint: [/opt/bin/init.tmm.sh]\n    privileged: true\n    init: true\n    mem_limit: 4g\n    depends_on:\n      fixture:\n        condition: service_healthy\n    environment:\n      CONF_TRANSPORT: nats-tls\n      PAL_CPU_SET: 0-0\n      TMM_MAPRES_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_MAPRES_NO_IPV6_RULES: \"yes\"\n      ENABLE_TMROUTED_PROXY: \"false\"\n      SESSIONDB_EXTERNAL_STORAGE: \"FALSE\"\n      MSG_BUS_ADDR: fixture\n      MSG_BUS_PORT: \"4222\"\n      MSG_BUS_USER: tmm\n      MSG_BUS_PASS: insecure_password_tmm\n      CONFIG_SUBJECT: internal-config\n      PUBLISH_SUBJECT: dataplane-client\n      PROCESS_NAME: TMM\n      TMM_QUERY_INTERVAL_SECS: \"120\"\n      NATS_TLS_AUTH_CERT: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm.pem\n      NATS_TLS_AUTH_KEY: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm-key.pem\n      NATS_TLS_CA_FILE: /opt/f5/mbip/fsm/certificates/ca.pem\n      LS_SHIELD_BUILTIN: \"0\"\n      LS_VM_SELFTEST: \"0\"\n      LS_SHIELD_MODE: monitor\n      LS_VM_JIT: \"1\"\n      LS_VM_TIMING: \"1\"\n      LS_VM_SAMPLES: \"true\"\n      LS_VM_VERBOSE: \"1\"\n      LS_TP_RING: /dev/shm/ls_tp_ring\n      LS_LOAD_SOCKET: /tmp/ls_load.sock\n    volumes:\n      - nats-certs:/opt/f5/mbip/fsm/certificates:ro\n    networks:\n      management:\n        ipv4_address: 10.203.71.10\n        priority: 100\n      data:\n        ipv4_address: 10.203.72.10\n        priority: 50\n\nnetworks:\n  management:\n    ipam:\n      config:\n        - subnet: 10.203.71.0/24\n  data:\n    ipam:\n      config:\n        - subnet: 10.203.72.0/24\n\nvolumes:\n  nats-certs:\n  evidence:\n"
+      },
+      "mbip-apis-pb-303.43.0.tgz": {
+        "sha256": "702364ce971c6353e7d15532a6be576aae56e5d85bc48f1e1099e5af3d7afe99",
+        "size": 3984216
+      }
+    }
+  },
+  "returncode": 0,
+  "script": "\nimport hashlib, json, pathlib, subprocess\nroot = pathlib.Path('/home/starin/eob-dlp-20260924')\ndef run(*args):\n    p = subprocess.run(args, capture_output=True, text=True, timeout=60)\n    return {'argv': args, 'returncode': p.returncode, 'stdout': p.stdout, 'stderr': p.stderr}\nrecords = [run('docker', 'compose', '-f', str(root / 'icap-compose.yaml'), 'ps', '-a', '--format', 'json')]\nfor name in ('fixture', 'tmm'):\n    container = 'eob-dlp-20260924-' + name + '-1'\n    records += [run('docker', 'logs', container), run('docker', 'inspect', container,\n        '--format', '{{json .State}} {{json .Image}} {{json .NetworkSettings.Networks}}')]\nsources = {}\nfor p in sorted(root.glob('*')):\n    if p.is_file() and p.suffix in ('.py', '.sh', '.yaml', '.tgz'):\n        data = p.read_bytes()\n        sources[p.name] = {'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}\n        if p.suffix != '.tgz':\n            sources[p.name]['text'] = data.decode()\nprint(json.dumps({'records': records, 'sources': sources}, sort_keys=True))\n",
+  "stderr": "",
+  "utc": "2026-09-25T12:58:00.299889+00:00"
+}

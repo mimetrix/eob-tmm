@@ -22,19 +22,28 @@ sh "$REPO/env/scripts/bnk-receipt.sh" require package build_id "$BID"
 PREFIX=$(printf '%s' "$BID" | cut -c1-8)
 printf '%s\n' "$BID" > "$OUT/build-id"
 python3 "$REPO/substrate/exit_admit.py" "$DBG" "$RT" http_parse_client_headers
-for kind in fentry fexit; do
+for name in ctx96-fentry ctx96-fexit other-target; do
+    kind=fentry
+    hook=http_parse_client_headers
+    [ "$name" != ctx96-fexit ] || kind=fexit
+    # Valid different-target artifact for attached-slot refusal, NEVER armed.
+    [ "$name" != other-target ] || hook=device_poll
     first=5
     [ "$kind" = fentry ] || first=6
-    obj="$OUT/ctx96-$kind.bpf.o"
-    sec="$kind/http_parse_client_headers"
+    obj="$OUT/$name.bpf.o"
+    sec="$kind/$hook"
     "$CLANG" -O2 -target bpf -Wall -Werror "-DKIND=\"$sec\"" "-DFIRST=$first" \
         -c "$REPO/substrate/check_ctx_live.bpf.c" -o "$obj"
+    python3 "$REPO/substrate/bind_target.py" --prog "$obj" \
+        --index "${LS_HOOK_INDEX:-$HOME/lstools/hook-index.tsv}" \
+        --binary "$RT" --debug "$DBG" --objcopy /usr/lib/llvm-18/bin/llvm-objcopy
     "$PREVAIL" "$obj" "$sec" --termination --strict --no-division-by-zero \
         --stack-size 256
     python3 "$REPO/substrate/sign_shield.py" --key "$SIGN_KEY" --prog "$obj" \
-        --hook http_parse_client_headers --mode-ceiling monitor \
+        --hook "$hook" --mode-ceiling monitor \
         --build-min "0x$PREFIX" --build-max "0x$PREFIX" \
-        -o "$OUT/ctx96-$kind.bpf.sig"
-    sha256sum "$obj" "$OUT/ctx96-$kind.bpf.sig"
+        -o "$OUT/$name.bpf.sig"
+    sha256sum "$obj" "$OUT/$name.bpf.sig"
 done
+python3 "$REPO/substrate/make_target_negatives.py" "$OUT" --key "$SIGN_KEY"
 printf 'Context probes verified and signed for %s in %s\n' "$BID" "$OUT"

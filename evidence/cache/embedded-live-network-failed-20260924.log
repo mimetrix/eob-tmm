@@ -1,0 +1,213 @@
+kind-vs
+PINNED f5-tmm-7597dfff8b-28s9z ('42259fbc-3303-492a-95b1-9146b4105583', 'containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63', 0, 'sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1')
+c3b81927dfdcc31137cd8212b5e23bb85677a06c a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7 bulk catalogs absent
+OK armed=1 mode=0 gen=2 fired=32 safe_returns=32 errors=0 cycles=1607624 cycles_max=1099896 cycles_min=1192
+9090909090
+configmap/ctx-contract-test created
+pod/ctx-contract-test created
+f5bigcnepool.k8s.f5net.com/ctx-contract-test created
+f5virtualserver.k8s.f5net.com/ctx-contract-test created
+pod/ctx-contract-test condition met
+apiVersion: k8s.f5net.com/v1
+kind: F5VirtualServer
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"k8s.f5net.com/v1","kind":"F5VirtualServer","metadata":{"annotations":{},"name":"ctx-contract-test","namespace":"default"},"spec":{"destinationAddress":"11.11.11.99","destinationPort":18081,"http":{"clientside":"sys-default-http","serverside":"sys-default-http"},"httpRouter":true,"ipfamilies":"IPv4","loadBalancingMethod":"ROUND_ROBIN","pool":"ctx-contract-test","protocol":"tcp","protocolProfile":{"clientside":"sys-default-tcp","serverside":"sys-default-tcp"},"snat":{"pool":"","type":"automap"},"sourcePort":"preserve","translateAddress":true,"translatePort":true,"vlans":{"disableListedVlans":false,"vlanList":["tmm-client"]}}}
+  creationTimestamp: "2026-09-24T14:32:40Z"
+  finalizers:
+  - handletmmconfig_inconsistency
+  generation: 1
+  name: ctx-contract-test
+  namespace: default
+  resourceVersion: "3605875"
+  uid: 4cef2381-3204-40b1-afe2-62ba3bb01bcc
+spec:
+  a2a: false
+  access: ""
+  clientssl: ""
+  connectionRateLimit:
+    rateLimit: 0
+    rateLimitDestinationMask: 0
+    rateLimitMode: object
+    rateLimitSourceMask: 0
+  ddosProfile: ""
+  destinationAddress: 11.11.11.99
+  destinationPort: 18081
+  fastL4: ""
+  genericMessage: ""
+  http:
+    clientside: sys-default-http
+    serverside: sys-default-http
+  httpCompression: false
+  httpRouter: true
+  iRules: []
+  ipfamilies: IPv4
+  json: false
+  loadBalancingMethod: ROUND_ROBIN
+  mcp: false
+  namespace: ""
+  persistence: ""
+  pool: ctx-contract-test
+  protocol: tcp
+  protocolProfile:
+    clientside: sys-default-tcp
+    serverside: sys-default-tcp
+  routeAdvertisement: false
+  serverssl: ""
+  sip: ""
+  site: ""
+  snat:
+    pool: ""
+    type: automap
+  sourcePort: preserve
+  sse: false
+  tenant: ""
+  translateAddress: true
+  translatePort: true
+  vlans:
+    disableListedVlans: false
+    vlanList:
+    - tmm-client
+  vrf: ""
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-24T14:32:40Z"
+    message: ""
+    observedGeneration: 0
+    reason: Accepted
+    status: "True"
+    type: Accepted
+  - lastTransitionTime: "2026-09-24T14:32:40Z"
+    message: CR config sent to all grpc endpoints
+    observedGeneration: 3
+    reason: Programmed
+    status: "True"
+    type: Programmed
+  generationId: 0
+ctx96
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0
+100     6 100     6   0     0  2595     0  --:--:-- --:--:-- --:--:--  3000
+default via 169.254.1.1 dev eth0 
+22.22.22.0/24 dev server-net proto kernel scope link src 22.22.22.113 
+169.254.1.1 dev eth0 scope link 
+WARMUP 1 28  *   Trying 11.11.11.99:18081...
+* Established connection to 11.11.11.99 (11.11.11.99 port 18081) from 11.11.11.100 port 37178 
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: 11.11.11.99:18081
+> User-Agent: curl/8.17.0
+> Accept: */*
+> Connection: close
+> 
+* Request completely sent off
+* Operation timed out after 2002 milliseconds with 0 bytes received
+* closing connection #0
+curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+4: server-net@if3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 32:e4:a1:a3:51:d1 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+ARPING 22.22.22.113 from 22.22.22.113 server-net
+Sent 3 probes (3 broadcast(s))
+Received 0 response(s)
+SERVER-SIDE CAPTURE tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on tmm-server, link-type EN10MB (Ethernet), snapshot length 65535 bytes
+8 packets captured
+8 packets received by filter
+0 packets dropped by kernel
+14:32:52.721348 32:e4:a1:a3:51:d1 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 71: Request who-has 22.22.22.150 tell 22.22.22.113, length 57
+14:32:52.721696 02:30:76:e6:9d:80 > 32:e4:a1:a3:51:d1, ethertype ARP (0x0806), length 71: Reply 22.22.22.150 is-at 02:30:76:e6:9d:80, length 57
+14:32:54.997984 32:e4:a1:a3:51:d1 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 71: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 57
+14:32:55.718567 02:30:76:e6:9d:80 > 32:e4:a1:a3:51:d1, ethertype IPv4 (0x0800), length 128: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,nop,wscale 0,sackOK,TS val 3553980582 ecr 0], length 0 out slot1/tmm0 lis=default-ctx-contract-test port=1.2 trunk=
+14:32:55.998171 32:e4:a1:a3:51:d1 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 71: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 57
+14:32:56.997695 32:e4:a1:a3:51:d1 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 71: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 57
+14:32:58.718661 02:30:76:e6:9d:80 > 32:e4:a1:a3:51:d1, ethertype IPv4 (0x0800), length 128: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,nop,wscale 0,sackOK,TS val 3553983582 ecr 0], length 0 out slot1/tmm0 lis=default-ctx-contract-test port=1.2 trunk=
+14:33:01.718573 02:30:76:e6:9d:80 > 32:e4:a1:a3:51:d1, ethertype IPv4 (0x0800), length 116: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,sackOK,eol], length 0 out slot1/tmm0 lis=default-ctx-contract-test port=1.2 trunk=
+
+command terminated with exit code 124
+
+BACKEND CAPTURE tcpdump: WARNING: any: That device doesn't support promiscuous mode
+(Promiscuous mode not supported on the "any" device)
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+14:32:54.997373 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype ARP (0x0806), length 48: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 28
+14:32:55.719458 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 80: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,nop,wscale 0,sackOK,TS val 3553980582 ecr 0], length 0
+14:32:55.719478 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype IPv4 (0x0800), length 80: 22.22.22.113.18081 > 22.22.22.150.37178: Flags [S.], seq 6884965, ack 2677307566, win 31856, options [mss 1460,sackOK,TS val 4290444942 ecr 3553980582,nop,wscale 7], length 0
+14:32:55.721099 server-net In  ifindex 4 22:d1:90:5b:dd:9d ethertype IPv4 (0x0800), length 106: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [R.], seq 1:47, ack 1, win 0, length 46
+14:32:55.997415 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype ARP (0x0806), length 48: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 28
+14:32:56.997395 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype ARP (0x0806), length 48: Request who-has 22.22.22.113 (ff:ff:ff:ff:ff:ff) tell 22.22.22.113, length 28
+14:32:58.719038 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 80: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,nop,wscale 0,sackOK,TS val 3553983582 ecr 0], length 0
+14:32:58.719059 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype IPv4 (0x0800), length 80: 22.22.22.113.18081 > 22.22.22.150.37178: Flags [S.], seq 53753418, ack 2677307566, win 31856, options [mss 1460,sackOK,TS val 4290447941 ecr 3553983582,nop,wscale 7], length 0
+14:32:58.720587 server-net In  ifindex 4 22:d1:90:5b:dd:9d ethertype IPv4 (0x0800), length 106: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [R.], seq 1:47, ack 1, win 0, length 46
+14:33:01.719501 server-net In  ifindex 4 02:30:76:e6:9d:80 ethertype IPv4 (0x0800), length 68: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [S], seq 2677307565, win 23360, options [mss 1460,sackOK,eol], length 0
+14:33:01.719516 server-net Out ifindex 4 32:e4:a1:a3:51:d1 ethertype IPv4 (0x0800), length 68: 22.22.22.113.18081 > 22.22.22.150.37178: Flags [S.], seq 100635592, ack 2677307566, win 32120, options [mss 1460,nop,nop,sackOK], length 0
+14:33:01.720522 server-net In  ifindex 4 22:d1:90:5b:dd:9d ethertype IPv4 (0x0800), length 106: 22.22.22.150.37178 > 22.22.22.113.18081: Flags [R.], seq 1:47, ack 1, win 0, length 46
+14:33:02.185204 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 80: 10.244.236.192.34970 > 10.244.236.240.18081: Flags [S], seq 3270900523, win 33120, options [mss 1440,sackOK,TS val 3628374859 ecr 0,nop,wscale 7], length 0
+14:33:02.185222 eth0  Out ifindex 3 ee:72:21:3b:12:6d ethertype IPv4 (0x0800), length 80: 10.244.236.240.18081 > 10.244.236.192.34970: Flags [S.], seq 3597486559, ack 3270900524, win 32844, options [mss 1440,sackOK,TS val 2812517000 ecr 3628374859,nop,wscale 7], length 0
+14:33:02.185296 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 72: 10.244.236.192.34970 > 10.244.236.240.18081: Flags [.], ack 1, win 259, options [nop,nop,TS val 3628374860 ecr 18 packets captured
+18 packets received by filter
+0 packets dropped by kernel
+2812517000], length 0
+14:33:02.185482 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 72: 10.244.236.192.34970 > 10.244.236.240.18081: Flags [F.], seq 1, ack 1, win 259, options [nop,nop,TS val 3628374860 ecr 2812517000], length 0
+14:33:02.185930 eth0  Out ifindex 3 ee:72:21:3b:12:6d ethertype IPv4 (0x0800), length 72: 10.244.236.240.18081 > 10.244.236.192.34970: Flags [F.], seq 1, ack 2, win 257, options [nop,nop,TS val 2812517001 ecr 3628374860], length 0
+14:33:02.185969 eth0  In  ifindex 3 ee:ee:ee:ee:ee:ee ethertype IPv4 (0x0800), length 72: 10.244.236.192.34970 > 10.244.236.240.18081: Flags [.], ack 2, win 259, options [nop,nop,TS val 3628374860 ecr 2812517001], length 0
+
+command terminated with exit code 124
+
+WARMUP 2 28  *   Trying 11.11.11.99:18081...
+* Established connection to 11.11.11.99 (11.11.11.99 port 18081) from 11.11.11.100 port 34818 
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: 11.11.11.99:18081
+> User-Agent: curl/8.17.0
+> Accept: */*
+> Connection: close
+> 
+* Request completely sent off
+* Operation timed out after 2002 milliseconds with 0 bytes received
+* closing connection #0
+curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 3 28  *   Trying 11.11.11.99:18081...
+* Established connection to 11.11.11.99 (11.11.11.99 port 18081) from 11.11.11.100 port 57390 
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: 11.11.11.99:18081
+> User-Agent: curl/8.17.0
+> Accept: */*
+> Connection: close
+> 
+* Request completely sent off
+* Operation timed out after 2001 milliseconds with 0 bytes received
+* closing connection #0
+curl: (28) Operation timed out after 2001 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+WARMUP 4 28  *   Trying 11.11.11.99:18081...
+* Established connection to 11.11.11.99 (11.11.11.99 port 18081) from 11.11.11.100 port 57406 
+* using HTTP/1.x
+> GET / HTTP/1.1
+> Host: 11.11.11.99:18081
+> User-Agent: curl/8.17.0
+> Accept: */*
+> Connection: close
+> 
+* Request completely sent off
+* Operation timed out after 2002 milliseconds with 0 bytes received
+* closing connection #0
+curl: (28) Operation timed out after 2002 milliseconds with 0 bytes received
+command terminated with exit code 28
+
+configmap "ctx-contract-test" deleted from default namespace
+pod "ctx-contract-test" deleted from default namespace
+f5bigcnepool.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+f5virtualserver.k8s.f5net.com "ctx-contract-test" deleted from default namespace
+Traceback (most recent call last):
+  File "/tmp/embedded-live-driver-20260924.py", line 112, in <module>
+    raise AssertionError("HTTP/1 fixture did not become reachable during bounded warm-up")
+AssertionError: HTTP/1 fixture did not become reachable during bounded warm-up

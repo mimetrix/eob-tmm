@@ -7,10 +7,31 @@ actions · **Draft date:** 2026-09-23
 
 **Audience:** TMM, AI gateway, protocol-adapter, observability, performance, and security engineers.
 
+**Current work, 2026-09-28:** the owner selected **application-metadata extraction
+first**, before downstream analytics. The [probe contract](env/ai-traffic/METADATA.md)
+contains the current hook shortlist and packaged-binary checks. Source names
+`a2a_request`, `a2a_lookup_method` and `aimcp_request` have no entries in the checked
+hook index; the surrounding filter handlers have padded entries. New native-filter
+extraction remains unimplemented. The semantic-event catalog below is design work.
+
 **Planning premise:** the TMM + embedded eBPF engine will underpin an F5 AI gateway proxying Model
 Context Protocol (MCP), agent-to-agent (A2A), and inference traffic. This paper proposes what to
 instrument as that gateway is built; it is not a statement that those protocol integrations exist
 today. Event names and fields below are candidate interfaces, not protocol-standard definitions.
+
+**Source inventory update, 2026-09-24:** the current build-box TMM tree already contains
+`src/modules/hudfilter/a2a/` (JSON-RPC/SSE processing and task/context ID persistence) and
+`src/modules/hudfilter/aimcp/` (MCP HTTP session-header persistence), with active build-file entries.
+This is **MEASURED source presence**, not live protocol validation or proof of a full MCP
+operation-body decoder. These are concrete places to investigate the proposed hooks; the
+semantic eBPF interfaces below remain **IDEA**. See `GROUND_TRUTH.md` and the source-inventory
+receipt registered in [`SOURCES.md`](SOURCES.md#ai-protocol-source-inventory-2026-09-24).
+
+**Traffic baseline, 2026-09-24:** [`env/ai-traffic/`](env/ai-traffic/README.md) now generates synthetic
+MCP/A2A/inference exchanges through the deployed HTTP proxy. P19 passed 51 exchanges and six
+paced SSE streams with independent-of-substrate client/backend records and a packet witness.
+Native AI filters are disabled in this baseline; the semantic eBPF observations proposed below
+remain the next phase.
 
 ## 1. The opportunity
 
@@ -334,10 +355,250 @@ The first demonstrations should be:
 3. **Follow cancellation:** distinguish receipt, forwarding, local cleanup, upstream acknowledgment,
    and any later observed output. Do not label forwarding alone as successful remote cancellation.
 
+### 8.1 Immediate next slice: a continuous feed from the existing HTTP fixture
+
+**Planning update, 2026-09-24 — IDEA, not deployed.** The semantic catalog above is the longer-term
+interface. The next experiment is narrower: use the existing HTTP function-hook mechanism to emit
+useful internal metadata while [the P19 jig](env/ai-traffic/README.md) runs repeatedly. Register this
+as **P20**; P19 established traffic forwarding, not this feed.
+
+**Governing objective, clarified 2026-09-24:** continuously publish **useful TMM-internal metadata
+unavailable through the relevant exposed iRules/WASM interfaces**, with **measured low incremental
+poll-loop cost**. Correlation and ordinary HTTP metadata support that objective. A functioning feed
+of already-exposed fields does not meet it.
+
+**Scope correction, 2026-09-24:** the initial next-step recommendation prioritized streaming
+stalls and operational diagnostics. The owner redirected the work to **AI Security Platform use
+cases**. §8.2 now governs signal selection: control bypass/fail-open, agent/session routing
+integrity, inspection/release coverage and red-team evidence. Wait/backpressure or parser state
+is relevant when it explains one of those security outcomes. These are candidates, not established
+uniqueness claims. For each:
+
+1. State the AI security question, the platform capability it supports, and the exact internal
+   observation needed to distinguish safe from unsafe behavior.
+2. Compare the relevant iRules/WASM events and accessors, including timing and granularity. Record
+   the evidence; absence from our current inventory is not proof of unavailability. Use those
+   interfaces as complementary sources of application identity and policy context where useful.
+3. Establish a supported hook and valid field lifetime, then select the smallest sufficient record
+   and event frequency. Prefer meaningful transitions or bounded summaries to per-chunk copying.
+4. Set numeric workload/cost budgets before the armed experiment. Measure unarmed, armed without
+   publication, armed with publication and slow/stopped-consumer cases. Include field reads,
+   clocks, copying, accounting, initialization and shared-resource contention; a JIT floor alone
+   does not establish minimal poll-loop impact.
+
+The intended inline work is bounded capture and publication; decoding, enrichment, joins, batching
+and network export belong off-loop. Account for deliberate sampling and dropped records. Verify
+initialization/warm-up separately so lazy mapping is not hidden in a steady-state cost claim.
+
+#### Hook shortlist and what each observation would mean
+
+| Observation | Existing hook / source lead | Status and placement question |
+|---|---|---|
+| **Request-header parse result** | `fexit/http_parse_client_headers` | **Established calibration point; value still subject to the uniqueness gate above.** Entry/exit attachment and post-call embedded-cache reads are MEASURED on the pinned binary in [P17](embedded-traversal-validation.md). Export the parser return and bounded fields whose lifetime is established. `args.cache.cur_entries` is a cache-entry count, not automatically a count of wire headers. A parser return can request more input; a successful return must be shown to identify the completed header block before calling this a request event. |
+| **Input-fragment / parser pressure** | `fentry/http_parse_client_headers` | Entry reads of `args.xfrag_head.tqh_first.len` are MEASURED in P17. Useful for input fragmentation and parser diagnostics, not response size or end-to-end latency. Entry and exit use the same patch site: treat these as alternative probes, not two independent attachments on that pad. |
+| **Response headers / disposition** | Server-side HTTP processing; `http_process_server_headers` is a discovery lead | Verify a suitable boundary in the packaged binary and source. Earlier builds record this function as **partially inlined** in `GROUND_TRUTH.md`; a symbol or a firing counter does not establish coverage. Need status, request association, informational-response handling and a post-parse lifetime check. Do not assert current eligibility from that historical name. |
+| **First response-body data / progress** | HTTP response-body forwarding callbacks, to be selected from source and build-side discovery | Need direction, request association, byte-count semantics and non-duplicated advancement. Start with first-body-data and bounded progress observations. One callback is not necessarily one HTTP chunk, SSE message, token, or client delivery. No selected/validated hook yet. |
+| **Response end / failure** | HTTP message-end, abort and cleanup paths, to be selected | Need a terminal HTTP-message boundary including bodyless 202, errors, streaming EOF and early disconnect. Connection close is not a general request-completion hook. `rst_why` and its variants are historically demonstrated diagnostic leads for exceptional teardown, not successful completion. Generic contexts expose only five arguments; do not assume the sixth reset-cause argument is available. |
+| **A2A operation / task / semantic stream event** | `a2a_request`, `a2a_response`, `a2a_lookup_method` | **MEASURED source presence only**, per the [cached inventory](SOURCES.md#ai-protocol-source-inventory-2026-09-24). Source describes `a2a_response` as called per normal response or SSE message. Verify padding, inline coverage and field lifetime; use a separate filter-enabled fixture because P19 disables these filters and ID persistence may transform traffic. |
+| **MCP session continuity** | `aimcp_request`, `aimcp_decrypt_and_parse_sessionid`, `hud_aimcp_add_persist` | **MEASURED source presence only.** These are session-persistence leads, not proof of tool-name, arguments, result or usage decoding. Native MCP filter validation is a separate step. |
+
+The feed should establish **which security-relevant internal decision was made and what happened
+at the corresponding forwarding boundary**. Parser dispositions, fragment pressure and queue/
+backpressure observations are supporting signals when they explain a bypass, incomplete inspection
+or fail-open condition. Keep function-level facts named as function-level facts until lifecycle
+coverage has been demonstrated.
+
+#### Reuse the export path; make the record contract explicit
+
+```text
+BUILD BOX — off the traffic path
+  packaged binary + source + type/signature catalogs
+    -> select boundary and fields -> compile/relocate -> bind/verify/sign
+    -> build-specific monitor program + decoder/schema manifest
+
+TMM POLL LOOP
+  eligible function hook -> bounded reads + monotonic timestamp
+    -> fixed-size program record -> bpf_perf_event_output (helper 25)
+    -> thread's shared-memory STREAM ring; full ring drops new records
+
+SEPARATE COLLECTOR PROCESS
+  one ls_drain consumer for the segment -> raw JSONL archive + versioned decoder
+    -> request/attempt joins -> rolling metrics / timelines / downstream exporter
+    -> collector heartbeat, ring loss, decoding and incomplete-join counters
+```
+
+The streaming mechanism has a **MEASURED historical live result** in `GROUND_TRUTH.md` (the
+`trace_stream` row); it must be revalidated for this program on build `c3b81927…`. The current
+source provides a useful starting point, not a completed AI feed:
+
+- [`trace_stream.bpf.c`](substrate/surfaces/trace_stream.bpf.c) shows a program-owned record,
+  event-output map, bounded reads and helper 25. Begin with a small C program; the current DSL's
+  `count()`/`hist()` does not define a multi-field `emit(record)` language interface.
+- [`ls_map_glue.h`](substrate/ls_map_glue.h) caps each program emission at **256 bytes** and
+  provides `bpf_ktime_get_ns` (helper 5, monotonic). Target a smaller first record, e.g. ≤128 bytes,
+  leaving room for read scratch space within the verified stack budget. The **96-byte tracing
+  context** and the **export payload cap** are different constraints.
+- [`ls_tp_ring.h`](substrate/ls_tp_ring.h) defines **16 rings × 64 KiB**, claimed per thread,
+  with STREAM drop-new policy. Check the process's `LS_TP_RING` and actual segment before use;
+  a sidecar needs the same mapped file, not merely the same path in its own filesystem.
+  Initialization is one-shot in `ls_tp_emit.c`: setting an environment variable in a new exec
+  shell does not enable the running TMM's ring. If disabled, enabling it is a deployment step
+  with a new runtime baseline, not merely loading another program.
+- [`ls_ring.h`](substrate/ls_ring.h) carries `slot`, `schema_id`, `seq` and wall-clock `ts_ns`.
+  Slot is not TMM identity. [`ls_tp_emit.c`](substrate/ls_tp_emit.c) uses a process-wide sequence;
+  gaps in a single slot's records can therefore be other slots' emissions, not loss.
+- [`ls_drain`](substrate/drain/ls_drain.c) renders program records as schema 100, length and hex.
+  Give the payload its own version/kind and pair it with the exact program hash and attachment
+  manifest; schema 100 alone does not identify the application layout. Reject an unknown layout.
+  A single consumer advances ring cursors; fan out **after** that consumer. Raw archives and
+  decoder diagnostics must survive a downstream analytics restart.
+
+First-record fields to settle before compilation:
+
+| Part | Proposed contents / rule |
+|---|---|
+| Source identity | Collector envelope: pod UID, process epoch, build ID, program hash, attachment/generation and decoder version. Use a payload producer tag or a validated drain boundary on replacement; attachment history alone cannot safely assign queued records to the current slot owner. |
+| Observation | Payload version, event kind, validity/read-error flags, monotonic timestamp, parser disposition and selected bounded scalars. Never make a failed read look like a valid zero. |
+| Correlation | Request ID plus a validated association to later response observations. Preserve run/operation IDs where readable; identify provenance and truncation. Internal object identity is temporary and must be scoped to its lifetime and process epoch. |
+| Accounting | Separate eligible observations, intentionally sampled records, attempted emissions, ring drops, decoded records and unmatched/expired joins. Missing fields stay unavailable. |
+
+Use monotonic timestamps from the same process/clock domain for durations. The envelope's
+wall-clock timestamp is useful for log correlation, not a substitute. First upstream body data,
+downstream forwarding and client-observed first output are three different intervals.
+
+**Export preflight questions, not reproduced findings:** local source inspection makes helper
+success/failure polarity (`ls_tp_publish_raw` versus `ls_tp_ring_publish`) and consume/acknowledge/
+flush ordering (`ls_ring_consume` versus `ls_drain`) explicit test targets. Reproduce on the build
+box before trusting helper return values as publication receipts or any at-least-once delivery
+claim. Ring-full counters alone cannot account for records lost after consumption, disabled
+publication, or threads that cannot claim a ring. Treat the initial feed as best-effort with
+measured completeness, not a durable audit log.
+
+#### Correlation before analytics
+
+P19 already supplies `X-Run-Id`, `X-Request-Id`, `X-Operation-Id` and independent client/backend
+ledgers. First prove that a bounded read at the selected hook can recover the request key and
+exclude `/health` and `/_fixture/events`. Headers may live in fragmented buffers/cache structures;
+do not assume contiguous bytes or that eBPF can call a TMM header-lookup function arbitrarily.
+If the key is not available at that boundary, select a better boundary or design a small host
+context/accessor with its own contract. Do not substitute nearest-timestamp matching.
+
+The original P19 fixture creates a fresh `HTTPConnection` for **every exchange**. A flow-based join
+can appear correct there while failing on persistent connections. Add keep-alive, split headers,
+interleaved requests and object reuse before generalizing the correlation. An upstream connection
+is also not automatically the same identity as the downstream request.
+
+**2026-09-25 prerequisite:** the separate [attribution fixture](env/ai-traffic/ATTRIBUTION.md)
+exercises A/B over one reused backend connection and concurrent connections. Its destination-side
+proof verifier supplies authenticated expectations. No TMM-internal request join has yet been
+validated by that result; client labels and routing cookies remain untrusted correlation inputs.
+
+The three deliberate retries have **two request IDs but one operation ID** each. They are
+client-driven retries; seeing those pairs does not mean TMM made a retry decision. For the current
+baseline, paths identify traffic families, but a path does not identify a tool or model. Enrichment
+from the fixture ledger can attach those labels with `source=fixture`; only an independently
+validated native-parser observation should label them `source=tmm`.
+
+#### Proposed experiment order
+
+1. **Signal/value and cost contract, then export preflight.** Select one useful, otherwise-unavailable
+   internal signal using the gate above; record its expected event rate and numeric cost budgets.
+   Check the ring configuration and single consumer, record identity,
+   schema rejection, helper return semantics and collector-stop/restart behavior. Use a monitor-only
+   program returning fallthrough. Validate with pinned clang/PREVAIL before loading.
+2. **One calibration probe and the selected internal signal.** Use `fexit/http_parse_client_headers`
+   for the already-supported calibration boundary. Establish field validity,
+   parser return meanings, fixture filtering and correlation. Run P19 unchanged: aim for **51
+   uniquely correlated completed-request-header observations**, with parse attempts counted
+   separately. This is plumbing/correlation validation; completion of the milestone also requires
+   the selected unique signal, its independent semantic check and the cost comparison. No
+   request-completion or stream-semantics claim from this hook alone.
+3. **Keep the collector running.** Execute ten consecutive three-worker, one-round jig runs,
+   including an idle interval between runs. Reconcile **510** exchanges by run ID while retaining
+   one continuous raw feed. Report collector health during idle; an idle hook cannot emit its own
+   heartbeat. These counts are planned acceptance values, not measurements.
+4. **Add response lifecycle one boundary at a time.** Target final headers, first body data and
+   terminal outcome; define per-request cardinality before comparing counts. Validate bodyless
+   202, deliberate 404/503 and all six streams. Add keep-alive/fragmentation/disconnect cases with
+   their own independent expected records. Expired joins mean incomplete observation, not success.
+5. **Expand only where there is additional diagnostic value.** Enable native A2A/MCP paths in a
+   separately validated fixture. Add semantic events and bounded progress sampling. Repeat the
+   P16 cost/pressure comparison when the probe set or event rate changes; the first signal must
+   already have passed that comparison before expansion.
+
+The acceptance output is a request-correlated **security decision/outcome record** for one use case
+in §8.2, with independent witnesses and a measured capture/publication budget. Parser timelines and
+ordinary request metrics support that result. Keep high-cardinality IDs in records; use bounded
+family, event-kind and outcome dimensions for metrics. Perform joins and export formatting off the
+poll loop, with bounded state and explicit expiration/loss accounting.
+
+### 8.2 Security-platform use cases govern the next experiment
+
+**IDEA / candidate use cases, 2026-09-24.** The [F5 AI Security Platform overview](https://www.f5.com/products/ai-security-platform#overview)
+positions the platform around application and workforce AI security: runtime protection, agent/tool
+governance, data loss prevention and continuous red teaming. The retrieved excerpts and SHA-256 are
+registered in [SOURCES.md](SOURCES.md#f5-ai-security-platform-overview-2026-09-24). This is product
+positioning, not evidence that a particular guardrail, policy object or integration exists in our
+deployed TMM.
+
+**Proposed contribution:** a low-impact feed of internal execution evidence that the platform can
+join to its semantic detections, identity context and policies. The eBPF program captures bounded
+facts from supported hooks; platform components can classify content/intent and correlate events
+off the poll loop. Existing iRules/WASM observations can supply complementary context. Uniqueness
+must be established for the specific internal fact, timing and granularity, not claimed for all
+metadata about an AI exchange.
+
+| Security use case | Question for the platform | Candidate internal metadata | Availability / experiment |
+|---|---|---|---|
+| **Agent attribution — selected primary direction** | Which authenticated actor executed this operation, for which initiating principal and validated delegation, and did the actual downstream association agree? | Request/attempt-to-upstream association, validated lifetime-scoped internal handles, persistence/fallback decisions joined to authenticated principal and delegation evidence | Destination-side two-credential baseline now measured; TMM join and precise iRules/WASM gap remain unrun. Identity comes from authentication evidence, not eBPF inference. See the [trust contract](env/ai-traffic/ATTRIBUTION.md). |
+| **Guardrail bypass and fail-open detection** | Did this operation traverse the intended inspection/control path, and what happened on timeout or failure? | Actual filter/decision path, verdict applied, timeout/fallback reason, inspection completeness and correlated forwarding boundary | Inspect integration state first; the current fixture has no demonstrated AI guardrail integration. A missing inspection record is ambiguous with telemetry loss. Require a trustworthy positive coverage state or another independent witness before declaring bypass. |
+| **Agent/session routing integrity** | Did a request reach the destination permitted for its session/task and trusted identity? | Session/task cookie validation result, decoded binding, actual selected pool member and reason for fallback/rebinding | Strong existing-source lead: A2A/AIMCP persistence functions in the cached source inventory. A binding change is not itself an attack. Compare it with trusted identity/authorization supplied by the platform; native-filter reachability and exposed-API overlap still need validation. |
+| **Streaming DLP enforcement evidence** | Did data advance past the release boundary beyond the range covered by the applicable inspection verdict? | Inspection generation/range, verdict applicability, released range/byte count, buffer-limit/timeout disposition | Requires a real inspection/release contract and corresponding internal state. A platform DLP result establishes sensitivity; byte counts alone cannot. Keep handed-to-downstream bytes distinct from client receipt. |
+| **Parser/normalization evasion evidence** | Did the security component and forwarding path act on different message interpretations or coverage? | Normalization/parse result, fallback/passthrough reason, inspected-versus-forwarded message identity/range, limit/truncation flags | Validate concrete parser and inspection boundaries; fragmentation or a parse error alone is not evasion. Compare controlled equivalent/ambiguous inputs with independently observed forwarding outcomes. |
+| **Approved-destination policy drift** | Did fallback or persistence send an operation to an endpoint outside its approved set? | Actual route/pool selection, policy revision if available, selection reason, persistence override and upstream-attempt identity | Join to a trusted approved-endpoint policy. A requested model name or destination address alone does not prove which model executed. Retain only an internal selection detail unavailable through existing interfaces as the differentiated signal. |
+| **Explainable red-team results** | Why did a test get through or get stopped, and did a remediation change that path? | Correlated evidence from the cases above: decision sites, inspection coverage, applied outcome, actual forward/release result | Reuse the same feed across controlled attack/benign cases and policy revisions. This is not a separate high-volume probe set. Independent client/backend receipts must verify outcomes; exported verdicts alone are insufficient. |
+
+**Previous priority correction, 2026-09-24:** the initial recommendation favored agent/session routing
+integrity as the existing-source foothold. The owner selected **delayed DLP inspection of a paced
+response** as the first experiment: delayed allow, delayed deny and inspector timeout/fail-closed,
+compared with actual client receipt. A real host inspection/release gate is required. The
+[integration preflight](env/ai-traffic/INSPECTION.md) records the source/configuration findings and
+open deployment decision. Generic discovery, prompt/tool-name logging and latency dashboards do
+not by themselves meet the unique-metadata goal.
+
+**Owner-directed priority change, 2026-09-25:** agent identity/attribution is primary. Preserve
+the complete chain from initiating principal to executing actor, delegated task and downstream
+action, with explicit authenticated/claimed/unknown provenance. The
+[attribution contract](env/ai-traffic/ATTRIBUTION.md) records the first 23-outcome destination-side
+baseline. The earlier ICAP allow/deny/timeout outcomes are now measured in their bounded fixture;
+they remain a possible attributed enforcement outcome. Neither baseline establishes an internal
+attribution feed, unique visibility or incremental cost.
+
+For an agent/session-binding experiment, the discriminating cases would be a valid binding, an
+invalid or stale binding, a legitimate rebinding and a deliberately mismatched authorized context.
+The fixture/control plane supplies the expected authorized destination; the internal feed records
+the validation/selection reason, and the backend independently records where the request arrived.
+If the required trusted context or native-filter behavior is absent, the experiment stays scoped
+to binding behavior and cannot be described as detecting authorization bypass.
+
+For a guardrail/release experiment, the discriminating cases would be a known allow, a known deny,
+an inspection timeout/failure and partial inspection of a paced response. The independent witness
+is the actual received byte range, compared with the inspection contract. This needs an inspection
+fixture or integration beyond P19's current forwarding-only setup.
+
+**Common falsifiers:** the supposedly unique fact is already exposed by iRules/WASM at the needed
+boundary; the feed cannot distinguish the controlled safe/unsafe cases; an observation cannot be
+joined without guessing; missing telemetry is misreported as bypass; or capture/publication exceeds
+the pre-registered poll-loop budget. P20/P16 govern the record, correlation and cost checks.
+Emit compact records at security decisions/state transitions and bounded summaries where sufficient;
+perform content classification, enrichment and network publication off-loop. Continuous publication
+does not require copying every packet or semantic chunk.
+
 ## 9. Validation questions and falsifiers
 
-These questions are pre-registered as **P13–P16** in
-[02-RESEARCH-PARAMETERS.md](02-RESEARCH-PARAMETERS.md). All are unrun.
+These semantic-interface questions are pre-registered as **P13–P16** in
+[02-RESEARCH-PARAMETERS.md](02-RESEARCH-PARAMETERS.md). All are unrun. The narrower existing-hook
+feed in §8.1 has its own **P20**, also unrun.
 
 | Question | Experiment and falsifier |
 |---|---|

@@ -1,0 +1,73 @@
+  receipt: package/build_id matches (c3b81927dfdcc31137cd8212b5e23bb85677a06c)
+exit-admit: http_parse_client_headers
+  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fentry/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+PASS: fentry/http_parse_client_headers/check_ctx_live (terminates within 0 loop iterations)
+  signed /home/starin/catalog-probes/ctx96-fentry.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 72c2467011262d774521040307f74e6f77637aee3dcd01345e9ab0973d9393d2
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/ctx96-fentry.bpf.sig  (112-byte binding + 64-byte signature)
+72c2467011262d774521040307f74e6f77637aee3dcd01345e9ab0973d9393d2  /home/starin/catalog-probes/ctx96-fentry.bpf.o
+4f7231235fab190fc3477bb0d4de7f92e588c2610e80c391972707d0d053cf2e  /home/starin/catalog-probes/ctx96-fentry.bpf.sig
+exit-admit: http_parse_client_headers
+  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fexit/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+PASS: fexit/http_parse_client_headers/check_ctx_live (terminates within 0 loop iterations)
+  signed /home/starin/catalog-probes/ctx96-fexit.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : ba6eabab2f9640bae33285de576ce5b9418851a5508b56f0439af96b8f2328b5
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/ctx96-fexit.bpf.sig  (112-byte binding + 64-byte signature)
+ba6eabab2f9640bae33285de576ce5b9418851a5508b56f0439af96b8f2328b5  /home/starin/catalog-probes/ctx96-fexit.bpf.o
+8df179aff4cc69535c239274ba5ce4a7950cd794b5165374d7952b709bdc4134  /home/starin/catalog-probes/ctx96-fexit.bpf.sig
+  bound fentry/device_poll -> 0x40c000 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+PASS: fentry/device_poll/check_ctx_live (terminates within 0 loop iterations)
+  signed /home/starin/catalog-probes/other-target.bpf.o
+    hook          : device_poll
+    prog sha256   : 19a4547795cbf153b515afc4215d5369b998b3b97c0ec6d9f68b2d2afb2e18c3
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/other-target.bpf.sig  (112-byte binding + 64-byte signature)
+19a4547795cbf153b515afc4215d5369b998b3b97c0ec6d9f68b2d2afb2e18c3  /home/starin/catalog-probes/other-target.bpf.o
+a0b6302f206b12a67e2e6e4ff0544187c2c313a6f0f353f3e0d1da4378f35b17  /home/starin/catalog-probes/other-target.bpf.sig
+  signed /home/starin/catalog-probes/wrong-build.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 56939a6a54fca414ed1a3f385c510ab7f2284a092a4a583a0b5bf52aa8ed3e29
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/wrong-build.bpf.sig  (112-byte binding + 64-byte signature)
+  signed /home/starin/catalog-probes/wrong-kind.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : e6a0ed64c2cc96eab5f13e3d7f18f50f9d56c4e15790c7388a0ff6ce780a165f
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/wrong-kind.bpf.sig  (112-byte binding + 64-byte signature)
+  signed /home/starin/catalog-probes/wrong-address.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : df7770642d7d77d7723565771f9c38df7cc89bd5f69abfc1ac03f6be77efc2de
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/catalog-probes/wrong-address.bpf.sig  (112-byte binding + 64-byte signature)
+NEGATIVE TEST ONLY: /home/starin/catalog-probes/wrong-build.bpf.o
+NEGATIVE TEST ONLY: /home/starin/catalog-probes/wrong-kind.bpf.o
+NEGATIVE TEST ONLY: /home/starin/catalog-probes/wrong-address.bpf.o
+NEGATIVE TEST ONLY: /home/starin/catalog-probes/tampered-target.bpf.o
+Context probes verified and signed for c3b81927dfdcc31137cd8212b5e23bb85677a06c in /home/starin/catalog-probes

@@ -1,0 +1,38 @@
+# 1 hook(s) match 'http_parse_client_headers'   (of 71310 in the build)
+#   (no inline_status in this map --- run substrate/mk_inline_status.py against the SHIPPED binary; without it a partially-inlined hook looks complete)
+http_parse_client_headers
+built /tmp/tmp.4ljTgMSafe/tt_http_parse_client_headers_count_a49ec4.bpf.o  (count)  section fentry/http_parse_client_headers  verified=True
+target BTF: 116727 types
+ls_core_relocate rc=0, 1 relo(s)
+wrote relocated object: /tmp/tmp.4ljTgMSafe/relocated.o
+  bound fentry/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+PASS: fentry/http_parse_client_headers/tt_http_parse_client_headers_count_a49ec4 (terminates within 0 loop iterations)
+  signed /tmp/tmp.4ljTgMSafe/tt_http_parse_client_headers_count_a49ec4.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 45e766ed3652ea58b7b51762b784781a4ee1b906a0cf509b8270c82efad2caa7
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /tmp/tmp.4ljTgMSafe/tt_http_parse_client_headers_count_a49ec4.bpf.sig  (112-byte binding + 64-byte signature)
+tt_http_parse_client_headers_count_a49ec4 http_parse_client_headers count
+built /tmp/tmp.LZKgC0rbSF/tt_http_parse_client_headers_count_4273fe.bpf.o  (count)  section fexit/http_parse_client_headers  verified=True
+target BTF: 116727 types
+ls_core_relocate rc=0, 1 relo(s)
+wrote relocated object: /tmp/tmp.LZKgC0rbSF/relocated.o
+exit-admit: http_parse_client_headers
+  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fexit/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+PASS: fexit/http_parse_client_headers/tt_http_parse_client_headers_count_4273fe (terminates within 0 loop iterations)
+  signed /tmp/tmp.LZKgC0rbSF/tt_http_parse_client_headers_count_4273fe.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 9ee2157d4ba10956f794f3cfb6e77a1c890426f48123797722c1e11169266ae9
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /tmp/tmp.LZKgC0rbSF/tt_http_parse_client_headers_count_4273fe.bpf.sig  (112-byte binding + 64-byte signature)
+tt_http_parse_client_headers_count_4273fe http_parse_client_headers count

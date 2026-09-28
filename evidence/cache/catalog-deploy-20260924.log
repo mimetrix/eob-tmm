@@ -1,0 +1,33 @@
+time="2026-09-24T13:42:40Z" level=warning msg="DEPRECATION: The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.2.Use `config_path` instead."
+docker.io/library/tmm:CATALOGFREE 202609	saved	
+application/vnd.oci.image.index.v1+json sha256:96336e4cd08c72b6180f22ae4f72e179907c4d419fc0af502bc261fd78ae659d
+Importing	elapsed: 9.5 s	total:   0.0 B	(0.0 B/s)	
+time="2026-09-24T13:42:49Z" level=warning msg="DEPRECATION: The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.2.Use `config_path` instead."
+docker.io/library/tmm:CATALOGFREE 202609	saved	
+application/vnd.oci.image.index.v1+json sha256:96336e4cd08c72b6180f22ae4f72e179907c4d419fc0af502bc261fd78ae659d
+Importing	elapsed: 10.0s	total:   0.0 B	(0.0 B/s)	
+  receipt: bake produced build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+=== 1. is the image in every kind node's containerd?
+  vs-worker                  present
+  vs-control-plane           present
+=== 2. point the deployment at it and roll
+Warning: spec.template.spec.containers[0].env[40]: hides previous definition of "TMM_MAPRES_DELAY_MS", which may be dropped when using apply
+Waiting for deployment "f5-tmm" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "f5-tmm" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "f5-tmm" rollout to finish: 1 old replicas are pending termination...
+deployment "f5-tmm" successfully rolled out
+  f5-tmm-59696979b6-6xv8n  2/2  Terminating  restarts=0  node=vs-control-plane
+  f5-tmm-7597dfff8b-28s9z  2/2  Running  restarts=0  node=vs-worker
+
+  restarts must be 0. A pod that restarts once and comes back looks healthy in
+  'kubectl get pods' and is usually the VM failing at INIT_LATE --- read the logs.
+
+=== 3. VERIFY BY CONTENT, from inside the new pods
+  f5-tmm-7597dfff8b-28s9z    ls-tools: runtime identity matches, build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+ls-tools: authenticated per-program targets; no bulk catalogs in /usr/share/ls
+OK runtime identity and catalog-free tools
+deployment.apps/cnf-f5ingress restarted
+Waiting for deployment "cnf-f5ingress" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "cnf-f5ingress" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "cnf-f5ingress" rollout to finish: 1 old replicas are pending termination...
+deployment "cnf-f5ingress" successfully rolled out

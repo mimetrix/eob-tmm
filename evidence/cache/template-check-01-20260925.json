@@ -1,0 +1,121 @@
+{
+  "passed": false,
+  "scope": "pinned bench; no live TMM",
+  "commands": [
+    {
+      "argv": [
+        "clang-18",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/code/tmm/.ubpf",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/eob-tmm-staged/ebpf-verifier",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "06769f7b508214e63b97905d275920f7e90182fa\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-g",
+        "-gbtf",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "/home/starin/template-20260925/check_template.c",
+        "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a",
+        "-lm",
+        "-o",
+        "/home/starin/template-20260925/check-01/native"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--dump-section=.BTF=/home/starin/template-20260925/check-01/fixture.btf",
+        "/home/starin/template-20260925/check-01/native"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/home/starin/template-20260925/check-01/native",
+        "--offsets"
+      ],
+      "rc": 0,
+      "stdout": "{\"http_parse_ctx\":{\"version_num\":31,\"parser\":16},\"http_parser\":{\"header_count\":24},\"xbuf\":{\"len\":16}}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-DLS_CORE_RELO_TEST",
+        "/home/starin/template-20260925/ls_core_relo.c",
+        "-o",
+        "/home/starin/template-20260925/check-01/relo"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "/home/starin/template-20260925/ls_core_relo.c:22:10: fatal error: ls_core_relo.h: No such file or directory\n   22 | #include \"ls_core_relo.h\"\n      |          ^~~~~~~~~~~~~~~~\ncompilation terminated.\n"
+    }
+  ],
+  "sources": {
+    "template.c": "3c5985cef847197767db6e4d6cb9be394b334c76fff2b5ace37d388075aa59e7",
+    "check_template.c": "6a5b21b8e11f041feb6c78100aeef2e9264b31fc810f8a8eccab38c5474b4847",
+    "check_template.py": "7a12472739b6ef4554ced17c961002c5616e88d4dcfe378acd738c338ffd29b2",
+    "check_relo_baked.py": "f31c663917729199e4337942cefbfa11be93d5945b8ff7651a9e03fc9689cd59",
+    "ls_core_relo.c": "659aec53fe1d2b31710bf9cf82080994c43d3641b50ab96814358a2880217bb9",
+    "ls_map_glue.h": "af849d3fc34df486f7de343f5f0f121018d6466e6251ebb18870ae18826bae36",
+    "ls_map.h": "af4f112a1156bd112a2432fe0c72f666420019766f3775758c65de074f0b039b",
+    "ls_config.h": "bb65ba7a79f5d615f91b7927605de37d16f0ec1ad0ccbe2f2bbd621f571618ff",
+    "config_snapshot.bpf.h": "e31cf99fd4dbe9023885d5716065d18d69f88026f8193ee079c7dca8222cf61c",
+    "ls_tp.h": "14b63bd33316132f77996913b8d72756a3e273c6f6526ff42474f8fa0aa0da84",
+    "bind_target.py": "2cc65c48d7b2320892c74b6fb3411b9d8e3d5857cf12ba7160f521fd0e118d2c",
+    "ls_buildid.py": "fa8ad7304fb5740302ace8fe11bb8e4ebe2a7fb03a316ffe123108185305a2b9",
+    "exit_admit.py": "3b0819dd302fe4fd8c3c376e3d40e35f7b68b67a14865c837f4f463eb9ee341e"
+  },
+  "tools": {
+    "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail": "d9d84cb0c474016d7cffc31c71e62892f52c327e660248275f3e955f1b7cbea2",
+    "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a": "340cc6bb2855db63e225cd92ce6e36704244b801469fe0571963f54f03802ff1"
+  },
+  "error": "CalledProcessError(1, ['gcc', '-O2', '-DLS_CORE_RELO_TEST', '/home/starin/template-20260925/ls_core_relo.c', '-o', '/home/starin/template-20260925/check-01/relo'], '', '/home/starin/template-20260925/ls_core_relo.c:22:10: fatal error: ls_core_relo.h: No such file or directory\\n   22 | #include \"ls_core_relo.h\"\\n      |          ^~~~~~~~~~~~~~~~\\ncompilation terminated.\\n')"
+}

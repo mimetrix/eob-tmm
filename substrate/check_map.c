@@ -105,6 +105,37 @@ main(void)
         assert(!ls_map_addr_ok(&S, 0xdeadbeef, 8));                           n++;
     }
 
+    /* Every admitted capacity, including non-powers of two. Fill, delete holes,
+     * update surviving collision chains, and refill without losing any key. */
+    for (uint32_t capacity = 1; capacity <= LS_MAP_ENTRIES; capacity++) {
+        memset(&S, 0, sizeof S);
+        d.max_entries = capacity;
+        assert(ls_map_create(&S, &d) == 0);
+        m = ls_map_get(&S, 0);
+        for (uint32_t key = 0; key < capacity; key++) {
+            uint64_t value = key + 1000;
+            assert(!ls_map_update(m, (uint8_t *)&key, (uint8_t *)&value));
+        }
+        for (uint32_t key = 0; key < capacity; key++) {
+            uint64_t *value = ls_map_lookup(m, (uint8_t *)&key);
+            assert(value && *value == key + 1000);
+            if (!(key & 1)) assert(!ls_map_delete(m, (uint8_t *)&key));
+        }
+        for (uint32_t key = 1; key < capacity; key += 2) {
+            uint64_t value = key + 2000;
+            assert(!ls_map_update(m, (uint8_t *)&key, (uint8_t *)&value));
+        }
+        for (uint32_t key = 0; key < capacity; key += 2) {
+            uint64_t value = key + 2000;
+            assert(!ls_map_update(m, (uint8_t *)&key, (uint8_t *)&value));
+        }
+        for (uint32_t key = 0; key < capacity; key++) {
+            uint64_t *value = ls_map_lookup(m, (uint8_t *)&key);
+            assert(value && *value == key + 2000);
+        }
+        assert(m->evictions == 0);
+    }
+    puts("ok    all 256 map capacities: fill, delete, collision-chain update, refill");
     printf("ok    ls_map.h  (%d assertions: bad descriptors refused, index "
            "validated, accumulation, evict-and-count, bounds callback)\n", n);
     return 0;

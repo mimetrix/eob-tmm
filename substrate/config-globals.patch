@@ -1,0 +1,14 @@
+diff --git a/src/compile/default_whitelist_x86_64 b/src/compile/default_whitelist_x86_64
+--- a/src/compile/default_whitelist_x86_64
++++ b/src/compile/default_whitelist_x86_64
+@@ -146,2 +146,3 @@
+ g_ls_btf
++g_ls_config
+ g_ls_fexit_desync
+diff --git a/src/compile/debug_whitelist_x86_64 b/src/compile/debug_whitelist_x86_64
+--- a/src/compile/debug_whitelist_x86_64
++++ b/src/compile/debug_whitelist_x86_64
+@@ -146,2 +146,3 @@
+ g_ls_btf
++g_ls_config
+ g_ls_fexit_desync

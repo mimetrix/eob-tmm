@@ -11,12 +11,9 @@
  *  WHAT THIS DELIBERATELY DOES NOT DO --- read before enabling it
  * =====================================================================
  *
- *  NO SIGNATURE VERIFICATION. `sig_verify()` is declared in shield_abi.h and
- *  has no implementation (scope item 4, deferred by decision). Anything that can
- *  reach this socket can put executable content into the data plane. That is why
- *  it is OFF unless LS_LOAD_SOCKET is set, why the socket is created 0600, and
- *  why every accepted load logs the fact that it was not verified. Do not let
- *  this reach a build anyone else runs.
+ *  LOAD verifies the signed binding and program hash on a TMM prepare thread.
+ *  The program carries a build-resolved .ls.target record; ARM is constrained to
+ *  that authenticated entry. Socket caller authentication remains separate work.
  *
  *  NO RECLAMATION. A swapped-out VM is never freed. Freeing it requires knowing
  *  that no core is still executing it, which is the cross-core rendezvous of
@@ -42,6 +39,7 @@
 #include "ls_sig.h"
 #include "ls_audit.h"
 #include "ls_build_gate.h"
+#include "ls_target.h"
 #include <time.h>
 #include "ls_map.h"
 /* This file OWNS the map glue's state --- see ls_map_glue.h. Exactly one TU may
@@ -64,7 +62,9 @@ extern void ls_trampoline_entry(void);
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/random.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -154,6 +154,14 @@ struct ls_prep {
                                   * the interpreter is not a hook cost and nothing
                                   * else in the reply would say so. */
     int          rc;             /* slot on success, negative on refusal        */
+    /* Control-path only, serialized by the loader/prepare handoff. Kept here so
+     * target authorization needs no additional mutable TMM linker global. */
+    struct {
+        struct ls_target target;
+        char hook[SHIELD_HOOK_NAME_MAX];
+        unsigned char ceiling;
+        int valid, attached;
+    } targets[SHIELD_MAX_SHIELDS];
 };
 
 /* What the loader reads back. COPIED OUT before the slot returns to IDLE, so a caller can
@@ -234,9 +242,59 @@ ls_prep_run_pending(void)
                                         &g_prep.bmin, &g_prep.bmean, &g_prep.bmax,
                                         &g_prep.bjitted);
     } else {
+        struct ls_target target;
+        struct shield_binding binding_copy;
+        memcpy(&binding_copy, g_prep.binding, sizeof binding_copy);
+        const struct shield_binding *binding = &binding_copy;
+        int slot = g_prep.slot;
+        /* A signed name alone cannot authorize an independently supplied ARM
+         * address. Resolve on the build box, sign the record with the program,
+         * and validate it before publishing anything into a live slot. */
+        if (slot < 0 || (unsigned)slot >= SHIELD_MAX_SHIELDS ||
+            !memchr(binding->hook, 0, sizeof binding->hook) ||
+            binding->mode_ceiling > MODE_ENFORCE || g_prep.mode > binding->mode_ceiling ||
+            ls_target_parse(g_prep.prog, g_prep.prog_len, g_prep.section,
+                            ls_audit_build_id(), &target) != 0 ||
+            ls_target_check_file("/proc/self/exe", &target) != 0) {
+            fprintf(stderr, "ls_vm: LOAD REFUSED --- signed target/build/mode contract\n");
+            g_prep.rc = -1;
+            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            return;
+        }
+        if (g_prep.targets[slot].attached &&
+            (memcmp(&target, &g_prep.targets[slot].target, sizeof target) ||
+             strcmp(binding->hook, g_prep.targets[slot].hook))) {
+            fprintf(stderr, "ls_vm: LOAD REFUSED --- disarm before changing target or kind\n");
+            g_prep.rc = -1;
+            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            return;
+        }
+        uint64_t instance = ls_config_new_instance(&g_ls_config, (unsigned)slot);
+        if (!instance || atomic_load(&g_ls_config.slots[slot].sequence) > UINT64_MAX - 2) {
+            g_prep.rc = -1;
+            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            return;
+        }
+        g_ls_config.loading = instance;
         g_prep.rc = ls_vm_reload(g_prep.slot, g_prep.prog, g_prep.prog_len,
-                                 g_prep.section, g_prep.function,
-                                 (enum ls_mode)g_prep.mode);
+                                  g_prep.section, g_prep.function,
+                                   (enum ls_mode)g_prep.mode);
+        g_ls_config.loading = 0;
+        if (g_prep.rc >= 0) {
+            /* New VM may briefly see unavailable input before this publication;
+             * it can never see the previous instance's configuration. */
+            if (ls_config_bind(&g_ls_config, (unsigned)slot, instance,
+                               binding->prog_sha256) != 0) {
+                ls_vm_set_mode(slot, LS_MODE_DISABLE);
+                g_prep.rc = -1;
+                __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+                return;
+            }
+            g_prep.targets[slot].target = target;
+            memcpy(g_prep.targets[slot].hook, binding->hook, sizeof binding->hook);
+            g_prep.targets[slot].ceiling = binding->mode_ceiling;
+            g_prep.targets[slot].valid = 1;
+        }
     }
 
     __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
@@ -391,26 +449,24 @@ ls_load_buf_free(unsigned char *p)
         (void)munmap(p, LS_LOAD_MAX);
 }
 
-/* The message handler. Its exits are audited by handle() below rather than here, so that no
- * path can return without leaving a record --- including the early returns for input too short
- * or too large to interpret, which is exactly the traffic an audit trail must not lose.
- *
- * Writes the interpreted message to *seen so the wrapper can record what was asked for. NULL
- * means the bytes never became a message. */
-static void
-handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
+/* Shared framing for all operations; also exercised through real Unix sockets
+ * by check_config_socket.c without booting a TMM. */
+static int
+ls_load_receive(int fd, unsigned char *g_load_buf, struct shield_msg **seen,
+                struct shield_msg *copy)
 {
-    unsigned char *g_load_buf = ls_load_buf_alloc();
-    if (g_load_buf == NULL) {
-        reply(fd, "ERR scratch mmap failed\n");
-        return;
+    /* SOCK_STREAM has no message boundaries. Read the fixed header, then its
+     * bounded payload; a fragmented send is not a short-message refusal. */
+    struct timeval timeout = {5, 0};
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0) {
+        reply(fd, "ERR receive timeout setup failed\n");
+        return -1;
     }
-    ssize_t n = read(fd, g_load_buf, LS_LOAD_MAX);
+    ssize_t n = recv(fd, g_load_buf, sizeof(struct shield_msg), MSG_WAITALL);
 
     if (n < (ssize_t)sizeof(struct shield_msg)) {
         reply(fd, "ERR short message (%ld bytes)\n", (long)n);
-        ls_load_buf_free(g_load_buf);
-        return;
+        return -1;
     }
 
     struct shield_msg *m = (struct shield_msg *)g_load_buf;
@@ -427,9 +483,84 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
      * thing standing between a bad field and a bad read. Check it against what
      * actually arrived. */
     size_t hdr = sizeof(struct shield_msg);
+    if (m->prog_len > LS_LOAD_MAX - hdr) {
+        reply(fd, "ERR payload exceeds loader ceiling\n");
+        return -1;
+    }
+    if (m->prog_len) {
+        ssize_t body = recv(fd, m->prog, m->prog_len, MSG_WAITALL);
+        if (body > 0) n += body;
+    }
     if (m->prog_len > (size_t)n - hdr) {
         reply(fd, "ERR prog_len %u exceeds received payload %lu\n",
               m->prog_len, (unsigned long)((size_t)n - hdr));
+        return -1;
+    }
+    return 0;
+}
+
+/* The same configuration handler is used by the socket harness and TMM. */
+static void
+ls_handle_config(int fd, const struct shield_msg *m)
+{
+        unsigned char extra;
+        /* New operations require exact framing and the client's write EOF. */
+        if (recv(fd, &extra, 1, 0) != 0) {
+            reply(fd, "ERR config trailing bytes or missing write EOF\n");
+            return;
+        }
+        /* Config is authorized by the local socket owner's UID, not by the
+         * code-signing key. Do not label unsigned policy bytes as signed. */
+        struct { pid_t pid; uid_t uid; gid_t gid; } peer;
+        socklen_t peer_len = sizeof peer;
+        if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &peer_len) != 0 ||
+            peer_len != sizeof peer || peer.uid != geteuid()) {
+            reply(fd, "ERR config peer must be loader owner\n");
+        } else if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) != LS_PREP_IDLE) {
+            reply(fd, "ERR config: prepare outstanding\n");
+        } else if (m->epoch >= LS_CONFIG_SLOTS || !g_ls_config.session ||
+                   !g_ls_config.slots[m->epoch].current.instance) {
+            reply(fd, "ERR config: no loaded instance or session unavailable\n");
+        } else if (m->op == SHIELD_OP_CONFIG_STATUS) {
+            struct ls_config_slot *cs = &g_ls_config.slots[m->epoch];
+            char sha[65];
+            for (unsigned i = 0; i < 32; i++)
+                snprintf(sha + i * 2, 3, "%02x", cs->program_sha256[i]);
+            if (m->prog_len) {
+                reply(fd, "ERR config-status takes no payload\n");
+            } else {
+                reply(fd, "OK config {\"abi\":1,\"session\":\"%016llx\","
+                          "\"instance\":\"%016llx\",\"revision\":%llu,"
+                          "\"schema\":%u,\"entries\":%u,\"program_sha256\":\"%s\"}\n",
+                      (unsigned long long)g_ls_config.session,
+                      (unsigned long long)cs->current.instance,
+                      (unsigned long long)cs->current.revision,
+                      cs->current.schema, cs->current.entries, sha);
+            }
+        } else {
+            const char *why = ls_config_publish(&g_ls_config, m->epoch, m->prog, m->prog_len);
+            if (why) reply(fd, "ERR %s\n", why);
+            else reply(fd, "OK config published slot=%u revision=%llu\n", m->epoch,
+                       (unsigned long long)g_ls_config.slots[m->epoch].current.revision);
+        }
+}
+
+/* Every exit is audited by handle(); copied header survives scratch release. */
+static void
+handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
+{
+    unsigned char *g_load_buf = ls_load_buf_alloc();
+    if (!g_load_buf) {
+        reply(fd, "ERR scratch mmap failed\n");
+        return;
+    }
+    if (ls_load_receive(fd, g_load_buf, seen, copy) != 0) {
+        ls_load_buf_free(g_load_buf);
+        return;
+    }
+    struct shield_msg *m = (struct shield_msg *)g_load_buf;
+    if (m->op == SHIELD_OP_CONFIG_STATUS || m->op == SHIELD_OP_CONFIG_PUBLISH) {
+        ls_handle_config(fd, m);
         ls_load_buf_free(g_load_buf);
         return;
     }
@@ -658,6 +789,12 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
         break;
     }
     case SHIELD_OP_SET_MODE:
+        if (m->mode != MODE_DISABLE &&
+            (m->epoch >= SHIELD_MAX_SHIELDS || !g_prep.targets[m->epoch].valid ||
+             m->mode > g_prep.targets[m->epoch].ceiling)) {
+            reply(fd, "ERR mode exceeds signed ceiling or slot has no signed target\n");
+            break;
+        }
         ls_vm_set_mode((int)m->epoch, (enum ls_mode)m->mode);
         reply(fd, "OK mode=%d\n", m->mode);
         break;
@@ -741,10 +878,21 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
     case 0x1003: {   /* ARM LIVE --- hook a real function while TMM is RUNNING */
         char a[65];
         memcpy(a, m->binding.hook, 64); a[64] = 0;
-        unsigned long long addr = strtoull(a, NULL, 0);
         int slot = (int)m->epoch;
-        if (addr == 0) {
-            reply(fd, "ERR arm: put the entry address in binding.hook (e.g. 0xcd4700)\n");
+        if (slot < 0 || (unsigned)slot >= SHIELD_MAX_SHIELDS || !g_prep.targets[slot].valid) {
+            reply(fd, "ERR arm: slot has no authenticated target; load a bound program\n");
+            break;
+        }
+        unsigned long long addr = g_prep.targets[slot].target.entry;
+        char *end = NULL;
+        unsigned long long requested = strtoull(a, &end, 0);
+        if (a[0] && strcmp(a, g_prep.targets[slot].hook) &&
+            (!end || *end || requested != addr)) {
+            reply(fd, "ERR arm: requested target differs from signed target\n");
+            break;
+        }
+        if (g_prep.targets[slot].attached) {
+            reply(fd, "ERR arm: slot is already attached\n");
             break;
         }
         /*
@@ -784,20 +932,35 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
          * is_exit selects the entry vs exit trampoline for this slot's program. */
         if (ls_arm_live((void *)(uintptr_t)addr, (void *)ls_trampoline_entry, slot, is_exit) != 0)
             reply(fd, "ERR arm 0x%llx failed (no pad, out of rel32 range, or swap refused)\n", addr);
-        else
+        else {
+            g_prep.targets[slot].attached = 1;
             reply(fd, "OK ARMED LIVE entry=0x%llx slot=%d kind=%s (no restart)\n",
-                  addr, slot, is_exit ? "fexit" : "fentry");
+                   addr, slot, is_exit ? "fexit" : "fentry");
+        }
         break;
     }
     case 0x1004: {   /* DISARM LIVE --- restore the nops, equally live */
         char a[65];
         memcpy(a, m->binding.hook, 64); a[64] = 0;
-        unsigned long long addr = strtoull(a, NULL, 0);
-        if (addr == 0) { reply(fd, "ERR disarm: bad address\n"); break; }
+        char *end = NULL;
+        unsigned long long requested = strtoull(a, &end, 0);
+        int found = -1;
+        for (unsigned i = 0; i < SHIELD_MAX_SHIELDS; i++) {
+            if (!g_prep.targets[i].attached) continue;
+            if ((!a[0] && m->epoch == i) || !strcmp(a, g_prep.targets[i].hook) ||
+                (a[0] && end && !*end && requested == g_prep.targets[i].target.entry)) {
+                found = (int)i;
+                break;
+            }
+        }
+        if (found < 0) { reply(fd, "ERR disarm: no matching attached target\n"); break; }
+        unsigned long long addr = g_prep.targets[found].target.entry;
         if (ls_disarm_live((void *)(uintptr_t)addr) != 0)
             reply(fd, "ERR disarm 0x%llx failed (not armed?)\n", addr);
-        else
+        else {
+            g_prep.targets[found].attached = 0;
             reply(fd, "OK DISARMED LIVE entry=0x%llx\n", addr);
+        }
         break;
     }
 
@@ -806,11 +969,23 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
          * the program's memory --- needs item 0c. Mode DISABLE stops it running;
          * it does not remove it. */
         ls_vm_set_mode((int)m->epoch, LS_MODE_DISABLE);
-        /* Release the revoked program's map shapes. Shapes are recorded per LOAD
-         * and LS_MAP_MAX is 4, so without this the fifth program loaded finds the
-         * table full and its maps silently do not exist --- indistinguishable from
-         * a program whose predicate never matches. */
-        ls_map_reset_shapes();
+        /* Do not race a late prepare after a loader timeout. Mode disable still
+         * runs; a pending handoff is already reported by CONFIG_* as busy. */
+        if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) == LS_PREP_IDLE)
+            (void)ls_config_revoke(&g_ls_config, m->epoch);
+        /* The registry is shared. Reclaim only when every slot is disabled;
+         * another loaded program must retain its map references and contents.
+         * The reset also refuses an in-flight VM call without waiting. */
+        if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) == LS_PREP_IDLE) {
+            int active = 0;
+            for (unsigned i = 0; i < SHIELD_MAX_SHIELDS; i++) {
+                struct ls_stats st;
+                if (ls_vm_stats((int)i, &st) && st.armed && st.mode != LS_MODE_DISABLE)
+                    active = 1;
+            }
+            if (!active)
+                (void)ls_map_reset_shapes();
+        }
         reply(fd, "OK disabled (not reclaimed --- see item 0c)\n");
         break;
 
@@ -936,6 +1111,15 @@ loader_thread(void *arg)
     /* Before the first accept, so the sink and the build ID are known for record 1 rather than
      * being filled in lazily by whichever request happens to arrive first. */
     ls_audit_init();
+
+    /* A fresh process/fork session makes captured controller requests stale.
+     * Failure leaves configuration unavailable; never invent a weak nonce. */
+    uint64_t session = 0;
+    if (getrandom(&session, sizeof session, GRND_NONBLOCK) != sizeof session || !session) {
+        session = 0;
+        fprintf(stderr, "ls_vm: configuration session unavailable (getrandom)\n");
+    }
+    g_ls_config.session = session;
 
     fprintf(stderr,
             "ls_vm: LOADER LISTENING on %s --- programs are signature-checked, the PEER is "

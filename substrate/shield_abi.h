@@ -51,6 +51,8 @@ enum shield_op {
     SHIELD_OP_SET_MODE = 2, /* promote/demote within the binding's mode_ceiling    */
     SHIELD_OP_STATUS   = 3, /* read back per-core fire counters (step 12)          */
     SHIELD_OP_REVOKE   = 4, /* disarm every core — the kill switch                 */
+    SHIELD_OP_CONFIG_STATUS = 5, /* local-owner configuration identity/revision     */
+    SHIELD_OP_CONFIG_PUBLISH = 6, /* ls_config.h v1 body; compare-and-publish        */
 };
 
 /* Operational modes. MODE_MONITOR is the canon spelling (trampoline_arm's third

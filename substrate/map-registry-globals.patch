@@ -1,0 +1,24 @@
+diff --git a/src/compile/default_whitelist_x86_64 b/src/compile/default_whitelist_x86_64
+--- a/src/compile/default_whitelist_x86_64
++++ b/src/compile/default_whitelist_x86_64
+@@ -131,7 +131,8 @@
+ g_ls_fexit_seq
+ g_ls_fexit_stack
+ g_ls_fexit_top
++g_ls_map_registry
+ g_ls_names
+ g_ls_nshapes
+ g_ls_shapes
+ g_origin
+diff --git a/src/compile/debug_whitelist_x86_64 b/src/compile/debug_whitelist_x86_64
+--- a/src/compile/debug_whitelist_x86_64
++++ b/src/compile/debug_whitelist_x86_64
+@@ -131,7 +131,8 @@
+ g_ls_fexit_seq
+ g_ls_fexit_stack
+ g_ls_fexit_top
++g_ls_map_registry
+ g_ls_names
+ g_ls_nshapes
+ g_ls_shapes
+ g_origin

@@ -1,0 +1,19 @@
+ls-tools: runtime identity matches, build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+ls-tools: authenticated per-program targets; no bulk catalogs in /usr/share/ls
+PASS metadata layer audit: 16 layers, 7504 regular files, 1318 ELF files; no named bulk catalogs or ELF BTF
+=== 1. what does /usr/bin/tmm actually resolve to?
+  tmm -> /usr/bin/tmm64.no_pgo
+  ok  tmm.debug present but NOT what tmm resolves to --- fine for arming
+=== 2. is the binary it resolves to actually padded?
+  checking /usr/bin/tmm64.no_pgo (what tmm resolves to)
+  pad signatures : 37,222
+  VM linked      : True
+  VERDICT        : READY
+=== 3. does the binary CONTAIN the change? ===
+  image  : tmm:CATALOGFREE-20260924
+  binary : /usr/bin/tmm64.no_pgo (what /usr/bin/tmm resolves to)
+  ok      ls_vm: LOAD REFUSED --- signed target/build/mode contract (1)
+  VERDICT : every token present --- safe to ship
+
+  Next: docker save tmm:CATALOGFREE-20260924 | ssh <datkube> 'cat > /tmp/tmm:CATALOGFREE-20260924.tar'
+        then  bnk-ship-image.sh deploy tmm:CATALOGFREE-20260924  on the datkube host.

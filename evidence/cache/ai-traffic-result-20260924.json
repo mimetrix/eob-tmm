@@ -1,0 +1,25 @@
+{
+  "backend_peer_ips": [
+    "22.22.22.150"
+  ],
+  "checks": "17 exchanges/worker; payload hashes, RPC IDs, session/task state, errors/retry, paced SSE",
+  "event": "PASS",
+  "requests": 51,
+  "rounds": 1,
+  "run_id": "ai-4f9fb0add705",
+  "streams": 6,
+  "witness": "fixture-checker",
+  "workers": 3,
+  "tmm_after": {
+    "pod": "f5-tmm-7597dfff8b-28s9z",
+    "uid": "42259fbc-3303-492a-95b1-9146b4105583",
+    "node": "vs-worker",
+    "containerID": "containerd://039aa0fc34f6f0e77542abfa1646858cc328ca9a9b2c6597977c477c03b0be63",
+    "imageID": "sha256:a713a9c7c9916b0010a2679674b5abb237bb0c59789cfd398f3773445e2649d1",
+    "restartCount": 0
+  },
+  "runtime": {
+    "build_id": "c3b81927dfdcc31137cd8212b5e23bb85677a06c",
+    "sha256": "a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7"
+  }
+}

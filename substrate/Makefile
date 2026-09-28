@@ -12,6 +12,11 @@ CLANG  ?= clang-18
 PREVAIL ?= ../ebpf-verifier/bin/prevail
 
 .PHONY: check-ctx-verifier
+.PHONY: check-target
+.PHONY: check-embedded
+.PHONY: check-config
+.PHONY: check-template
+
 
 .PHONY: check check-header check-schema check-offsets check-budget check-gates \
         check-geometry check-shields check-stack check-vm check-tramp check-fexit check-arm check-swap \
@@ -59,6 +64,22 @@ check: check-prereqs check-header check-schema check-offsets check-budget check-
 
 # The header must compile standalone, be include-guard clean, and its
 # _Static_asserts on struct shield_msg's layout must hold.
+check-target:
+	@$(PYTHON) check_target.py
+	@$(PYTHON) check_image_metadata.py
+
+check-embedded:
+	@CLANG=$(CLANG) PREVAIL=$(PREVAIL) $(PYTHON) check_embedded.py
+
+# Requires the pinned build-box toolchain; no silent verifier/JIT skips.
+check-config:
+	@CLANG=$(CLANG) PREVAIL=$(PREVAIL) $(PYTHON) check_config.py
+
+# Keep outputs in a new directory; the driver refuses to overwrite a run.
+check-template:
+	@test -n "$(TEMPLATE_OUT)" || { echo "Set TEMPLATE_OUT to a new output directory"; exit 1; }
+	@CLANG=$(CLANG) PREVAIL=$(PREVAIL) $(PYTHON) check_template.py --output "$(TEMPLATE_OUT)"
+
 check-header:
 	@$(CC) -fsyntax-only -x c shield_abi.h && echo "ok    shield_abi.h  (syntax)"
 	@printf '#include "shield_abi.h"\n#include "shield_abi.h"\nint main(void){return (int)sizeof(struct shield_msg);}\n' > .guard.c
@@ -513,10 +534,10 @@ check-sig:
 	  openssl genpkey -algorithm ed25519 -out $$T/sk.pem 2>/dev/null; \
 	  openssl genpkey -algorithm ed25519 -out $$T/other.pem 2>/dev/null; \
 	  openssl pkey -in $$T/sk.pem -pubout -out $$T/pk.pem 2>/dev/null; \
-	  clang -O2 -g -target bpf -I. -c shields/rst_watch.bpf.c -o $$T/prog.o 2>/dev/null \
-	    || cp shields/rst_watch.bpf.c $$T/prog.o; \
-	  clang -O2 -g -target bpf -I. -c shields/demo_pass.bpf.c -o $$T/other.o 2>/dev/null \
-	    || cp shields/demo_pass.bpf.c $$T/other.o; \
+	  $(CLANG) -O2 -target bpf -DKIND='"fentry/rst_why"' -DFIRST=5 \
+	    -c check_ctx_live.bpf.c -o $$T/prog.o; \
+	  $(CLANG) -O2 -target bpf -DKIND='"fentry/rst_why"' -DFIRST=6 \
+	    -c check_ctx_live.bpf.c -o $$T/other.o; \
 	  python3 sign_shield.py --key $$T/sk.pem --prog $$T/prog.o --hook rst_why \
 	      -o $$T/signed.bin >/dev/null; \
 	  python3 sign_shield.py --key $$T/other.pem --prog $$T/prog.o --hook rst_why \

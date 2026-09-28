@@ -1,0 +1,408 @@
+{
+  "passed": true,
+  "action": "archive-cleanup",
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "6fde0589b185\n2898afd85da2\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "6fde0589b185",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"6fde0589b185312e311f0f651dc260d06caab34d5892d41b20f2aeff7abcaac1\",\"name\":\"/eob-template-20260925-tmm-1\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"status\":\"running\",\"started\":\"2026-09-28T15:42:24.720733994Z\",\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "2898afd85da2",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"2898afd85da24b29391a16e1db7d1a9b202b19afa2f95bcaa803d84c2281b068\",\"name\":\"/eob-template-20260925-fixture-1\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"status\":\"running\",\"started\":\"2026-09-28T15:42:21.945902728Z\",\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"status\":\"running\",\"started\":\"2026-08-21T18:14:16.71521944Z\",\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-tmm-1",
+        "python3",
+        "-u",
+        "-c",
+        "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+        "0xd99c00"
+      ],
+      "rc": 0,
+      "stdout": "{\"pid\": \"7\", \"sha256\": \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 929903 4189 0 0 916 2313 1 5 20 0 2 0 327518808 3831881728 935470 18446744073709551615 4235264 34633613 140735258198208 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 91418624 140735258200953 140735258201047 140735258201047 140735258202091 0\\n\", \"entry\": 14261248, \"bytes\": \"f30f1efa9090909090415766480f6ecf\"}\n{\"final\": true, \"bytes\": \"f30f1efa9090909090415766480f6ecf\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 929903 4189 0 0 916 2313 1 5 20 0 2 0 327518808 3831881728 935470 18446744073709551615 4235264 34633613 140735258198208 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 91418624 140735258200953 140735258201047 140735258201047 140735258202091 0\\n\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "0"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "1"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "2"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "3"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "4"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "5"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "6"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "7"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=8 safe_returns=0 errors=0 cycles=2534982 cycles_max=2431628 cycles_min=10852\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "8"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "9"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "10"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "11"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "-c",
+        "import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob(\"*\") if p.is_file()}))"
+      ],
+      "rc": 0,
+      "stdout": "{\"method-live-01/exit-status\": \"9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa\", \"method-live-01/method-config.json\": \"cdd1596f6a88df8eea6be47e8e2ac9d7b3c46a043ab347655387b1e3a798f2db\", \"method-live-01/tao.xml\": \"51b00f529e29fce6db708e150628ea0b503a16142ad748777905838064022095\", \"method-live-01/result.json\": \"1d27ab3d31d17487aad11dca5b8111c6337b3ebca8edcd811f8267906583f690\", \"method-live-01/tao.log\": \"914756a05f95811b178ca5b632844e6357ed3114731598340b53d7954d64528f\", \"method-live-01/checked-exit-status\": \"9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--env-file",
+        "template-fixture.env",
+        "--project-name",
+        "eob-template-20260925",
+        "-f",
+        "icap-compose.yaml",
+        "-f",
+        "config-compose.yaml",
+        "-f",
+        "observability-compose.yaml",
+        "down",
+        "--volumes",
+        "--remove-orphans"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": " Container eob-template-20260925-tmm-1 Stopping \n Container eob-template-20260925-tmm-1 Stopped \n Container eob-template-20260925-tmm-1 Removing \n Container eob-template-20260925-tmm-1 Removed \n Container eob-template-20260925-fixture-1 Stopping \n Container eob-template-20260925-fixture-1 Stopped \n Container eob-template-20260925-fixture-1 Removing \n Container eob-template-20260925-fixture-1 Removed \n Volume eob-template-20260925_ls-sockets Removing \n Volume eob-template-20260925_nats-certs Removing \n Volume eob-template-20260925_ls-stream Removing \n Network eob-template-20260925_management Removing \n Volume eob-template-20260925_evidence Removing \n Network eob-template-20260925_data Removing \n Volume eob-template-20260925_nats-certs Removed \n Volume eob-template-20260925_ls-stream Removed \n Volume eob-template-20260925_ls-sockets Removed \n Volume eob-template-20260925_evidence Removed \n Network eob-template-20260925_data Removed \n Network eob-template-20260925_management Removed \n"
+    },
+    {
+      "argv": [
+        "docker",
+        "container",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"status\":\"running\",\"started\":\"2026-08-21T18:14:16.71521944Z\",\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": {
+    "lifetime_fixture.py": {
+      "sha256": "be7819cb35fc5cecd80c2e5818fe1b69eacab98cd243de8c121b2fd5d889d59b",
+      "text": "#!/usr/bin/env python3\n\"\"\"Create or archive/remove only the isolated parser-lifetime Compose fixture.\"\"\"\nimport argparse\nimport hashlib\nimport io\nimport json\nfrom pathlib import Path\nimport subprocess\nimport tarfile\nimport time\n\nfrom config_live_run import WITNESS\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\nPROJECT = \"eob-template-20260925\"\nCOMPOSE = (\"docker\", \"compose\", \"--env-file\", \"template-fixture.env\", \"--project-name\",\n           PROJECT, \"-f\", \"icap-compose.yaml\", \"-f\", \"config-compose.yaml\",\n           \"-f\", \"observability-compose.yaml\")\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"action\", choices=(\"create\", \"archive-cleanup\"))\n    parser.add_argument(\"--output\", type=Path, required=True)\n    parser.add_argument(\"--archive\", type=Path)\n    parser.add_argument(\"--live\", type=Path)\n    args = parser.parse_args()\n    record = {\"passed\": False, \"action\": args.action, \"commands\": [], \"sources\": {}}\n\n    def run(*argv, check=True):\n        result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=240, check=False)\n        record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                   \"stdout\": result.stdout, \"stderr\": result.stderr})\n        if check:\n            result.check_returncode()\n        return result.stdout\n\n    def inventory():\n        rows = []\n        for identity in run(\"docker\", \"ps\", \"-aq\").split():\n            rows.append(json.loads(run(\"docker\", \"inspect\", identity, \"--format\",\n                '{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},'\n                '\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},'\n                '\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}')))\n        return rows\n\n    with args.output.open(\"x\") as receipt:\n        try:\n            for name in (\"lifetime_fixture.py\", \"icap-compose.yaml\", \"config-compose.yaml\",\n                         \"observability-compose.yaml\", \"template-fixture.env\"):\n                path = ROOT / name\n                record[\"sources\"][name] = {\"sha256\": hashlib.sha256(path.read_bytes()).hexdigest(),\n                                           \"text\": path.read_text()}\n            record[\"before\"] = inventory()\n            owned = [row for row in record[\"before\"] if row[\"project\"] == PROJECT]\n            if args.action == \"create\":\n                assert not owned, owned\n                run(*COMPOSE, \"up\", \"-d\", \"--wait\", \"--wait-timeout\", \"180\")\n                image = run(\"docker\", \"inspect\", PROJECT + \"-tmm-1\", \"--format\", \"{{.Image}}\")\n                assert image.strip() == \"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\"\n                for _ in range(60):\n                    status = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                                 \"/work/ls-load.py\", \"status\", \"5\", check=False)\n                    if status.startswith(\"OK \"):\n                        break\n                    time.sleep(2)\n                else:\n                    raise RuntimeError(\"isolated loader did not become ready\")\n            else:\n                assert len(owned) == 2 and args.archive is not None and args.live is not None\n                assert not args.archive.exists()\n                live = json.loads(args.live.read_text())\n                assert live[\"passed\"]\n                assert next(r[\"id\"] for r in owned if r[\"name\"].endswith(\"-tmm-1\")) == json.loads(live[\"before\"].split()[0])\n                record[\"live_sha256\"] = hashlib.sha256(args.live.read_bytes()).hexdigest()\n                record[\"witness_script\"] = WITNESS\n                for label, program in live[\"program_build\"][\"programs\"].items():\n                    rows = [json.loads(line) for line in run(\n                        \"docker\", \"exec\", PROJECT + \"-tmm-1\", \"python3\", \"-u\", \"-c\",\n                        WITNESS, program[\"entry\"]).splitlines()]\n                    expected = live[\"witnesses\"][label][\"initial\"]\n                    assert rows[0][\"sha256\"] == expected[\"sha256\"]\n                    assert rows[0][\"bytes\"] == rows[-1][\"bytes\"] == expected[\"bytes\"]\n                    assert rows[0][\"stat\"].split()[21] == expected[\"stat\"].split()[21]\n                for slot in range(12):\n                    text = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                               \"/work/ls-load.py\", \"status\", str(slot))\n                    assert text.startswith(\"OK \") and (\"mode=0\" in text or \"armed=0\" in text), text\n                record[\"manifest\"] = json.loads(run(\n                    \"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\", \"-c\",\n                    'import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); '\n                    'print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() '\n                    'for p in root.rglob(\"*\") if p.is_file()}))'))\n                archive = subprocess.run([\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"tar\", \"czf\", \"-\",\n                                          \"-C\", \"/evidence\", \".\"], capture_output=True, timeout=60, check=True)\n                members = {}\n                with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode=\"r:gz\") as stream:\n                    for member in stream.getmembers():\n                        if member.isfile():\n                            name = member.name.removeprefix(\"./\")\n                            assert not name.endswith((\".pem\", \".key\", \".p12\"))\n                            assert name not in members\n                            data = stream.extractfile(member).read()\n                            assert b\"PRIVATE KEY-----\" not in data and b\"BEGIN CERTIFICATE\" not in data\n                            members[name] = hashlib.sha256(data).hexdigest()\n                        else:\n                            assert member.isdir(), member.name\n                assert members == record[\"manifest\"] and members\n                with args.archive.open(\"xb\") as output:\n                    output.write(archive.stdout)\n                record[\"archive\"] = {\"path\": str(args.archive), \"files\": len(members),\n                                     \"sha256\": hashlib.sha256(archive.stdout).hexdigest()}\n                run(*COMPOSE, \"down\", \"--volumes\", \"--remove-orphans\")\n                for kind in (\"container\", \"network\", \"volume\"):\n                    assert not run(\"docker\", kind, \"ls\", \"-q\", \"--filter\",\n                                   \"label=com.docker.compose.project=\" + PROJECT).strip()\n            record[\"after\"] = inventory()\n            assert [r for r in record[\"before\"] if r[\"project\"] != PROJECT] == [\n                r for r in record[\"after\"] if r[\"project\"] != PROJECT]\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(record, receipt, indent=2)\n    print(json.dumps({\"passed\": record[\"passed\"], \"output\": str(args.output)}))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "icap-compose.yaml": {
+      "sha256": "dd58596bbd75f0138ad557d773cf1a0867995f854b03153773e825cb23bc0154",
+      "text": "# Isolated build-box fixture. Explicit project name prevents overlap with other tests.\n# The TMM image is reused; this file does not change or rebuild TMM source.\nname: eob-dlp-20260924\n\nservices:\n  fixture:\n    image: artifactory.f5net.com/f5-tmm-docker/f5-tmm-test-image/tao@sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\n    entrypoint: [/bin/bash, /work/icap-bootstrap.sh]\n    environment:\n      DEPLOYMENT: development\n      MODULAR_BIP_URL: https://artifactory.f5net.com/artifactory/f5-apis-npm/@f5-apis/mbip-apis-pb/-/@f5-apis/mbip-apis-pb-303.43.0.tgz\n      WITH_GRPC: \"false\"\n      CONF_TRANSPORT: nats-tls\n      NATS_CERTS_PATH: /package/nats_certs\n      ICB_ASYNCAPI_PROTO_VERSION: v2\n      PYTHONUNBUFFERED: \"1\"\n      # NATS is asynchronous; its send call has no synchronous DPC return value.\n      CONFIG_SERVER_DPC_RAISE_ON_ERROR: \"false\"\n      ICAP_VIP: ${ICAP_VIP:-10.203.72.50}\n      ICAP_BACKEND: ${ICAP_BACKEND:-10.203.72.11}\n    volumes:\n      - nats-certs:/package/nats_certs/tmm\n      - .:/work:ro\n      - evidence:/evidence\n    networks:\n      management:\n        ipv4_address: ${FIXTURE_MANAGEMENT_IP:-10.203.71.11}\n        priority: 100\n      data:\n        ipv4_address: ${FIXTURE_DATA_IP:-10.203.72.11}\n        priority: 50\n    cap_add: [NET_ADMIN]\n    healthcheck:\n      test: [CMD-SHELL, \"test -f /package/nats_certs/tmm/ca.pem && test -f /package/proto/package/py/profile_responseadapt_pb2.py\"]\n      interval: 2s\n      timeout: 2s\n      retries: 90\n\n  tmm:\n    image: tmm:CATALOGFREE-20260924\n    pull_policy: never\n    entrypoint: [/opt/bin/init.tmm.sh]\n    privileged: true\n    init: true\n    mem_limit: 4g\n    depends_on:\n      fixture:\n        condition: service_healthy\n    environment:\n      CONF_TRANSPORT: nats-tls\n      PAL_CPU_SET: 0-0\n      TMM_MAPRES_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_MAPRES_NO_IPV6_RULES: \"yes\"\n      TMM_ENFORCE_LICENSING: \"false\"\n      ENABLE_TMROUTED_PROXY: \"false\"\n      SESSIONDB_EXTERNAL_STORAGE: \"FALSE\"\n      MSG_BUS_ADDR: fixture\n      MSG_BUS_PORT: \"4222\"\n      MSG_BUS_USER: tmm\n      MSG_BUS_PASS: insecure_password_tmm\n      CONFIG_SUBJECT: internal-config\n      PUBLISH_SUBJECT: dataplane-client\n      PROCESS_NAME: TMM\n      TMM_QUERY_INTERVAL_SECS: \"120\"\n      NATS_TLS_AUTH_CERT: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm.pem\n      NATS_TLS_AUTH_KEY: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm-key.pem\n      NATS_TLS_CA_FILE: /opt/f5/mbip/fsm/certificates/ca.pem\n      LS_SHIELD_BUILTIN: \"0\"\n      LS_VM_SELFTEST: \"0\"\n      LS_SHIELD_MODE: monitor\n      LS_VM_JIT: \"1\"\n      LS_VM_TIMING: \"1\"\n      LS_VM_SAMPLES: \"true\"\n      LS_VM_VERBOSE: \"1\"\n      LS_TP_RING: /dev/shm/ls_tp_ring\n      LS_LOAD_SOCKET: /tmp/ls_load.sock\n    volumes:\n      - nats-certs:/opt/f5/mbip/fsm/certificates:ro\n    networks:\n      management:\n        ipv4_address: ${TMM_MANAGEMENT_IP:-10.203.71.10}\n        priority: 100\n      data:\n        ipv4_address: ${TMM_DATA_IP:-10.203.72.10}\n        priority: 50\n\nnetworks:\n  management:\n    ipam:\n      config:\n        - subnet: ${MANAGEMENT_SUBNET:-10.203.71.0/24}\n  data:\n    ipam:\n      config:\n        - subnet: ${DATA_SUBNET:-10.203.72.0/24}\n\nvolumes:\n  nats-certs:\n  evidence:\n"
+    },
+    "config-compose.yaml": {
+      "sha256": "58424834e6aafbd8caf9621297630202d7ab37a5ccfc477e72dfabab59cb73ff",
+      "text": "# Layer over icap-compose.yaml with --env-file config-fixture.env and\n# --project-name eob-config-20260925. Separate networks, volumes and image.\nservices:\n  fixture:\n    environment:\n      LS_LOAD_SOCKET: /run/ls/ls_load.sock\n    volumes:\n      - ls-sockets:/run/ls\n      - ls-stream:/run/ls-stream\n  tmm:\n    image: tmm:CONFIG-20260925\n    environment:\n      LS_LOAD_SOCKET: /run/ls/ls_load.sock\n      LS_TP_RING: /run/ls-stream/ls_tp_ring\n    volumes:\n      - ls-sockets:/run/ls\n      - ls-stream:/run/ls-stream\nvolumes:\n  ls-sockets:\n  ls-stream:\n"
+    },
+    "observability-compose.yaml": {
+      "sha256": "efe8f2051a8c373835843f1419f5b5a9166e4e1e1b791ed21a4270caab63f318",
+      "text": "# Repaired test image for the isolated tutorial fixture only.\nservices:\n  tmm:\n    image: tmm:OBSERVABILITY-20260925\n"
+    },
+    "template-fixture.env": {
+      "sha256": "c120678ecbb91954515d142d71cc86cf7aa8daa47b82068b74c5f557f57cd0f1",
+      "text": "MANAGEMENT_SUBNET=10.203.75.0/24\nDATA_SUBNET=10.203.76.0/24\nFIXTURE_MANAGEMENT_IP=10.203.75.11\nFIXTURE_DATA_IP=10.203.76.11\nTMM_MANAGEMENT_IP=10.203.75.10\nTMM_DATA_IP=10.203.76.10\nICAP_VIP=10.203.76.50\nICAP_BACKEND=10.203.76.11\n"
+    }
+  },
+  "before": [
+    {
+      "id": "6fde0589b185312e311f0f651dc260d06caab34d5892d41b20f2aeff7abcaac1",
+      "name": "/eob-template-20260925-tmm-1",
+      "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+      "status": "running",
+      "started": "2026-09-28T15:42:24.720733994Z",
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "2898afd85da24b29391a16e1db7d1a9b202b19afa2f95bcaa803d84c2281b068",
+      "name": "/eob-template-20260925-fixture-1",
+      "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+      "status": "running",
+      "started": "2026-09-28T15:42:21.945902728Z",
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "status": "running",
+      "started": "2026-08-21T18:14:16.71521944Z",
+      "restarts": 0,
+      "project": null
+    }
+  ],
+  "live_sha256": "99a55f596c65f6450ba58881db0fea67accc9de5ddf35605746445b9253d8c9f",
+  "witness_script": "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+  "manifest": {
+    "method-live-01/exit-status": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "method-live-01/method-config.json": "cdd1596f6a88df8eea6be47e8e2ac9d7b3c46a043ab347655387b1e3a798f2db",
+    "method-live-01/tao.xml": "51b00f529e29fce6db708e150628ea0b503a16142ad748777905838064022095",
+    "method-live-01/result.json": "1d27ab3d31d17487aad11dca5b8111c6337b3ebca8edcd811f8267906583f690",
+    "method-live-01/tao.log": "914756a05f95811b178ca5b632844e6357ed3114731598340b53d7954d64528f",
+    "method-live-01/checked-exit-status": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  "archive": {
+    "path": "/home/starin/eob-config-20260925/method-evidence-01.tar.gz",
+    "files": 6,
+    "sha256": "faab547e916cee6df0008beaaa4138d7518b836bf7f3c155c5a8fed8473bad1b"
+  },
+  "after": [
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "status": "running",
+      "started": "2026-08-21T18:14:16.71521944Z",
+      "restarts": 0,
+      "project": null
+    }
+  ]
+}

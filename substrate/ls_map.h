@@ -118,6 +118,7 @@ struct ls_map {
 struct ls_map_set {
     struct ls_map m[LS_MAP_MAX];
     uint32_t      n;
+    uint64_t      generation;
 };
 
 /* FNV-1a over the key bytes. Not cryptographic and does not need to be: the
@@ -195,7 +196,10 @@ ls_map_get(struct ls_map_set *s, uint64_t idx)
 {
     if (s == 0)
         return 0;           /* helper ran on a thread with no maps --- fail safe */
-    if (idx >= (uint64_t)s->n)
+    if ((idx >> 8) != s->generation)
+        return 0;           /* reference from a retired registry generation */
+    idx &= 255u;
+    if (idx >= LS_MAP_MAX || idx >= (uint64_t)s->n)
         return 0;
     return s->m[idx].in_use ? &s->m[idx] : 0;
 }
@@ -205,19 +209,24 @@ ls_map_get(struct ls_map_set *s, uint64_t idx)
 static inline int
 ls_map_slot(struct ls_map *m, const uint8_t *key, int for_insert)
 {
-    uint32_t h = ls_map_hash(key, m->key_sz), i, s;
+    uint32_t h = ls_map_hash(key, m->key_sz) % m->entries, i, s;
+    int empty = -1;
     for (i = 0; i < m->entries; i++) {
-        s = (h + i) & (LS_MAP_ENTRIES - 1u);
-        if (s >= m->entries)
+        s = (h + i) % m->entries;
+        if (!m->used[s]) {
+            if (empty < 0) empty = (int)s;
             continue;
-        if (!m->used[s])
-            return for_insert ? (int)s : -1;
+        }
         if (memcmp(&m->keys[s * LS_MAP_KEY_MAX], key, m->key_sz) == 0)
             return (int)s;
     }
+    /* Deletion leaves holes. Search the whole bounded table before inserting,
+     * or an existing colliding key beyond a hole can be duplicated or missed. */
+    if (for_insert && empty >= 0)
+        return empty;
     /* Full: evict at the hash position rather than failing. Counted by the
      * caller --- a silent eviction is indistinguishable from a miss. */
-    return for_insert ? (int)(h & (LS_MAP_ENTRIES - 1u)) % (int)m->entries : -1;
+    return for_insert ? (int)h : -1;
 }
 
 static inline void *

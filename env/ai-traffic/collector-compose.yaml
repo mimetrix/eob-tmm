@@ -1,0 +1,30 @@
+# Layer over the isolated template fixture. Source binding is controller-owned.
+services:
+  fixture:
+    volumes:
+      - collector-api:/collector-api:ro
+  collector:
+    image: ${COLLECTOR_IMAGE:?provide the checked image ID}
+    pull_policy: never
+    pid: service:tmm
+    network_mode: none
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [SYS_PTRACE]
+    security_opt: [no-new-privileges:true, "apparmor=unconfined"]
+    cpus: 0.5
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 32
+    tmpfs: ["/tmp:size=8m,noexec,nosuid,nodev"]
+    restart: "no"
+    stop_grace_period: 15s
+    volumes:
+      - ls-stream:/run/ls-stream
+      - collector-journal:/journal
+      - collector-api:/api
+      - ${COLLECTOR_SOURCE_DIR:?provide the source binding directory}:/source:ro
+volumes:
+  collector-journal:
+  collector-api:

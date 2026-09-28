@@ -48,7 +48,8 @@
  *
  * So relocation records only the SHAPE in a process-global table, and each thread
  * allocates its own STORAGE from those shapes the first time a helper runs on it.
- * Threads never share a table, so there is still no locking on the hot path.
+ * Threads never share a table. VM calls use an atomic reader count to prevent
+ * registry reset during execution; they do not wait for a reset.
  */
 /* ONE TU DEFINES THESE, EVERY OTHER TU SEES EXTERNS. They were `static`, which
  * in a header means each including TU gets its OWN copy --- the shapes written by
@@ -82,6 +83,44 @@
  * uBPF already hands us symbol_name; the old code took it only to print it.
  */
 #define LS_MAP_NAME_MAX 32u
+
+/* Registry reset is off the data path and never waits for a reader. References
+ * carry a generation, so a retained VM cannot alias a replacement's maps. */
+struct ls_map_registry {
+    _Atomic uint64_t generation;
+    _Atomic uint32_t readers, resetting;
+};
+#ifdef LS_MAP_GLUE_IMPL
+struct ls_map_registry g_ls_map_registry;
+#else
+extern struct ls_map_registry g_ls_map_registry;
+#endif
+
+static inline int
+ls_map_enter(void)
+{
+    atomic_fetch_add(&g_ls_map_registry.readers, 1);
+    if (atomic_load(&g_ls_map_registry.resetting)) {
+        atomic_fetch_sub(&g_ls_map_registry.readers, 1);
+        return -1;
+    }
+    return 0;
+}
+
+static inline void
+ls_map_leave(void)
+{
+    atomic_fetch_sub(&g_ls_map_registry.readers, 1);
+}
+
+#include "ls_config.h"
+#ifdef LS_MAP_GLUE_IMPL
+struct ls_config_store g_ls_config;
+__thread struct ls_config_view g_ls_config_view;
+#else
+extern struct ls_config_store g_ls_config;
+extern __thread struct ls_config_view g_ls_config_view;
+#endif
 
 #ifdef LS_MAP_GLUE_IMPL
 struct ls_map_def  g_ls_shapes[LS_MAP_MAX];
@@ -119,11 +158,12 @@ extern __thread int                g_ls_cur_slot;
 #endif
 
 /* Lazily bring this thread's storage up to the recorded shapes. Idempotent, and
- * cheap after the first call: a pointer test. */
+ * checks the registry generation on each call. */
 static inline struct ls_map_set *
 ls_map_current(void)
 {
     uint32_t n, i;
+    uint64_t generation = atomic_load(&g_ls_map_registry.generation);
     void *p;
 
     if (g_ls_maps_failed)
@@ -142,6 +182,10 @@ ls_map_current(void)
      * worked at idx 1 after map_selftest had claimed idx 0. "Works on the first
      * program loaded, never on the second" is a bad failure to leave in place. */
     if (g_ls_maps != 0) {
+        if (g_ls_maps->generation != generation) {
+            memset(g_ls_maps, 0, sizeof *g_ls_maps);
+            g_ls_maps->generation = generation;
+        }
         n = atomic_load_explicit(&g_ls_nshapes, memory_order_acquire);
         for (i = g_ls_maps->n; i < n; i++) {
             if (ls_map_create(g_ls_maps, &g_ls_shapes[i]) < 0)
@@ -167,6 +211,7 @@ ls_map_current(void)
         return 0;
     }
     memset(p, 0, sizeof(struct ls_map_set));
+    ((struct ls_map_set *)p)->generation = generation;
 
     for (i = 0; i < n; i++) {
         if (ls_map_create((struct ls_map_set *)p, &g_ls_shapes[i]) < 0) {
@@ -203,11 +248,10 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
     struct ls_map_def d;
     int idx;
 
-    (void)ctx;
     if (data == 0)
-        return (uint64_t)LS_MAP_MAX + 1u;
-    if (symbol_offset + sizeof d > data_size || symbol_size < sizeof d)
-        return (uint64_t)LS_MAP_MAX + 1u;   /* truncated descriptor --- refuse */
+        goto refused;
+    if (symbol_offset > data_size || sizeof d > data_size - symbol_offset || symbol_size < sizeof d)
+        goto refused;   /* truncated descriptor */
 
     memcpy(&d, data + symbol_offset, sizeof d);
 
@@ -215,9 +259,24 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
      * storage is shared or private. Refuse rather than guess: a wrong guess in
      * either direction is silent. */
     if (symbol_name == 0 || symbol_name[0] == '\0')
-        return (uint64_t)LS_MAP_MAX + 1u;
+        goto refused;
     if (strnlen(symbol_name, LS_MAP_NAME_MAX) >= LS_MAP_NAME_MAX)
-        return (uint64_t)LS_MAP_MAX + 1u;   /* would not round-trip --- refuse */
+        goto refused;   /* would not round-trip */
+
+    /* ARRAY is currently the dedicated configuration view only. Its reference
+     * identifies this loaded instance, not a name in the mutable hash registry.
+     * A stale VM cannot use its reference to read its replacement's policy. */
+    if (d.type == 2u || strcmp(symbol_name, LS_CONFIG_MAP_NAME) == 0) {
+        uint64_t handle = (uint64_t)(uintptr_t)ctx;
+        if (strcmp(symbol_name, LS_CONFIG_MAP_NAME) || d.type != 2u ||
+            d.key_size != 4u || d.value_size != LS_CONFIG_VALUE_SIZE ||
+            d.max_entries != LS_CONFIG_ROWS + 1u || d.map_flags != LS_CONFIG_MAP_FLAG ||
+            !(handle & LS_CONFIG_HANDLE_BIT)) {
+            g_ls_config.load_error = 1;
+            goto refused;
+        }
+        return handle;
+    }
 
     /* Already recorded under this NAME? clang emits one relocation per REFERENCE,
      * so the same map arrives several times --- three, in the experiment program.
@@ -231,10 +290,12 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
         for (i = 0; i < have; i++) {
             if (strncmp(g_ls_names[i], symbol_name, LS_MAP_NAME_MAX) != 0)
                 continue;
-            if (g_ls_shapes[i].key_size   == d.key_size &&
+            if (g_ls_shapes[i].type       == d.type &&
+                g_ls_shapes[i].map_flags  == d.map_flags &&
+                g_ls_shapes[i].key_size   == d.key_size &&
                 g_ls_shapes[i].value_size == d.value_size &&
                 g_ls_shapes[i].max_entries == d.max_entries)
-                return (uint64_t)i;         /* deliberate share */
+                return (atomic_load(&g_ls_map_registry.generation) << 8) | i;
             fprintf(stderr, "ls_map: REFUSED %s --- shape disagrees with the "
                             "map already registered under that name "
                             "(have key=%u val=%u max=%u, asked key=%u val=%u max=%u)\n",
@@ -242,7 +303,7 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
                     g_ls_shapes[i].key_size, g_ls_shapes[i].value_size,
                     g_ls_shapes[i].max_entries,
                     d.key_size, d.value_size, d.max_entries);
-            return (uint64_t)LS_MAP_MAX + 1u;
+            goto refused;
         }
     }
 
@@ -251,8 +312,10 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
      * cannot honour fails at load time where somebody is watching. */
     {
         uint32_t have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
-        if (!ls_map_check_descriptor(&d) || have >= LS_MAP_MAX)
-            return (uint64_t)LS_MAP_MAX + 1u;
+        if (!ls_map_check_descriptor(&d) || have >= LS_MAP_MAX) {
+            g_ls_config.load_error = 1;
+            goto refused;
+        }
         idx = (int)have;
         g_ls_shapes[have] = d;
         /* Fill the shape AND THE NAME before publishing the count: a reader that
@@ -266,14 +329,18 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
     fprintf(stderr, "ls_map: reloc %s -> idx %d (key=%u val=%u max=%u)\n",
             symbol_name ? symbol_name : "?", idx,
             d.key_size, d.value_size, d.max_entries);
-    return (uint64_t)idx;
+    return (atomic_load(&g_ls_map_registry.generation) << 8) | (uint64_t)idx;
+refused:
+    g_ls_config.load_error = 1;
+    return (uint64_t)LS_MAP_MAX + 1u;
 }
 
 /* uBPF permits only the ctx and the stack. This extends it to map values --- and
  * note the JIT does not bounds-check at all, so without this the interpreter and
  * the JIT disagree: the program works in production and fails in test. */
 /*
- * Release every recorded shape. Called when a slot is revoked.
+ * Release every recorded shape only when all slots are disabled and the
+ * prepare path is idle. The loader checks those conditions before calling.
  *
  * Without this, shapes accumulate for the process lifetime: each load records
  * its own and LS_MAP_MAX is 4, so the fifth program loaded finds the table full
@@ -282,14 +349,24 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
  * the thread rebuilds from the new shapes on its next call. Bounded: it is one
  * mapping per thread, not per load.
  */
-static inline void
+static inline int
 ls_map_reset_shapes(void)
 {
+    if (atomic_exchange(&g_ls_map_registry.resetting, 1))
+        return -1;
+    uint64_t generation = atomic_load(&g_ls_map_registry.generation);
+    if (atomic_load(&g_ls_map_registry.readers) || generation == ((1ull << 55) - 1)) {
+        atomic_store(&g_ls_map_registry.resetting, 0);
+        return -1; /* in-flight calls finish; generation exhaustion never wraps */
+    }
     /* Clear the NAMES as well. They are identity now, so a name left behind at an
      * index the next load reuses would match a map it has nothing to do with ---
      * reintroducing exactly the cross-program aliasing the name key removes. */
     memset(g_ls_names, 0, sizeof g_ls_names);
     atomic_store_explicit(&g_ls_nshapes, 0, memory_order_release);
+    atomic_store(&g_ls_map_registry.generation, generation + 1);
+    atomic_store(&g_ls_map_registry.resetting, 0);
+    return 0;
 }
 
 /* This runs on the thread doing the access, so ls_map_current() gives that
@@ -298,8 +375,10 @@ ls_map_reset_shapes(void)
 static inline bool
 ls_map_bounds(void *ctx, uint64_t addr, uint64_t size)
 {
-    struct ls_map_set *s = ls_map_current();
     (void)ctx;
+    if (ls_config_addr_ok(&g_ls_config_view, addr, size))
+        return true;
+    struct ls_map_set *s = ls_map_current();
     return s != 0 && ls_map_addr_ok(s, addr, size) != 0;
 }
 
@@ -321,6 +400,13 @@ ls_map_bounds(void *ctx, uint64_t addr, uint64_t size)
 static inline uint64_t
 ls_h_map_lookup(uint64_t map, uint64_t key, uint64_t a, uint64_t b, uint64_t c)
 {
+    if (map & LS_CONFIG_HANDLE_BIT) {
+        uint32_t index;
+        if (!key) return 0;
+        memcpy(&index, (const void *)(uintptr_t)key, sizeof index);
+        return (uint64_t)(uintptr_t)ls_config_lookup(&g_ls_config, &g_ls_config_view,
+                                                    map, index);
+    }
     struct ls_map *m = ls_map_get(ls_map_current(), map);
     (void)a; (void)b; (void)c;
     if (m == 0 || key == 0)
@@ -331,6 +417,7 @@ ls_h_map_lookup(uint64_t map, uint64_t key, uint64_t a, uint64_t b, uint64_t c)
 static inline uint64_t
 ls_h_map_update(uint64_t map, uint64_t key, uint64_t val, uint64_t flags, uint64_t c)
 {
+    if (map & LS_CONFIG_HANDLE_BIT) return (uint64_t)-1;
     struct ls_map *m = ls_map_get(ls_map_current(), map);
     (void)flags; (void)c;
     if (m == 0 || key == 0 || val == 0)
@@ -342,6 +429,7 @@ ls_h_map_update(uint64_t map, uint64_t key, uint64_t val, uint64_t flags, uint64
 static inline uint64_t
 ls_h_map_delete(uint64_t map, uint64_t key, uint64_t a, uint64_t b, uint64_t c)
 {
+    if (map & LS_CONFIG_HANDLE_BIT) return (uint64_t)-1;
     struct ls_map *m = ls_map_get(ls_map_current(), map);
     (void)a; (void)b; (void)c;
     if (m == 0 || key == 0)
@@ -658,7 +746,9 @@ ls_map_glue_install(struct ubpf_vm *vm)
 
     /* Order: relocation first, because ubpf_load_elf_ex walks the maps section
      * and consults it there. Registered afterwards it is simply never asked. */
-    if (ubpf_register_data_relocation(vm, 0, ls_map_reloc) != 0) {
+    g_ls_config.load_error = 0;
+    if (ubpf_register_data_relocation(vm, (void *)(uintptr_t)g_ls_config.loading,
+                                      ls_map_reloc) != 0) {
         fprintf(stderr, "ls_map: relocation callback refused\n");
         return -1;
     }

@@ -1,0 +1,6 @@
+Command on starin@10.145.37.36: python3 /home/starin/ai-traffic-jig/check.py
+SHA256 e24172150d03e5a46566b9b7c674b0c944dd69d6a9d2bee53a45657ffcdf5f17 backend.py
+SHA256 5767dd51fbed4a2de359beb3facf556e99ad150cc158ec0aabd2ba58cb6f801b client.py
+SHA256 def29a6e33de2e38707601150b2879aca900685a993e556b9c1e6d7965338912 check.py
+{"backend_peer_ips": ["127.0.0.1"], "checks": "17 exchanges/worker; payload hashes, RPC IDs, session/task state, errors/retry, paced SSE", "event": "PASS", "requests": 51, "rounds": 1, "run_id": "ai-5849c0336012", "streams": 6, "witness": "fixture-checker", "workers": 3}
+PASS loopback fixture only; no TMM/proxy evidence

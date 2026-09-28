@@ -1,0 +1,305 @@
+{
+  "scope": "P21 build-box bench and socket harness; no live TMM",
+  "commands": [
+    {
+      "argv": [
+        "clang-18",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/code/tmm/.ubpf",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "-C",
+        "/home/starin/eob-tmm-staged/ebpf-verifier",
+        "rev-parse",
+        "HEAD"
+      ],
+      "rc": 0,
+      "stdout": "06769f7b508214e63b97905d275920f7e90182fa\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "clang-18",
+        "-O2",
+        "-g",
+        "-target",
+        "bpf",
+        "-c",
+        "/home/starin/config-io-20260925.039uaw/substrate/surfaces/config_threshold.bpf.c",
+        "-o",
+        "/tmp/ls-config-ev4rrh_o/config.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/lib/llvm-18/bin/llvm-objcopy",
+        "--remove-section=.BTF",
+        "--remove-section=.BTF.ext",
+        "--remove-section=.rel.BTF.ext",
+        "/tmp/ls-config-ev4rrh_o/config.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/tmp/ls-config-ev4rrh_o/config.bpf.o",
+        "fentry/config_fixture",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fentry/config_fixture/config_threshold (terminates within 0 loop iterations)\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "-pthread",
+        "/home/starin/config-io-20260925.039uaw/substrate/check_config.c",
+        "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a",
+        "-lm",
+        "-o",
+        "/tmp/ls-config-ev4rrh_o/check-config"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/tmp/ls-config-ev4rrh_o/check-config",
+        "/tmp/ls-config-ev4rrh_o/config.bpf.o"
+      ],
+      "rc": 0,
+      "stdout": "PASS stale identities/revisions, malformed requests, cross-slot publication\nPASS interpreter: no-input, publish during emit, invocation consistency, next revision\nPASS JIT: no-input, publish during emit, invocation consistency, next revision\nPASS concurrent-writer unavailability stays unavailable for the whole invocation\nPASS stores isolated to invocation copy; update/delete/out-of-bounds/inactive refused\nPASS empty snapshot advances revision and clears previous data\nPASS 10000 concurrent updates / four readers: coherent=3643 unavailable=175742\nPASS replacement/revoke invalidate old token; invalid ARRAY declaration refused\n",
+      "stderr": "ls_map: reloc cfg_events -> idx 0 (key=4 val=4 max=1)\n"
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "/home/starin/config-io-20260925.039uaw/substrate/check_glue_owner.c",
+        "/home/starin/config-io-20260925.039uaw/substrate/check_glue_user.c",
+        "/home/starin/config-io-20260925.039uaw/substrate/check_glue_stubs.c",
+        "-o",
+        "/tmp/ls-config-ev4rrh_o/check-glue"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/tmp/ls-config-ev4rrh_o/check-glue"
+      ],
+      "rc": 0,
+      "stdout": "ok    two TUs share ONE g_ls_shapes (a static in the header gave each its own)\nok    install order: reloc bounds h1 h2 h3 h4 h5 h25 \nok    non-owning TU installs identically (no divergence by includer)\nok    NULL vm refused, nothing registered\nok    install is all-or-nothing at each of the 8 registrations\nok    map identity is the NAME: same name+shape shares, different name is private, name+other shape REFUSED\nok    bpf_ktime_get_ns non-zero and never regresses (MONOTONIC, not REALTIME --- a clock step must not open every limiter)\nok    bpf_ringbuf_output: 6 refusals (size 0, oversize, NULL, hash map, bad index, no program), 1 publish, hash ops on a ring refuse\nok    /proc/self/maps parsed: 7 readable range(s)\nok    bpf_probe_read: reads what is mapped, REFUSES null, zero, over-cap, wild, low, wrapping, and straddling\nok    check_glue: 36 assertions\n",
+      "stderr": "ls_map: relocation callback refused\nls_map: bounds callback refused\nls_map: helper registration refused\nls_map: helper registration refused\nls_map: helper registration refused\nls_map: probe-read/clock/event-output registration refused\nls_map: probe-read/clock/event-output registration refused\nls_map: probe-read/clock/event-output registration refused\nls_map: reloc rate -> idx 0 (key=4 val=8 max=64)\nls_map: reloc resets_seen -> idx 1 (key=4 val=8 max=64)\nls_map: REFUSED rate --- shape disagrees with the map already registered under that name (have key=4 val=8 max=64, asked key=8 val=8 max=64)\nls_map: reloc ring -> idx 0 (key=4 val=4 max=16)\nls_map: reloc counts -> idx 1 (key=4 val=8 max=64)\n"
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "/home/starin/config-io-20260925.039uaw/substrate/check_config_socket.c",
+        "-Wl,--gc-sections",
+        "-pthread",
+        "-o",
+        "/tmp/ls-config-ev4rrh_o/config-socket"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/home/starin/config-io-20260925.039uaw/env/scripts/ls-load.py",
+        "config-publish",
+        "5",
+        "/tmp/ls-config-ev4rrh_o/snapshot.json"
+      ],
+      "rc": 0,
+      "stdout": "OK config published slot=5 revision=2\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/home/starin/config-io-20260925.039uaw/env/scripts/ls-load.py",
+        "config-publish",
+        "5",
+        "/tmp/ls-config-ev4rrh_o/snapshot.json"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "*** ERR config revision conflict\n"
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/home/starin/config-io-20260925.039uaw/env/scripts/ls-load.py",
+        "config-status",
+        "5"
+      ],
+      "rc": 0,
+      "stdout": "{\n  \"abi\": 1,\n  \"session\": \"0000000123456789\",\n  \"instance\": \"8000000000000045\",\n  \"revision\": 2,\n  \"schema\": 1,\n  \"entries\": 1,\n  \"program_sha256\": \"abababababababababababababababababababababababababababababababab\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "/home/starin/config-io-20260925.039uaw/env/scripts/ls-load.py",
+        "config-publish",
+        "5",
+        "/tmp/ls-config-ev4rrh_o/snapshot.json"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "*** duplicate configuration field abi\n"
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "-fsyntax-only",
+        "/home/starin/config-io-20260925.039uaw/substrate/ls_vm.c"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "-fsyntax-only",
+        "/home/starin/config-io-20260925.039uaw/substrate/ls_vm_load.c"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "gcc",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-I/home/starin/config-io-20260925.039uaw/substrate",
+        "-I/home/starin/code/tmm/.ubpf/vm/inc",
+        "-I/home/starin/code/tmm/.ubpf/build/vm",
+        "-fsyntax-only",
+        "/home/starin/config-io-20260925.039uaw/substrate/ls_audit.c"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "checks": [
+    "fragmented headers/bodies accepted; stale replay refused by actual handler",
+    "truncated/trailing/status payloads rejected without changing published revision",
+    "client rejects malformed schema, numbers, records and unknown fields",
+    "CLI publish/status round trip; refusal, duplicate JSON, empty/timeout replies fail",
+    "changed TMM translation units syntax-check with pinned uBPF headers"
+  ],
+  "passed": true,
+  "source_sha256": {
+    "ls_config.h": "bb65ba7a79f5d615f91b7927605de37d16f0ec1ad0ccbe2f2bbd621f571618ff",
+    "config_snapshot.bpf.h": "e31cf99fd4dbe9023885d5716065d18d69f88026f8193ee079c7dca8222cf61c",
+    "ls_map.h": "af4f112a1156bd112a2432fe0c72f666420019766f3775758c65de074f0b039b",
+    "ls_map_glue.h": "af849d3fc34df486f7de343f5f0f121018d6466e6251ebb18870ae18826bae36",
+    "ls_vm.c": "19fc19500d909167db81c52ca1f3755e519774b32c40180c0b6f0330447260eb",
+    "ls_vm_load.c": "da76eafbdeac4ada80116e06cc8a18fc21fde51c4ea939f85d0bc2c12e4e247d",
+    "shield_abi.h": "3d0d88022f436ee9a6d6e203180009305a9d498764b7006f8a925d79c178f484",
+    "ls_audit.c": "14a4d1c6041789966e39729c55cdf833bfc79ab11fdfa810fc754fa9fce127db",
+    "check_config.c": "2f3b542b03e48dd5e83ae80f8e75227e7ef16726c55a1523cbccaadb251a2d79",
+    "check_config_socket.c": "36590595d105c8254e0c3cd7c519c29291493124f8b1be16b217bd1e46572b42",
+    "check_config.py": "3849196ac69b6428a2dccb882e07670e39e2bec1aee75a1e3e35682ff6fc2e91",
+    "check_glue_owner.c": "884b08e4f0c45d7dbd02fc522397bace8feeb239bc140cfa56103fe5e42f757f",
+    "check_glue_user.c": "faa21503537777e33e7b5795bc2eea3f8148f6cc7dc1e3bb0f920cfc04f400f0",
+    "check_glue_stubs.c": "36413dabdec11b4c52de53999682ad6c43ec5ac0a776c97808d719532ea7848b",
+    "surfaces/config_threshold.bpf.c": "d3f972ffe1e0cce6d223d9b9ec0f39984f38ea733813b7e1c31de5bf4aeaaf7c",
+    "../env/scripts/ls-load.py": "700b2f5333f161da00bd97eaa77cd59489812e36ba047ed3d2f39a415f0ef052"
+  },
+  "tool_sha256": {
+    "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail": "d9d84cb0c474016d7cffc31c71e62892f52c327e660248275f3e955f1b7cbea2",
+    "/home/starin/code/tmm/.ubpf/build/lib/libubpf.a": "340cc6bb2855db63e225cd92ce6e36704244b801469fe0571963f54f03802ff1"
+  },
+  "object_sha256": "ab9833e2195c344afd566c5305d82e3a5b765ba001cc778c94bd2edd392896bd",
+  "socket_server": {
+    "stdout": "",
+    "stderr": "",
+    "exit": -15,
+    "terminated_by_test": true
+  }
+}

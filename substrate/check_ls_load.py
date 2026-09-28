@@ -371,6 +371,23 @@ def main():
     assert m.elf_fentry_hook(b"") == b""; n += 1
     print("  ok    the hook name is READ FROM the object's fentry/ section, not defaulted")
 
+    # The current CLI must never consult a catalog: even an explicit address is
+    # a request checked by TMM against the authenticated target, not a bypass.
+    from unittest.mock import patch
+    for args, op, slot, hook in (
+        (["arm", "2"], m.OP_ARM, 2, b""),
+        (["arm", "2", "victim"], m.OP_ARM, 2, b"victim"),
+        (["arm", "2", "0x1234"], m.OP_ARM, 2, b"0x1234"),
+        (["disarm", "victim"], m.OP_DISARM, 0, b"victim"),
+    ):
+        with patch.object(m, "resolve_hook", side_effect=AssertionError("catalog lookup")), \
+             patch.object(m, "send", return_value="OK") as sent, \
+             patch.object(sys, "argv", ["ls-load.py"] + args):
+            m.main()
+            sent.assert_called_once_with(m.msg(op, slot=slot, hook=hook))
+        n += 1
+    print("  ok    arm/disarm CLI sends target requests without a catalog lookup")
+
     print("  ok    check_ls_load: %d assertions, 7 of them refusals" % n)
     return 0
 

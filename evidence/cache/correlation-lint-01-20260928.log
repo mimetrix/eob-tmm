@@ -1,0 +1,11 @@
+Build VM, before the live correlation test; command returned status 4:
+docker exec eob-template-20260925-fixture-1 python3 -m pylint --disable=C,R /work/correlation_suite.py /work/correlation_join.py
+
+************* Module correlation_suite
+/work/correlation_suite.py:31:4: W0221: Number of parameters was 4 in 'ScopeClient.request' and is now 7 in overriding 'CandidateClient.request' method (arguments-differ)
+/work/correlation_suite.py:31:4: W0221: Variadics removed in overriding 'CandidateClient.request' method (arguments-differ)
+
+-----------------------------------
+Your code has been rated at 9.92/10
+
+Correction: retain the parent's variadic signature and unpack the fixture arguments inside the method.

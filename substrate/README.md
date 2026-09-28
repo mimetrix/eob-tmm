@@ -16,6 +16,20 @@ throughout: **per-call cost of an armed hook is unmeasured**. (The companion cla
 been mitigated on live traffic* was **falsified 2026-09-03** — CVE-2025-41414 is crashed by traffic
 and prevented by a selective shield; see `cve-41414-demonstration.md`.)
 
+## New users
+
+Start with [`template.c`](template.c) and the
+[eBPF tutorial](../docs/EBPF-TUTORIAL.md). The tutorial covers configuration,
+maps, named-field reads, timestamps, unsampled event output and entry/exit
+programs. `check_template.py` runs the pinned bench checks;
+`template_io.py` creates policy input and decodes output records.
+The repaired host passes both variants and changed-layout map replacement live.
+Schema 2 attempts one record per call and has no sampling option. The prior default
+was already unsampled. `check_observability.py` tests the real output bridge and
+map lifecycle on the pinned build box. The tutorial keeps the earlier host
+failures and the [repair records](../SOURCES.md#unsampled-observability-repairs-2026-09-25).
+Output under sustained pressure and per-call cost remain unmeasured.
+
 ## Compiled into TMM
 
 | File | What it is |

@@ -1,0 +1,7 @@
+ARG PYTHON_IMAGE
+FROM ${PYTHON_IMAGE}
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /app
+COPY ls_stream stream_collector.py method_decode.py collector_container.py collector_client.py /app/
+STOPSIGNAL SIGTERM
+ENTRYPOINT ["python3", "/app/collector_container.py"]

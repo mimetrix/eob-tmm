@@ -4,11 +4,35 @@ This repo holds the substrate **sources**; they are compiled into TMM **elsewher
 build tree. That split is the reason someone can read every file here and still not be able to
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
-**The headline property — and read the scope carefully, because it depends on tree state.** In the
-**substrate-only** tree (no vulnerable-SSL overlay) the substrate adds **36 files and ~8,400 lines**
-into `src/base/` (33) and `src/compile/` (2 whitelist config), edits three build-configuration files
-(`filelist` and the two globals whitelists), and adds a `Makefile.overrides` — verified 2026-08-31 by
-`git status --porcelain src/` on the build box. The larger **46 files / ~7,800 lines** figure counts a
+**Host repairs built and exercised in isolated live TMM, 2026-09-25 (P22):**
+`ls_map.h`, `ls_map_glue.h`, `ls_vm.c`, `ls_vm_load.c` and `ls_tp_emit.c` change.
+Apply [`map-registry-globals.patch`](map-registry-globals.patch) once to register
+`g_ls_map_registry` in both x86-64 globals whitelists. No new C file is needed.
+The registry holds a generation, active-reader count and reset flag. Rebuild
+after invalidating substrate objects: the map-set layout and VM call path change.
+The build driver checks both whitelist entries and the linked global. Packaged
+build `ca69b84f…` passed the unsampled tutorial and map-replacement test in
+`eob-template-20260925`. Shared atomic operations and first-use storage clearing
+have no measured traffic-path cost.
+[Build, source hashes and live receipts](../SOURCES.md#unsampled-observability-repairs-2026-09-25).
+
+**Source synchronized, built and exercised in isolated live TMM, 2026-09-25 (P21):** this repo adds `base/ls_config.h`
+and changes `ls_map_glue.h`, `ls_vm.c`, `ls_vm_load.c`, `shield_abi.h`, `ls_audit.c`
+for [controller-published configuration](../configuration-snapshots.md). The single
+process-global `g_ls_config` is added to both globals whitelists by
+[`config-globals.patch`](config-globals.patch); `g_ls_config_view` is TLS,
+like `g_ls_maps`. No new C translation unit/filelist entry is needed. Invalidate the
+affected objects before rebuilding. The program SDK `config_snapshot.bpf.h` stays
+on the authoring side. The measured counts below describe the September 24 tree.
+P21's new header/edits are additional; packaged build `b8dc27f3…` runs in the separate
+`eob-config-20260925` SSA project. [Build and live receipts](../SOURCES.md#configuration-snapshots-2026-09-25).
+
+**The headline property — and read the scope carefully, because it depends on tree state.** The
+**substrate delta** adds **37 files**: 35 under `src/base/` (8,948 lines) and two whitelist snapshots
+under `src/compile/`. It edits three build-configuration files (`filelist` and the two globals
+whitelists), and uses a `Makefile.overrides` — re-enumerated 2026-09-24 by
+`git status --porcelain src/` on the build box (`../evidence/cache/catalog-tree-20260924.log`).
+The earlier 36-file count predates `ls_target.h`. The larger **46 files / ~7,800 lines** figure counts a
 tree that **also** has the vulnerable-SSL demo overlay under `src/modules/hudfilter/ssl/` plus the
 `ssl.c` revert (`VULNERABLE-BUILD.md`), which is not applied in the current tree. **No existing F5
 function BODY is edited **by the substrate.** The tree as it stands also carries the **CVE-2025-41414 revert** in `http2.c`, which *does* edit an F5 function body — a demonstration artifact rather than integration, and unrecorded until 2026-09-04 (`CONTESTED-PREMISES.md` §16)** --- that is the accurate form of
@@ -18,31 +42,32 @@ constraint is real and load-bearing, because the shield targets a TMM that is *a
 
 The **tracepoint** (§6b) does edit two F5 source files, deliberately, because a tracepoint is a
 build-time decision about what TMM should expose and a call site is the correct mechanism for one.
-So `git status` in the TMM tree should show `M` on exactly five files — three build-config, plus
-`http.c` and `http1x.c`. **Any other `M` is a regression.**
+That overlay is not applied in the current tree. The earlier instruction expecting exactly five
+modified files described that overlay, not today's tree; the current manifest below is authoritative.
 
 Tree: `gitswarm.f5net.com/tmm/tmm` (MBIP), version `10.207.3-main.bdbfc7e182`, built with
 `make tmm-gdb`. Paths below are relative to `src/`.
 
 ---
 
-## 1. New source files — by function (current tree, verified 2026-08-31)
+## 1. New source files — by function (current tree, verified 2026-09-24)
 
-Authoritative source: `git status --porcelain src/` on the build box, **re-measured 2026-09-05:
-36 added, 4 modified**. The tree adds **36 files** (34 under `src/base/`, 2 whitelist snapshots under
+Authoritative source: `git status --porcelain src/` on the build box, **re-measured 2026-09-24:
+37 added, 4 modified**. The tree adds **37 files** (35 under `src/base/`, 2 whitelist snapshots under
 `src/compile/`) and edits **4** F5 files —
 corrected 2026-09-04 from **3**. The three build-configuration edits below are the substrate's own;
 the fourth is `src/modules/hudfilter/http2/http2.c`, carrying the **CVE-2025-41414 fix `81d3428d3d`
 reverted** (`cve-41414-demonstration.md`). It was in no manifest, and it means **every binary built
 from this tree is vulnerable to CVE-2025-41414 whatever it was built for**. Status only here, never
 the diff. See `CONTESTED-PREMISES.md` §16 for why it stayed invisible. Of the
-33 `base/` files, **13 `.c` are compiled into `tmm`** (they appear in `filelist` — §2); the rest are
+35 `base/` files, **13 `.c` are compiled into `tmm`** (they appear in `filelist` — §2); the rest are
 headers pulled in by those, one build-box-only harness, and one data blob. Grouped by what they do:
 
 | function | files (`base/`) | in `tmm`? |
 |---|---|---|
 | **VM / bytecode engine** — embed uBPF, load the ELF, JIT, the env knobs, per-core stack | `ls_vm.c` `ls_vm.h` · `ls_vm_load.c` · `ls_vm_config.c` `ls_vm_config.h` · `vm_stack_policy.h` | yes (`.c`) |
 | **Build gate** — refuse a program signed for a different build | `ls_build_gate.h` | yes |
+| **Authenticated target** — full build ID, padded entry, hook kind and record validation | `ls_target.h` | yes, included by `ls_vm_load.c` |
 | **CO-RE relocation** — rewrite a program's field offsets to this build's layout | `ls_core_relo.c` `ls_core_relo.h` | yes |
 | **Arm / trampoline** — patch & restore the 5-byte entry pad; build `ctx`, apply the verdict; INIT_FUNC startup | `ls_arm.c` `ls_arm.h` · `ls_prep.c` · `ls_tramp.c` · `ls_tramp_asm.c` (from `trampoline_x86_64.S`) | yes (`.c`) |
 | **Function-exit hooks** — return-hijack + per-instance shadow stack | `ls_fexit.c` `ls_fexit.h` | yes |

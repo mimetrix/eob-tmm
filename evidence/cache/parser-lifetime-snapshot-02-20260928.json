@@ -1,0 +1,154 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "-n",
+        "/home/starin/eob-config-20260925/icap-run-suite.sh"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "-m",
+        "pylint",
+        "--disable=C,R,broad-exception-caught",
+        "/work/lifetime_suite.py"
+      ],
+      "rc": 0,
+      "stdout": "\n-------------------------------------------------------------------\nYour code has been rated at 10.00/10 (previous run: 9.92/10, +0.08)\n\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "5"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=58 safe_returns=0 errors=0 cycles=2537316 cycles_max=1861306 cycles_min=1686\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "5"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "*** ERR config: no loaded instance or session unavailable\n"
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "6"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=71 safe_returns=0 errors=0 cycles=1166034 cycles_max=68156 cycles_min=3842\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "6"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "*** ERR config: no loaded instance or session unavailable\n"
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "7"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=75 safe_returns=0 errors=0 cycles=778472 cycles_max=73392 cycles_min=1196\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "7"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "*** ERR config: no loaded instance or session unavailable\n"
+    }
+  ],
+  "sources": {
+    "lifetime_snapshot.py": {
+      "sha256": "2e433bacc159405d2eafe5267844a4d3b6ec869e3ee5ffd8f9b29613458da2f0",
+      "text": "#!/usr/bin/env python3\n\"\"\"Check receipt/source consistency and final disabled state before cleanup.\"\"\"\nimport argparse\nfrom collections import Counter\nimport hashlib\nimport json\nfrom pathlib import Path\nimport subprocess\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--live\", type=Path, required=True)\n    parser.add_argument(\"--output\", type=Path, required=True)\n    args = parser.parse_args()\n    record = {\"passed\": False, \"commands\": [], \"sources\": {}}\n    with args.output.open(\"x\") as receipt:\n        try:\n            live = json.loads(args.live.read_text())\n            assert live[\"passed\"]\n            record[\"live_sha256\"] = hashlib.sha256(args.live.read_bytes()).hexdigest()\n            test = json.loads(live[\"files\"][\"result.json\"])\n            record[\"summary\"] = test[\"summary\"]\n            record[\"flags\"] = dict(Counter(e[\"flags\"] for e in test[\"events\"]))\n            record[\"reuse_pairs\"] = len(test[\"address_reuse\"])\n            for name, saved in live[\"sources\"].items():\n                path = ROOT / name\n                assert hashlib.sha256(path.read_bytes()).hexdigest() == saved[\"sha256\"], name\n                assert hashlib.sha256(saved[\"text\"].encode()).hexdigest() == saved[\"sha256\"], name\n            for name in (\"lifetime_snapshot.py\", \"lifetime_fixture.py\", \"lifetime_build.py\", \"lifetime_discover.py\"):\n                path = ROOT / name\n                record[\"sources\"][name] = {\"sha256\": hashlib.sha256(path.read_bytes()).hexdigest(),\n                                           \"text\": path.read_text()}\n            for name in (\"lifetime_suite.py\", \"lifetime_live_run.py\", \"lifetime_fixture.py\",\n                         \"lifetime_snapshot.py\", \"lifetime_build.py\", \"lifetime_discover.py\"):\n                compile((ROOT / name).read_text(), name, \"exec\")\n            fixture = \"eob-template-20260925-fixture-1\"\n            # stop() must attempt every detach/revoke after any cleanup exception.\n            # It saves each error and raises after the remaining actions finish.\n            record[\"lint_scope\"] = \"Errors/warnings, except intentional broad cleanup catches; convention/refactor rules excluded.\"\n            commands = [[\"bash\", \"-n\", str(ROOT / \"icap-run-suite.sh\")],\n                        [\"docker\", \"exec\", fixture, \"python3\", \"-m\", \"pylint\", \"--disable=C,R,broad-exception-caught\", \"/work/lifetime_suite.py\"]]\n            for slot in (5, 6, 7):\n                for operation in (\"status\", \"config-status\"):\n                    commands.append([\"docker\", \"exec\", fixture, \"python3\", \"/work/ls-load.py\", operation, str(slot)])\n            for argv in commands:\n                result = subprocess.run(argv, capture_output=True, text=True, timeout=60, check=False)\n                record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                           \"stdout\": result.stdout, \"stderr\": result.stderr})\n                if \"config-status\" in argv:\n                    assert result.returncode != 0\n                else:\n                    result.check_returncode()\n                if \"status\" in argv:\n                    assert \"mode=0\" in result.stdout\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(record, receipt, indent=2)\n    print(json.dumps({\"passed\": record[\"passed\"], \"output\": str(args.output)}))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "lifetime_fixture.py": {
+      "sha256": "be7819cb35fc5cecd80c2e5818fe1b69eacab98cd243de8c121b2fd5d889d59b",
+      "text": "#!/usr/bin/env python3\n\"\"\"Create or archive/remove only the isolated parser-lifetime Compose fixture.\"\"\"\nimport argparse\nimport hashlib\nimport io\nimport json\nfrom pathlib import Path\nimport subprocess\nimport tarfile\nimport time\n\nfrom config_live_run import WITNESS\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\nPROJECT = \"eob-template-20260925\"\nCOMPOSE = (\"docker\", \"compose\", \"--env-file\", \"template-fixture.env\", \"--project-name\",\n           PROJECT, \"-f\", \"icap-compose.yaml\", \"-f\", \"config-compose.yaml\",\n           \"-f\", \"observability-compose.yaml\")\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"action\", choices=(\"create\", \"archive-cleanup\"))\n    parser.add_argument(\"--output\", type=Path, required=True)\n    parser.add_argument(\"--archive\", type=Path)\n    parser.add_argument(\"--live\", type=Path)\n    args = parser.parse_args()\n    record = {\"passed\": False, \"action\": args.action, \"commands\": [], \"sources\": {}}\n\n    def run(*argv, check=True):\n        result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=240, check=False)\n        record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                   \"stdout\": result.stdout, \"stderr\": result.stderr})\n        if check:\n            result.check_returncode()\n        return result.stdout\n\n    def inventory():\n        rows = []\n        for identity in run(\"docker\", \"ps\", \"-aq\").split():\n            rows.append(json.loads(run(\"docker\", \"inspect\", identity, \"--format\",\n                '{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},'\n                '\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},'\n                '\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}')))\n        return rows\n\n    with args.output.open(\"x\") as receipt:\n        try:\n            for name in (\"lifetime_fixture.py\", \"icap-compose.yaml\", \"config-compose.yaml\",\n                         \"observability-compose.yaml\", \"template-fixture.env\"):\n                path = ROOT / name\n                record[\"sources\"][name] = {\"sha256\": hashlib.sha256(path.read_bytes()).hexdigest(),\n                                           \"text\": path.read_text()}\n            record[\"before\"] = inventory()\n            owned = [row for row in record[\"before\"] if row[\"project\"] == PROJECT]\n            if args.action == \"create\":\n                assert not owned, owned\n                run(*COMPOSE, \"up\", \"-d\", \"--wait\", \"--wait-timeout\", \"180\")\n                image = run(\"docker\", \"inspect\", PROJECT + \"-tmm-1\", \"--format\", \"{{.Image}}\")\n                assert image.strip() == \"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\"\n                for _ in range(60):\n                    status = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                                 \"/work/ls-load.py\", \"status\", \"5\", check=False)\n                    if status.startswith(\"OK \"):\n                        break\n                    time.sleep(2)\n                else:\n                    raise RuntimeError(\"isolated loader did not become ready\")\n            else:\n                assert len(owned) == 2 and args.archive is not None and args.live is not None\n                assert not args.archive.exists()\n                live = json.loads(args.live.read_text())\n                assert live[\"passed\"]\n                assert next(r[\"id\"] for r in owned if r[\"name\"].endswith(\"-tmm-1\")) == json.loads(live[\"before\"].split()[0])\n                record[\"live_sha256\"] = hashlib.sha256(args.live.read_bytes()).hexdigest()\n                record[\"witness_script\"] = WITNESS\n                for label, program in live[\"program_build\"][\"programs\"].items():\n                    rows = [json.loads(line) for line in run(\n                        \"docker\", \"exec\", PROJECT + \"-tmm-1\", \"python3\", \"-u\", \"-c\",\n                        WITNESS, program[\"entry\"]).splitlines()]\n                    expected = live[\"witnesses\"][label][\"initial\"]\n                    assert rows[0][\"sha256\"] == expected[\"sha256\"]\n                    assert rows[0][\"bytes\"] == rows[-1][\"bytes\"] == expected[\"bytes\"]\n                    assert rows[0][\"stat\"].split()[21] == expected[\"stat\"].split()[21]\n                for slot in range(12):\n                    text = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                               \"/work/ls-load.py\", \"status\", str(slot))\n                    assert text.startswith(\"OK \") and (\"mode=0\" in text or \"armed=0\" in text), text\n                record[\"manifest\"] = json.loads(run(\n                    \"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\", \"-c\",\n                    'import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); '\n                    'print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() '\n                    'for p in root.rglob(\"*\") if p.is_file()}))'))\n                archive = subprocess.run([\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"tar\", \"czf\", \"-\",\n                                          \"-C\", \"/evidence\", \".\"], capture_output=True, timeout=60, check=True)\n                members = {}\n                with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode=\"r:gz\") as stream:\n                    for member in stream.getmembers():\n                        if member.isfile():\n                            name = member.name.removeprefix(\"./\")\n                            assert not name.endswith((\".pem\", \".key\", \".p12\"))\n                            assert name not in members\n                            data = stream.extractfile(member).read()\n                            assert b\"PRIVATE KEY-----\" not in data and b\"BEGIN CERTIFICATE\" not in data\n                            members[name] = hashlib.sha256(data).hexdigest()\n                        else:\n                            assert member.isdir(), member.name\n                assert members == record[\"manifest\"] and members\n                with args.archive.open(\"xb\") as output:\n                    output.write(archive.stdout)\n                record[\"archive\"] = {\"path\": str(args.archive), \"files\": len(members),\n                                     \"sha256\": hashlib.sha256(archive.stdout).hexdigest()}\n                run(*COMPOSE, \"down\", \"--volumes\", \"--remove-orphans\")\n                for kind in (\"container\", \"network\", \"volume\"):\n                    assert not run(\"docker\", kind, \"ls\", \"-q\", \"--filter\",\n                                   \"label=com.docker.compose.project=\" + PROJECT).strip()\n            record[\"after\"] = inventory()\n            assert [r for r in record[\"before\"] if r[\"project\"] != PROJECT] == [\n                r for r in record[\"after\"] if r[\"project\"] != PROJECT]\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(record, receipt, indent=2)\n    print(json.dumps({\"passed\": record[\"passed\"], \"output\": str(args.output)}))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "lifetime_build.py": {
+      "sha256": "72dc94399786065d8532e3483c096ab99152113a78896ce814a395ec4127a299",
+      "text": "#!/usr/bin/env python3\n\"\"\"Build, verify and sign three cooperating parser-lifetime programs.\"\"\"\nimport argparse\nimport hashlib\nimport json\nfrom pathlib import Path\nimport subprocess\n\n\ndef digest(path):\n    return hashlib.sha256(path.read_bytes()).hexdigest()\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--output\", type=Path, required=True)\n    args = parser.parse_args()\n    args.output.mkdir()\n    base = Path(\"/home/starin/eob-tmm-staged/substrate\")\n    ubpf = Path(\"/home/starin/code/tmm/.ubpf\")\n    verifier = base.parent / \"ebpf-verifier/bin/prevail\"\n    context = Path(\"/home/starin/observability-20260925/image-context\")\n    debug = context.parent / \"debug/usr/lib/debug/usr/bin/tmm64.no_pgo.debug\"\n    objcopy = \"/usr/lib/llvm-18/bin/llvm-objcopy\"\n    record = {\"passed\": False, \"commands\": [], \"sources\": {}, \"programs\": {}}\n\n    def run(*argv):\n        argv = list(map(str, argv))\n        result = subprocess.run(argv, text=True, capture_output=True, timeout=180, check=False)\n        record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                   \"stdout\": result.stdout, \"stderr\": result.stderr})\n        print(result.stdout, result.stderr, flush=True)\n        result.check_returncode()\n        return result.stdout\n\n    with (args.output / \"lifetime-program-build.json\").open(\"x\") as receipt:\n        try:\n            for name in (\"surfaces/parser_lifetime.bpf.c\", \"check_parser_lifetime.c\",\n                         \"ls_map_glue.h\", \"ls_map.h\", \"ls_config.h\", \"config_snapshot.bpf.h\",\n                         \"bind_target.py\", \"exit_admit.py\", \"ls_buildid.py\", \"sign_shield.py\"):\n                path = base / name\n                record[\"sources\"][name] = {\"sha256\": digest(path), \"text\": path.read_text()}\n            record[\"driver\"] = {\"sha256\": digest(Path(__file__)), \"text\": Path(__file__).read_text()}\n            gate = Path(__file__).parent / \"LIFETIME.md\"\n            record[\"registered_gate\"] = {\"sha256\": digest(gate), \"text\": gate.read_text()}\n            assert \"18.1.3\" in run(\"clang-18\", \"--version\")\n            run(\"gcc\", \"--version\")\n            for path, expected in ((ubpf, \"c900ed9faf1d41358a7ea9217ccd0b64a4ee8d5d\"),\n                                   (verifier.parent.parent, \"06769f7b508214e63b97905d275920f7e90182fa\")):\n                assert run(\"git\", \"-C\", path, \"rev-parse\", \"HEAD\").strip() == expected\n            record[\"inputs\"] = {str(p): digest(p) for p in (\n                verifier, ubpf / \"build/lib/libubpf.a\", debug,\n                context / \"tmm64.no_pgo\", context / \"hook-index.tsv\")}\n            identity = json.loads((context / \"runtime-identity.json\").read_text())\n            assert identity[\"sha256\"] == digest(context / \"tmm64.no_pgo\")\n            record[\"runtime\"] = identity\n            objects = []\n            for kind, label, section, slot in (\n                    (1, \"init\", \"fentry/http_parse_ctx_init\", 6),\n                    (2, \"parse\", \"fexit/http_parse_client_headers\", 5),\n                    (3, \"fini\", \"fentry/http_parse_ctx_fini\", 7)):\n                obj = args.output / (\"lifetime-\" + label + \".bpf.o\")\n                objects.append(obj)\n                run(\"clang-18\", \"-target\", \"bpf\", \"-O2\", \"-g\", \"-Wall\", \"-Wextra\", \"-Werror\",\n                    \"-DLIFE_KIND=\" + str(kind), \"-c\", base / \"surfaces/parser_lifetime.bpf.c\", \"-o\", obj)\n                run(objcopy, \"--remove-section=.BTF\", \"--remove-section=.BTF.ext\",\n                    \"--remove-section=.rel.BTF.ext\", obj)\n                binding = run(\"python3\", base / \"bind_target.py\", \"--prog\", obj,\n                              \"--binary\", context / \"tmm64.no_pgo\", \"--index\", context / \"hook-index.tsv\",\n                              \"--debug\", debug, \"--objcopy\", objcopy)\n                assert run(verifier, obj, section, \"--termination\", \"--strict\",\n                           \"--no-division-by-zero\", \"--stack-size\", \"256\").startswith(\"PASS:\")\n                signature = obj.with_suffix(\".sig\")\n                build = \"0x\" + identity[\"build_id\"][:8]\n                run(\"python3\", base / \"sign_shield.py\", \"--key\", Path.home() / \".ls-signing/shield_sk.pem\",\n                    \"--prog\", obj, \"--hook\", section.split(\"/\")[1], \"--mode-ceiling\", \"monitor\",\n                    \"--build-min\", build, \"--build-max\", build, \"-o\", signature)\n                record[\"programs\"][label] = {\"kind\": kind, \"slot\": slot, \"section\": section,\n                    \"entry\": binding.split(\" -> \")[1].split()[0],\n                    \"object\": obj.name, \"sha256\": digest(obj), \"signature_sha256\": digest(signature)}\n            native = args.output / \"native\"\n            run(\"gcc\", \"-O2\", \"-Wall\", \"-Wextra\", \"-Werror\", \"-I\" + str(ubpf / \"vm/inc\"),\n                \"-I\" + str(ubpf / \"build/vm\"), base / \"check_parser_lifetime.c\",\n                ubpf / \"build/lib/libubpf.a\", \"-lm\", \"-o\", native)\n            run(native, *objects)\n            record[\"native_sha256\"] = digest(native)\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(record, receipt, indent=2)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "lifetime_discover.py": {
+      "sha256": "8074d3977a8745b86b7fb09785395236c1582f515c48a8a4f15034713ab5e00c",
+      "text": "#!/usr/bin/env python3\n\"\"\"Retain authoritative callers, reset paths and packaged lifecycle targets.\"\"\"\nimport argparse\nimport hashlib\nimport json\nfrom pathlib import Path\nimport subprocess\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--output\", type=Path, required=True)\n    args = parser.parse_args()\n    tree = Path(\"/home/starin/code/tmm\")\n    context = Path(\"/home/starin/observability-20260925/image-context\")\n    record = {\"passed\": False, \"commands\": [], \"files\": {}}\n    with args.output.open(\"x\") as output:\n        try:\n            pattern = (r\"http_parse_ctx_(init|fini)|http_parse_client_headers|\"\n                       r\"http_parse_server_headers|http_parse_headers|\"\n                       r\"http_reset_(http|scb)_context\")\n            command = [\"git\", \"-C\", str(tree), \"grep\", \"-n\", \"-E\", pattern, \"--\", \"src\"]\n            result = subprocess.run(command, text=True, capture_output=True, check=False)\n            record[\"commands\"].append({\"argv\": command, \"rc\": result.returncode,\n                                       \"stdout\": result.stdout, \"stderr\": result.stderr})\n            result.check_returncode()\n            paths = {tree / line.split(\":\", 1)[0] for line in result.stdout.splitlines()}\n            paths |= {tree / \"AGENTS.md\", tree / \"src/modules/hudfilter/http/http.h\",\n                      context / \"runtime-identity.json\", context / \"hook-index.tsv\"}\n            for path in sorted(paths):\n                data = path.read_bytes()\n                record[\"files\"][str(path)] = {\"sha256\": hashlib.sha256(data).hexdigest(),\n                                             \"text\": data.decode()}\n            for command in ([\"git\", \"-C\", str(tree), \"rev-parse\", \"HEAD\"],\n                            [\"git\", \"-C\", str(tree), \"status\", \"--porcelain\", \"src/\"],\n                            [\"docker\", \"compose\", \"ls\", \"--format\", \"json\"]):\n                result = subprocess.run(command, text=True, capture_output=True, check=False)\n                record[\"commands\"].append({\"argv\": command, \"rc\": result.returncode,\n                                           \"stdout\": result.stdout, \"stderr\": result.stderr})\n                result.check_returncode()\n            record[\"driver\"] = Path(__file__).read_text()\n            record[\"passed\"] = True\n        finally:\n            json.dump(record, output, indent=2)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    }
+  },
+  "live_sha256": "dbad0c97ab48c807faff6b0d61a13211c78a40bbdb820d2f6ed214a36a90483d",
+  "summary": {
+    "events": 204,
+    "hook_counts": {
+      "2": 58,
+      "3": 75,
+      "1": 71
+    },
+    "closed_lifetimes": 71,
+    "known_header_attempts": 48,
+    "unknown_header_attempts": 3,
+    "http_responses": 53,
+    "accepted": 52,
+    "request_scope_validated": false
+  },
+  "flags": {
+    "32": 7,
+    "0": 196,
+    "256": 1
+  },
+  "reuse_pairs": 66,
+  "lint_scope": "Errors/warnings, except intentional broad cleanup catches; convention/refactor rules excluded."
+}

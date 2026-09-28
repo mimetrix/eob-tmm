@@ -10,6 +10,368 @@ cd evidence/cache && sha256sum * > MANIFEST.sha256
 
 ## Retrieved
 
+### Separate collector container, 2026-09-28
+
+[Registered checks](env/ai-traffic/COLLECTOR-CONTAINER.md). Test controllers and
+assertions are SELF witnesses; process access and container state use kernel and
+Docker observations. Source validation is not a claim of strong security isolation.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Native build 04: eleven tests pass, including Unix-socket replay, single API ownership and stale-socket recovery | `collector-build-04-20260928.json` | `e22c0a0c3d2ca2cbf88c72eb677b2090d3e8e1d0c9c7f336b3a45cfaa8e4b73e` |
+| Dedicated image build 01: resolved Python base digest, exact sources, checked native binary, Python/SQLite runtime smoke check | `collector-image-01-20260928.json` | `be8d7e61f7f2df8204fd1ee73e7b97fa30fa2ffd6e985e5abf3f18d2d96d1d79` |
+| Create isolated TMM and fixture with separate collector volume definitions; other Docker identities/state unchanged | `collector-container-create-01-20260928.json` | `90f568035a2e58c4f9c67388811eb46ac03bca6e3caed6bf5332329dc7427ee4` |
+| Live attempt 01 stops before attachment. Reading the pinned TMM executable is denied both without and with `SYS_PTRACE` under the default AppArmor profile | `collector-container-live-01-20260928.json` | `30a3ed71ee67362fc4bf04b7864a3596bed06a1a0a0233f570251c3ab5a5a9c1` |
+| Diagnostic: collector profile `docker-default`, TMM `unconfined`. With `SYS_PTRACE` and `apparmor=unconfined`, exact source passes and wrong start time is refused; seccomp filtering and no-new-privileges remain active | `collector-container-diagnostic-01-20260928.json` | `5878bee49a94d0210e88a52acd6e83f1089b13b5c21f39fd91eec8791c2f5319` |
+| Image build 02: bounded executable hashing; same tested reader/journal/API; corrected AppArmor deployment setting and explicit RAM/swap/temp-storage limits recorded | `collector-image-02-20260928.json` | `88133fda437ac79784b72ace563d4867606de0ffcb5f22ada8d8c17d3cd9b2da` |
+| Live attempt 02 stops before attachment: controller expects `SYS_PTRACE`, Docker reports canonical `CAP_SYS_PTRACE`; capability remains present | `collector-container-live-02-20260928.json` | `c45b16796260e10c80d865623efbb525c142d616e36d1a4e5d647d5939dbca97` |
+| Live attempt 03: traffic checks and two collector replacements complete; final controller check incorrectly expects `event_id` on the source-boundary event. Retains all commands, consumer pages and kernel witnesses | `collector-container-live-03-20260928.json` | `497bcc811ec2648b5bc872368144518864fae9dbb9b510d7f3492561b1d5f8a5` |
+| Evidence-only recovery: no new traffic. Ten requests, eight exact method records and ten unique journal events; normal stop and SIGKILL each followed by collector replacement. Both requests during outages forward successfully and their queued records are recovered. Two separate consumer containers mount only the read-only API volume and receive identical records. Stable TMM process/container/binary, restored hook and journal integrity; original controller failure retained | `collector-container-recovery-01-20260928.json` | `fd36a9e7934bb4b00387532c62c836dc96e18c6648fe3f5945065730b85401ce` |
+| Cleanup rechecks the pinned process/binary, restored hook and all 12 inactive slots, archives evidence, then removes the three-container project and its volumes/networks. Other Docker identities/state stay unchanged | `collector-container-cleanup-01-20260928.json` | `3427594d13f848b061a591259a42e03a2dbcea26c01c0ecfb113b4e6eeb0d797` |
+| Nine evidence files, including the SQLite journal and fixture control exchange; all hashes match the volume manifest before removal | `collector-container-evidence-01-20260928.tar.gz` | `b7871d4ed994b6bf6de6c3bb3f395009765cc68bdc206e454664822f4bee9ef3` |
+
+### Continuous metadata collector, 2026-09-28
+
+[Contract and scope](env/ai-traffic/COLLECTOR.md). Native checks use the actual
+ring and reader, a controlled source process, and authored assertions (SELF).
+Process mappings, file identity and locks are observed through the kernel.
+These receipts do not establish power-loss durability or production throughput.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Pinned GCC 13.3.0 build; eight native/process checks pass: old helper consumes before downstream acceptance, pre-ACK replay, post-commit deduplication, reader/writer locks, source replacement, full-ring drops, retention gaps, page-limit rollback, two HTTP consumers and reader exit after parent death. Exact sources and test output retained | `collector-build-01-20260928.json` | `6f45ff2286a6f887d6df1ac59c1ebd03f4e0824d4ab18495b4389b75c053bd86` |
+| Build 02: nine checks pass. Adds the real legacy drain writing to `/dev/full`: record consumed, output fails, exit status remains zero. This falsifies its at-least-once comment. Adds clean collector interrupt handling | `collector-build-02-20260928.json` | `0da4d5d88e3c9f7141655addea3d0317d3e57d11d1e7dfc3312f738cfaad54fb` |
+| Recreate only the isolated template fixture with the pinned image; other Docker identities/state unchanged | `collector-create-01-20260928.json` | `e36d98605b53b3090295ec5594f9d8e68050ca98d0346d9c1d795c0bc4652606` |
+| Live attempt 01 stops before attachment: collector starts before the lazy ring exists; runner also reports a missing test-result directory. Original source and restored hook witness retained | `collector-live-01-20260928.json` | `94397dd8f405574cfc985a94f7f689746676336fb674ed768f6f3acae8f467a1` |
+| Exact startup log and direct retry: `ls_stream: invalid segment file`. Diagnostic script and all command results retained | `collector-diagnostic-01-20260928.json` | `44ed6078b0bf8bb1e47be2ff25e786135ff55691838add172b72bc2af570ef90` |
+| Build 03: ten checks pass. Adds bounded lazy-segment startup and deadline refusal; retains all crash, storage, output-failure and consumer tests | `collector-build-03-20260928.json` | `f709f44ac91e3c8ea4227dc340d43f78e05ae1230ae408c31d9f23c852282ffa` |
+| Live attempt 02: ten requests, eight method records, ten journal events. Both HTTP consumers receive identical bytes/cursors. Six value/prefix comparisons and two status-only records; no reported loss/new VM errors/restart. Collector stopped cleanly; journal integrity check passes. Black and scoped pylint pass; kernel witnesses record the pinned process and restored hook | `collector-live-02-20260928.json` | `7475d7438ea0f3800c526ae67c4ea425bc7c825d9c0c23c3df4dc9060a75f776` |
+| Recheck binary/process, restored method hook and all 12 inactive slots; archive evidence and remove only the isolated project. Other Docker identities/state unchanged | `collector-cleanup-01-20260928.json` | `32e15d60b1e8eaa1836d7da7c3cdac3f817caa24df6046e9f9e13e227dcdd1ba` |
+| Eight evidence files, including the committed SQLite journal; file hashes match the pre-removal volume manifest | `collector-evidence-01-20260928.tar.gz` | `c5a040ab67658e4838e109041e1195365ccae4b1169d6495fe20d75c01ad0f93` |
+
+### Controlled correlation gaps, 2026-09-28
+
+[Registered contract and results](env/ai-traffic/GAPS.md). These tests cover
+controller-reported gaps and bounded tracking capacity. They do not establish
+detection of silent, unreported gaps. Native traces and assertions, the controller,
+client, authority and program counters are SELF witnesses. PREVAIL is INDEPENDENT;
+process identity and patch bytes are KERNEL witnesses.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Four pinned signed programs rechecked with PREVAIL. Four-VM interpreter/JIT tests reproduce stale intervals after omitted boundaries, check limits 127/128 and 256/257, and verify fresh reset. Seven guard checks per execution mode; exact sources, native traces and original contract retained | `gap-build-01-20260928.json` | `167d8faca0b9486d493f2c83db1b15e84cab19b08e481190507c4c6dbdf51004` |
+| Recreate only the isolated template fixture; pinned image and unchanged toolchain container | `gap-create-01-20260928.json` | `f6a2fddea941d38c63603b7584bb731a47cab0c11184eeb8311035740d972260` |
+| Retained attempt 01: lint flags unspecified file encoding; stops before hook attachment and creates no fixture result directory | `gap-live-01-20260928.json` | `cdec703a8b698f5ffbd2662cde055585dd5e0930612a02f574632f323a1ad2dd` |
+| Live attempt 02: five windows, 150 accepted HTTP requests, 1,023 calls/records. Known gaps and exhausted capacity stay unknown. Fresh recovery gives two matches and leaves a retained connection unknown. Live stale interval reuse is observed; the old consumer already refuses that live window. Stable process, zero restarts/drops/new errors/selections, all four sites restored; Black and scoped lint pass | `gap-live-02-20260928.json` | `dbb4a888473b1503ece115a13ac7605585483d3c52b6d4523777304fe312a644` |
+| Exact live sources and syntax checks pass; final four slots disabled and configuration status refused; final-check sources and scoped lint result retained | `gap-snapshot-01-20260928.json` | `493793d8446807a5a6959acb6ec9036942e7a219cdcf45a08dbf0c26c8496914` |
+| All four restored sites and 12 inactive slots checked against the same process/binary; evidence archived, fixture removed, toolchain identity/state preserved | `gap-cleanup-01-20260928.json` | `7eb5e03de63d1c4ff7de28dbeeb2929dbccf33f483ea979ffb042fbe49413295` |
+| 25 fixture evidence files, with hashes checked against the source volume before removal | `gap-evidence-01-20260928.tar.gz` | `ab817ba3ef58b6d129513c286ccb42bde647ddd86ec61268b7e32065e8dcece5` |
+
+### Bounded request correlation, 2026-09-28
+
+[Registered contract and result](env/ai-traffic/CORRELATION.md). The final live
+receipt includes the pre-run contract, exact sources, four program bindings,
+client/authority records, counters and kernel witnesses. Authentication comes
+from the fixture authority, not from the extracted header values. Client checks,
+authority decisions and program records are SELF witnesses. PREVAIL is INDEPENDENT;
+process identity and hook bytes are KERNEL witnesses. No cost result is claimed.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Authoritative parser source and disassembly, argument use, hook index, binary identity and tree state; source inspection only | `correlation-discover-01-20260928.json` | `d2c91c295818b884885b0cf356fea2ebd2da546e285aff99bb56e3531e8f516f` |
+| Retained failed build: PREVAIL passes, but the native test exposes five requested maps against a four-map host limit | `correlation-build-01-20260928.json` | `62f11dd0e4a7d9ea39690009076d0ac353dbc99ea5925fd2a3e6913c1afd535b` |
+| Corrected four-map reader passes pinned clang-18/PREVAIL, monitor signing and native interpreter/JIT checks; retains three prerequisite program receipts and exact sources | `correlation-build-02-20260928.json` | `17c2ff0187ace9b2449deb94f7812483efaceddaf5ecd559cb6e5a6ef1e6521e` |
+| Recreate only the isolated template fixture with the pinned repaired image; preserve toolchain identity/state | `correlation-create-01-20260928.json` | `2d09310ad79d23f0749a5cb2c9c24ba6a91f2e07ec99803c3187a768ee27208c` |
+| Retained lint failure: subclass request signature differs from its parent; corrected before the successful live run | `correlation-lint-01-20260928.log` | `18b94e8e01b1e7c5eb89f7c9057469bf9170ea86df2b38d19d110406e089ce42` |
+| Retained attempt 01: Black stops the recorder before hook attachment; no fixture result directory is created | `correlation-live-01-20260928.json` | `d75df4315d72a512a305bc36b253d0422ed51b5958065709bc189f7acc6a1dc7` |
+| Live attempt 02: 313 calls/records; 51 completed header observations yield 42 accepted-operation matches, one authenticated rejection and eight unknowns. Reordering and five missing/invalid-evidence checks pass. Four restored hook sites, stable process, zero restarts/drops/new errors/selections; Black and scoped pylint pass | `correlation-live-02-20260928.json` | `2476016e4af2afa52a86a5d1e8a166c7541724108193e6e4e8ec025fd79b7f29` |
+| Final source/hash/syntax and scoped lifetime lint checks pass; slots 5–8 disabled and configuration status refused; exact final-check sources retained | `correlation-snapshot-01-20260928.json` | `e401a5dce5e1062a431583ce0f097c2e24cc698fa4f6c04f369f88e2673c436a` |
+| Archive and remove the fixture after checking four restored sites, matching runtime/process and all 12 inactive slots. No project resources remain; toolchain identity/state preserved | `correlation-cleanup-01-20260928.json` | `4902629d8a0843d1cbb87b6b8193436b140b482197624b035cabd993a34c9b50` |
+| Nine fixture evidence files, checked against the source-volume manifest before removal | `correlation-evidence-01-20260928.tar.gz` | `bde46120b8ee02380668a97e61d1e3e68131a340abdedbb7597c889c527f348f` |
+
+### Parser lifetime, 2026-09-28
+
+[Registered experiment](env/ai-traffic/LIFETIME.md). Source inspection is separate
+from a live lifetime result.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Authoritative callers of parser initialization/cleanup, client/server/string/trailer parsing and HTTP reset helpers. Includes all matching source files, build-box instructions, packaged hook index/runtime identity and tree state | `parser-lifetime-discover-01-20260928.json` | `b4aadf4a218dc553efc198e147c272b14561b4acd995145630fcee3bd1cdc27b` |
+| Three final bound programs pass pinned clang-18/PREVAIL; monitor signatures and three-VM native interpreter/JIT checks. Includes exact program/helper/test sources and the pre-run contract | `parser-lifetime-build-01-20260928.json` | `9855ad6a8fed1489951f8761043a19ea8577830bea4f9c46c47569a5932c68d7` |
+| Recreate only the isolated template fixture with the repaired image; preserve the toolchain container | `parser-lifetime-create-01-20260928.json` | `38151d08837ec102d48c9a5bbdae1a79f45f3b45d5eca0e1dbca223dc8a35248` |
+| Live gate: 204 calls/records, 71 closed observed parser lifetimes, 66 address-reuse pairs, 48 known and 3 unknown completed header attempts. Three kernel pad witnesses, stable process, 53 HTTP responses, disabled programs, JSON/XML success; attribution gate remains closed | `parser-lifetime-live-01-20260928.json` | `dbad0c97ab48c807faff6b0d61a13211c78a40bbdb820d2f6ed214a36a90483d` |
+| Retained final-check attempt: source hashes and shell syntax pass; stops on two intentional broad cleanup-catch lint warnings | `parser-lifetime-snapshot-01-20260928.json` | `257413cd0d3d7bb20d8f89ad7a90762a5f6707d97bac07f486237613e3f5910a` |
+| Final source/syntax and scoped lint checks pass; all three slots disabled and configuration status refused. Broad cleanup catches and convention/refactor lint rules are excluded, as recorded | `parser-lifetime-snapshot-02-20260928.json` | `4a578873eda02458cd23076a42b142743b1bca98b7ab0ac7060dbc8ac628c501` |
+| Archive and remove the recreated fixture: same runtime identity, three restored pads, 12 inactive slots, no project resources left; toolchain container preserved | `parser-lifetime-cleanup-01-20260928.json` | `2f3f28077219c90b8018d942bbf8c80a1d7cd9016d348914f6bf0a6997cf8a57` |
+| Eight fixture evidence files, each checked against the source volume before removal | `parser-lifetime-evidence-01-20260928.tar.gz` | `a6da9e72c8537c6f65e0cf52eb1005ebcfcf527f0281491c16a0fa0bbde43823` |
+
+### Lab fixture cleanup, 2026-09-28
+
+[Cleanup record](env/ai-traffic/CLEANUP-20260928.md). The receipts contain exact
+driver sources, command results and before/after state. Failed attempts are
+retained. Resource state comes from Docker/Kubernetes. Process memory is a KERNEL
+witness; loader status is SELF. This cleanup does not establish traffic health.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Build inventory: three two-container fixture projects, their mounts/volumes, disabled loaded programs, process scan and temporary-file candidates | `vm-cleanup-build-inventory-01-20260928.json` | `dcf4b23b8a2dfe28fdb6887be839e6176f6eec9d21084ee9912867ab67e1416e` |
+| Deployment inventory: five jig-owned resources, shared pod/container identities, routes, disabled loaded programs and process scan | `vm-cleanup-deploy-inventory-01-20260928.json` | `44c15a58f3ac9879696a0af169c9b9e3c08c14ed397a3dbe4c51e93af05b44fa` |
+| Build attempt 01: absent deployed hook index stops the driver before deletion | `vm-cleanup-build-01-20260928.json` | `875562de2db36f538a4dae5024bf39c4d29e37171b6c2d9de8514689d0be6a69` |
+| Deployment attempt 01: same absent-index error; no deletion | `vm-cleanup-deploy-01-20260928.json` | `ddccd0de93340dd34626454df77c52eff658b189422b351d4b78d074e250cdf1` |
+| Build attempt 02: two evidence archives checked; older DLP Compose checksum stops cleanup before deletion | `vm-cleanup-build-02-20260928.json` | `8764bcb07b0a7ac7b44d77026acbb115d91d20dd8c0b8a4249317332da988e6f` |
+| Build attempt 03: all three archives verified, 177 files retained, six containers/six networks/ten volumes removed. No matching test process remains. Toolchain identity/state unchanged | `vm-cleanup-build-03-20260928.json` | `ad87f052a58f616a6082ddf099e25f6ac0c6836851c6bfce26dde6b0ebac50f5` |
+| Deployment attempt 02: five jig-owned resources removed. Other default-namespace pod identities/readiness/restarts and route specifications unchanged. Shared TMM process, binary, parser pad and disabled slot status unchanged; zero restarts. Includes final backend log | `vm-cleanup-deploy-02-20260928.json` | `dca82e1bf56a69612c1496cc408c107efcc8a2fd37388f5bc7bc1b1ae75d3602` |
+| Configuration fixture evidence archive; 39 files, verified against the source volume | `eob-config-20260925-evidence-20260928.tar.gz` | `e1349709a29f663bd7cda1f5173937569c8c4dec4fdb0644c670edcbc04ca6cd` |
+| Tutorial/parser-scope fixture evidence archive; 113 files, including failed attempts, verified against the source volume | `eob-template-20260925-evidence-20260928.tar.gz` | `2d8cb1fc2ea35c4df54d678f1907bb0b8a4d869c3b6e7af013bad0dd129c371f` |
+| DLP/attribution fixture evidence archive; 25 files, verified against the source volume | `eob-dlp-20260924-evidence-20260928.tar.gz` | `a186d37a57ba90153e7722d165aea7555d125b30b4c0b0225c6c47719e904e8c` |
+| Exact final cleanup driver. Earlier driver sources and hashes are embedded in each receipt | `vm-cleanup-driver-20260928.py` | `c28dfb9bf4673e410401272ff1c8388cb81328c526c587ea64678212a7c267e6` |
+
+### Attribution parser scope, 2026-09-28
+
+This experiment tests the observation boundary before enabling attribution.
+An anonymous address tag records equality within one thread. It does not prove
+an object lifetime. The [registered gate](env/ai-traffic/ATTRIBUTION.md#live-parser-scope-gate--registered-2026-09-28-before-the-run)
+requires unsampled records and keeps request scope unvalidated.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Authoritative TMM HTTP source, headers, build-box instructions, packaged hook index and runtime identity. The parser preserves partial state and returns `ERR_MORE_DATA`; the client wrapper resumes it. `http_ingress_initialize` increments a connection-local counter and also handles responses. Includes source hashes and tree/container state; source inspection is not a live lifetime result | `attribution-discover-01-20260928.json` | `0364f9e7af41e66d279d19b98e81d3a25080278498234515efef1c2ec799ff09` |
+| Pinned clang-18/PREVAIL, exit admission and packaged binding pass for the scope probe. Interpreter and JIT checks pass for partial/completed results, opaque address reuse, table capacity without eviction, null address, output refusals and saturated count. Exact sources, tool/input hashes and monitor signing retained. Build `ca69b84f…`, object `72136c0a…`; bench output uses a test sink | `request-scope-build-01-20260928.json` | `7debab6f6536c20fd59b055bc02375fb0107743f2764c83f0f361e132dad67b3` |
+| Live attempt 01 stops at a recorder assertion: it incorrectly requires a lifetime SAFE_RETURN total of zero. The retained slot counter is 16 before and after the first observed call; the new probe selects none. One call produces one record. Cleanup disarms/revokes and kernel bytes are restored; process/container identity is stable, restart count zero. This is a failed test, not a scope result | `request-scope-live-01-20260928.json` | `9c407407acaa00456e5fdfaffdebfad52a685b857b9ece675b9f8ccb0ff3b6c7` |
+| Live attempt 02 passes JSON/XML checks: 61 HTTP responses, 54 accepted fixture operations and seven intended rejections. Armed window: 66 calls/records, 59 successful header parses, seven partial returns. Three fragmented requests each produce `17,17,0`; a paced body follows its successful header parse. Eight address tags appear across multiple independently opened client connections. All 59 attempted joins remain unknown. Zero new errors/selections or reported drops; call/NOP cycle, stable process/container and zero restarts | `request-scope-live-02-20260928.json` | `61d6c42b4e60dbb2859530f2cf018cc1df8926d3910ce2087150f02f4229f35f` |
+| Failed attempt's exact fixture source, registered gate, build/live receipts, disabled slot state and formatting/lint/shell checks | `request-scope-snapshot-01-20260928.json` | `8179e1df1a37f44a804084b921bf20adc233039b53c9b7683cff83a2ea49d185` |
+| Corrected fixture source, both live receipts, original registered gate and build receipt. Final slots 5/6 disabled; configuration status refuses. Black, pylint and shell checks pass. Sources and nested receipts carry hashes | `request-scope-snapshot-02-20260928.json` | `f5667e77d4c9a6a4fd6eba120679f7f610755e7bfc71d7a40f939c82700eaf78` |
+
+### Unsampled observability repairs, 2026-09-25
+
+The repaired host and schema-2 tutorial were checked on the pinned build box.
+Build, package and live results are separate records inside the snapshot.
+The live run used `tmm:OBSERVABILITY-20260925`, build
+`ca69b84f4f5c9e225813b2ed3997c59f18ba2a31`, runtime SHA-256
+`05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611`.
+Witnesses are SELF for host counters and native assertions, INDEPENDENT for
+PREVAIL and the HTTP client, and KERNEL for executable bytes and process state.
+These tests establish neither a per-call cost nor loss-free output under pressure.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Live repair test passes: 126 exact HTTP responses; 112 tutorial calls and records; eight precursor calls and 16 records; one-entry HASH works after output-map replacement; revoking slot 6 preserves slot 5's count; 16 monitor selections; zero reported drops/errors; three call/NOP cycles; stable process, restart count zero | `observability-live-01-20260925.json` | `d7fe04a212d52a6f76cf159bd1203f64d246156c50e77f910f9a083614477980` |
+| Receipt bundle and exact source texts: host attempts 01–03, tutorial checks 06–07, configuration regression, build/package, signing, isolated deployment, live result and final state. Host checks cover all 256 capacities, collision/deletion handling, two threads across 100 replacements, stale references, busy reset, output delivery/drop/off. Includes retained compiler-bound and retired-generator failures. Final black, pylint and shell checks pass | `observability-snapshot-01-20260925.json` | `f6f1b3a85daadc00c404cd67395b2f77779c8887bb38069ca5262b0a301f1bc2` |
+
+### eBPF tutorial, 2026-09-25
+
+The tutorial checks ran on the pinned x86-64 build box. Receipts contain commands,
+tool versions, source hashes, outputs and failures. Bench attempt 05 covers both
+execution modes and target binding. Live attempt 03 completes both variants but
+fails sampling. An earlier live attempt exposes map-storage reuse after revoke.
+Both host defects have build-box reproducers. No cost result is claimed.
+These are the earlier attempts. The [repair records](#unsampled-observability-repairs-2026-09-25)
+supersede their open status without removing the failed evidence.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Attempt 01: staging omitted `ls_core_relo.h`; retained build failure | `template-check-01-20260925.json` | `724e01209e50ba9bf66c4a6a5ed660c4f83f8285692fcff4ddcf3e31020a011e` |
+| Attempt 02: entry passes PREVAIL but native check fails with a one-entry hash map | `template-check-02-20260925.json` | `8c4eda7a9e81751038300684a19dc90c569747b4a31db004887b918fb9a1f2be` |
+| Attempt 03: same failure with explicit `flags=8` map-failure output | `template-check-03-20260925.json` | `4e1abb81447b5c13d17bfc4cdc15f67c1b21c6a771866ebe0e0f032d876d30fb` |
+| Attempt 04: 256-entry map shape; entry/exit PREVAIL and interpreter/JIT pass; unrelocated entry fails as expected | `template-check-04-20260925.json` | `d9536c1e25841bf08c7565c6e0b60bbf0b481506f44adc074267538165a34059` |
+| Attempt 05: final source; bench, input builder, event decoder, malformed-length refusal, packaged entry/exit binding and final PREVAIL pass | `template-check-05-20260925.json` | `b7b736f00ed9c702a327be1beed8261dc1ae50a03ebbe543c00051ed106771ce` |
+| Signing: exact attempt-05 objects, monitor ceiling, packaged runtime identity | `template-program-build.json` | `fe5b6953b934203999d2348996a6ce37a3716d4dffed8a519e035829dd108005` |
+| Live 01: existing configuration fixture; missing-input output works, then state map fails; hook restored | `template-live-01-20260925.json` | `c441a0e6a9b3a45143ebb4c8cd7a17cf440c88e1c7eb440085b2f3802d7beb51` |
+| Fixture 01: retained compile failure; missing uBPF generated-header include directory | `template-fixture-01.json` | `8367625f88176042728dadb5f6c80b110234ed17784efeb13c57c58742345d0e` |
+| Fixture 02: map-reuse falsifier returns 1; registered HASH still has ring storage; starts separate SSA fixture using the same image | `template-fixture-02.json` | `9240eebaea14f244ecf24d8a356544a4243016ab9452c5d96196be46f8cbfb29` |
+| Live 02: fresh fixture; entry fields, state and threshold work; sampling fails; monitor audit records and restored hook retained | `template-live-02-20260925.json` | `2f711feda2195efe97a7b251f5007d9e919abf87f83bf73fe4dd9ed2f8590fa5` |
+| Live 03: both variants complete; 118 exact HTTP responses, 112 calls/events, 16 monitor selections; both sampling checks fail; two restored hook cycles, no restart | `template-live-03.json` | `31b1d36515f4e29ac01001b7a99339f2cde48b9f878d5560a6b51adf167fdeda` |
+| Final snapshot: source texts/hashes, real output bridge reports -1 for delivery and 0 for a drop, lint/shell checks, both fixtures disabled/revoked | `template-snapshot-01.json` | `5abd30b89f107e18e06bab68ade987bc085991dc3a91ede54c3a3f444a38020e` |
+
+### ASD-STE100 Issue 9
+
+Downloaded from the publisher on 2026-09-25. The PDF is available locally for
+checking writing rules and the approved dictionary. Downloading the file does not
+establish that a document complies with the standard.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Full ASD-STE100 Issue 9 standard, from [the publisher](https://www.asd-ste100.org/assets/files/ASD-STE100_ISSUE9.pdf) | `ASD-STE100_ISSUE9.pdf` | `d1f4ea9e7cd6e46b47aa9057209f99e78c0e9cfc4e27a5b07895b05c1a166431` |
+
+### Configuration snapshots, 2026-09-25
+
+P21 runs on the pinned x86-64 build box, with separate staging and an isolated SSA/Tao
+deployment. Bench, build/package and live lifecycle evidence are distinguished below;
+none is a data-path cost measurement.
+Commands, tool/source hashes, stdout, stderr and failures are retained in each receipt.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| First PREVAIL attempt rejects the sample: `Invalid type (r1.type == map_fd)` with static map symbols / pinned clang-18 and PREVAIL | `config-snapshots-check-01-20260925.json` | `5a84c47b1f0cfe3d7f4f815db9e02d69209b9ade8c009130ae6e64644ceeb82e` |
+| Global ELF map symbols fix admission; interpreter/JIT, 10,000 publications/four readers, stale identity/revision and mutation refusals, actual socket-handler framing, CLI error handling and changed-TU syntax checks pass / pinned build-box harness | `config-snapshots-check-02-20260925.json` | `db77a519dedefaabbf8893afabb367dd1f6761eb3ed67665bfdd6cf06ee2fb21` |
+| Latest source rerun adds sticky-unavailability, empty-snapshot withdrawal and existing cross-TU map/helper regressions; all pass. Concurrent run observes 3,643 coherent reads and 175,742 unavailable attempts, with no mixed successful read; this is not a performance/availability budget / same harness | `config-snapshots-check-03-20260925.json` | `36570345e340c155f44fc185545bab6910141617bdcb456715dbd99dfe061e22` |
+| Read-only integration preflight: existing build-tree/staged source hashes agree; candidate differs in intended P21 files; toolchain and isolated fixture running, no make/compiler process in captured inventory / build box | `config-integration-preflight-20260925.json` | `f4a251889b42e87f71542b098609c5113497b4226dd89c9d8a42062a5310ccbd` |
+| Working-tree staging matches by content; subsequent direct invocation of non-executable sync script fails with Permission denied / retained attempt | `config-source-sync-20260925.log` | `b931c5d0e49066adedf6deb214b1998c1490b8805a9826a376a3a8efe2a7694a` |
+| Sync invoked with sh succeeds; prior differences inspected, configuration header/source copied, generated public key excluded, substrate object invalidation confirms zero remain / build box | `config-source-sync-02-20260925.log` | `8212670119e31265cede59e305c5fcb708e704329b2db5386c2f59c7eb034744` |
+| Existing wire-layout/header, audit and loader-client regressions pass / pinned build box | `config-legacy-checks-20260925.log` | `3f5b146c403b0ab3f3711ad16e648cca476d5bfdd733e07b557f13065f3bb1aa` |
+| `make tmm` succeeds through the prescribed toolchain; linked no_pgo artifact is fresh, includes configuration globals/code, build ID `a361c87ff9852ad80b46b661a6401f7fecad2b01`, SHA-256 `a1236133…cf3b3`; source and whitelist hashes recorded, signing public key unchanged. Linked build only, not packaged/live / build box | `config-tmm-build-20260925.json` | `be9a348c046ec21582f3c4dae7c584e6cf404321b2a5965db003f29a94214400` |
+| Packaging and bake succeed; separate `tmm:CONFIG-20260925` image `sha256:9ea1df6a…b837`, packaged runtime build `b8dc27f34a93db91f91b60f0844105bfb30c6f90`, SHA-256 `26e8f07b12a279e7d84f2328363db998a7dfa109a9b3c71847be408a6710a12c` / pinned build box | `config-package-20260925.json` | `ca82a542e1ad65cbd5f5681e0fba4d29d123349c4884b8d571fac77f6b82e8d1` |
+| Packaged-pair discovery, image runtime identity/key match and catalog-free audit pass: 16 layers, 7,504 regular files, 1,318 ELF files / image build gate | `config-bake-20260925.log` | `fa32beb4bc8b1a4ad294cca61461bf62e1cbd1b6e09efd71e1fb14130049743d` |
+| Live configuration-only observer compiled with clang-18.1.3, bound to packaged `http_parse_client_headers` at `0xccc600` (+4 pad), PREVAIL PASS and signed monitor-only; final object SHA-256 `82fb7618…73381` / pinned build box | `config-program-build-20260925.json` | `f8522e8af1b9d51aada934f787c45bd2675f5b17ec737fd7af0e53093b264911` |
+| First live lifecycle's fixture JSON/XML pass, but outer recorder fails: it incorrectly expected jump opcode `e9`, while kernel memory shows the correct `e8` call and restored NOPs. Retained failure; fixture files recovered in snapshot below / isolated SSA | `config-live-01-20260925.json` | `e43bacf98374ba08f9b8ebe14592420984eb28e790151b9183380bd3d42b8fc0` |
+| Corrected full lifecycle passes: 52 exact HTTP responses, 48 armed calls and 48 events across six phases, zero reported drops/errors/safe returns; signed load, missing input, revisions 1/2, empty revision 3, five stale publication refusals, same-bytecode reload/new instance and revoke. Executing `/proc/7/exe` matches packaged SHA; kernel reads capture two call/NOP cycles, same process starttime and unchanged container state/restart count 0 / isolated SSA | `config-live-02-20260925.json` | `efc2652569fa9ade5121a0b6d520aa13b9f4eefecf5f68d187d2812028113861` |
+| Both lifecycle attempts' JSON/XML/logs and exact publisher documents, fixture source text/hashes, image/process state, final revoked slot, TMM/audit logs and successful black/pylint/shell checks / read-only isolated fixture collection | `config-live-snapshot-20260925.json` | `3af4d607ad1f576f5c28d9c6b1b15dae3f8fbfddda16d0713179b147d8f56e8a` |
+
+### Agent attribution fixture, 2026-09-25
+
+Destination-authenticated test protocol through the isolated SSA/Tao TMM. Witness is the
+authored client/authentication ledger (independent of eBPF, not an independent security audit).
+Contract, trust boundary and limits: [`env/ai-traffic/ATTRIBUTION.md`](env/ai-traffic/ATTRIBUTION.md).
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Two-agent run: 23 attempts, 17 accepted, six rejected; 15 attempts share one backend connection, eight interleave on two additional connections. Spoofed claim remains A; forged credential remains unknown; replay and invalid delegation rejected; valid B execution retains A's parent/origin. Includes exact source hashes, client/server ledgers, configuration ACKs, container identity, formatting/lint checks and regression of result-checking against retained failed/successful ICAP receipts. **Recorder limitation:** executing-ELF inventory is empty because its name filter omitted `tmm64.no_pgo`; corrected in the follow-up below / build-box isolated fixture | `ai-attribution-01-20260925.json` | `1b111d69ddfb800a7cee8a28b31cd47ca970909fd0b7ea45166dbd1945f7264d` |
+| ICAP monitor authoring preserved: build receipt plus object/signature hashes; compile, five relocations, target binding, PREVAIL and signing, without a live attach result / `result.icap_probe` in the same snapshot | `ai-attribution-01-20260925.json` | `1b111d69ddfb800a7cee8a28b31cd47ca970909fd0b7ea45166dbd1945f7264d` |
+| First runtime-recorder correction fails explicitly: executable name now matches, but runtime image lacks `readelf`; swallowed OSError still leaves inventory empty. Test receipts unchanged / preserved failed collection | `ai-attribution-runtime-20260925.json` | `b0833cd1301c54015bab408a937a2c708342455438877607b2f0825c6c70a5a1` |
+| Corrected collection: `/proc/6/exe` resolves to `/usr/bin/tmm64.no_pgo`, SHA-256 `a4b9e777…afd7`; identical to packaged build-box runtime whose ELF notes identify `c3b81927dfdcc31137cd8212b5e23bb85677a06c`. Includes process stat, container identity, original unchanged test receipts and all successful collection/check statuses / build-box + isolated TMM | `ai-attribution-runtime-02-20260925.json` | `d9643e82345dd346a44e560c8d55a7724235ba089eedf46501ce46ef47d61673` |
+| Conservative join consumer passes 19 checks in the pinned SSA/Tao fixture. Retained 23-attempt authority ledger plus **synthetic** candidate observations yields 16 attributed, four rejected, three unknown (two ambiguous replay candidates and one unauthenticated attempt). Fresh fixture proofs verify A/B with one nonce, then reject replay; all three candidate joins remain unknown. Missing scope/accounting/rows/events, drops/errors, duplicate request identities/candidates and incomplete authority data fail closed. Includes exact source text/hashes, container identity, black/pylint checks. **No live TMM attribution join or request-lifetime qualification** / isolated fixture consumer test | `ai-attribution-join-01-20260925.json` | `9cb7d8e735b90b3b0dd697bd0f9b5d190df14fe05718061a2a72238364dc6dad` |
+| Follow-up adds explicit ledger-order and event-order permutation challenges: all **21 checks** pass with the same dispositions. Both test receipts and current source/check provenance retained; synthetic observations still do not qualify a live producer / same pinned fixture | `ai-attribution-join-02-20260925.json` | `fb27a8605c8b35ca25512cabe4738732b858fad37fa1733969a1b8e8f1c45581` |
+
+### Isolated inspection fixture, 2026-09-25
+
+Build-box SSA/Tao harness receipts. Forwarding is measured; inspection outcomes and hook cost
+remain separate experiments. Exact scripts and their hashes are embedded in each receipt.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Initial test-image bootstrap failed on authenticated schema download, HTTP 401 / isolated build-box fixture | `ai-icap-bootstrap-401-20260925.json` | `f9ca25f5bcb08c494beb1eb6b91f45e52574fd0eab6bb30e35495402abf90fda` |
+| Bootstrap recovered with hash-pinned schema cached by the authoritative toolchain; healthy fixture, no TMM yet / same fixture | `ai-icap-bootstrap-recovery-20260925.json` | `ceb093226772956734c17c7b22e8cf9197020bff52e8ae5636517898c386f6ee` |
+| First SSA baseline failed before forwarding: synchronous DPC-return validation enabled on asynchronous NATS transport / fixture test log and TMM startup | `ai-icap-baseline-attempt-01-20260925.json` | `978ad094bbf1dd674b4900e3d41ad7613140ea49c6e2e00e555b1ec0b14e5e4e` |
+| Second SSA baseline: successful asynchronous acknowledgement and exact HTTP response through isolated TMM; origin sees TMM self-IP. Includes transport sources, runtime identity and retained first failure / fixture + TMM | `ai-icap-forwarding-baseline-20260925.json` | `b36acc177295bedab789fc3346fee5830db39defc1dc32db679696584997ae1a` |
+| First gate attempt fails: reused IDs across different configuration objects, IVS not found, reset before inspection / fixture and TMM logs | `ai-icap-gate-01-20260925.json` | `3c9d9d031c454b7c12c216f95fb7a659e5f7b6d23f0fda89c51115e180a7f1ec` |
+| Second gate attempt reaches complete inspection but fixture wrongly requires Allow: 204 on a preview request; no verdict emitted / same fixture | `ai-icap-gate-02-20260925.json` | `b87db65f0e388fc061efe0b1b00ded818ba0ca72942ceea7d7bbd32e6ed9af2c` |
+| Third gate attempt: delayed allow, deny and fail-closed timeout pass independent client content/application-read checks; one request each, identical 33-byte body / same fixture, no eBPF attached | `ai-icap-gate-03-20260925.json` | `627464989b9f5fa7e9e6020fe87256c78b8cc26421584cd6e7180bed03607c95` |
+
+### AI inspection integration preflight, 2026-09-24
+
+Read-only investigation on the authoritative build box and stable `kind-vs` pod. These receipts
+establish source/configuration facts, not a live DLP result. Scope and open gates are in
+[`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPECTION.md).
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Adaptation sources/iRules interface, ICAP configuration test examples, build-keyed hook/signature candidates, installed CRD inventory/selected schemas, executing ELF identity and ring configuration / build box + datkube | `ai-inspection-preflight-20260924.json` | `2f06ed79f38f5f64b78ab95aacd3899f1bd545f6961a4777c098622b4a7701f1` |
+| Follow-up adds inference response-passthrough and lossy ext-proc mirror source, plus the ICAP test's separate configuration-server transport; repeats runtime/schema checks / same authoritative hosts | `ai-inspection-preflight-followup-20260924.json` | `e15c9b669c78579525e3e53a9be5358f1a5aaa4d89377e00b5222443c8f08bb8` |
+
+### F5 AI Security Platform overview, 2026-09-24
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| F5's stated platform scope: application/workforce AI security, runtime protection, continuous red teaming, agent/tool governance and data loss prevention / [official overview](https://www.f5.com/products/ai-security-platform#overview), selected text excerpts retrieved with webfetch; product positioning, not independent efficacy or implementation evidence | `f5-ai-security-platform-20260924.md` | `b475f6d710a1f3d6ae9e74189842655dbd86de85a29924e991fcce45b183216a` |
+
+### AI traffic fixture (P19), 2026-09-24
+
+Own-system tiers and scope are recorded in `GROUND_TRUTH.md` and `env/ai-traffic/README.md`.
+The client/backend ledger is authored fixture instrumentation, independent of the eBPF substrate;
+the loopback check is separate from the live proxy run.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Loopback jig check, 51 exchanges/6 streams, source hashes / build-box console receipt | `ai-traffic-loopback-20260924.log` | `e4bc27f84beff232403c5d4b861e7b963add2b6a2d8c64ed802a28e7a3f66438` |
+| Runtime/pod identity, source hashes, installed fixture resources and scoped neighbor pins / datkube | `ai-traffic-preflight-20260924.json` | `83eebee77d2748362dcf0724a31852f80b1aee242bfe9841c2c1440cd5b39c49` |
+| Live client timing/body hashes plus origin events and exact reconciliation / fixture client through TMM | `ai-traffic-flows-20260924.jsonl` | `e080caaa5052e6e6d11f9e15799ca093d22eb802ea6c27bf46854eab975da119` |
+| Separate origin stdout copy / kubectl logs | `ai-traffic-origin-20260924.jsonl` | `d89ceda0db504ec8b2e3f1a9663f48f4f17f1962e94fc154e53d959938419a75` |
+| HTTP proxy configuration with native AI filters disabled / Kubernetes virtual-server object | `ai-traffic-listener-20260924.json` | `cb2a0a5acd81eaad60e859a9a2e986d6fd0735b18d09b42e191343731f9788c9` |
+| Selected TMM client/VIP traffic and listener name / TMM tcpdump, 20 packets | `ai-traffic-packets-20260924.log` | `058f0a009e33659fd331b5f33c9ca119f7eb704a7dce82b70eff2020d499e688` |
+| Passed run summary and final stable TMM identity / datkube driver | `ai-traffic-result-20260924.json` | `96e22dfd1877e137f47f3b744e5d47c80d6d6766cb6ff5eebbc9078ed4f314f7` |
+
+### Application-metadata hook discovery, 2026-09-28
+
+Authoritative build-box source and packaged-binary inspection. No compilation,
+attachment or live native-filter test. [Probe contract](env/ai-traffic/METADATA.md).
+Both receipts retain exact source, hook index, binary identity, commands and driver.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Initial source shortlist on packaged build `ca69b84f…`: no hook-index entries for `a2a_request`, `a2a_lookup_method` or `aimcp_request`; padded response/persistence/inference/server-header entries, with selected disassembly. Full A2A/AIMCP source and JSON interface describe on-demand parsing and length-delimited escaped strings / build box, source and binary inspection only | `metadata-discover-01-20260928.json` | `c87063a42829c15f04e70e915552043020e5c6c13250695bac29b2542dbbfdb9` |
+| Expanded shortlist includes padded `hud_a2a_handler`, `hud_aimcp_handler`, `a2a_walk_and_replace`, `tmm_json_object_get` and `tmm_json_value_get_string`. Source distinguishes unknown methods, normal responses/SSE messages and stored MCP session/pool/endpoint state. Binary SHA `05d17517…a9611`; hook-index build ID matches ELF notes. Argument/field lifetime qualification and live extraction remain pending / same package and source tree | `metadata-discover-02-20260928.json` | `bc408a848aa450078262fed1a5444a2d5159324643c4b2c39d15bcf6102fcc0b` |
+
+### Native-handler event probes, 2026-09-28
+
+These receipts establish event-code extraction, not method/session field extraction.
+Build tests use the pinned toolchain. Live records and clients are SELF evidence;
+hook bytes and process identity are KERNEL evidence. The live receipt retains the
+formatted decoder used there; build 01 retains its earlier, equivalent source.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Handler argument layout, pinned event enum and native-filter fixture source / build box | `metadata-discover-03-20260928.json` | `e2e0de92a19b67f69e2c724d45f78252a8fd740c8dc71e9c31d89e431ff9749f` |
+| Both probes pass pinned PREVAIL and real interpreter/JIT checks; numeric event codes, presence bits, output refusal and instance reset / build box | `metadata-build-01-20260928.json` | `77d6249f0e4e69d4086dc1009973bd6b5b157a412f81e7f2ceb9aa56c47495d7` |
+| Isolated fixture creation / build box | `metadata-create-01-20260928.json` | `48a9180bbd62add2a0d02512fd8ad95a7ee157b60f24ec299d843300b009b522` |
+| Retained standalone inspection failure: `AttributeError: module 'tao' has no attribute 'runner'` / build box | `metadata-preflight-01-20260928.json` | `d56a0561de19640ada5c4a3f1695164eb703036ae08f31ebb90529b168f9d2a7` |
+| Configuration interface inspection succeeds after removing unnecessary Tao imports / build box | `metadata-preflight-02-20260928.json` | `a6e4e60b830d4506e63313056e94188beac52083829fd83da1d18fa92395741e` |
+| Eight requests through native filters; 192 records / 192 calls, 96 per handler, 22 event codes per handler; no reported loss, new VM errors or process restart; restored pads / isolated fixture | `metadata-live-01-20260928.json` | `97cf52b09632725fbacb4d8fb1a90a2094f76f2025be8919234a165e682e0b1b` |
+| Slot/pad checks, evidence archive and isolated fixture removal / build box | `metadata-cleanup-01-20260928.json` | `ccc10f112fdc742f0e9773b82782ef1cdeba8120ce834c1788f780cffe9f2837` |
+| Archived live fixture result, logs and source files / build box | `metadata-evidence-01-20260928.tar.gz` | `526a42461530f8db00cdb1a2239fbf83796aceb28da803c9706b2bc2c23202cb` |
+
+### Root-object method extraction, 2026-09-28
+
+The field probe reads an application's returned string after checking its owner
+and member key. It does not infer a request identity or decode untouched fields.
+Live value comparisons are SELF evidence. Hook restoration and stable process
+identity are KERNEL evidence. PREVAIL is INDEPENDENT admission evidence.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| JSON parser source and packaged debug layouts: value owner, member key/value links, circular list and string descriptor. No indexed `a2a_get_subtree` hook / build box | `metadata-discover-04-20260928.json` | `add07c4e5d2372d63331e475584f9a3aa950d3dcd202343f89d0bd79719fcc47` |
+| Retained PREVAIL failure: first record layout exceeded the 256-byte stack limit; not loaded / pinned build box | `method-build-01-20260928.json` | `aeee0a5e32a463d4048b15ae91080db74cc56c2d60e41dd205c47aa019c7a5fb` |
+| Revised 144-byte record passes the same PREVAIL limit and exit admission; 40 interpreter/JIT records check exact values, escapes, lengths, guard pages, scope, budget and output refusal / pinned build box | `method-build-02-20260928.json` | `4bafaa39b6b985d1464820d6d8d5a195454509405a477deeb8528fd33ff1c0c1` |
+| Isolated field-test fixture creation / build box | `method-create-01-20260928.json` | `23b2268527a1ffe322ebc48f20650822c0a1c9d7e7e5067e6b15ad43363c138c` |
+| Ten live requests; six exact string/prefix comparisons, one getter error, one exhausted walk; nested-only and AIMCP inputs produce no getter calls. Eight calls/eight records, no reported loss/new VM errors/restart, restored hook / isolated native-filter fixture | `method-live-01-20260928.json` | `99a55f596c65f6450ba58881db0fea67accc9de5ddf35605746445b9253d8c9f` |
+| Verified disabled slots, restored pad, archived evidence and removed only the isolated fixture / build box | `method-cleanup-01-20260928.json` | `d42660a3fd2f1d2caafcd643fafd1f6ca6c92d53bef4aa335ad7312f190cb4a6` |
+| Live result, Tao logs and configuration receipt archive / build box | `method-evidence-01-20260928.tar.gz` | `faab547e916cee6df0008beaaa4138d7518b836bf7f3c155c5a8fed8473bad1b` |
+
+### AI protocol source inventory, 2026-09-24
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| A2A protocol processing and AIMCP session-persistence sources, active filelist entries, source hashes and selected excerpts / authoritative build-box TMM tree at `e2104734a940a099a9190eb84bfbea01fb4b81d4`; source inspection only | `ai-protocol-source-20260924.txt` | `f9014e986fbfb53af272393262fb9ac1c3ce3d84bfbc85e305c49f26b15d7202` |
+
+### Embedded-structure traversal (P17), 2026-09-24
+
+The fixture, real-target authoring and live results have separate scopes in
+[`embedded-traversal-validation.md`](embedded-traversal-validation.md) and `GROUND_TRUTH.md`.
+Failed pre-probe network attempts are retained alongside the successful run.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Native offset/value oracle, pinned PREVAIL, interpreter/JIT and refusal checks / build box | `embedded-fixtures-20260924.log` | `7a5e2d02362c3af81c59ac01bcfd37dbf918797de29fd815978abbb81fe161aa` |
+| Preserved legacy catalog, 12 real-TMM relocations, final target binding/verification/signing / build box | `embedded-authoring-20260924.log` | `18ce81443d72372afa8f9faf4b729c7d9715122c29dffd95eb86bbed7700b545` |
+| Exact real-target authoring driver / build box | `embedded-authoring-driver-20260924.py` | `82815c5ea3637a3f87b8c9a2ff0edc504fcc4895a41c4bb44cdcc2439fe4557f` |
+| Three live HTTP/1 probes, counters, independent patch readback, stable pod/cleanup and competing ARP replies / datkube | `embedded-live-20260924.log` | `6b0b719c97ce1bf74729538e3d38c106c17d3cb1cbed9b9e34d75231d03aadf8` |
+| Exact pinned-pod live driver, including unexercised neighbor-pin fallback / datkube | `embedded-live-driver-20260924.py` | `16e807d2c814ba68717f7ddc61a56eb7d49c47a3ac7fb4e99d8f90e3eeeac31e` |
+| Failed baseline warm-ups before program loading / datkube | `embedded-live-warmup-failed-20260924.log` | `6e6a5bb3ead81a9646c3a776173351669041148edf48135cfb09277100ba03e7` |
+| Failed baseline, captured backend handshake and competing-MAC reset / datkube | `embedded-live-network-failed-20260924.log` | `96891fc7568a54a362a82a3874fd53ce0ed93e16bec71566656a35895f355ae5` |
+
+### Catalog-free deployment, 2026-09-24 — build-box / cluster receipts
+
+Own-system results are tiered in `GROUND_TRUTH.md`; these files also anchor claims about the
+external TMM build and toolchain. Full hashes are repeated in `evidence/cache/MANIFEST.sha256`.
+
+| Claim / origin | Cached file (`evidence/cache/`) | SHA-256 |
+|---|---|---|
+| Previous CTX96 image still carried TSV catalogs / build-box Docker | `catalog-before-20260924.log` | `6adc37ec222a8de310351457a01c23e44e25e7d42c7b087e8a8ec2537e072b25` |
+| Pinned parser/sanitizer/verifier, signature and client checks / build box | `catalog-checks-20260924.log` | `2d533e62b2119e4675011f43952fb7de250997528f22c258b7f4ba5ade87e3a1` |
+| Packaged build identity / build box | `catalog-package-20260924.log` | `5e6c51c79a1c56c763e3ab6ff9e24dd7348cbf73a624aa3a86e267eed2b77902` |
+| Build/program/image/layer audit / build box | `catalog-bake-20260924.log` | `2eed800d90c768934fa9da0865f782de49be39cb772a3e4764d652ee28fe0008` |
+| Pre-ship content and every-layer checks / build box | `catalog-ship-20260924.log` | `b3a04605d6fff7b9e0ed57d4dcee2a6d73e632909480e5a8df6bb57c1c17406d` |
+| Per-node import and rollout / datkube | `catalog-deploy-20260924.log` | `2c986105d8760cf0113937b358780f14bcd83e801a011060020093f41788fb97` |
+| Discovery and final DSL verification/signing / build box | `catalog-discovery-20260924.log` | `a4ca48250f576bb7c2c5db333720bd7cd611edc9a916275d4fedd496b36f645c` |
+| Final signed probes, including valid different-target control / build box | `catalog-probes-final-20260924.log` | `3a31e5b3c2d8a32a0b39025cc2a43458127f9caee74bb5315ec7032d8de60da5` |
+| First live target/context run / datkube | `catalog-live-20260924.log` | `66ebd72e290bed5ebd97fb411ea3770ffe7f4a3f1e10bcfc8bf5766638055f35` |
+| Complete repeat with valid different-hook replacement / datkube | `catalog-live-retarget-20260924.log` | `d7cac00e337d97857c2e5f053b94c9e65ea4d6525258c68931bb4cc146dd1a59` |
+| DSL entry/exit traffic counters / datkube | `catalog-dsl-live-20260924.log` | `433d381fb694d90b2d4de7725eccb3f661acfa57ea44fbdd6715538d71123370` |
+| Initial final pad/slot/identity and fixture cleanup / datkube | `catalog-final-20260924.log` | `76153c90ccd45dde0e22e2d5e9afcd7e99af775d1b2bb6585c32e16d497b0f91` |
+| Final repeated-run pad/slot and cleanup / datkube | `catalog-final-retarget-20260924.log` | `c2b34c26ba9ad71a617fe9da87d2e4fe113618678baee872eb4f207cf9e015f8` |
+| Full `src/` status, source hashes, file/line counts / authoritative TMM tree | `catalog-tree-20260924.log` | `cf35c19d54fd353c385ef7208ec76c11ab00b08a33e88bba73ce8c68a2bdb1d9` |
+
+### Vendored and retrieved references
+
 | claim it supports | origin | cached file | SHA-256 | retrieved (UTC) |
 |---|---|---|---|---|
 | uBPF: PREVAIL assumes r1 points to a valid memory region; uBPF enforces no context layout | vendored ubpf/docs/VerifiedPrograms.md @ c900ed9f | [`ubpf-c900ed9f-VerifiedPrograms.md`](evidence/cache/ubpf-c900ed9f-VerifiedPrograms.md) | `4efc1fd5f1dec514cc305b280c47fd76…` | 2026-08-20T12:37:56Z |

@@ -1,0 +1,132 @@
+RUNTIME RECEIPT {"build_id": "c3b81927dfdcc31137cd8212b5e23bb85677a06c", "sha256": "a4b9e777a1daccd8c2b8c7f1aa7eba920b6040253f45f017605ea0a5f0a8afd7"}
+SHA256 cb165a1d48da5e8cfc69caec09bea3e9995d16d84cc368d021de5dc6595c2466 /home/starin/lstools/tmm.btf
+SHA256 64b57167c0e1719f970470557105d00e972b42b36bbb3577cba5b5f9c481df5c /home/starin/lstools/signatures.tsv
+SHA256 83e9d4b5fbd22a48c8ea8a7b271ce852a6eccc62daa0aaffd2d149832963356f /home/starin/lstools/hook-index.tsv
+SHA256 f125c6ff4d2f33558e98fa7ecbc7104ea1e4677cdee1e5f471b11711b936b921 /home/starin/eob-tmm-staged/substrate/gen_type_catalog.py
+SHA256 8a1d8a2d0cf99b85fe500a4eeb21482a23e3c73676077334427f5695401d4a23 /home/starin/eob-tmm-staged/substrate/tmmtrace.py
+SHA256 82815c5ea3637a3f87b8c9a2ff0edc504fcc4895a41c4bb44cdcc2439fe4557f /tmp/embedded-authoring-driver-20260924.py
+PASS all existing catalog keys unchanged; embedded owner types 3184
+SHA256 49b34181c76bb76089d538bed66c46e841f96ba5b860ca484b8f60f99aee0ff2 /home/starin/embedded-p17-20260924/types.json
+CASE nested fexit/http_parse_client_headers /args.cache.cur_entries > 0/ { count() }
+built /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_6bb6a8.bpf.o  (count)  section fexit/http_parse_client_headers  verified=True
+CASE nested-control fexit/http_parse_client_headers /args.cache.cur_entries == 0/ { count() }
+built /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_883ba8.bpf.o  (count)  section fexit/http_parse_client_headers  verified=True
+CASE embedded-pointer fentry/http_parse_client_headers /args.xfrag_head.tqh_first.len > 0/ { count() }
+built /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_5ac447.bpf.o  (count)  section fentry/http_parse_client_headers  verified=True
+CASE pointer-embedded fentry/http2_http_data_to_frames /arg0.http_data.ci.http.cache.cur_entries > 0/ { count() }
+built /home/starin/embedded-p17-20260924/tt_http2_http_data_to_frames_count_011bbe.bpf.o  (count)  section fentry/http2_http_data_to_frames  verified=True
+COMMAND gcc -O2 -DLS_CORE_RELO_TEST /home/starin/eob-tmm-staged/substrate/ls_core_relo.c -o /home/starin/embedded-p17-20260924/relo
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/check_relo_baked.py /home/starin/lstools/tmm.btf /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_6bb6a8.bpf.o /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_883ba8.bpf.o /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_5ac447.bpf.o /home/starin/embedded-p17-20260924/tt_http2_http_data_to_frames_count_011bbe.bpf.o --relo /home/starin/embedded-p17-20260924/relo
+target BTF : /home/starin/lstools/tmm.btf (116727 types, 6712122 bytes)
+relocator  : /home/starin/embedded-p17-20260924/relo
+
+=== per program ===
+  program                    relos  agree  diff  note
+  tt_http_parse_client_headers_count_6bb6a8.bpf.o     2      2     0  
+  tt_http_parse_client_headers_count_883ba8.bpf.o     2      2     0  
+  tt_http_parse_client_headers_count_5ac447.bpf.o     3      3     0  
+  tt_http2_http_data_to_frames_count_011bbe.bpf.o     5      5     0  
+
+=== result ===
+  relocations checked : 12
+  agree               : 12
+  MISMATCH            : 0
+  unresolved          : 0
+  non-reproducible    : 0
+  fatal hazards       : 0
+
+  Two independent implementations agree on every relocation, and no
+  relocated field is a bitfield that a scalar read would get wrong.
+COMMAND dpkg-deb -x /home/starin/code/tmm/docker_build/DEBS/amd64/tmm_10.207-3.HEAD.b13f8f034e_amd64.deb /home/starin/embedded-p17-20260924/target
+COMMAND dpkg-deb -x /home/starin/code/tmm/docker_build/DEBS/amd64/tmm-debuginfo_10.207-3.HEAD.b13f8f034e_amd64.deb /home/starin/embedded-p17-20260924/target
+COMMAND /home/starin/embedded-p17-20260924/relo /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_6bb6a8.bpf.o /home/starin/lstools/tmm.btf /home/starin/embedded-p17-20260924/nested.bpf.o
+target BTF: 116727 types
+ls_core_relocate rc=0, 2 relo(s)
+wrote relocated object: /home/starin/embedded-p17-20260924/nested.bpf.o
+COMMAND /usr/lib/llvm-18/bin/llvm-objcopy --remove-section=.BTF --remove-section=.BTF.ext --remove-section=.rel.BTF.ext /home/starin/embedded-p17-20260924/nested.bpf.o
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/bind_target.py --prog /home/starin/embedded-p17-20260924/nested.bpf.o --binary /home/starin/embedded-p17-20260924/target/usr/bin/tmm64.no_pgo --debug /home/starin/embedded-p17-20260924/target/usr/lib/debug/usr/bin/tmm64.no_pgo.debug --index /home/starin/lstools/hook-index.tsv --objcopy /usr/lib/llvm-18/bin/llvm-objcopy
+exit-admit: http_parse_client_headers
+  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fexit/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+COMMAND /home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail /home/starin/embedded-p17-20260924/nested.bpf.o fexit/http_parse_client_headers --termination --strict --no-division-by-zero --stack-size 256
+PASS: fexit/http_parse_client_headers/tt_http_parse_client_headers_count_6bb6a8 (terminates within 0 loop iterations)
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/sign_shield.py --key /home/starin/.ls-signing/shield_sk.pem --prog /home/starin/embedded-p17-20260924/nested.bpf.o --hook http_parse_client_headers --mode-ceiling monitor --build-min 0xc3b81927 --build-max 0xc3b81927 -o /home/starin/embedded-p17-20260924/nested.bpf.sig
+  signed /home/starin/embedded-p17-20260924/nested.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 1d717cc63687dd3b6468cfb1951aff358c84c186c66c03f77625899b65987169
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/embedded-p17-20260924/nested.bpf.sig  (112-byte binding + 64-byte signature)
+SHA256 1d717cc63687dd3b6468cfb1951aff358c84c186c66c03f77625899b65987169 /home/starin/embedded-p17-20260924/nested.bpf.o
+SHA256 055a517afa0e98fd2c00ca7bae95544d05e541018c644cb8430c1ebd9190f837 /home/starin/embedded-p17-20260924/nested.bpf.sig
+COMMAND /home/starin/embedded-p17-20260924/relo /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_883ba8.bpf.o /home/starin/lstools/tmm.btf /home/starin/embedded-p17-20260924/nested-control.bpf.o
+target BTF: 116727 types
+ls_core_relocate rc=0, 2 relo(s)
+wrote relocated object: /home/starin/embedded-p17-20260924/nested-control.bpf.o
+COMMAND /usr/lib/llvm-18/bin/llvm-objcopy --remove-section=.BTF --remove-section=.BTF.ext --remove-section=.rel.BTF.ext /home/starin/embedded-p17-20260924/nested-control.bpf.o
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/bind_target.py --prog /home/starin/embedded-p17-20260924/nested-control.bpf.o --binary /home/starin/embedded-p17-20260924/target/usr/bin/tmm64.no_pgo --debug /home/starin/embedded-p17-20260924/target/usr/lib/debug/usr/bin/tmm64.no_pgo.debug --index /home/starin/lstools/hook-index.tsv --objcopy /usr/lib/llvm-18/bin/llvm-objcopy
+exit-admit: http_parse_client_headers
+  #5 return type : enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_VAL, ERR_ARG, ERR_BOUNDS, ERR_TOOBIG, ERR_ABRT, ERR_CONN, ERR_VLAN, ERR_RTE, ERR_NEIGHBOR, ERR_USE, ERR_PORT, ERR_IO, ERR_EXPIRED, ERR_REJECT, ERR_MORE_DATA, ERR_NOT_FOUND, ERR_HUD_ABORT, ERR_HUD_TEARDOWN, ERR_INPROGRESS, ERR_MCP, ERR_DB, ERR_TCL, ERR_DL, ERR_ISCONNECTED, ERR_HA_UNIT_NOT_ACTIVE, ERR_NOTINPROGRESS, ERR_TYPE, ERR_VERSION, ERR_INIT, ERR_UNKNOWN, ERR_NOT_SUPPORTED, ERR_LICENSE, ERR_ALIGN, ERR_TIMEOUT, ERR_ENCAP_FAILED, ERR_VERBOTEN, ERR_TUNNEL, ERR_WOULDBLOCK, ERR_OPENSSLRNG, ERR_RETRY, ERR_DUPLICATE_ENTRY, ERR_UNRECOVERABLE, ERR_LAST} --- enum {ERR_OK, ERR_MEM, ERR_BUF, ERR_V... (rax)
+  #4a unwind     : clear --- TMM imports no unwind initiator (P8 holds)
+  #4b frame      : no LSDA --- plain frame, nothing for an unwind to process here
+  VERDICT        : ADMIT
+  bound fexit/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+COMMAND /home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail /home/starin/embedded-p17-20260924/nested-control.bpf.o fexit/http_parse_client_headers --termination --strict --no-division-by-zero --stack-size 256
+PASS: fexit/http_parse_client_headers/tt_http_parse_client_headers_count_883ba8 (terminates within 0 loop iterations)
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/sign_shield.py --key /home/starin/.ls-signing/shield_sk.pem --prog /home/starin/embedded-p17-20260924/nested-control.bpf.o --hook http_parse_client_headers --mode-ceiling monitor --build-min 0xc3b81927 --build-max 0xc3b81927 -o /home/starin/embedded-p17-20260924/nested-control.bpf.sig
+  signed /home/starin/embedded-p17-20260924/nested-control.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 252862ed842cc4a9dbb2fddcc269e2984398b1885011fb8fe944a4dc98f0d1b0
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/embedded-p17-20260924/nested-control.bpf.sig  (112-byte binding + 64-byte signature)
+SHA256 252862ed842cc4a9dbb2fddcc269e2984398b1885011fb8fe944a4dc98f0d1b0 /home/starin/embedded-p17-20260924/nested-control.bpf.o
+SHA256 92337fdaeff547199735c3c9034fefee8e4f0828b44a241624f89d79a2734666 /home/starin/embedded-p17-20260924/nested-control.bpf.sig
+COMMAND /home/starin/embedded-p17-20260924/relo /home/starin/embedded-p17-20260924/tt_http_parse_client_headers_count_5ac447.bpf.o /home/starin/lstools/tmm.btf /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o
+target BTF: 116727 types
+ls_core_relocate rc=0, 3 relo(s)
+wrote relocated object: /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o
+COMMAND /usr/lib/llvm-18/bin/llvm-objcopy --remove-section=.BTF --remove-section=.BTF.ext --remove-section=.rel.BTF.ext /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/bind_target.py --prog /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o --binary /home/starin/embedded-p17-20260924/target/usr/bin/tmm64.no_pgo --debug /home/starin/embedded-p17-20260924/target/usr/lib/debug/usr/bin/tmm64.no_pgo.debug --index /home/starin/lstools/hook-index.tsv --objcopy /usr/lib/llvm-18/bin/llvm-objcopy
+  bound fentry/http_parse_client_headers -> 0xccc600 (+4 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+COMMAND /home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o fentry/http_parse_client_headers --termination --strict --no-division-by-zero --stack-size 256
+PASS: fentry/http_parse_client_headers/tt_http_parse_client_headers_count_5ac447 (terminates within 0 loop iterations)
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/sign_shield.py --key /home/starin/.ls-signing/shield_sk.pem --prog /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o --hook http_parse_client_headers --mode-ceiling monitor --build-min 0xc3b81927 --build-max 0xc3b81927 -o /home/starin/embedded-p17-20260924/embedded-pointer.bpf.sig
+  signed /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o
+    hook          : http_parse_client_headers
+    prog sha256   : 2ffad48f0038475085e4d78c992af37b0fb48be34f87e7cea15b4d915c9a6471
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/embedded-p17-20260924/embedded-pointer.bpf.sig  (112-byte binding + 64-byte signature)
+SHA256 2ffad48f0038475085e4d78c992af37b0fb48be34f87e7cea15b4d915c9a6471 /home/starin/embedded-p17-20260924/embedded-pointer.bpf.o
+SHA256 a5c5ce1d61cfa0efb43823cdb783bae3a1e5fa3ee9ba745f586ce34577db13e8 /home/starin/embedded-p17-20260924/embedded-pointer.bpf.sig
+COMMAND /home/starin/embedded-p17-20260924/relo /home/starin/embedded-p17-20260924/tt_http2_http_data_to_frames_count_011bbe.bpf.o /home/starin/lstools/tmm.btf /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o
+target BTF: 116727 types
+ls_core_relocate rc=0, 5 relo(s)
+wrote relocated object: /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o
+COMMAND /usr/lib/llvm-18/bin/llvm-objcopy --remove-section=.BTF --remove-section=.BTF.ext --remove-section=.rel.BTF.ext /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/bind_target.py --prog /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o --binary /home/starin/embedded-p17-20260924/target/usr/bin/tmm64.no_pgo --debug /home/starin/embedded-p17-20260924/target/usr/lib/debug/usr/bin/tmm64.no_pgo.debug --index /home/starin/lstools/hook-index.tsv --objcopy /usr/lib/llvm-18/bin/llvm-objcopy
+  bound fentry/http2_http_data_to_frames -> 0xcef580 (+0 pad), full build c3b81927dfdcc31137cd8212b5e23bb85677a06c
+  Run PREVAIL on these final bytes, then sign.
+COMMAND /home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o fentry/http2_http_data_to_frames --termination --strict --no-division-by-zero --stack-size 256
+PASS: fentry/http2_http_data_to_frames/tt_http2_http_data_to_frames_count_011bbe (terminates within 0 loop iterations)
+COMMAND python3 /home/starin/eob-tmm-staged/substrate/sign_shield.py --key /home/starin/.ls-signing/shield_sk.pem --prog /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o --hook http2_http_data_to_frames --mode-ceiling monitor --build-min 0xc3b81927 --build-max 0xc3b81927 -o /home/starin/embedded-p17-20260924/pointer-embedded.bpf.sig
+  signed /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o
+    hook          : http2_http_data_to_frames
+    prog sha256   : 898c7ffb68bf7427d371f6be05059a8aaf0890d15e4ff69b0aee51e64129b175
+    mode ceiling  : monitor
+    ctx abi       : 3  (from shield_abi.h)
+    builds        : 0xc3b81927 .. 0xc3b81927
+    out           : /home/starin/embedded-p17-20260924/pointer-embedded.bpf.sig  (112-byte binding + 64-byte signature)
+SHA256 898c7ffb68bf7427d371f6be05059a8aaf0890d15e4ff69b0aee51e64129b175 /home/starin/embedded-p17-20260924/pointer-embedded.bpf.o
+SHA256 4e67d854d55b4efc20883c0c48d036962232ed6b3026e85a3d323e81cfa2e89e /home/starin/embedded-p17-20260924/pointer-embedded.bpf.sig
+PASS real-TMM authoring: independent relocation check, bind, final PREVAIL, sign; not live execution
