@@ -1,0 +1,209 @@
+{
+  "passed": true,
+  "action": "create",
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"status\":\"running\",\"started\":\"2026-08-21T18:14:16.71521944Z\",\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--env-file",
+        "template-fixture.env",
+        "--project-name",
+        "eob-template-20260925",
+        "-f",
+        "icap-compose.yaml",
+        "-f",
+        "config-compose.yaml",
+        "-f",
+        "observability-compose.yaml",
+        "-f",
+        "collector-compose.yaml",
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        "180",
+        "fixture",
+        "tmm"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": " Volume eob-template-20260925_evidence Creating \n Volume eob-template-20260925_evidence Creating \n Network eob-template-20260925_management Creating \n Network eob-template-20260925_management Creating \n Volume eob-template-20260925_ls-sockets Creating \n Volume eob-template-20260925_nats-certs Creating \n Volume eob-template-20260925_nats-certs Creating \n Volume eob-template-20260925_ls-sockets Creating \n Volume eob-template-20260925_collector-api Creating \n Volume eob-template-20260925_collector-api Creating \n Network eob-template-20260925_data Creating \n Network eob-template-20260925_data Creating \n Volume eob-template-20260925_ls-stream Creating \n Volume eob-template-20260925_ls-stream Creating \n Volume eob-template-20260925_evidence Created \n Volume eob-template-20260925_evidence Created \n Volume eob-template-20260925_ls-sockets Created \n Volume eob-template-20260925_ls-sockets Created \n Volume eob-template-20260925_collector-api Created \n Volume eob-template-20260925_collector-api Created \n Volume eob-template-20260925_ls-stream Created \n Volume eob-template-20260925_ls-stream Created \n Volume eob-template-20260925_nats-certs Created \n Volume eob-template-20260925_nats-certs Created \n Network eob-template-20260925_management Created \n Network eob-template-20260925_management Created \n Network eob-template-20260925_data Created \n Network eob-template-20260925_data Created \n Container eob-template-20260925-fixture-1 Creating \n Container eob-template-20260925-fixture-1 Created \n Container eob-template-20260925-tmm-1 Creating \n Container eob-template-20260925-tmm-1 Created \n Container eob-template-20260925-fixture-1 Starting \n Container eob-template-20260925-fixture-1 Started \n Container eob-template-20260925-fixture-1 Waiting \n Container eob-template-20260925-fixture-1 Healthy \n Container eob-template-20260925-tmm-1 Starting \n Container eob-template-20260925-tmm-1 Started \n Container eob-template-20260925-fixture-1 Waiting \n Container eob-template-20260925-tmm-1 Waiting \n Container eob-template-20260925-fixture-1 Healthy \n Container eob-template-20260925-tmm-1 Healthy \n"
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "eob-template-20260925-tmm-1",
+        "--format",
+        "{{.Image}}"
+      ],
+      "rc": 0,
+      "stdout": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "5"
+      ],
+      "rc": 1,
+      "stdout": "",
+      "stderr": "no loader socket at /run/ls/ls_load.sock or /run/ls/ls_load.sock.* --- is LS_LOAD_SOCKET set, and did the loader thread start? Check the pod log for 'LOADER LISTENING'.\n"
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "5"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "a823df28e140\n73d281aea81a\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "a823df28e140",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"a823df28e140a26e1e7ddba59513bc919f8d0891783e4de7004186ca342531be\",\"name\":\"/eob-template-20260925-tmm-1\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"status\":\"running\",\"started\":\"2026-09-28T21:16:12.769793197Z\",\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "73d281aea81a",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"73d281aea81a2b05ceca0c4ac588e8897e9918dca6197ff4649fe1600c805055\",\"name\":\"/eob-template-20260925-fixture-1\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"status\":\"running\",\"started\":\"2026-09-28T21:16:07.926910478Z\",\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"status\":\"running\",\"started\":\"2026-08-21T18:14:16.71521944Z\",\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": {
+    "lifetime_fixture.py": {
+      "sha256": "320b9076cf7f7eddd20c196b19c4d4ce9fa4be8cb45f323ab130e6ff08705cb6",
+      "text": "#!/usr/bin/env python3\n\"\"\"Create or archive/remove only the isolated parser-lifetime Compose fixture.\"\"\"\nimport argparse\nimport hashlib\nimport io\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport tarfile\nimport time\n\nfrom config_live_run import WITNESS\n\nROOT = Path(\"/home/starin/eob-config-20260925\")\nPROJECT = \"eob-template-20260925\"\nCOMPOSE = (\"docker\", \"compose\", \"--env-file\", \"template-fixture.env\", \"--project-name\",\n           PROJECT, \"-f\", \"icap-compose.yaml\", \"-f\", \"config-compose.yaml\",\n           \"-f\", \"observability-compose.yaml\")\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"action\", choices=(\"create\", \"archive-cleanup\"))\n    parser.add_argument(\"--output\", type=Path, required=True)\n    parser.add_argument(\"--archive\", type=Path)\n    parser.add_argument(\"--live\", type=Path)\n    parser.add_argument(\"--collector-image\")\n    parser.add_argument(\"--collector-source\", type=Path)\n    args = parser.parse_args()\n    record = {\"passed\": False, \"action\": args.action, \"commands\": [], \"sources\": {}}\n    compose = COMPOSE\n    environment = os.environ.copy()\n    if args.collector_image:\n        assert args.collector_image.startswith(\"sha256:\") and args.collector_source.is_dir()\n        compose += (\"-f\", \"collector-compose.yaml\")\n        environment.update(COLLECTOR_IMAGE=args.collector_image,\n                           COLLECTOR_SOURCE_DIR=str(args.collector_source.resolve()))\n        record[\"collector_image\"] = args.collector_image\n\n    def run(*argv, check=True):\n        result = subprocess.run(argv, cwd=ROOT, env=environment, capture_output=True, text=True, timeout=240, check=False)\n        record[\"commands\"].append({\"argv\": argv, \"rc\": result.returncode,\n                                   \"stdout\": result.stdout, \"stderr\": result.stderr})\n        if check:\n            result.check_returncode()\n        return result.stdout\n\n    def inventory():\n        rows = []\n        for identity in run(\"docker\", \"ps\", \"-aq\").split():\n            rows.append(json.loads(run(\"docker\", \"inspect\", identity, \"--format\",\n                '{\"id\":{{json .Id}},\"name\":{{json .Name}},\"image\":{{json .Image}},'\n                '\"status\":{{json .State.Status}},\"started\":{{json .State.StartedAt}},'\n                '\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}')))\n        return rows\n\n    with args.output.open(\"x\") as receipt:\n        try:\n            for name in (\"lifetime_fixture.py\", \"icap-compose.yaml\", \"config-compose.yaml\",\n                         \"observability-compose.yaml\", \"template-fixture.env\"):\n                path = ROOT / name\n                record[\"sources\"][name] = {\"sha256\": hashlib.sha256(path.read_bytes()).hexdigest(),\n                                           \"text\": path.read_text()}\n            record[\"before\"] = inventory()\n            if args.collector_image:\n                path = ROOT / \"collector-compose.yaml\"\n                record[\"sources\"][path.name] = {\"sha256\": hashlib.sha256(path.read_bytes()).hexdigest(), \"text\": path.read_text()}\n            owned = [row for row in record[\"before\"] if row[\"project\"] == PROJECT]\n            if args.action == \"create\":\n                assert not owned, owned\n                run(*compose, \"up\", \"-d\", \"--wait\", \"--wait-timeout\", \"180\", \"fixture\", \"tmm\")\n                image = run(\"docker\", \"inspect\", PROJECT + \"-tmm-1\", \"--format\", \"{{.Image}}\")\n                assert image.strip() == \"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\"\n                for _ in range(60):\n                    status = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                                 \"/work/ls-load.py\", \"status\", \"5\", check=False)\n                    if status.startswith(\"OK \"):\n                        break\n                    time.sleep(2)\n                else:\n                    raise RuntimeError(\"isolated loader did not become ready\")\n            else:\n                assert len(owned) == (3 if args.collector_image else 2) and args.archive is not None and args.live is not None\n                assert not args.archive.exists()\n                live = json.loads(args.live.read_text())\n                assert live[\"passed\"]\n                assert next(r[\"id\"] for r in owned if r[\"name\"].endswith(\"-tmm-1\")) == json.loads(live[\"before\"].split()[0])\n                record[\"live_sha256\"] = hashlib.sha256(args.live.read_bytes()).hexdigest()\n                record[\"witness_script\"] = WITNESS\n                for label, program in live[\"program_build\"][\"programs\"].items():\n                    rows = [json.loads(line) for line in run(\n                        \"docker\", \"exec\", PROJECT + \"-tmm-1\", \"python3\", \"-u\", \"-c\",\n                        WITNESS, program[\"entry\"]).splitlines()]\n                    expected = live[\"witnesses\"][label][\"initial\"]\n                    assert rows[0][\"sha256\"] == expected[\"sha256\"]\n                    assert rows[0][\"bytes\"] == rows[-1][\"bytes\"] == expected[\"bytes\"]\n                    assert rows[0][\"stat\"].split()[21] == expected[\"stat\"].split()[21]\n                for slot in range(12):\n                    text = run(\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\",\n                               \"/work/ls-load.py\", \"status\", str(slot))\n                    assert text.startswith(\"OK \") and (\"mode=0\" in text or \"armed=0\" in text), text\n                record[\"manifest\"] = json.loads(run(\n                    \"docker\", \"exec\", PROJECT + \"-fixture-1\", \"python3\", \"-c\",\n                    'import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); '\n                    'print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() '\n                    'for p in root.rglob(\"*\") if p.is_file()}))'))\n                archive = subprocess.run([\"docker\", \"exec\", PROJECT + \"-fixture-1\", \"tar\", \"czf\", \"-\",\n                                          \"-C\", \"/evidence\", \".\"], capture_output=True, timeout=60, check=True)\n                members = {}\n                with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode=\"r:gz\") as stream:\n                    for member in stream.getmembers():\n                        if member.isfile():\n                            name = member.name.removeprefix(\"./\")\n                            assert not name.endswith((\".pem\", \".key\", \".p12\"))\n                            assert name not in members\n                            data = stream.extractfile(member).read()\n                            assert b\"PRIVATE KEY-----\" not in data and b\"BEGIN CERTIFICATE\" not in data\n                            members[name] = hashlib.sha256(data).hexdigest()\n                        else:\n                            assert member.isdir(), member.name\n                assert members == record[\"manifest\"] and members\n                with args.archive.open(\"xb\") as output:\n                    output.write(archive.stdout)\n                record[\"archive\"] = {\"path\": str(args.archive), \"files\": len(members),\n                                     \"sha256\": hashlib.sha256(archive.stdout).hexdigest()}\n                run(*compose, \"down\", \"--volumes\", \"--remove-orphans\")\n                for kind in (\"container\", \"network\", \"volume\"):\n                    assert not run(\"docker\", kind, \"ls\", \"-q\", \"--filter\",\n                                   \"label=com.docker.compose.project=\" + PROJECT).strip()\n            record[\"after\"] = inventory()\n            assert [r for r in record[\"before\"] if r[\"project\"] != PROJECT] == [\n                r for r in record[\"after\"] if r[\"project\"] != PROJECT]\n            record[\"passed\"] = True\n        except BaseException as error:\n            record[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(record, receipt, indent=2)\n    print(json.dumps({\"passed\": record[\"passed\"], \"output\": str(args.output)}))\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "icap-compose.yaml": {
+      "sha256": "dd58596bbd75f0138ad557d773cf1a0867995f854b03153773e825cb23bc0154",
+      "text": "# Isolated build-box fixture. Explicit project name prevents overlap with other tests.\n# The TMM image is reused; this file does not change or rebuild TMM source.\nname: eob-dlp-20260924\n\nservices:\n  fixture:\n    image: artifactory.f5net.com/f5-tmm-docker/f5-tmm-test-image/tao@sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\n    entrypoint: [/bin/bash, /work/icap-bootstrap.sh]\n    environment:\n      DEPLOYMENT: development\n      MODULAR_BIP_URL: https://artifactory.f5net.com/artifactory/f5-apis-npm/@f5-apis/mbip-apis-pb/-/@f5-apis/mbip-apis-pb-303.43.0.tgz\n      WITH_GRPC: \"false\"\n      CONF_TRANSPORT: nats-tls\n      NATS_CERTS_PATH: /package/nats_certs\n      ICB_ASYNCAPI_PROTO_VERSION: v2\n      PYTHONUNBUFFERED: \"1\"\n      # NATS is asynchronous; its send call has no synchronous DPC return value.\n      CONFIG_SERVER_DPC_RAISE_ON_ERROR: \"false\"\n      ICAP_VIP: ${ICAP_VIP:-10.203.72.50}\n      ICAP_BACKEND: ${ICAP_BACKEND:-10.203.72.11}\n    volumes:\n      - nats-certs:/package/nats_certs/tmm\n      - .:/work:ro\n      - evidence:/evidence\n    networks:\n      management:\n        ipv4_address: ${FIXTURE_MANAGEMENT_IP:-10.203.71.11}\n        priority: 100\n      data:\n        ipv4_address: ${FIXTURE_DATA_IP:-10.203.72.11}\n        priority: 50\n    cap_add: [NET_ADMIN]\n    healthcheck:\n      test: [CMD-SHELL, \"test -f /package/nats_certs/tmm/ca.pem && test -f /package/proto/package/py/profile_responseadapt_pb2.py\"]\n      interval: 2s\n      timeout: 2s\n      retries: 90\n\n  tmm:\n    image: tmm:CATALOGFREE-20260924\n    pull_policy: never\n    entrypoint: [/opt/bin/init.tmm.sh]\n    privileged: true\n    init: true\n    mem_limit: 4g\n    depends_on:\n      fixture:\n        condition: service_healthy\n    environment:\n      CONF_TRANSPORT: nats-tls\n      PAL_CPU_SET: 0-0\n      TMM_MAPRES_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_IGNORE_MEM_LIMIT: \"yes\"\n      TMM_MAPRES_NO_IPV6_RULES: \"yes\"\n      TMM_ENFORCE_LICENSING: \"false\"\n      ENABLE_TMROUTED_PROXY: \"false\"\n      SESSIONDB_EXTERNAL_STORAGE: \"FALSE\"\n      MSG_BUS_ADDR: fixture\n      MSG_BUS_PORT: \"4222\"\n      MSG_BUS_USER: tmm\n      MSG_BUS_PASS: insecure_password_tmm\n      CONFIG_SUBJECT: internal-config\n      PUBLISH_SUBJECT: dataplane-client\n      PROCESS_NAME: TMM\n      TMM_QUERY_INTERVAL_SECS: \"120\"\n      NATS_TLS_AUTH_CERT: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm.pem\n      NATS_TLS_AUTH_KEY: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm-key.pem\n      NATS_TLS_CA_FILE: /opt/f5/mbip/fsm/certificates/ca.pem\n      LS_SHIELD_BUILTIN: \"0\"\n      LS_VM_SELFTEST: \"0\"\n      LS_SHIELD_MODE: monitor\n      LS_VM_JIT: \"1\"\n      LS_VM_TIMING: \"1\"\n      LS_VM_SAMPLES: \"true\"\n      LS_VM_VERBOSE: \"1\"\n      LS_TP_RING: /dev/shm/ls_tp_ring\n      LS_LOAD_SOCKET: /tmp/ls_load.sock\n    volumes:\n      - nats-certs:/opt/f5/mbip/fsm/certificates:ro\n    networks:\n      management:\n        ipv4_address: ${TMM_MANAGEMENT_IP:-10.203.71.10}\n        priority: 100\n      data:\n        ipv4_address: ${TMM_DATA_IP:-10.203.72.10}\n        priority: 50\n\nnetworks:\n  management:\n    ipam:\n      config:\n        - subnet: ${MANAGEMENT_SUBNET:-10.203.71.0/24}\n  data:\n    ipam:\n      config:\n        - subnet: ${DATA_SUBNET:-10.203.72.0/24}\n\nvolumes:\n  nats-certs:\n  evidence:\n"
+    },
+    "config-compose.yaml": {
+      "sha256": "58424834e6aafbd8caf9621297630202d7ab37a5ccfc477e72dfabab59cb73ff",
+      "text": "# Layer over icap-compose.yaml with --env-file config-fixture.env and\n# --project-name eob-config-20260925. Separate networks, volumes and image.\nservices:\n  fixture:\n    environment:\n      LS_LOAD_SOCKET: /run/ls/ls_load.sock\n    volumes:\n      - ls-sockets:/run/ls\n      - ls-stream:/run/ls-stream\n  tmm:\n    image: tmm:CONFIG-20260925\n    environment:\n      LS_LOAD_SOCKET: /run/ls/ls_load.sock\n      LS_TP_RING: /run/ls-stream/ls_tp_ring\n    volumes:\n      - ls-sockets:/run/ls\n      - ls-stream:/run/ls-stream\nvolumes:\n  ls-sockets:\n  ls-stream:\n"
+    },
+    "observability-compose.yaml": {
+      "sha256": "efe8f2051a8c373835843f1419f5b5a9166e4e1e1b791ed21a4270caab63f318",
+      "text": "# Repaired test image for the isolated tutorial fixture only.\nservices:\n  tmm:\n    image: tmm:OBSERVABILITY-20260925\n"
+    },
+    "template-fixture.env": {
+      "sha256": "c120678ecbb91954515d142d71cc86cf7aa8daa47b82068b74c5f557f57cd0f1",
+      "text": "MANAGEMENT_SUBNET=10.203.75.0/24\nDATA_SUBNET=10.203.76.0/24\nFIXTURE_MANAGEMENT_IP=10.203.75.11\nFIXTURE_DATA_IP=10.203.76.11\nTMM_MANAGEMENT_IP=10.203.75.10\nTMM_DATA_IP=10.203.76.10\nICAP_VIP=10.203.76.50\nICAP_BACKEND=10.203.76.11\n"
+    },
+    "collector-compose.yaml": {
+      "sha256": "c4286a515af3ed3d7f2222ac53bb6b531f8f120add1f072ebbaacc74c47672e7",
+      "text": "# Layer over the isolated template fixture. Source binding is controller-owned.\nservices:\n  fixture:\n    volumes:\n      - collector-api:/collector-api:ro\n  collector:\n    image: ${COLLECTOR_IMAGE:?provide the checked image ID}\n    pull_policy: never\n    pid: service:tmm\n    network_mode: none\n    init: true\n    read_only: true\n    cap_drop: [ALL]\n    cap_add: [SYS_PTRACE]\n    security_opt: [no-new-privileges:true, \"apparmor=unconfined\"]\n    cpus: 0.5\n    mem_limit: 128m\n    memswap_limit: 128m\n    pids_limit: 32\n    tmpfs: [\"/tmp:size=8m,noexec,nosuid,nodev\"]\n    restart: \"no\"\n    stop_grace_period: 15s\n    volumes:\n      - ls-stream:/run/ls-stream\n      - collector-journal:/journal\n      - collector-api:/api\n      - ${COLLECTOR_SOURCE_DIR:?provide the source binding directory}:/source:ro\nvolumes:\n  collector-journal:\n  collector-api:\n"
+    }
+  },
+  "collector_image": "sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054",
+  "before": [
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "status": "running",
+      "started": "2026-08-21T18:14:16.71521944Z",
+      "restarts": 0,
+      "project": null
+    }
+  ],
+  "after": [
+    {
+      "id": "a823df28e140a26e1e7ddba59513bc919f8d0891783e4de7004186ca342531be",
+      "name": "/eob-template-20260925-tmm-1",
+      "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+      "status": "running",
+      "started": "2026-09-28T21:16:12.769793197Z",
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "73d281aea81a2b05ceca0c4ac588e8897e9918dca6197ff4649fe1600c805055",
+      "name": "/eob-template-20260925-fixture-1",
+      "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+      "status": "running",
+      "started": "2026-09-28T21:16:07.926910478Z",
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "status": "running",
+      "started": "2026-08-21T18:14:16.71521944Z",
+      "restarts": 0,
+      "project": null
+    }
+  ]
+}

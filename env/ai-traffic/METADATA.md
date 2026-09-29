@@ -1,8 +1,8 @@
 # Application-metadata probe
 
 **2026-09-28 — MEASURED root-object method-value extraction in the native A2A
-fixture, plus handler event-code extraction. MCP methods and session fields
-remain unextracted.**
+fixture, plus handler event-code extraction. The later [token-cache probe](TOKEN-METHOD.md)
+also extracts `tools/list` on the AIMCP/JSON path. Session fields remain unextracted.**
 
 [View the extracted values](EXTRACTED-METADATA.md) or run
 `python3 env/ai-traffic/metadata_export.py` from the repo root for the JSON export.
@@ -263,7 +263,7 @@ bytes with authored request values, rather than using hook counts as a substitut
 | Numeric method | Getter-error status; no value bytes |
 | Method beyond the four-member walk | Budget-exhausted status; no value bytes |
 | Nested-only method | No getter invocation; no field observation |
-| AIMCP `tools/list` request | No getter invocation; no MCP method extraction |
+| AIMCP `tools/list` request | No getter invocation in this experiment; the later [token-cache probe](TOKEN-METHOD.md) extracts it |
 
 Eight getter calls produced eight records. No output loss or new VM error was
 reported. The process did not restart. Kernel byte checks confirmed the hook was
@@ -287,9 +287,11 @@ address join. Unreadable memory, nested fields and other keys are checked in nat
 tests. The live nested-only request did not exercise the getter's exclusion branch.
 
 The 12-read / 320-byte cap and four-member walk are deliberate limits. A later
-member is unavailable to this probe even when TMM parsed it. MCP methods, session
-IDs, task IDs and tool fields need separate hooks or field paths. The AIMCP result
-is an observed coverage gap, not a reason to suppress the request's handler event.
+member is unavailable to this probe even when TMM parsed it. The later
+[token-cache probe](TOKEN-METHOD.md) closes the measured AIMCP method gap with a
+different hook. It requires the JSON filter, literal keys and bounded traversal;
+it does not establish general MCP coverage. Session IDs, task IDs and tool fields
+remain separate work. The original getter gap remains part of the record.
 
 ### Implementation
 

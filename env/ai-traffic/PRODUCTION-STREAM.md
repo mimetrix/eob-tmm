@@ -24,6 +24,12 @@ outages forward and their queued values are recovered. Two separate consumers us
 only the Unix API volume. TMM stays unchanged. The collector still shares TMM's PID
 namespace and needs process-inspection access; strong security isolation is open.
 
+**Token-cache subset:** the [completion-hook probe](TOKEN-METHOD.md) now supplies
+literal root method values on the AIMCP/JSON path, including exact `tools/list`.
+The same collector image retains 26 raw records from 13 requests. Consumer-side
+decoding and replay checks pass. This requires JSON filtering and does not establish
+general MCP coverage, tool arguments, request identity or session relationships.
+
 ## 1. Where each step runs
 
 ```text
@@ -133,9 +139,9 @@ service is open; no transport integration is implemented by this document.
 
 | Workflow | Field requirement / current limit |
 |---|---|
-| Distribution of observed method values; detection of unfamiliar values | Current method values can supply input. Counts are getter observations, not proven request counts. A production stream remains pending. |
+| Distribution of observed method values; detection of unfamiliar values | Current method values can supply input. Counts are getter or cache observations, not proven request counts. A production stream remains pending. |
 | Per-request latency and outcome | Needs qualified request/response association and completion fields. The current method record does not supply them. |
-| MCP tool activity | Needs a reachable MCP method/tool extraction path. The live AIMCP input did not call the current getter. |
+| MCP tool activity | The token-cache probe extracts literal root methods on the configured AIMCP/JSON path. Tool identity, arguments, qualified protocol identity and general coverage remain pending. The earlier getter gap is retained. |
 | Agent/session activity graph | Needs qualified identities and relationships. Do not substitute pointer, connection or method identity. |
 
 Preserve unfamiliar values and status-only records. Do not require a recognized

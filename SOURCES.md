@@ -10,6 +10,28 @@ cd evidence/cache && sha256sum * > MANIFEST.sha256
 
 ## Retrieved
 
+### Token-cache method extraction, 2026-09-28
+
+Authoritative source, debug types, binary inspection and native checks ran on
+`eob-bnk-build-01`. The live check used that box's isolated SSA/Tao fixture and
+the existing separate collector image. Build `ca69b84f…`; no TMM rebuild.
+Value comparisons and clients are SELF; PREVAIL is INDEPENDENT; process and hook
+bytes are KERNEL witnesses. [Contract, exact values and limits](env/ai-traffic/TOKEN-METHOD.md).
+
+| Evidence / source | Cached file in `evidence/cache/` | SHA-256 |
+|---|---|---|
+| Initial cache-attachment candidate; source, hook index and debug layouts / build box | `token-method-discovery-01.json` | `668c6a242066887aaa768e53499f7845d9b57c59320d2407d0ba5d5e8a1265c6` |
+| Revised completion hook; compiled inline attachment path, caller disassembly and `json_scb` layout / build box | `token-method-discovery-02.json` | `0c79f3bb14fddc567db25f41333acdc94b9ae371009274266bf39ad2588da70e` |
+| First build: PREVAIL passes; native fixture compilation stops on signedness warning / build box | `token-method-build-01.json` | `a80b72ed6334ae2c4e88f3c417d26887141e321307a813edc2ce90383b57f3a1` |
+| Corrected fixture: 56 interpreter/JIT records / build box | `token-method-build-02.json` | `3f1c368b7c9f97b14e4acf3a8da79a5301bddabce06d19f159dba6d662ce83d6` |
+| Added nested/escaped-key tests and ordered token bounds: 64 records / build box | `token-method-build-03.json` | `218720672b4e09d4c3e4f29553df47f7871a490a3781f2afe8c07669588cd7c8` |
+| Completion-hook program: pinned PREVAIL, 68 interpreter/JIT records, signed target and exact source text / build box | `token-method-build-04.json` | `2f74b021b90384eecffd36fc4ca8fa07f40b1a85ece6be904985896777532aac` |
+| Isolated fixture creation, pinned image and other container inventory / build box | `token-method-create-01.json` | `cded502961992fc0d98edf42523554b4f86a42f5e9ce64fd4e70c14d561e9b1e` |
+| Failed first live attempt: forwarded request, zero attachment-helper records, armed/restored pad / build box | `token-method-live-01.json` | `e406758d9859080e6de1b227e9d947630401df2c4a2aecb84029d5c809dbd344` |
+| Successful live attempt: 13 AIMCP-path requests, 26 exact/status records, journal replay and kernel witnesses / build box | `token-method-live-02.json` | `dcd59034a8278644bd4259e02018e5a82765131b71b55b66f7bc5580a19ef963` |
+| Restored hooks, inactive slots, archive manifest and isolated fixture removal / build box | `token-method-cleanup-01.json` | `b121dcf34776d5026bbbba769062ece85b403ec28adb55026ee476df9081f605` |
+| Immutable fixture reports and SQLite journals for both live attempts / build box | `token-method-evidence-01.tar.gz` | `52b4bc6109c9932fc780d982f082b085b9cee106d3000f5bb1a9d1e96896eea3` |
+
 ### Separate collector container, 2026-09-28
 
 [Registered checks](env/ai-traffic/COLLECTOR-CONTAINER.md). Test controllers and

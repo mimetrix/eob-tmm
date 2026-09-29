@@ -7,6 +7,11 @@ analytics can follow. The immediate work is the [metadata probe](METADATA.md),
 not identity matching or a representative workload test. No overall coverage
 percentage is established.
 
+**MEASURED extraction subset:** the [getter probe](METADATA.md) supplies root-method
+values on the A2A path. The [token-cache probe](TOKEN-METHOD.md) also supplies
+`tools/list` on the configured AIMCP/JSON path. These fixture results do not give
+an overall coverage percentage, authenticated identity or session relationships.
+
 The earlier version of this page proposed a fixed concurrency test too soon.
 That proposal is withdrawn below, with the reason retained. The questions in
 the register are prompts for investigation, not a model of how agents must work.
@@ -51,7 +56,7 @@ claim coverage of that work; it is not a test waiting to be marked passed.
 | C04 | Delegation and work split across agents | **MEASURED:** one-level fixture delegation, actor/originator/parent retention and selected invalid-grant cases. [Attribution](ATTRIBUTION.md), [correlation](CORRELATION.md) | Test several children, nested delegation and results returning out of order. Fail on an invented parent, changed executing actor, expanded authority or an inferred completed task. |
 | C05 | Retries, replay and duplicate work | **MEASURED:** replay, fresh-nonce retry and ambiguous marker refusal in fixture tests. [Attribution](ATTRIBUTION.md), [correlation](CORRELATION.md) | Test timeout after acceptance, overlapping retries, speculative requests and cancellation. Fail if attempts collapse into one operation or cancellation is reported as proof that work stopped. |
 | C06 | Long responses and streams | **MEASURED:** paced synthetic stream forwarding; fragmented request headers and paced bodies. This is not attributed stream completion. [Traffic fixture](README.md), [correlation](CORRELATION.md) | Attribute stream boundaries, partial output, disconnect and reconnect separately. Fail if chunks become separate requests or partial output becomes a completed operation. |
-| C07 | Protocol and transport changes | **MEASURED:** canonical fixture HTTP/1 header extraction, bounded to 512 bytes. Native AI filters are not validated. [Correlation](CORRELATION.md) | Separate contracts for native Model Context Protocol (MCP), Agent-to-Agent (A2A), HTTP/2, WebSocket and gRPC paths. Fail if unsupported syntax or multiplexed streams receive a guessed HTTP/1 identity. |
+| C07 | Protocol and transport changes | **MEASURED:** canonical fixture HTTP/1 header extraction, bounded to 512 bytes. Subsequent native-filter tests add handler events and bounded A2A/AIMCP method values. These do not validate native-filter attribution or general protocol coverage. [Correlation](CORRELATION.md), [metadata](METADATA.md), [token cache](TOKEN-METHOD.md) | Different contracts are necessary for native Model Context Protocol (MCP), Agent-to-Agent (A2A), HTTP/2, WebSocket and gRPC paths. Reject a result if unsupported syntax or multiplexed streams receive a guessed HTTP/1 identity. |
 | C08 | Identity providers, tenants and credential changes | **MEASURED:** two fixture identities with per-run request-proof keys. Production identity integration is unvalidated. [Attribution](ATTRIBUTION.md) | Test credential rotation, expiry/revocation and identical actor labels under different authorities or tenants. Fail on stale authorization or cross-tenant identity merging. |
 | C09 | Observation gaps and restarts | **MEASURED:** reported detach, capacity refusal, full reload and retained-connection refusal. [Gaps](GAPS.md) | Test lost controller history, collector restart, mixed old/new records and independent detection of attachment changes. Fail if absent history is treated as continuous coverage. Silent breaks remain unvalidated. |
 | C10 | Workers, scale and output pressure | **MEASURED:** one-worker bounded joins and tracking-limit refusal. No data-path cost result. [Correlation](CORRELATION.md), [gaps](GAPS.md) | Test multiple TMM workers, instance rollout and slow/stopped consumers against registered budgets. Fail on cross-worker joins, hidden loss, unbounded waits or exceeded budgets. |

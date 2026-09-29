@@ -1,11 +1,11 @@
 # Extracted application metadata
 
-**MEASURED — saved live TMM run.** These are actual probe
+**MEASURED — saved live TMM runs.** These are actual probe
 values from authored fixture requests. They are not production agent data.
 Values below are decoded from the captured ring payloads. The exporter
 checks them against the saved records before displaying them.
 
-## Values
+## Earlier getter values
 
 Field: `root_object.method`. Values use JSON notation. Escapes in the
 application's string are preserved; the exporter does not expand them.
@@ -32,7 +32,8 @@ These labels come from the isolated fixture, not from probe field extraction.
 - `nested` (configured filter: `a2a`): no getter record.
 - `mcp-not-consumed` (configured filter: `aimcp`): no getter record.
 
-These cases have no extracted field value; no missing value is filled in.
+These cases have no extracted field value in the getter run. The later token-cache
+run below observes the AIMCP method through a different hook.
 
 ## Source and record context
 
@@ -61,3 +62,47 @@ The first command emits JSON, including exact hexadecimal value bytes.
 
 [Field scope and limits](METADATA.md#7-field-result--measured-on-the-pinned-build)
 · [Evidence index](../../SOURCES.md#root-object-method-extraction-2026-09-28)
+
+## Later token-cache values on the AIMCP/JSON path
+
+The completion-hook probe observes the existing JSON tokens. It does not depend on
+an application getter call. The following rows come from the captured payloads in
+`token-method-live-02.json`. Values use JSON notation, as in the earlier table.
+
+| Sequence | Extracted value (JSON notation) | Status | Original / copied bytes |
+|---|---|---|---|
+| 1 | `"tools/list"` | complete | 10 / 10 |
+| 3 | `"future.variant"` | complete | 14 / 14 |
+| 5 | `""` | complete | 0 / 0 |
+| 7 | `"future\\u002evariant"` | complete | 19 / 19 |
+| 9 | 64 `x` bytes | complete | 64 / 64 |
+| 11 | 64 `y` bytes | truncated | 65 / 64 |
+| 13 | — | nonstring | unknown / 0 |
+| 15 | — | budget_exhausted | unknown / 0 |
+| 17 | — | no_literal_method | unknown / 0 |
+| 19 | `"tools/list"` | complete | 10 / 10 |
+| 21 | — | no_literal_method | unknown / 0 |
+| 23 | `"first"` | complete | 5 / 5 |
+| 25 | — | out_of_scope | unknown / 0 |
+
+Even sequences 2–26 are the 13 response-cache records, all `no_literal_method`.
+The input cases include a nested-only method, an escaped key and duplicate keys.
+See the [case table](TOKEN-METHOD.md#exact-live-values) for their exact scope.
+These are cache observations, not proven request identities or protocol outcomes.
+
+- Receipt SHA-256: `dcd59034a8278644bd4259e02018e5a82765131b71b55b66f7bc5580a19ef963`.
+- TMM build ID: `ca69b84f4f5c9e225813b2ed3997c59f18ba2a31`.
+- Hook: `fentry/json_filter_handle_json_complete`.
+- Value witness: SELF; verifier witness: INDEPENDENT (PREVAIL);
+  hook/process witness: KERNEL.
+
+To check and export all 26 captured records, including exact hexadecimal bytes:
+
+```sh
+python3 env/ai-traffic/token_method_verify.py --export
+```
+
+The saved journal contains 28 events. It retains the new schema as raw records;
+the consumer decoder supplies the fields above. The test fixture has been removed.
+[Contract and limits](TOKEN-METHOD.md)
+· [Evidence index](../../SOURCES.md#token-cache-method-extraction-2026-09-28).

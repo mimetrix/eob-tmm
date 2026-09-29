@@ -746,6 +746,18 @@ removed. Shared PID namespace, `SYS_PTRACE` and unconfined AppArmor limit securi
 isolation. Production ownership, full health history and sustained cost remain open.
 [Receipts](SOURCES.md#separate-collector-container-2026-09-28).
 
+**Token-cache method follow-up, 2026-09-28 — MEASURED subset.** The
+[registered token-read gate](env/ai-traffic/TOKEN-METHOD.md) now extracts `tools/list`
+on the AIMCP/JSON path. The initial attachment-helper hook produced zero records;
+compiled inlining explains the gap. The revised JSON-completion hook passes pinned
+PREVAIL and 68 native invocations. Thirteen live requests produce 26 cache records
+through the existing separate collector, with exact bytes, explicit exclusions,
+replay equality, restored hook and archived fixture removal. Bounds: four root
+members, four fragments per selected read, 64 value bytes, 40 reads and 1,024 source
+bytes. Literal first-match keys only; JSON filtering is required. Session fields,
+protocol identity, complete coverage and data-path cost remain unvalidated.
+[Receipts](SOURCES.md#token-cache-method-extraction-2026-09-28).
+
 ---
 
 ### P21 · Controller-published configuration snapshots — implementation in progress

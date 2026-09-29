@@ -1,5 +1,11 @@
 # Reproducing the live result
 
+**Token-cache method extraction (2026-09-28):**
+[TOKEN-METHOD.md](env/ai-traffic/TOKEN-METHOD.md) gives the pinned build and isolated
+live procedure, plus a local saved-evidence check and exact-value export.
+The measured AIMCP/JSON path yields 26 cache records from 13 requests through the
+separate collector. General protocol coverage and data-path cost remain unvalidated.
+
 **Configuration input (2026-09-25):** [configuration-snapshots.md](configuration-snapshots.md)
 contains the ABI, SDK example, controller commands, pinned build-box checks and isolated
 SSA/Tao lifecycle reproduction. Bench/socket and live integration pass; cost remains unmeasured.

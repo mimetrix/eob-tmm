@@ -39,6 +39,9 @@ fi
 if [[ "$ICAP_SUITE" == collector-container ]]; then
     export TAO_TEST_PATH=/work/collector_container_suite.py
 fi
+if [[ "$ICAP_SUITE" == token-method ]]; then
+    export TAO_TEST_PATH=/work/token_method_suite.py
+fi
 export TAO_TIME_OUT=210
 if [[ "$ICAP_SUITE" == gaps ]]; then
     export TAO_TEST_PATH=/work/gap_suite.py

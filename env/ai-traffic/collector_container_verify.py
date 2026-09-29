@@ -35,8 +35,20 @@ def verify(cache):
     for name in ("collector_container.py", "collector_client.py", "stream_collector.py",
                  "method_decode.py", "Dockerfile.collector", "collector-compose.yaml"):
         assert digest(Path(__file__).with_name(name).read_bytes()) == image["sources"][name]["sha256"], name
-    for name in ("collector_container_suite.py", "collector_container_recover.py", "icap-run-suite.sh", "lifetime_fixture.py"):
+    for name in ("collector_container_suite.py", "collector_container_recover.py", "lifetime_fixture.py"):
         assert digest(Path(__file__).with_name(name).read_bytes()) == live["sources"][name]["sha256"], name
+    # The later token-method gate adds only this selector. Require every byte of
+    # the older dispatcher to match its immutable receipt after that exact delta.
+    dispatcher = Path(__file__).with_name("icap-run-suite.sh").read_bytes()
+    dispatcher_changed = digest(dispatcher) != live["sources"]["icap-run-suite.sh"]["sha256"]
+    if dispatcher_changed:
+        addition = (b'if [[ "$ICAP_SUITE" == token-method ]]; then\n'
+                    b'    export TAO_TEST_PATH=/work/token_method_suite.py\nfi\n')
+        anchor = (b'if [[ "$ICAP_SUITE" == collector-container ]]; then\n'
+                  b'    export TAO_TEST_PATH=/work/collector_container_suite.py\nfi\n')
+        assert dispatcher.count(anchor + addition) == 1, "icap-run-suite.sh selector"
+        dispatcher = dispatcher.replace(anchor + addition, anchor, 1)
+    assert digest(dispatcher) == live["sources"]["icap-run-suite.sh"]["sha256"], "icap-run-suite.sh"
     assert live["before"] == live["after"] == original["before"] == original["after"]
     assert live["suite"]["returncode"] == 0
     assert [row["action"] for row in live["controls"]] == ["stop", "resume", "kill", "resume"]
@@ -118,6 +130,7 @@ def verify(cache):
     assert [row for row in cleanup["before"] if row["project"] != "eob-template-20260925"] == cleanup["after"]
     return {"verified": True, "collector_container_identities": 3, "consumer_containers": 2,
             "journal_events": 10, "method_records": 8, "archive_files": len(files),
+            "suite_dispatch_changed_after_run": dispatcher_changed,
             "live_driver_changed_after_run": digest(Path(__file__).with_name("collector_container_live.py").read_bytes()) != live["sources"]["collector_container_live.py"]["sha256"]}
 
 

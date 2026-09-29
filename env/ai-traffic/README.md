@@ -29,6 +29,8 @@ results; retain it as supporting enforcement evidence. Its signed monitor remain
 ## Topology
 
 - [Extracted metadata](EXTRACTED-METADATA.md): actual values from the saved live run.
+- [Token-cache method extraction](TOKEN-METHOD.md): exact `tools/list` and unfamiliar
+  values on the AIMCP/JSON path, delivered through the separate collector.
 - [Continuous collector](COLLECTOR.md): measured local journal and HTTP replay.
   Two independent consumers receive the same live method values and status records.
 - [Separate collector container](COLLECTOR-CONTAINER.md): measured stop, SIGKILL
@@ -45,9 +47,12 @@ Real activity must establish later representative workload tests.
 **Measured now:** a getter-return probe extracts root-object method values in the
 native A2A fixture. Live comparisons include unfamiliar and escaped values, empty
 strings and explicit truncation. It checks at most four members and copies at most
-64 bytes. The AIMCP test input did not call this getter, so MCP method/session
-extraction remains open. See [the field result](METADATA.md#7-field-result--measured-on-the-pinned-build)
-for code, receipts and the distinction from the earlier event-only probe.
+64 bytes. The AIMCP test input did not call this getter. The later
+[token-cache probe](TOKEN-METHOD.md) extracts that method through a JSON-completion
+hook: 13 requests, 26 cache records, exact values and explicit exclusions.
+It requires the JSON filter and literal root keys. Session fields, protocol identity
+and production coverage remain open. See [the getter result](METADATA.md#7-field-result--measured-on-the-pinned-build)
+for the earlier scope and its distinction from the event-only probe.
 
 ```text
 CLIENT POD                         RUNNING TMM                      BACKEND POD

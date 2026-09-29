@@ -8,6 +8,34 @@ Ordered newest first.
 
 ---
 
+## 32 · A padded source-level callee covers the compiled path — FALSIFIED
+
+**2026-09-28.** The first token-cache probe selected `json_http_set_cache`.
+The source completion path calls it, its entry is padded, and the probe passed
+PREVAIL and native checks. Live attempt 01 forwarded the AIMCP request but emitted
+zero records. Kernel bytes confirmed a real arm followed by restoration.
+
+The packaged completion function contains the opaque-table operations inline.
+Its ordinary HTTP path does not call the selected function entry. A hook-index
+entry establishes an attachment site, not coverage of every source-level call.
+The revised probe observes `json_filter_handle_json_complete` directly and checks
+valid-parse and HTTP-mode flags before reading the cache. Build 04 passes pinned
+verification and 68 native invocations; live attempt 02 gives 26 exact/status
+records from 13 requests through the existing separate collector.
+
+**Replacement limit:** this is bounded literal-root-method extraction from the
+JSON filter, including an AIMCP-path method the getter did not consume. It is not
+general MCP parsing, protocol identity, escaped-key decoding or all-message
+coverage. Four root members, four fragments per read, 64 value bytes and explicit
+read/budget status remain part of the contract. No TMM function body was edited.
+
+The first build also retained a native-test signedness warning. The correction
+casts the nonnegative sibling index to the token's signed integer type; compiler
+warnings remain errors. All failed artifacts stay in the evidence index.
+
+[Receipts](SOURCES.md#token-cache-method-extraction-2026-09-28),
+[contract and exact values](env/ai-traffic/TOKEN-METHOD.md).
+
 ## 31 · Separate collector permissions and report assumptions — corrected
 
 **2026-09-28.** The first container plan expected shared PID namespace plus
