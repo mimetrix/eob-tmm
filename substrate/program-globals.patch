@@ -1,0 +1,16 @@
+diff --git a/src/compile/default_whitelist_x86_64 b/src/compile/default_whitelist_x86_64
+--- a/src/compile/default_whitelist_x86_64
++++ b/src/compile/default_whitelist_x86_64
+@@ -141,3 +141,3 @@
+ g_prev
+-g_prog_stack
++g_programs
+ g_ready
+diff --git a/src/compile/debug_whitelist_x86_64 b/src/compile/debug_whitelist_x86_64
+--- a/src/compile/debug_whitelist_x86_64
++++ b/src/compile/debug_whitelist_x86_64
+@@ -144,3 +144,3 @@
+ g_prev
+-g_prog_stack
++g_programs
+ g_ready

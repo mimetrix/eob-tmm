@@ -4,6 +4,38 @@ This repo holds the substrate **sources**; they are compiled into TMM **elsewher
 build tree. That split is the reason someone can read every file here and still not be able to
 rebuild what ran. This file is the missing half: the complete, exact delta applied to the TMM tree.
 
+**Program ownership built, 2026-09-30:** adds `base/ls_program.h` and
+`base/ls_program_impl.h`. Changes `ls_vm.c`, `ls_vm.h`, `ls_vm_load.c`,
+`ls_map_glue.h`, `ls_target.h`, `ls_arm.h`, `ls_tramp.c` and the generated
+`ls_tramp_asm.c`. No new C translation unit or filelist entry is needed.
+[`program-globals.patch`](program-globals.patch) adds `g_programs` and removes
+`g_prog_stack` from both x86-64 globals whitelists. The latter is now TLS.
+The generated wrapper matches the assembly used in native tests.
+Build `5784e768…` passes Docker compilation and linked-symbol, TLS, globals and
+twelve trampoline checks. Packaged build `2ab960fa…` then passes the isolated
+two-owner/two-hook test: 18 exchanges and 594 records. Both entry pads are restored
+and the fixture is removed. Multiple workers and sustained cost remain unqualified.
+[Contract and driver](PROGRAMS.md),
+[build and retained failures](../SOURCES.md#program-ownership-and-tmm-build-2026-09-30).
+[Package and live receipts](../SOURCES.md#program-ownership-live-validation-2026-09-30).
+
+**Activity host built and exercised, 2026-09-30:** changes `ls_target.h`, `ls_vm.h`
+and `ls_vm.c` on top of the snapshot host below. Entry-only target sets let one ELF
+bind two hooks. The JIT compiler uses a bounded 512 KiB temporary output buffer.
+No new source file, whitelist symbol or application-body change is required for
+this increment. Build `f9a1ed8c…` runs both activity hooks together in the isolated
+fixture; both are restored and the fixture is removed. Sustained hook cost remains
+unmeasured. [Build and live receipts](../SOURCES.md#activity-program--2026-09-30).
+
+**Snapshot host built and packaged, 2026-09-29:** adds `base/ls_snapshot.h` and
+changes `ls_fexit.c`, `ls_vm.c`, `ls_vm.h`, `ls_vm_load.c` and `ls_target.h`.
+No new C translation unit, whitelist symbol or application-body change is required.
+Invalidate substrate objects and `harness.o` before the toolchain build.
+Packaged build `7bbb06a0…` passes build/image checks. Live snapshot admission is
+refused by full-width unwind inspection. Native tests pass; no initialization
+program was loaded. The isolated fixture is removed.
+[Sources, build and refusal](../SOURCES.md#production-entry-snapshots-2026-09-29).
+
 **Host repairs built and exercised in isolated live TMM, 2026-09-25 (P22):**
 `ls_map.h`, `ls_map_glue.h`, `ls_vm.c`, `ls_vm_load.c` and `ls_tp_emit.c` change.
 Apply [`map-registry-globals.patch`](map-registry-globals.patch) once to register

@@ -1,0 +1,19 @@
+{
+  "record_type": "authored summary of captured tool output; not an automatic test receipt",
+  "date": "2026-09-29",
+  "witness": "SELF",
+  "stops": [
+    {
+      "stage": "suite formatting before any probe load",
+      "message": "Cannot parse: 207:4",
+      "ask": "NO RECORD",
+      "cause": "publish_tests was indented inside boundary_test while its return statement was not",
+      "correction": "Restore module-level publish_tests, then apply Black's requested line wraps.",
+      "verification": "Pinned fixture Black check passed; pylint reported 10.00/10. Live receipts also retain both checks."
+    }
+  ],
+  "build_failure": "json-lifecycle-build-01.json retains the unused read_field compiler error; ask returned NO RECORD. Reset intentionally makes no application reads. Build 02 guards the unused helper with JL_KIND != 3.",
+  "consumer_revision": "Build 03 retains the stricter per-kind instance/revision and shared-run checks. Its five consumer checks supersede build 02's three checks.",
+  "live_failure": "json-lifecycle-live-01.json retains the unavailable-state assertion; ask returned NO RECORD. The corrected suite preserves explicit unavailable and unsupported records. It does not make the consumer window valid.",
+  "initial_lookup": "ask 'JSON-context initialization completion reuse cleanup boundaries' returned NO RECORD"
+}

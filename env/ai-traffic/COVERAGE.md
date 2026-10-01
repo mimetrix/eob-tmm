@@ -7,10 +7,45 @@ analytics can follow. The immediate work is the [metadata probe](METADATA.md),
 not identity matching or a representative workload test. No overall coverage
 percentage is established.
 
+**Latest measured subset, 2026-09-30:** [combined activity records](ACTIVITY-COMBINED.md)
+join method, target, ID, reported reply and HTTP fields using bytecode-generated
+exchange keys. Ten live exchanges include keep-alive and concurrent equal IDs.
+This qualifies one worker and non-pipelined HTTP/1 with the observed boundaries.
+Identity, general protocol coverage, silent missed hooks and sustained cost remain
+open. The earlier extraction and boundary results below retain their own limits.
+
 **MEASURED extraction subset:** the [getter probe](METADATA.md) supplies root-method
 values on the A2A path. The [token-cache probe](TOKEN-METHOD.md) also supplies
 `tools/list` on the configured AIMCP/JSON path. These fixture results do not give
 an overall coverage percentage, authenticated identity or session relationships.
+
+**Later extraction subset, 2026-09-29:** the
+[session/routing probes](SESSION-ROUTING.md) supply saved request-header bytes
+and selected pool/endpoint state. These are inputs to proposed identity profiles
+and blast-radius assessment. Authentication and policy-permitted reach remain open.
+
+The [response probe](RESPONSE-METADATA.md) adds HTTP status and local transfer
+completion in nine cases. Paced and interrupted bodies pass the bounded gate.
+These fields do not establish remote-operation completion or request identity.
+
+The [requested-target probe](OPERATION-TARGET.md) adds literal tool names and
+resource addresses. It is a small step toward identity profiles: requested
+activity is measured, but trusted caller identity and association remain open.
+
+The [reply probe](REPLY-METADATA.md) adds reported result/error fields in 38 cases.
+Missing, conflicting and wrong-type fields remain explicit. The result does not
+establish remote success, authenticated identity or general protocol coverage.
+
+The [message-ID probe](MESSAGE-ID.md) adds exact root ID type and raw bytes in
+35 cases. Reused and mismatched IDs remain separate observations. Matching still
+requires qualified connection/session scope and protocol equality rules.
+
+The [combined ID/side probe](ID-FLOW.md) adds observed flow side to the same record.
+Forty-four exchanges include keep-alive and concurrent equal IDs. Side follows the
+flow state, not JSON member names. [Local boundary tests](JSON-LIFECYCLE.md) now
+produce 306 entry records from 13 exchanges. Eleven unavailable-context records
+invalidate the full consumer window. Lifecycle and general request association
+remain unvalidated; the boundary contract lists the untested live paths.
 
 The earlier version of this page proposed a fixed concurrency test too soon.
 That proposal is withdrawn below, with the reason retained. The questions in
@@ -55,13 +90,13 @@ claim coverage of that work; it is not a test waiting to be marked passed.
 | C03 | Several deployed copies of one agent | No qualified authenticated instance identity | Test distinct instance credentials and shared credentials. Fail if two copies merge when evidence distinguishes them, or if shared credentials acquire a guessed instance. |
 | C04 | Delegation and work split across agents | **MEASURED:** one-level fixture delegation, actor/originator/parent retention and selected invalid-grant cases. [Attribution](ATTRIBUTION.md), [correlation](CORRELATION.md) | Test several children, nested delegation and results returning out of order. Fail on an invented parent, changed executing actor, expanded authority or an inferred completed task. |
 | C05 | Retries, replay and duplicate work | **MEASURED:** replay, fresh-nonce retry and ambiguous marker refusal in fixture tests. [Attribution](ATTRIBUTION.md), [correlation](CORRELATION.md) | Test timeout after acceptance, overlapping retries, speculative requests and cancellation. Fail if attempts collapse into one operation or cancellation is reported as proof that work stopped. |
-| C06 | Long responses and streams | **MEASURED:** paced synthetic stream forwarding; fragmented request headers and paced bodies. This is not attributed stream completion. [Traffic fixture](README.md), [correlation](CORRELATION.md) | Attribute stream boundaries, partial output, disconnect and reconnect separately. Fail if chunks become separate requests or partial output becomes a completed operation. |
+| C06 | Long responses and streams | **MEASURED:** paced forwarding and bounded [local transfer-completion fields](RESPONSE-METADATA.md), including chunked/SSE and interrupted bodies. This is not attributed remote-operation completion. [Traffic fixture](README.md), [correlation](CORRELATION.md) | Attribute stream boundaries, partial output, disconnect and reconnect separately. Fail if chunks become separate requests or partial output becomes a completed operation. |
 | C07 | Protocol and transport changes | **MEASURED:** canonical fixture HTTP/1 header extraction, bounded to 512 bytes. Subsequent native-filter tests add handler events and bounded A2A/AIMCP method values. These do not validate native-filter attribution or general protocol coverage. [Correlation](CORRELATION.md), [metadata](METADATA.md), [token cache](TOKEN-METHOD.md) | Different contracts are necessary for native Model Context Protocol (MCP), Agent-to-Agent (A2A), HTTP/2, WebSocket and gRPC paths. Reject a result if unsupported syntax or multiplexed streams receive a guessed HTTP/1 identity. |
 | C08 | Identity providers, tenants and credential changes | **MEASURED:** two fixture identities with per-run request-proof keys. Production identity integration is unvalidated. [Attribution](ATTRIBUTION.md) | Test credential rotation, expiry/revocation and identical actor labels under different authorities or tenants. Fail on stale authorization or cross-tenant identity merging. |
 | C09 | Observation gaps and restarts | **MEASURED:** reported detach, capacity refusal, full reload and retained-connection refusal. [Gaps](GAPS.md) | Test lost controller history, collector restart, mixed old/new records and independent detection of attachment changes. Fail if absent history is treated as continuous coverage. Silent breaks remain unvalidated. |
 | C10 | Workers, scale and output pressure | **MEASURED:** one-worker bounded joins and tracking-limit refusal. No data-path cost result. [Correlation](CORRELATION.md), [gaps](GAPS.md) | Test multiple TMM workers, instance rollout and slow/stopped consumers against registered budgets. Fail on cross-worker joins, hidden loss, unbounded waits or exceeded budgets. |
 | C11 | Deferred work and work outside the proxy path | **Outside current scope:** local execution or traffic that does not reach this observer. No qualified queued-work attribution | Inventory the actual path and obtain a separate execution/queue witness where needed. Fail if no TMM record is presented as proof that no work occurred. |
-| C12 | Useful internal security facts | Request-to-actor matching is bounded and measured; distinctive internal visibility is still open | Select a routing, rebinding or policy fact and audit existing interfaces. Fail if the observation cannot distinguish the condition or adds no visibility beyond the relevant existing surface. See P20. |
+| C12 | Useful internal security facts | **MEASURED:** selected pool/endpoint state in the bounded [session/routing fixture](SESSION-ROUTING.md). Comparison with existing interfaces, policy-permitted reach and full blast radius remain open. | Audit existing interfaces and qualify identity, authority and resource relationships. Fail if supplied route claims are presented as selected destinations, or observed traffic is presented as the full permitted reach. See P20. |
 
 Measured claims above refer to the [ground-truth record](../../GROUND_TRUTH.md)
 and its registered source receipts. Authored client, authority and collector

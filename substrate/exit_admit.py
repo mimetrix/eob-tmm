@@ -14,12 +14,11 @@ are gates, not hopes. This tool answers, for one function on one build:
       and void (nothing to read).
 
   #4  Can a non-local exit unwind THROUGH the frame?  The return-address hijack
-      corrupts a stack unwind that walks the frame. TMM initiates no unwind ---
-      P8, verified on the build box: zero _Unwind_* / __cxa_* imports --- so no TMM
-      frame can sit on a completed throw->catch chain. This RE-CHECKS that property
-      against the actual runtime binary. If it ever fails (TMM gains C++ exception
-      handling), exit hooks are refused wholesale, because the empty-exclusion-set
-      argument no longer holds and a real per-target reachability analysis is owed.
+       corrupts a stack unwind that walks the frame. Admission requires no listed
+       unwind imports in the runtime. The earlier P8 claim of zero imports was
+       falsified on 2026-09-29: shortened readelf output hid versioned names on two
+       packaged TMM builds. See CONTESTED-PREMISES.md section 39. These builds are
+       refused; a separate per-target reachability argument is still required.
 
 Usage:
     exit_admit.py <debug-binary> <runtime-binary> <function>
@@ -84,6 +83,8 @@ def frame_has_lsda(runtime_bin, addr):
     if dd is None or addr is None:
         return (False, False)
     r = sh(dd, "--eh-frame", runtime_bin)
+    if r.returncode != 0:
+        return (False, False)
     lo = hi = None
     cur_lsda = False
     fde = re.compile(r"FDE .*pc=([0-9a-f]+)\.\.\.([0-9a-f]+)")
@@ -145,7 +146,9 @@ def classify_return(t):
 def unwind_clear(runtime_bin):
     """(clear: bool, found: list) --- P8: the binary must import no unwind
     initiator. Reads .dynsym for UND symbols."""
-    r = sh("readelf", "--dyn-syms", runtime_bin)
+    r = sh("readelf", "--wide", "--dyn-syms", runtime_bin)
+    if r.returncode != 0:
+        return (False, ["unwind symbol scan failed"])
     found = []
     for line in r.stdout.splitlines():
         if " UND " not in line:

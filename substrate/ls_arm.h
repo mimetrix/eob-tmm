@@ -53,6 +53,8 @@ struct ls_regs {
 #define LS_ARG5(r) ((r)->r9)
 
 struct ls_tramp_result ls_tramp_dispatch(int slot, const struct ls_regs *regs);
+struct ls_tramp_result ls_tramp_dispatch_at(int slot, const struct ls_regs *regs,
+                                           uint64_t return_ip);
 
 /* single-writer forms (no concurrent executor; used only off the live path) */
 int ls_arm(void *fn, void *trampoline);

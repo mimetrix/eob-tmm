@@ -83,6 +83,9 @@ OP_CONFIG_STATUS, OP_CONFIG_PUBLISH = 5, 6
 OP_BENCH = 0x1001
 OP_SAMPLES = 0x1002
 OP_ARM, OP_DISARM = 0x1003, 0x1004
+PROGRAM_OPS = {"program-load": 0x2001, "program-attach": 0x2002,
+               "program-detach": 0x2003, "program-mode": 0x2004,
+               "program-revoke": 0x2005, "program-status": 0x2006}
 
 HOOK_INDEX = os.environ.get("LS_HOOK_INDEX", "/usr/share/ls/hook-index.tsv")
 
@@ -436,7 +439,7 @@ def sock():
 OFF_BINDING, OFF_SIG, BINDING_LEN, SIG_LEN = 16, 128, 112, 64
 
 
-def read_signature(prog_path):
+def read_signature(prog_path, signature_path=None):
     """The signed blob beside a program: <name>.bpf.o -> <name>.bpf.sig.
 
     REFUSES rather than sending an unsigned request. TMM will reject it anyway now, but the
@@ -444,7 +447,8 @@ def read_signature(prog_path):
     looks for a corrupted signature rather than a missing one. Say it here, where the file is.
     """
     base = prog_path[:-2] if prog_path.endswith(".o") else prog_path
-    for cand in (base + ".sig", prog_path + ".sig"):
+    candidates = (signature_path,) if signature_path else (base + ".sig", prog_path + ".sig")
+    for cand in candidates:
         try:
             with open(cand, "rb") as f:
                 blob = f.read()
@@ -455,6 +459,8 @@ def read_signature(prog_path):
                      "    Regenerate it with substrate/sign_shield.py."
                      % (cand, len(blob), BINDING_LEN + SIG_LEN, BINDING_LEN, SIG_LEN))
         return blob[:BINDING_LEN], blob[BINDING_LEN:]
+    if signature_path:
+        sys.exit("*** cannot read signature: " + signature_path)
     sys.exit("*** no signature found for %s (looked for %s.sig).\n"
              "    Every load is signature-verified now; an unsigned program is refused by TMM,\n"
              "    so this refuses here where the reason is visible. Sign it:\n"
@@ -589,11 +595,18 @@ def send(payload):
 #
 # (min, max, "usage") --- max None means unbounded.
 _ARGS = {
+    "program-load": (3, 3, "program-load <program> <file.bpf.o> <program.sig>"),
+    "program-status": (1, 1, "program-status <program>"),
+    "program-attach": (3, 3, "program-attach <program> <instance> <entry-index>"),
+    "program-detach": (3, 3, "program-detach <program> <instance> <entry-index>"),
+    "program-mode": (3, 3, "program-mode <program> <instance> <0|1|2>"),
+    "program-revoke": (2, 2, "program-revoke <program> <instance>"),
     "arm":     (1, 2, "arm <slot> [signed-symbol-or-entry-address]"),
     "disarm":  (1, 1, "disarm <symbol-or-0xADDR>          # a NAME, not a slot"),
     "load":    (2, 4, "load <slot> <file.bpf.o> [mode]   # mode 1=MONITOR 2=ENFORCE.\n"
                       "               Needs <file>.sig beside it --- the hook comes from the\n"
                       "               signed binding, not from an argument"),
+    "load-signed": (3, 4, "load-signed <slot> <file.bpf.o> <hook.sig> [mode]"),
     "status":  (1, 1, "status <slot>"),
     "config-status": (1, 1, "config-status <slot>"),
     "config-publish": (2, 2, "config-publish <slot> <snapshot.json>"),
@@ -647,6 +660,40 @@ def main():
     cmd = a[0]
     _check_args(cmd, a[1:])
 
+    if cmd in PROGRAM_OPS:
+        try:
+            program = int(a[1])
+            if not 0 <= program < 8:
+                raise ValueError("program index must be 0..7")
+            body, binding, signature, mode = b"", None, None, 0
+            if cmd == "program-load":
+                body = read_program(a[2])
+                binding, signature = read_signature(a[2], a[3])
+                if binding[32:96].split(b"\0", 1)[0] != b"@program-v1":
+                    raise ValueError("program signature must bind @program-v1")
+            elif cmd != "program-status":
+                instance = int(a[2], 0)
+                if not 0 < instance <= 0xffffffffffffffff:
+                    raise ValueError("invalid program instance")
+                entry = 0
+                if cmd in ("program-attach", "program-detach"):
+                    entry = int(a[3])
+                    if not 0 <= entry < 12:
+                        raise ValueError("entry index must be 0..11")
+                elif cmd == "program-mode":
+                    mode = int(a[3])
+                    if mode not in (0, 1, 2):
+                        raise ValueError("program mode must be 0, 1 or 2")
+                body = struct.pack("<QII", instance, entry, 0)
+            response = send(msg(PROGRAM_OPS[cmd], slot=program, mode=mode,
+                                prog=body, binding=binding, sig=signature))
+            if not response.startswith("OK program=") or "\n" in response:
+                raise ValueError(response or "empty response; outcome unknown")
+            print(response)
+        except (OSError, ValueError) as exc:
+            sys.exit("*** " + str(exc))
+        return
+
     if cmd in ("config-status", "config-publish"):
         try:
             slot = int(a[1])
@@ -679,7 +726,15 @@ def main():
     elif cmd == "disarm":
         # Only a target actually attached by this loader may be restored.
         print(send(msg(OP_DISARM, hook=a[1].encode())))
-    elif cmd == "load":
+    elif cmd in ("load", "load-signed"):
+        # One ELF may have multiple authenticated entry sections. Select the
+        # hook through an explicit signed binding, never an unsigned argument.
+        signature_path = None
+        if cmd == "load-signed":
+            if len(a) not in (4, 5):
+                sys.exit("usage: load-signed SLOT PROGRAM SIGNATURE [MODE]")
+            signature_path = a[3]
+            a = ["load", a[1], a[2], a[4] if len(a) == 5 else "1"]
         slot, path = int(a[1]), a[2]
         mode = int(a[3]) if len(a) > 3 else 2
         prog = read_program(path)
@@ -701,7 +756,7 @@ def main():
         # from an argument. Both of those are things a caller controls; the binding is what a
         # key asserted. The ELF section is still checked by TMM against the program symbol --- a
         # separate gate on a separate identity --- but it no longer decides where this may arm.
-        binding, sig = read_signature(path)
+        binding, sig = read_signature(path, signature_path)
         if len(a) > 4:
             print("*** ignoring the hook argument: the signed binding names the hook, and a "
                   "second name on the wire would be a second answer to one question.",

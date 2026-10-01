@@ -1,0 +1,9 @@
+{
+  "passed": false,
+  "commands": [],
+  "sources": {},
+  "programs": {},
+  "discovery_sha256": "42e8a5047f613ef9f29d9858d7042db9e3c0fd1c65b1412110d86dc569c32c45",
+  "layout": "type = struct http_data {\n    struct hud_ref ref;\n    struct http_header_cache_info ci;\n    BOOL http_11 : 1;\n    BOOL http_20 : 1;\n    BOOL http_30 : 1;\n    BOOL client_version_11 : 1;\n    BOOL persist_cookie_response : 1;\n    BOOL add_connection_close : 1;\n    BOOL is_keepalive : 1;\n    BOOL close_connection : 1;\n    BOOL flush_headers : 1;\n    BOOL server_owned : 1;\n    BOOL respond_rule : 1;\n    BOOL retry_rule : 1;\n    BOOL proxy_request_orig : 1;\n    BOOL proxy_request : 1;\n    BOOL proxy_rewrite : 1;\n    BOOL proxy_disabled : 1;\n    BOOL websockets_payload_processing_enabled : 1;\n    BOOL chunked_encoding : 1;\n    BOOL chunk_payload : 1;\n    struct http_cfg *http_cfg;\n    struct tm_opaque_table *tm_opaque_table;\n}\ntype = struct http_parse_info {\n    BOOL is_trailer : 1;\n    BOOL is_request : 1;\n    BOOL is_crlf : 1;\n    BOOL lws_found : 1;\n    unsigned int version : 2;\n    unsigned int original_version : 2;\n    BYTE method;\n    UINT16 header_count;\n    UINT32 body_pos;\n    int status_code;\n    UINT32 f_invalid_method : 1;\n    UINT32 f_invalid_scheme : 1;\n    UINT32 f_invalid_path : 1;\n    UINT32 f_invalid_status : 1;\n    UINT32 f_invalid_authority : 1;\n    UINT32 reserved : 27;\n    struct tm_header_cache cache;\n}\n$1 = 28\n$2 = 36\n[('is_trailer', 0, 1), ('is_request', 1, 1), ('is_crlf', 2, 1), ('lws_found', 3, 1), ('version', 4, 2), ('original_version', 6, 2), ('method', 8, 0), ('header_count', 16, 0), ('body_pos', 32, 0), ('status_code', 64, 0), ('f_invalid_method', 96, 1), ('f_invalid_scheme', 97, 1), ('f_invalid_path', 98, 1), ('f_invalid_status', 99, 1), ('f_invalid_authority', 100, 1), ('reserved', 101, 27), ('cache', 128, 0)]\n",
+  "error": "AssertionError()"
+}

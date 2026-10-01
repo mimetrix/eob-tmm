@@ -1,0 +1,35 @@
+{
+  "scope": "package and catalog-free image checks; no deployment",
+  "started": 1790717434.4942288,
+  "commands": [
+    {
+      "argv": [
+        "sh",
+        "/home/starin/eob-tmm-staged/env/scripts/bnk-package.sh"
+      ],
+      "started": 1790717434.5269444,
+      "returncode": 0,
+      "finished": 1790717841.7728853,
+      "log": "/home/starin/eob-config-20260925/entry-snapshot-integration-01/package-step-0.log"
+    },
+    {
+      "argv": [
+        "sh",
+        "/home/starin/eob-tmm-staged/env/scripts/bnk-bake-tools.sh",
+        "tmm:local",
+        "tmm:ENTRY-SNAPSHOT-20260929"
+      ],
+      "started": 1790717841.7728968,
+      "returncode": 0,
+      "finished": 1790718132.9372602,
+      "log": "/home/starin/eob-config-20260925/entry-snapshot-integration-01/package-step-1.log"
+    }
+  ],
+  "passed": true,
+  "image": "sha256:2fce46114e21e3ad344b1036fa4e39cbff3cc1bcec1d40a87ab1651e7afbc807",
+  "runtime": {
+    "build_id": "7bbb06a03cf8bafd7b81e09421530d7d4d891a9a",
+    "sha256": "a68bbcb1c7bd3decbbcce59cb21f26af3e153c0de537df58f0729bfab7108e18"
+  },
+  "finished": 1790718133.0409832
+}

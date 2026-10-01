@@ -13,8 +13,36 @@ rule, not a substitute for it.
 
 ## Start here
 
+**2026-09-30 program ownership:** [PROGRAMS.md](substrate/PROGRAMS.md) is the
+current contract and native/socket/build/live record. Independent programs with
+multiple entry attachments pass pinned native checks. The new sources compile
+into TMM build `5784e768…`; linked functions, TLS, globals and trampolines pass
+inspection. Packaged build `2ab960fa…` passes 18 exchanges across eight ownership
+phases, with 594 records. Hooks are restored and the isolated fixture is removed.
+Scope is two owners, two hooks and one worker; sustained cost remains unmeasured.
+
+**2026-09-30 combined activity:** [ACTIVITY-COMBINED.md](env/ai-traffic/ACTIVITY-COMBINED.md)
+is the current exchange contract, measured result and export procedure.
+[ACTIVITY-PROGRAM.md](env/ai-traffic/ACTIVITY-PROGRAM.md) records the one-ELF,
+two-entry build. Ten live exchanges produce combined records, including keep-alive
+and concurrent equal IDs. Both hooks were restored and the fixture was removed.
+Scope is one worker and non-pipelined HTTP/1. Identity binding, silent missed hooks
+and sustained data-path cost remain unqualified.
+
+**2026-09-30 activity export:** [AGENT-ACTIVITY.md](env/ai-traffic/AGENT-ACTIVITY.md)
+is the current format and procedure for identity-ready JSON observations. Archived
+replay and collector API checks pass. Authenticated identity binding remains open.
+
+**2026-09-29 correction:** the old zero-unwind-import admission premise is false
+for both re-examined packaged binaries. Full-width inspection now refuses them.
+[ENTRY-SNAPSHOT.md](env/ai-traffic/ENTRY-SNAPSHOT.md) is the current native/build
+record and live-admission limit. Earlier successful return observations remain
+records; they do not establish exception-path qualification. See
+[`CONTESTED-PREMISES.md` §39](CONTESTED-PREMISES.md#39--no-unwind-imports-means-return-hook-admission-is-clear--falsified-check).
+
 | if you want | read |
 |---|---|
+| Build TMM and matching bytecode from a source-tree path | [`docs/BUILD-FROM-SOURCE.md`](docs/BUILD-FROM-SOURCE.md) — PROCEDURE; explicit inputs and known gaps, not yet tested on a fresh host |
 | A starting program with configuration, maps, field reads and metadata output | [`docs/EBPF-TUTORIAL.md`](docs/EBPF-TUTORIAL.md), [`substrate/template.c`](substrate/template.c) — PROCEDURE; unsampled entry/exit and map replacement pass on the repaired isolated TMM; cost remains unmeasured |
 | **What the engine does, has done, and could do** — the current state, with evidence | [`tmm-bpf-engine-architect-brief.md`](tmm-bpf-engine-architect-brief.md) |
 | Every axis in flat form: hook types, maps, helpers, ceilings | [`vm-capability-inventory.md`](vm-capability-inventory.md) |
@@ -51,6 +79,10 @@ construction, kept that way on purpose, and carrying its own dated accuracy note
 
 | document | covers |
 |---|---|
+| [`substrate/PROGRAMS.md`](substrate/PROGRAMS.md) | **MEASURED native/socket tests, package and isolated live TMM, 2026-09-30.** Two owners, two shared entry hooks, 18 exchanges, 594 records; separate maps/configuration, independent detach/revoke and replacement. Restored hooks and removed fixture. Multiple workers and sustained cost remain unqualified. |
+| [`env/ai-traffic/VOID-COMPLETION.md`](env/ai-traffic/VOID-COMPLETION.md) | **MEASURED native fixture only, 2026-09-29.** Both pinned compilers pass 24 cases and 1,100 observed returns. Tests a frame-bound entry snapshot with the unchanged return machinery. Production entry capture and live initialization remain unvalidated. |
+| [`env/ai-traffic/JSON-INITIALIZATION.md`](env/ai-traffic/JSON-INITIALIZATION.md) | **MEASURED source/compiled/admission qualification only, 2026-09-29.** Handler/reset void-return refusals, admitted control and rejected forwarding shortcut. Build-box verifier checks 48 source snapshots and 15 instruction locations. No live probe; completed initialization and lifecycle remain unqualified. |
+| [`env/ai-traffic/ID-FLOW.md`](env/ai-traffic/ID-FLOW.md) | **Measured same-record ID and flow side, 2026-09-29.** Pinned PREVAIL, 224 native invocations, 12 decoder rejections and 44 live exchanges yielding 88 records. Keep-alive and concurrent equal IDs; exact replay, archive and cleanup. Local lifecycle, message role and request/reply association remain unqualified. |
 | [`env/ai-traffic/GAPS.md`](env/ai-traffic/GAPS.md) | **Measured controlled-gap tests, 2026-09-28.** Four-VM native falsifier; five live windows, 150 accepted requests and 1,023 calls/records. Reported gaps and capacity invalidate a whole window. Full reload recovers fresh-request matching; retained connection stays unknown. Silent-gap detection, multiple workers and cost remain open. |
 | [`env/ai-traffic/CORRELATION.md`](env/ai-traffic/CORRELATION.md) | **Measured bounded live join, 2026-09-28.** Four hooks, 313 calls/records; 51 completed header observations yield 42 accepted-operation matches, one authenticated rejection and eight unknowns. Trusted fixture ledger, canonical HTTP/1, 512-byte bound and lifetimes 1–127. General request identity, native AI-filter visibility and cost remain open. |
 | [`env/ai-traffic/LIFETIME.md`](env/ai-traffic/LIFETIME.md) | **Measured parser-interval gate, 2026-09-28.** Three hooks, 204 calls/records, 71 closed lifetimes and 66 address-reuse pairs. Late/missed initialization remains unknown. The later correlation record adds a bounded authenticated join; general request identity and cost remain unvalidated. |
@@ -78,8 +110,15 @@ reachable, or what something costs, prefer the current documents.
 
 | document | what has been superseded since |
 |---|---|
+| [`env/ai-traffic/JSON-LIFECYCLE.md`](env/ai-traffic/JSON-LIFECYCLE.md) | **CURRENT, 2026-09-29: measured boundary subset, lifecycle unknown.** Three probes; 312 native records and 306 live records from 13 exchanges. Eleven unavailable-context records invalidate the full consumer window. Late attachment, malformed JSON, keep-alive and concurrency are tested. Other required live paths remain unvalidated. Both attempts are archived and fixtures removed. |
+| [`env/ai-traffic/MESSAGE-SCOPE.md`](env/ai-traffic/MESSAGE-SCOPE.md) | **MEASURED source/compiled qualification only, 2026-09-29.** Build-box check covers 16 embedded files and 11 instruction locations. Rejects reused JSON context as request/shared-connection identity. Qualifies flow-side and handler/reset candidates; runtime scope and common owner lifetime remain unvalidated. |
+| [`env/ai-traffic/MESSAGE-ID.md`](env/ai-traffic/MESSAGE-ID.md) | **MEASURED bounded message-ID extraction, 2026-09-29.** Pinned PREVAIL and 194 native invocations; 35 live exchanges and 70 records. Exact types and raw bytes, including large numbers, with explicit missing/ambiguous/limited states. Reused and mismatched IDs stay as observations. Saved-evidence verifier checks fields, replay, archive and cleanup. General request association, protocol equality and caller identity remain unqualified. |
+| [`env/ai-traffic/REPLY-METADATA.md`](env/ai-traffic/REPLY-METADATA.md) | **MEASURED bounded reported reply fields, 2026-09-29.** Pinned PREVAIL and 106 native invocations; 38 live exchanges and 76 records. Exact presence, integer/Boolean values and explicit missing/ambiguous states. Saved-evidence verifier checks replay, both archives and cleanup. Retains pre-arm fixture failures. Reported fields do not prove remote success, caller identity or request association. |
+| [`env/ai-traffic/OPERATION-TARGET.md`](env/ai-traffic/OPERATION-TARGET.md) | **MEASURED bounded requested tool/resource extraction, 2026-09-29.** Pinned PREVAIL and 74 native invocations; 28 live requests and 56 records. Exact bytes, nested exclusions, duplicate rules, truncation, replay and cleanup pass. This adds requested activity for proposed identity profiles, not authenticated identity or authorized/successful access. |
+| [`env/ai-traffic/RESPONSE-METADATA.md`](env/ai-traffic/RESPONSE-METADATA.md) | **MEASURED bounded HTTP status and local transfer completion, 2026-09-29.** Pinned PREVAIL and 80 native invocations; nine live requests and 201 handler records, including paced, chunked, SSE and interrupted bodies. Saved-evidence verifier/export checks fields, journal, replay and cleanup. Retains failed cache-validity rule and layout assertion. No general request identity, remote-operation success, HTTP/2 coverage or data-path cost claim. |
+| [`env/ai-traffic/SESSION-ROUTING.md`](env/ai-traffic/SESSION-ROUTING.md) | **MEASURED bounded session-header and selected-route extraction, 2026-09-29.** Pinned PREVAIL and 80 native invocations; seven live requests, five session records and seven routing records through the existing collector. Exact bytes, replay, restored hooks and archived fixture removal. Retains three failed attempts. Identity profiles and blast-radius assessment remain IDEA consumer goals; successful persistence decoding, authenticated identity and data-path cost remain unvalidated. |
 | [`env/ai-traffic/COVERAGE.md`](env/ai-traffic/COVERAGE.md) | **IDEA probe-first discovery plan, corrected 2026-09-28.** Metadata extraction comes first; representative usage tests and analytics follow observations. Retains both the withdrawn fixed-concurrency proposal and the correction to requiring a real deployment before probe design. |
-| [`env/ai-traffic/METADATA.md`](env/ai-traffic/METADATA.md) | **MEASURED handler events and bounded root-object method extraction, 2026-09-28.** Retains the event-only limitation and failed stack-limit build. Pinned interpreter/JIT and live byte comparisons pass, including unfamiliar/escaped values and explicit truncation. Four-member walk and getter reachability limit coverage; the AIMCP input produced no getter observation. The token-cache result below supplies a separate measured path. Other fields and collector-side ZeroMQ publication remain pending/IDEA. |
+| [`env/ai-traffic/METADATA.md`](env/ai-traffic/METADATA.md) | **MEASURED handler events and bounded root-object method extraction, 2026-09-28.** Retains the event-only limitation and failed stack-limit build. Pinned interpreter/JIT and live byte comparisons pass, including unfamiliar/escaped values and explicit truncation. Four-member walk and getter reachability limit coverage; the AIMCP input produced no getter observation. The token-cache and session/routing results supply separate measured paths. Broader fields and collector-side ZeroMQ publication remain pending/IDEA. |
 | [`env/ai-traffic/TOKEN-METHOD.md`](env/ai-traffic/TOKEN-METHOD.md) | **MEASURED bounded AIMCP/JSON method extraction, 2026-09-28.** Completion-hook program passes pinned PREVAIL, 68 native invocations and a 13-request live gate. The separate collector retains 26 cache records in 28 journal events. Exact values, replay, restored hook and archive/removal are checked. Initial helper-hook coverage failure remains recorded. Requires JSON filtering, literal root keys and bounded traversal; no protocol/request identity or data-path cost claim. |
 | [`env/ai-traffic/EXTRACTED-METADATA.md`](env/ai-traffic/EXTRACTED-METADATA.md) | **MEASURED source results, readable exports, 2026-09-28.** Actual method bytes and status records from the saved getter and token-cache runs. `metadata_export.py` and `token_method_verify.py --export` decode captured bytes. Authored fixture data, not production-agent observations. |
 | [`env/ai-traffic/PRODUCTION-STREAM.md`](env/ai-traffic/PRODUCTION-STREAM.md) | **IDEA production service contract, 2026-09-28.** The local collector subset below is measured. Multiworker identity, attachment/health history, power-loss durability, authenticated off-box transport and sustained cost remain unvalidated. |

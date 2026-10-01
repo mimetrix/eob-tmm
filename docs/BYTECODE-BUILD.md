@@ -1,5 +1,9 @@
 # Bytecode build — the independent surface pipeline
 
+For the complete ordering from a TMM source-tree path, start with
+[BUILD-FROM-SOURCE.md](BUILD-FROM-SOURCE.md). It names the required external
+inputs and the gaps that prevent a fresh-host build of the current sources.
+
 How a **surface** (portable eBPF bytecode) is authored, compiled, verified, signed, and loaded into
 a running TMM. It does not require rebuilding TMM, but consumes that build's **packaged
 runtime/debug pair and build-side metadata**. Offsets and the attachment target are resolved

@@ -35,6 +35,12 @@
  * only ever sees a pointer that is either the old program or the new one.
  */
 
+/* SO_PEERCRED's struct ucred is a GNU interface. TMM's STDINC build does
+ * not define this feature macro on the command line. Set it before headers. */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "ls_vm.h"
 #include "ls_sig.h"
 #include "ls_audit.h"
@@ -154,6 +160,7 @@ struct ls_prep {
                                   * the interpreter is not a hook cost and nothing
                                   * else in the reply would say so. */
     int          rc;             /* slot on success, negative on refusal        */
+    struct ls_program_status program_status;
     /* Control-path only, serialized by the loader/prepare handoff. Kept here so
      * target authorization needs no additional mutable TMM linker global. */
     struct {
@@ -182,6 +189,37 @@ _Static_assert(sizeof(((struct ls_prep *)0)->sig) == SHIELD_SIG_MAX,
                "ls_prep's signature copy has drifted from SHIELD_SIG_MAX");
 
 static struct ls_prep g_prep;
+
+static int
+ls_is_program_op(int op)
+{
+    return op >= LS_PROGRAM_LOAD && op <= LS_PROGRAM_STATUS;
+}
+
+static void
+ls_prep_complete(void)
+{
+    /* Program requests own their input mapping. A socket timeout must not free
+     * bytes that a late prepare still needs. Release them on the prepare thread. */
+    if (ls_is_program_op(g_prep.op) && g_prep.prog) {
+        (void)munmap((void *)g_prep.prog, g_prep.prog_len ? g_prep.prog_len : 1);
+        g_prep.prog = NULL;
+    }
+    __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+}
+
+static int
+ls_program_patch(uint64_t address, unsigned site, int install)
+{
+    if (site >= LS_PROGRAM_SITES)
+        return -1;
+    for (unsigned i = 0; i < SHIELD_MAX_SHIELDS; i++)
+        if (g_prep.targets[i].attached &&
+            (i == site || g_prep.targets[i].target.entry == address))
+            return -1;
+    return install ? ls_arm_live((void *)(uintptr_t)address, NULL, (int)site, 0) :
+                     ls_disarm_live((void *)(uintptr_t)address);
+}
 
 /* Set by ls_prep.c once a TMM thread owns the timer. Read here only to refuse a
  * load that could never be serviced. */
@@ -212,11 +250,11 @@ ls_prep_run_pending(void)
      * a negative rc, which the loader reports exactly as it reports any other refusal, so the
      * caller cannot distinguish "bad signature" from "bad ELF" and cannot probe which half of
      * a forgery to fix. */
-    if (g_prep.op == LS_PREP_OP_RELOAD && g_prep.verify) {
+    if ((g_prep.op == LS_PREP_OP_RELOAD || g_prep.op == LS_PROGRAM_LOAD) && g_prep.verify) {
         enum ls_sig_result sr = ls_sig_verify(g_prep.binding, sizeof g_prep.binding,
                                              g_prep.sig, 64u,
                                              g_prep.prog, g_prep.prog_len);
-        if (sr != LS_SIG_OK && !ls_vm_sig_enforce()) {
+        if (sr != LS_SIG_OK && g_prep.op == LS_PREP_OP_RELOAD && !ls_vm_sig_enforce()) {
             fprintf(stderr, "ls_vm: *** SIGNATURE CHECK FAILED (%s) AND ADMITTED ANYWAY --- "
                             "LS_SIG_ENFORCE is off. This build trusts whatever reaches the "
                             "socket.\n", ls_sig_strerror(sr));
@@ -225,12 +263,47 @@ ls_prep_run_pending(void)
         if (sr != LS_SIG_OK) {
             fprintf(stderr, "ls_vm: LOAD REFUSED --- %s\n", ls_sig_strerror(sr));
             g_prep.rc = -1;
-            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            ls_prep_complete();
             return;
         }
     }
 
-    if (g_prep.op == LS_PREP_OP_BENCH) {
+    if (g_prep.op >= LS_PROGRAM_LOAD && g_prep.op <= LS_PROGRAM_STATUS) {
+        unsigned id = (unsigned)g_prep.slot;
+        g_prep.rc = -1;
+        if (g_prep.op == LS_PROGRAM_LOAD) {
+            struct shield_binding binding;
+            struct ls_program_entry entries[LS_PROGRAM_ENTRIES];
+            memcpy(&binding, g_prep.binding, sizeof binding);
+            int count = ls_target_program_entries(g_prep.prog, g_prep.prog_len,
+                                                   ls_audit_build_id(), "/proc/self/exe", entries);
+            if (count > 0 && g_prep.verify && binding.mode_ceiling <= MODE_ENFORCE)
+                g_prep.rc = ls_program_load(id, g_prep.prog, g_prep.prog_len,
+                                             entries, (unsigned)count, binding.prog_sha256,
+                                             binding.mode_ceiling);
+        } else if (g_prep.op == LS_PROGRAM_STATUS) {
+            g_prep.rc = ls_program_status(id, &g_prep.program_status);
+        } else {
+            struct ls_program_request request;
+            memcpy(&request, g_prep.prog, sizeof request);
+            switch (g_prep.op) {
+            case LS_PROGRAM_ATTACH:
+                g_prep.rc = ls_program_attach(id, request.instance, request.entry, ls_program_patch);
+                break;
+            case LS_PROGRAM_DETACH:
+                g_prep.rc = ls_program_detach(id, request.instance, request.entry, ls_program_patch);
+                break;
+            case LS_PROGRAM_MODE:
+                g_prep.rc = ls_program_mode(id, request.instance, g_prep.mode);
+                break;
+            case LS_PROGRAM_REVOKE:
+                g_prep.rc = ls_program_revoke(id, request.instance, ls_program_patch);
+                break;
+            }
+        }
+        if (g_prep.rc == 0)
+            (void)ls_program_status(id, &g_prep.program_status);
+    } else if (g_prep.op == LS_PREP_OP_BENCH) {
         /* THE FIX THIS STRUCTURE EXISTED FOR ALREADY. ls_vm_bench_program used to be called
          * straight from the loader thread, which hits the identical allocator freeze that
          * this handoff was built to avoid for loads --- the dev ops were simply never
@@ -255,8 +328,16 @@ ls_prep_run_pending(void)
             binding->mode_ceiling > MODE_ENFORCE || g_prep.mode > binding->mode_ceiling ||
             ls_target_parse(g_prep.prog, g_prep.prog_len, g_prep.section,
                             ls_audit_build_id(), &target) != 0 ||
-            ls_target_check_file("/proc/self/exe", &target) != 0) {
+             ls_target_check_file("/proc/self/exe", &target) != 0) {
             fprintf(stderr, "ls_vm: LOAD REFUSED --- signed target/build/mode contract\n");
+            g_prep.rc = -1;
+            __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+            return;
+        }
+        if (!memcmp(target.magic, LS_TARGET_SNAPSHOT_MAGIC, 8) &&
+            (binding->mode_ceiling > MODE_MONITOR ||
+             g_prep.mode > MODE_MONITOR)) {
+            fprintf(stderr, "ls_vm: LOAD REFUSED --- snapshot is observe-only\n");
             g_prep.rc = -1;
             __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
             return;
@@ -297,7 +378,7 @@ ls_prep_run_pending(void)
         }
     }
 
-    __atomic_store_n(&g_prep.state, LS_PREP_DONE, __ATOMIC_RELEASE);
+    ls_prep_complete();
 }
 
 /* Loader side. Parks the request, waits for a TMM thread to do it, returns the
@@ -319,9 +400,24 @@ ls_prep_submit(int op, int slot, const void *prog, unsigned int prog_len,
     }
     /* One request at a time. The socket is serial, so this only trips if a
      * previous prepare never completed. */
+    if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) == LS_PREP_DONE &&
+        ls_is_program_op(g_prep.op))
+        __atomic_store_n(&g_prep.state, LS_PREP_IDLE, __ATOMIC_RELEASE);
     if (__atomic_load_n(&g_prep.state, __ATOMIC_ACQUIRE) != LS_PREP_IDLE) {
         *why = "a previous prepare is still outstanding";
         return -1;
+    }
+
+    if (ls_is_program_op(op)) {
+        void *copy = mmap(NULL, prog_len ? prog_len : 1, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (copy == MAP_FAILED) {
+            *why = "program request allocation failed";
+            return -1;
+        }
+        if (prog_len)
+            memcpy(copy, prog, prog_len);
+        prog = copy;
     }
 
     g_prep.op       = op;
@@ -547,6 +643,70 @@ ls_handle_config(int fd, const struct shield_msg *m)
 
 /* Every exit is audited by handle(); copied header survives scratch release. */
 static void
+ls_handle_program(int fd, const struct shield_msg *m)
+{
+    unsigned char extra;
+    struct ucred peer;
+    socklen_t peer_len = sizeof peer;
+    if (recv(fd, &extra, 1, 0) != 0 ||
+        getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peer, &peer_len) != 0 ||
+        peer.uid != geteuid()) {
+        reply(fd, "ERR program framing or peer identity\n");
+        return;
+    }
+    if (m->epoch >= LS_PROGRAM_MAX || m->mode > MODE_ENFORCE ||
+        (m->op != LS_PROGRAM_MODE && m->mode != MODE_DISABLE)) {
+        reply(fd, "ERR program index or mode\n");
+        return;
+    }
+    if (m->op == LS_PROGRAM_LOAD) {
+        uint32_t running;
+        enum ls_build_verdict build = ls_build_gate(ls_audit_build_id(),
+                                  m->binding.build_min, m->binding.build_max, &running);
+        if (!m->prog_len || m->prog_len > LS_PREP_MAX_PROG ||
+            m->binding.ctx_abi_version != SHIELD_CTX_ABI_VERSION ||
+            memcmp(m->binding.hook, LS_PROGRAM_BINDING, sizeof LS_PROGRAM_BINDING) ||
+            build == LS_BUILD_MISMATCH || build == LS_BUILD_BAD_RANGE ||
+            build == LS_BUILD_NO_ID ||
+            ls_expiry_gate(m->binding.expires_with, (uint64_t)time(NULL)) == LS_EXPIRY_EXPIRED) {
+            reply(fd, "ERR program binding, build, expiry, size or context ABI\n");
+            return;
+        }
+    } else if (m->op == LS_PROGRAM_STATUS) {
+        if (m->prog_len) {
+            reply(fd, "ERR program status payload\n");
+            return;
+        }
+    } else {
+        struct ls_program_request request;
+        if (m->prog_len != sizeof request) {
+            reply(fd, "ERR program control length\n");
+            return;
+        }
+        memcpy(&request, m->prog, sizeof request);
+        if (!request.instance || request.reserved ||
+            ((m->op == LS_PROGRAM_MODE || m->op == LS_PROGRAM_REVOKE) && request.entry)) {
+            reply(fd, "ERR program control identity or reserved field\n");
+            return;
+        }
+    }
+    const char *why = "unknown";
+    if (ls_prep_submit((int)m->op, (int)m->epoch, m->prog, m->prog_len,
+                        "", "", m->mode, 0,
+                        m->op == LS_PROGRAM_LOAD ? &m->binding : NULL,
+                        m->op == LS_PROGRAM_LOAD ? m->sig : NULL, NULL, &why) < 0) {
+        reply(fd, "ERR program operation refused (%s); inspect status before retry\n", why);
+        return;
+    }
+    /* The socket has one control writer. No later request can replace this
+     * copied result before the reply has been sent. */
+    const struct ls_program_status *s = &g_prep.program_status;
+    reply(fd, "OK program=%u instance=%llu entries=%u attached=%u mode=%u config_slot=%u\n",
+          m->epoch, (unsigned long long)s->instance, s->entries,
+          s->attached, s->mode, s->config_slot);
+}
+
+static void
 handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
 {
     unsigned char *g_load_buf = ls_load_buf_alloc();
@@ -561,6 +721,17 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
     struct shield_msg *m = (struct shield_msg *)g_load_buf;
     if (m->op == SHIELD_OP_CONFIG_STATUS || m->op == SHIELD_OP_CONFIG_PUBLISH) {
         ls_handle_config(fd, m);
+        ls_load_buf_free(g_load_buf);
+        return;
+    }
+    if (m->op >= LS_PROGRAM_LOAD && m->op <= LS_PROGRAM_STATUS) {
+        ls_handle_program(fd, m);
+        ls_load_buf_free(g_load_buf);
+        return;
+    }
+    if ((m->op == SHIELD_OP_LOAD || m->op == SHIELD_OP_SET_MODE ||
+         m->op == SHIELD_OP_REVOKE) && m->epoch >= LS_PROGRAM_SITES) {
+        reply(fd, "ERR legacy slot out of range\n");
         ls_load_buf_free(g_load_buf);
         return;
     }
@@ -588,6 +759,12 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
                        ls_function_in_section(m->prog, m->prog_len, probe, tmp, sizeof tmp) > 0);
         snprintf(section, sizeof section, "%s/%.63s",
                  is_exit ? "fexit" : "fentry", m->binding.hook);
+        snprintf(probe, sizeof probe, LS_SNAPSHOT_SECTION "%.63s",
+                 m->binding.hook);
+        if (m->prog_len > 0 &&
+            ls_function_in_section(m->prog, m->prog_len, probe,
+                                   tmp, sizeof tmp) > 0)
+            snprintf(section, sizeof section, "%s", probe);
     }
 
     /*
@@ -807,11 +984,14 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
         int qslot = (int)m->epoch;
         if (!ls_vm_stats(qslot, &st)) { reply(fd, "ERR no such slot %d\n", qslot); break; }
         reply(fd, "OK armed=%d mode=%d gen=%u fired=%llu safe_returns=%llu errors=%llu "
-                  "cycles=%llu cycles_max=%llu cycles_min=%llu\n",
+                  "cycles=%llu cycles_max=%llu cycles_min=%llu "
+                  "snapshot_entry_errors=%llu snapshot_return_errors=%llu\n",
               (int)st.armed, st.mode, st.gen,
               (unsigned long long)st.fired, (unsigned long long)st.safe_returns,
               (unsigned long long)st.errors, (unsigned long long)st.cycles,
-              (unsigned long long)st.cycles_max, (unsigned long long)st.cycles_min);
+              (unsigned long long)st.cycles_max, (unsigned long long)st.cycles_min,
+              (unsigned long long)st.snapshot_entry_errors,
+              (unsigned long long)st.snapshot_return_errors);
         break;
     }
     /* Ops beyond the ABI's four. shield_msg.op is a uint32 and the enum uses the
@@ -884,6 +1064,10 @@ handle_msg(int fd, struct shield_msg **seen, struct shield_msg *copy)
             break;
         }
         unsigned long long addr = g_prep.targets[slot].target.entry;
+        if (ls_program_site_owned((unsigned)slot, addr)) {
+            reply(fd, "ERR arm: site is reserved by the program attachment manager\n");
+            break;
+        }
         char *end = NULL;
         unsigned long long requested = strtoull(a, &end, 0);
         if (a[0] && strcmp(a, g_prep.targets[slot].hook) &&

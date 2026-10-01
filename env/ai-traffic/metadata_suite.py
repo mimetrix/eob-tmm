@@ -120,11 +120,23 @@ class Metadata(Lifecycle):
                 "/work/ls_drain", "--segment", "/run/ls-stream/ls_tp_ring", "--once"
             )
         for label, (slot, _, _, _) in self.programs.items():
-            text = await self.cli(
+            program = self.build["programs"][label]
+            load = [
                 "load",
                 str(slot),
-                str(directory / ("metadata-" + label + ".bpf.o")),
+                str(directory / program.get("object", "metadata-" + label + ".bpf.o")),
                 "1",
+            ]
+            if program.get("signature"):
+                load = [
+                    "load-signed",
+                    str(slot),
+                    str(directory / program["object"]),
+                    str(directory / program["signature"]),
+                    "1",
+                ]
+            text = await self.cli(
+                *load,
             )
             assert "signature=verified" in text, text
             self.loaded_slots.add(slot)

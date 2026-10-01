@@ -1,5 +1,16 @@
 # TMM build — the image and its build artifacts
 
+**Starting with only a source-tree path?** Use
+[BUILD-FROM-SOURCE.md](BUILD-FROM-SOURCE.md) first. The procedure below assumes
+the prepared lab. The new guide lists missing inputs, historical configuration
+lists and the remaining fresh-tree integration work.
+
+**2026-09-30 ownership build:** [PROGRAMS.md](../substrate/PROGRAMS.md) records
+the incremental build/package drivers and the bounded live result. Image
+`tmm:PROGRAMS-20260930`, packaged build `2ab960fa…`, passes 18 exchanges with two
+independent owners and two shared hooks. The isolated fixture is removed;
+multiple workers and sustained cost remain unqualified.
+
 How the TMM image is built and what our adjustments are. Everything here is **build-time**:
 it produces the image a pod runs.
 

@@ -34,6 +34,10 @@
 #ifndef LS_VM_H
 #define LS_VM_H
 
+/* Bounded temporary compiler output buffer. The retained executable mapping
+ * uses the actual code size. Combined readers exceed uBPF's 64 KiB default. */
+#define LS_JIT_CODE_MAX (512u * 1024u)
+
 #include <stdbool.h>
 #include <stddef.h>   /* size_t --- this header must stand alone */
 #include <stdint.h>
@@ -95,7 +99,10 @@ struct ls_ctx_sample {
 /* One armed program. TMM holds a small fixed array of these per instance ---
  * fixed because allocating on the call path is not acceptable. */
 
+#include "ls_snapshot.h"
+
 struct ls_slot {
+    unsigned     owner;     /* 0: legacy slot; otherwise program index + 1 */
     void        *vm;        /* struct ubpf_vm *, opaque here          */
     void        *jit_fn;    /* ubpf_jit_fn when JIT'd; NULL = interpret.
                              * Held separately because ubpf_exec never
@@ -106,6 +113,10 @@ struct ls_slot {
     bool         is_exit;       /* fexit hook: arm via ls_fexit_table, not the
                                  * entry table. Set at load from the program's
                                  * fexit/ vs fentry/ section; read at arm. */
+    bool         is_snapshot;
+    struct ls_snapshot_id snapshot_id;
+    uint64_t     snapshot_entry_errors;
+    uint64_t     snapshot_return_errors;
     uint64_t     safe_value;    /* what the CALLER receives when SAFE_RETURN skips
                                  * the body (item 7). ZERO IS NOT UNIVERSALLY SAFE:
                                  * for an err_t-returning hook 0 is ERR_OK ---
@@ -146,6 +157,8 @@ struct ls_stats {
     uint64_t cycles;
     uint64_t cycles_max;
     uint64_t cycles_min;
+    uint64_t snapshot_entry_errors;
+    uint64_t snapshot_return_errors;
 };
 
 /* The form TMM actually calls. Applies the environment overrides --- program
@@ -249,6 +262,12 @@ int ls_vm_arm(const void *elf, size_t elf_len,
  * fail-open is correct HERE and only here: a shield that cannot run must not
  * take TMM down with it. Admission fails closed; invocation fails open. */
 enum ls_verdict ls_vm_call(int slot, void *ctx, size_t ctx_len);
+
+/* Frame-bound completion mode. Identity is read on the owning TMM thread.
+ * Execution failure is distinct from a program's FALLTHROUGH verdict. */
+int ls_vm_snapshot_identity(int slot, struct ls_snapshot_id *identity);
+int ls_vm_snapshot_call(int slot, const struct ls_snapshot_id *identity,
+                        struct ls_snapshot_ctx *ctx);
 
 /* Runtime load path (ls_vm_load.c). Started only if LS_LOAD_SOCKET is set.
  * VERIFIES EVERY PROGRAM'S SIGNATURE (ls_sig.c) and NOTHING ABOUT ITS SENDER: the

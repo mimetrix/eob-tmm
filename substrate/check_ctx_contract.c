@@ -12,6 +12,7 @@
 
 #include "ls_arm.h"
 #include "ls_fexit.h"
+#include "check_snapshot_stubs.h"
 #include "ls_vm.h"
 
 /* The C exit dispatcher only needs this symbol's address, never executes it. */

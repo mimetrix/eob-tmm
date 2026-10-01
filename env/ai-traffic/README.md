@@ -1,5 +1,19 @@
 # AI traffic jig: a repeatable proxy workload
 
+**One activity bytecode artifact:** [ACTIVITY-PROGRAM.md](ACTIVITY-PROGRAM.md)
+records the build and live check of both required entry hooks running together.
+The [combined-record result](ACTIVITY-COMBINED.md) adds bytecode-generated exchange
+keys and an exporter. Ten live exchanges pass, including keep-alive and concurrent
+equal IDs. Both hooks were restored and the fixture was removed. Scope is one
+worker and non-pipelined HTTP/1; identity remains unknown.
+
+**Export activity metadata:** [AGENT-ACTIVITY.md](AGENT-ACTIVITY.md) documents the
+versioned JSON view of the collector stream. Run `activity_export.py --socket
+/collector-api/events.sock` where that socket is mounted. Method, target, message
+ID and reported response fields are supported. This one-row observation view
+keeps correlation and identity unknown. Use `activity_combine.py --socket
+/collector-api/events.sock --follow` for checked exchange records.
+
 **MEASURED, 2026-09-24:** 51 synthetic AI exchanges passed through the current TMM, from three
 concurrent client workers, including six paced Server-Sent Events (SSE) streams. Request and
 response body hashes agree between client and backend. The selected TMM's packet capture and
@@ -28,7 +42,33 @@ results; retain it as supporting enforcement evidence. Its signed monitor remain
 
 ## Topology
 
+- [Production entry snapshots](ENTRY-SNAPSHOT.md): native tests and TMM
+  build/package pass. Live initialization is refused by the corrected unwind
+  gate. The earlier zero-import argument is falsified on both tested binaries.
+  The unused fixture is archived and removed.
+
+- [ID and flow side](ID-FLOW.md): 44 exchanges and 88 same-record field observations,
+  including keep-alive and concurrent equal IDs. Request association remains open.
+- [JSON-context boundary test](JSON-LIFECYCLE.md): 13 exchanges and 306 entry
+  records. Unavailable context invalidates the full window; lifecycle remains unknown.
+- [Initialization-completion qualification](JSON-INITIALIZATION.md): pinned return
+  refusals and compiled-path checks reject the tested candidates. No live probe;
+  completed initialization remains unqualified.
+- [Void-return completion test](VOID-COMPLETION.md): the native entry-snapshot
+  adapter passes both pinned compilers. Production entry capture is the next work.
 - [Extracted metadata](EXTRACTED-METADATA.md): actual values from the saved live run.
+- [Observed message IDs](MESSAGE-ID.md): exact ID type and raw bytes, including
+  large numbers without rounding; a field for later request/reply association.
+- [Message scope qualification](MESSAGE-SCOPE.md): pinned flow-side and JSON
+  lifecycle candidates; source/compiled checks only, with runtime scope still open.
+- [Reported reply fields](REPLY-METADATA.md): result/error presence, signed error
+  codes and Boolean tool-error reports, with explicit missing and ambiguous states.
+- [Requested tool/resource metadata](OPERATION-TARGET.md): exact tool names and
+  resource addresses from bounded JSON-cache reads; a step toward activity profiles.
+- [Response metadata](RESPONSE-METADATA.md): measured HTTP status and local transfer
+  completion, including paced and interrupted bodies; saved-evidence verifier/export.
+- [Session and routing extraction](SESSION-ROUTING.md): saved session-header bytes,
+  selected pool/endpoint state and proposed identity-profile/blast-radius uses.
 - [Token-cache method extraction](TOKEN-METHOD.md): exact `tools/list` and unfamiliar
   values on the AIMCP/JSON path, delivered through the separate collector.
 - [Continuous collector](COLLECTOR.md): measured local journal and HTTP replay.
@@ -50,8 +90,9 @@ strings and explicit truncation. It checks at most four members and copies at mo
 64 bytes. The AIMCP test input did not call this getter. The later
 [token-cache probe](TOKEN-METHOD.md) extracts that method through a JSON-completion
 hook: 13 requests, 26 cache records, exact values and explicit exclusions.
-It requires the JSON filter and literal root keys. Session fields, protocol identity
-and production coverage remain open. See [the getter result](METADATA.md#7-field-result--measured-on-the-pinned-build)
+It requires the JSON filter and literal root keys. Saved session-header and selected
+routing fields now have a [separate bounded result](SESSION-ROUTING.md). Protocol
+identity and production coverage remain open. See [the getter result](METADATA.md#7-field-result--measured-on-the-pinned-build)
 for the earlier scope and its distinction from the event-only probe.
 
 ```text

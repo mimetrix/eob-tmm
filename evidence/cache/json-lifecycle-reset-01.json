@@ -1,0 +1,585 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "9f51dd106462\n986e15b43d23\nc2eb17cdaaaf\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "9f51dd106462",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"9f51dd1064623ad56a6a271042cf62ee7858ebb8006accb598d820a87747bd90\",\"image\":\"sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054\",\"name\":\"/eob-template-20260925-collector-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"2026-09-29T18:55:31.499622536Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":0,\"Restarting\":false,\"Running\":false,\"StartedAt\":\"2026-09-29T18:55:18.677688744Z\",\"Status\":\"exited\"},\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "986e15b43d23",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"986e15b43d23338672cf9eedac54ee257838d91d9796571aa16b68d11ca6ab99\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"name\":\"/eob-template-20260925-tmm-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":4080147,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T18:49:16.695682517Z\",\"Status\":\"running\"},\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "c2eb17cdaaaf",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"c2eb17cdaaaf65f49905094a37ccccb26debc33e2b3c70529a076a9d44a96f5d\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"name\":\"/eob-template-20260925-fixture-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-29T18:57:49.807513951Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T18:57:49.765672171Z\"},{\"End\":\"2026-09-29T18:57:51.86426992Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T18:57:51.809167185Z\"},{\"End\":\"2026-09-29T18:57:53.903864597Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T18:57:53.865085617Z\"},{\"End\":\"2026-09-29T18:57:55.946055063Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T18:57:55.905226953Z\"},{\"End\":\"2026-09-29T18:57:57.994594094Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T18:57:57.94703396Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":4079235,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T18:49:11.913276913Z\",\"Status\":\"running\"},\"restarts\":0,\"project\":\"eob-template-20260925\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":37331,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-08-21T18:14:16.71521944Z\",\"Status\":\"running\"},\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-tmm-1",
+        "python3",
+        "-u",
+        "-c",
+        "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+        "0xd94100"
+      ],
+      "rc": 0,
+      "stdout": "{\"pid\": \"7\", \"sha256\": \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939552 4284 0 0 2130 3811 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\", \"entry\": 14237952, \"bytes\": \"f30f1efa909090909041574156415541\"}\n{\"final\": true, \"bytes\": \"f30f1efa909090909041574156415541\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939552 4284 0 0 2130 3811 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-tmm-1",
+        "python3",
+        "-u",
+        "-c",
+        "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+        "0xd93540"
+      ],
+      "rc": 0,
+      "stdout": "{\"pid\": \"7\", \"sha256\": \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939553 4284 0 0 2131 3813 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\", \"entry\": 14234944, \"bytes\": \"9090909090415741564989d641554154\"}\n{\"final\": true, \"bytes\": \"9090909090415741564989d641554154\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939553 4284 0 0 2131 3813 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-tmm-1",
+        "python3",
+        "-u",
+        "-c",
+        "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+        "0xd927c0"
+      ],
+      "rc": 0,
+      "stdout": "{\"pid\": \"7\", \"sha256\": \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939563 4284 0 0 2131 3814 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\", \"entry\": 14231488, \"bytes\": \"9090909090415455534889fb488b3f48\"}\n{\"final\": true, \"bytes\": \"9090909090415455534889fb488b3f48\", \"stat\": \"7 (tmm.0) S 1 7 1 0 -1 4194560 939563 4284 0 0 2131 3814 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\\n\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "0"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=1 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "1"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "2"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "3"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "4"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "5"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "6"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "7"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "8"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=19 safe_returns=0 errors=0 cycles=2088012 cycles_max=2033534 cycles_min=1332\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "9"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=2 safe_returns=0 errors=0 cycles=12992 cycles_max=8104 cycles_min=4888\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "10"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=1 mode=0 gen=1 fired=2 safe_returns=0 errors=0 cycles=5920 cycles_max=3316 cycles_min=2604\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "11"
+      ],
+      "rc": 0,
+      "stdout": "OK armed=0 mode=0 gen=0 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "python3",
+        "-c",
+        "import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob(\"*\") if p.is_file()}))"
+      ],
+      "rc": 0,
+      "stdout": "{\"json-lifecycle-live-01/exit-status\": \"4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865\", \"json-lifecycle-live-01/reset-config.json\": \"5385e8ae0f561face656fcdffc0dc63886fd399afd7cc1bd85598a99ed4bd81f\", \"json-lifecycle-live-01/events.sqlite\": \"8a0ee36558967aa1d3603bbc79404d7930bab938bc56534ee6a7a7477f2738ec\", \"json-lifecycle-live-01/tao.xml\": \"843a6e2a3a053a993c0e236ba5f21d90a50d77e00b1cf3814fbfe585436eded5\", \"json-lifecycle-live-01/result.json\": \"eb5529baa15fed9243e405b00992f6b8c54d0c70a1ae64648792ca65eebf0beb\", \"json-lifecycle-live-01/tao.log\": \"cdfdff69c911b165b8d426565179a69359f9ee7d049a444fa9a50bfbd77ba076\", \"json-lifecycle-live-01/complete-config.json\": \"c0d1e35cc3c9da375815e38c608db8be1be84ce94fb362107a610f73edde4628\", \"json-lifecycle-live-01/handler-config.json\": \"4a77168884a2b158345b3a631101513dd662d2c6932d0c53ee5368e5b8b55d34\", \"json-lifecycle-live-01/checked-exit-status\": \"4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--env-file",
+        "template-fixture.env",
+        "--project-name",
+        "eob-template-20260925",
+        "-f",
+        "icap-compose.yaml",
+        "-f",
+        "config-compose.yaml",
+        "-f",
+        "observability-compose.yaml",
+        "-f",
+        "collector-compose.yaml",
+        "down",
+        "--volumes",
+        "--remove-orphans"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": " Container eob-template-20260925-collector-1 Stopping \n Container eob-template-20260925-collector-1 Stopped \n Container eob-template-20260925-collector-1 Removing \n Container eob-template-20260925-collector-1 Removed \n Container eob-template-20260925-tmm-1 Stopping \n Container eob-template-20260925-tmm-1 Stopped \n Container eob-template-20260925-tmm-1 Removing \n Container eob-template-20260925-tmm-1 Removed \n Container eob-template-20260925-fixture-1 Stopping \n Container eob-template-20260925-fixture-1 Stopped \n Container eob-template-20260925-fixture-1 Removing \n Container eob-template-20260925-fixture-1 Removed \n Volume eob-template-20260925_nats-certs Removing \n Network eob-template-20260925_management Removing \n Network eob-template-20260925_data Removing \n Volume eob-template-20260925_ls-sockets Removing \n Volume eob-template-20260925_evidence Removing \n Volume eob-template-20260925_collector-api Removing \n Volume eob-template-20260925_collector-journal Removing \n Volume eob-template-20260925_ls-stream Removing \n Volume eob-template-20260925_nats-certs Removed \n Volume eob-template-20260925_evidence Removed \n Volume eob-template-20260925_ls-stream Removed \n Volume eob-template-20260925_ls-sockets Removed \n Volume eob-template-20260925_collector-api Removed \n Volume eob-template-20260925_collector-journal Removed \n Network eob-template-20260925_management Removed \n Network eob-template-20260925_data Removed \n"
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":37331,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-08-21T18:14:16.71521944Z\",\"Status\":\"running\"},\"restarts\":0,\"project\":null}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "container",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "volume",
+        "ls",
+        "-q",
+        "--filter",
+        "label=com.docker.compose.project=eob-template-20260925"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "sources": {
+    "json_lifecycle_reset.py": {
+      "text": "#!/usr/bin/env python3\n\"\"\"Archive a failed JSON boundary run before removing its isolated fixture.\"\"\"\nimport argparse\nimport hashlib\nimport io\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport tarfile\nfrom config_live_run import WITNESS\nfrom lifetime_fixture import COMPOSE, PROJECT, ROOT\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument('--output', type=Path, required=True)\n    parser.add_argument('--archive', type=Path, required=True)\n    parser.add_argument('--live', type=Path, required=True)\n    parser.add_argument('--source-dir', type=Path, required=True)\n    args = parser.parse_args()\n    failed = json.loads(args.live.read_text())\n    environment = dict(os.environ, COLLECTOR_IMAGE=failed['collector']['image'],\n                       COLLECTOR_SOURCE_DIR=str(args.source_dir.resolve()))\n    record = dict(passed=False, commands=[], sources={}, witnesses={}, witness_script=WITNESS)\n\n    def run(*argv):\n        row = subprocess.run(argv, cwd=ROOT, env=environment, capture_output=True, text=True, timeout=240, check=False)\n        record['commands'].append(dict(argv=argv, rc=row.returncode, stdout=row.stdout, stderr=row.stderr))\n        row.check_returncode()\n        return row.stdout\n\n    def inventory():\n        return [json.loads(run('docker', 'inspect', identity, '--format',\n            '{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}},'\n            '\"project\":{{json (index .Config.Labels \"com.docker.compose.project\")}}}'))\n            for identity in run('docker', 'ps', '-aq').split()]\n\n    with args.output.open('x') as output:\n        try:\n            assert not args.archive.exists()\n            assert not failed['passed'] and failed['before'] == failed['after']\n            result = json.loads(failed['files']['result.json'])\n            assert not result['passed'] and not result['cleanup_errors']\n            record['live_sha256'] = hashlib.sha256(args.live.read_bytes()).hexdigest()\n            for name in ('json_lifecycle_reset.py', 'collector-compose.yaml'):\n                path = ROOT / name\n                record['sources'][name] = dict(text=path.read_text(), sha256=hashlib.sha256(path.read_bytes()).hexdigest())\n            record['before'] = inventory()\n            owned = [r for r in record['before'] if r['project'] == PROJECT]\n            assert len(owned) == 3\n            assert next(r['id'] for r in owned if r['name'].endswith('-tmm-1')) == json.loads(failed['before'].split()[0])\n            fixture, tmm = PROJECT + '-fixture-1', PROJECT + '-tmm-1'\n            for name, program in failed['program_build']['programs'].items():\n                expected = failed['witnesses'][name]['initial']\n                rows = [json.loads(line) for line in run('docker', 'exec', tmm, 'python3', '-u', '-c', WITNESS, program['entry']).splitlines()]\n                record['witnesses'][name] = rows\n                assert rows[0]['sha256'] == expected['sha256']\n                assert all(r['bytes'] == expected['bytes'] and r['stat'].split()[21] == expected['stat'].split()[21] for r in rows)\n            for slot in range(12):\n                status = run('docker', 'exec', fixture, 'python3', '/work/ls-load.py', 'status', str(slot))\n                assert status.startswith('OK ') and ('mode=0' in status or 'armed=0' in status)\n            record['manifest'] = json.loads(run('docker', 'exec', fixture, 'python3', '-c',\n                'import hashlib,json,pathlib; root=pathlib.Path(\"/evidence\"); '\n                'print(json.dumps({str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob(\"*\") if p.is_file()}))'))\n            archive = subprocess.run(['docker', 'exec', fixture, 'tar', 'czf', '-', '-C', '/evidence', '.'], capture_output=True, timeout=60, check=True)\n            members = {}\n            with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode='r:gz') as stream:\n                for member in stream.getmembers():\n                    assert member.isdir() or member.isfile()\n                    if member.isfile():\n                        name = member.name.removeprefix('./')\n                        assert name not in members and not Path(name).is_absolute() and '..' not in Path(name).parts\n                        assert not name.endswith(('.pem', '.key', '.p12', '.sig', '.bpf.o'))\n                        data = stream.extractfile(member).read()\n                        assert b'PRIVATE KEY-----' not in data and b'BEGIN CERTIFICATE' not in data\n                        members[name] = hashlib.sha256(data).hexdigest()\n            assert members == record['manifest'] and members\n            with args.archive.open('xb') as archive_file:\n                archive_file.write(archive.stdout)\n            record['archive'] = dict(files=len(members), sha256=hashlib.sha256(archive.stdout).hexdigest())\n            run(*COMPOSE, '-f', 'collector-compose.yaml', 'down', '--volumes', '--remove-orphans')\n            record['after'] = inventory()\n            assert [r for r in record['before'] if r['project'] != PROJECT] == record['after']\n            for kind in ('container', 'network', 'volume'):\n                assert not run('docker', kind, 'ls', '-q', '--filter', 'label=com.docker.compose.project=' + PROJECT).strip()\n            record['passed'] = True\n        except BaseException as error:\n            record['error'] = repr(error)\n            raise\n        finally:\n            json.dump(record, output, indent=2)\n    print(json.dumps(dict(passed=record['passed'], archive=record['archive'])))\n\n\nif __name__ == '__main__':\n    main()\n",
+      "sha256": "140438af63f9283c49084da03074ea962220bd608af2633bbe35cf58f797fc3a"
+    },
+    "collector-compose.yaml": {
+      "text": "# Layer over the isolated template fixture. Source binding is controller-owned.\nservices:\n  fixture:\n    volumes:\n      - collector-api:/collector-api:ro\n  collector:\n    image: ${COLLECTOR_IMAGE:?provide the checked image ID}\n    pull_policy: never\n    pid: service:tmm\n    network_mode: none\n    init: true\n    read_only: true\n    cap_drop: [ALL]\n    cap_add: [SYS_PTRACE]\n    security_opt: [no-new-privileges:true, \"apparmor=unconfined\"]\n    cpus: 0.5\n    mem_limit: 128m\n    memswap_limit: 128m\n    pids_limit: 32\n    tmpfs: [\"/tmp:size=8m,noexec,nosuid,nodev\"]\n    restart: \"no\"\n    stop_grace_period: 15s\n    volumes:\n      - ls-stream:/run/ls-stream\n      - collector-journal:/journal\n      - collector-api:/api\n      - ${COLLECTOR_SOURCE_DIR:?provide the source binding directory}:/source:ro\nvolumes:\n  collector-journal:\n  collector-api:\n",
+      "sha256": "c4286a515af3ed3d7f2222ac53bb6b531f8f120add1f072ebbaacc74c47672e7"
+    }
+  },
+  "witnesses": {
+    "handler": [
+      {
+        "pid": "7",
+        "sha256": "05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939552 4284 0 0 2130 3811 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n",
+        "entry": 14237952,
+        "bytes": "f30f1efa909090909041574156415541"
+      },
+      {
+        "final": true,
+        "bytes": "f30f1efa909090909041574156415541",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939552 4284 0 0 2130 3811 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n"
+      }
+    ],
+    "complete": [
+      {
+        "pid": "7",
+        "sha256": "05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939553 4284 0 0 2131 3813 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n",
+        "entry": 14234944,
+        "bytes": "9090909090415741564989d641554154"
+      },
+      {
+        "final": true,
+        "bytes": "9090909090415741564989d641554154",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939553 4284 0 0 2131 3813 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n"
+      }
+    ],
+    "reset": [
+      {
+        "pid": "7",
+        "sha256": "05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939563 4284 0 0 2131 3814 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n",
+        "entry": 14231488,
+        "bytes": "9090909090415455534889fb488b3f48"
+      },
+      {
+        "final": true,
+        "bytes": "9090909090415455534889fb488b3f48",
+        "stat": "7 (tmm.0) S 1 7 1 0 -1 4194560 939563 4284 0 0 2131 3814 1 4 20 0 2 0 337280006 3831894016 935475 18446744073709551615 4235264 34633613 140730176406304 0 0 0 0 4097 25185534 0 0 0 17 0 0 0 0 0 0 50353792 61314936 102154240 140730176408441 140730176408535 140730176408535 140730176409579 0\n"
+      }
+    ]
+  },
+  "witness_script": "\nimport hashlib,json,os,pathlib,select,sys,time\nmatches=[]\nfor path in pathlib.Path('/proc').glob('[0-9]*/exe'):\n    try:\n        if path.resolve().name in ('tmm','tmm64','tmm.no_pgo','tmm64.no_pgo'):\n            matches.append(path)\n    except OSError:\n        pass\nassert len(matches)==1, matches\nexe=matches[0]\nfd=os.open(str(exe.parent/'mem'),os.O_RDONLY)\naddress=int(sys.argv[1],16)\ndef sample():\n    return os.pread(fd,16,address).hex()\nfirst=sample()\nidentity={'pid':exe.parent.name,'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),\n          'stat':(exe.parent/'stat').read_text(),'entry':address,'bytes':first}\nprint(json.dumps(identity),flush=True)\nprevious=first\nwhile not select.select([sys.stdin],[],[],0.02)[0]:\n    current=sample()\n    if current!=previous:\n        print(json.dumps({'time_ns':time.time_ns(),'bytes':current}),flush=True)\n        previous=current\nprint(json.dumps({'final':True,'bytes':sample(),\n                  'stat':(exe.parent/'stat').read_text()}),flush=True)\nos.close(fd)\n",
+  "live_sha256": "0da67c6ab7730f51290e20ed30d3307197b6302e7a8b74999bdbac9f56dff9e1",
+  "before": [
+    {
+      "id": "9f51dd1064623ad56a6a271042cf62ee7858ebb8006accb598d820a87747bd90",
+      "image": "sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054",
+      "name": "/eob-template-20260925-collector-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-09-29T18:55:31.499622536Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 0,
+        "Restarting": false,
+        "Running": false,
+        "StartedAt": "2026-09-29T18:55:18.677688744Z",
+        "Status": "exited"
+      },
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "986e15b43d23338672cf9eedac54ee257838d91d9796571aa16b68d11ca6ab99",
+      "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+      "name": "/eob-template-20260925-tmm-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4080147,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T18:49:16.695682517Z",
+        "Status": "running"
+      },
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "c2eb17cdaaaf65f49905094a37ccccb26debc33e2b3c70529a076a9d44a96f5d",
+      "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+      "name": "/eob-template-20260925-fixture-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Health": {
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "End": "2026-09-29T18:57:49.807513951Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T18:57:49.765672171Z"
+            },
+            {
+              "End": "2026-09-29T18:57:51.86426992Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T18:57:51.809167185Z"
+            },
+            {
+              "End": "2026-09-29T18:57:53.903864597Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T18:57:53.865085617Z"
+            },
+            {
+              "End": "2026-09-29T18:57:55.946055063Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T18:57:55.905226953Z"
+            },
+            {
+              "End": "2026-09-29T18:57:57.994594094Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T18:57:57.94703396Z"
+            }
+          ],
+          "Status": "healthy"
+        },
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4079235,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T18:49:11.913276913Z",
+        "Status": "running"
+      },
+      "restarts": 0,
+      "project": "eob-template-20260925"
+    },
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 37331,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-08-21T18:14:16.71521944Z",
+        "Status": "running"
+      },
+      "restarts": 0,
+      "project": null
+    }
+  ],
+  "manifest": {
+    "json-lifecycle-live-01/exit-status": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "json-lifecycle-live-01/reset-config.json": "5385e8ae0f561face656fcdffc0dc63886fd399afd7cc1bd85598a99ed4bd81f",
+    "json-lifecycle-live-01/events.sqlite": "8a0ee36558967aa1d3603bbc79404d7930bab938bc56534ee6a7a7477f2738ec",
+    "json-lifecycle-live-01/tao.xml": "843a6e2a3a053a993c0e236ba5f21d90a50d77e00b1cf3814fbfe585436eded5",
+    "json-lifecycle-live-01/result.json": "eb5529baa15fed9243e405b00992f6b8c54d0c70a1ae64648792ca65eebf0beb",
+    "json-lifecycle-live-01/tao.log": "cdfdff69c911b165b8d426565179a69359f9ee7d049a444fa9a50bfbd77ba076",
+    "json-lifecycle-live-01/complete-config.json": "c0d1e35cc3c9da375815e38c608db8be1be84ce94fb362107a610f73edde4628",
+    "json-lifecycle-live-01/handler-config.json": "4a77168884a2b158345b3a631101513dd662d2c6932d0c53ee5368e5b8b55d34",
+    "json-lifecycle-live-01/checked-exit-status": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  "archive": {
+    "files": 9,
+    "sha256": "d284c8f35f13dad2f5918cbd5fc966355687aba6a19ffc68952b4aa52a2d91a1"
+  },
+  "after": [
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 37331,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-08-21T18:14:16.71521944Z",
+        "Status": "running"
+      },
+      "restarts": 0,
+      "project": null
+    }
+  ]
+}

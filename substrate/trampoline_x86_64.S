@@ -242,6 +242,7 @@ ls_trampoline_slot\n:
      * exactly that off-by-eight mistake with the movq forms.
      */
     leaq    8(%rsp), %rsi           /* -> struct ls_regs, r11 first            */
+    movq    80(%rsp), %rdx          /* patched site's continuation address    */
 
     /*
      * Returns a {int verdict; uint64_t safe_value} pair, which System V returns
@@ -250,7 +251,7 @@ ls_trampoline_slot\n:
      * have placed on the stack while this call site passed only six registers:
      * the callee would have dereferenced whatever happened to be there.
      */
-    call    ls_tramp_dispatch       /* -> eax: 0 fall through, 1 safe return   */
+    call    ls_tramp_dispatch_at    /* -> eax: 0 fall through, 1 safe return   */
                                     /*    rdx: the declared safe value          */
 
     addq    $8, %rsp

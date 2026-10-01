@@ -24,9 +24,8 @@
  * invocations never overlap on a core --- the same assumption ls_vm.h makes. All
  * state is g_ls_fexit_*, which the TMM globals whitelist carries as a set.
  *
- * Status: mechanism proven by check_fexit.c (arms stand-ins; capture,
- * transparency, nesting, recursion, longjmp-reclaim). Running the exit PROGRAM
- * (ls_vm_call on struct ls_ctx_exit) is fexit step #2; today leave records.
+ * Value-return hooks call the program at return. Snapshot hooks also run at
+ * entry, then retain only a bounded private state copy with this exact frame.
  */
 
 #include <stdint.h>
@@ -45,6 +44,10 @@ struct ls_fexit_frame {
     uint64_t  args[6];      /* rdi..r9 as captured at entry                         */
     uint64_t  seq;          /* which enter this was                                 */
     int       prog_slot;    /* which exit-program to run at leave                   */
+    int       snapshot;
+    int       captured;
+    struct ls_snapshot_id identity;
+    uint64_t  state[4];
 };
 
 /* Per-instance state. Non-static: the whole g_ls_fexit_* set is what the TMM
@@ -85,7 +88,7 @@ ls_fexit_reset(void)
 void
 ls_fexit_enter(int prog_slot, uint64_t *slot, const uint64_t *args)
 {
-    if (g_ls_fexit_top >= LS_FEXIT_DEPTH) {
+    if (g_ls_fexit_top >= LS_FEXIT_DEPTH || g_ls_fexit_seq == UINT64_MAX) {
         g_ls_fexit_overflow++;
         return;                                 /* do not hijack: plain return */
     }
@@ -95,6 +98,20 @@ ls_fexit_enter(int prog_slot, uint64_t *slot, const uint64_t *args)
     memcpy(f->args, args, sizeof f->args);
     f->seq       = ++g_ls_fexit_seq;
     f->prog_slot = prog_slot;
+    f->snapshot = ls_vm_snapshot_identity(prog_slot, &f->identity);
+    f->captured = 0;
+    memset(f->state, 0, sizeof f->state);
+
+    if (f->snapshot) {
+        struct ls_snapshot_ctx ctx = {0};
+        memcpy(ctx.arg, f->args, sizeof ctx.arg);
+        ctx.phase = LS_SNAPSHOT_ENTRY;
+        ctx.sequence = f->seq;
+        if (ls_vm_snapshot_call(prog_slot, &f->identity, &ctx) == 0) {
+            memcpy(f->state, ctx.state, sizeof f->state);
+            f->captured = 1;
+        }
+    }
 
     *slot = (uint64_t)(void *)ls_fexit_stub;    /* the hijack */
 }
@@ -138,14 +155,20 @@ ls_fexit_leave(uint64_t cur, uint64_t retval)
      * state, stream, count). ls_vm_call fails open, exactly like the entry path:
      * a program that cannot run must not take TMM down with it.
      */
-    struct ls_ctx_exit ctx = {0};
-    ctx.arg[0] = f->args[0];
-    ctx.arg[1] = f->args[1];
-    ctx.arg[2] = f->args[2];
-    ctx.arg[3] = f->args[3];
-    ctx.arg[4] = f->args[4];
-    ctx.ret    = retval;
-    (void)ls_vm_call(f->prog_slot, &ctx, sizeof ctx);
+    if (f->snapshot) {
+        struct ls_snapshot_ctx ctx = {0};
+        memcpy(ctx.arg, f->args, sizeof ctx.arg);
+        ctx.phase = LS_SNAPSHOT_RETURN;
+        ctx.flags = f->captured ? LS_SNAPSHOT_CAPTURED : 0;
+        ctx.sequence = f->seq;
+        memcpy(ctx.state, f->state, sizeof ctx.state);
+        (void)ls_vm_snapshot_call(f->prog_slot, &f->identity, &ctx);
+    } else {
+        struct ls_ctx_exit ctx = {0};
+        memcpy(ctx.arg, f->args, sizeof ctx.arg);
+        ctx.ret = retval;
+        (void)ls_vm_call(f->prog_slot, &ctx, sizeof ctx);
+    }
 
     /* Record for `status` and the harness --- recent exits, like ls_vm.h's ctx
      * samples: a small per-instance ring, not the program's job. */
@@ -154,7 +177,7 @@ ls_fexit_leave(uint64_t cur, uint64_t retval)
         struct ls_fexit_event *e = &g_ls_fexit_log[g_ls_fexit_log_n++];
         e->seq    = f->seq;
         e->slot   = f->prog_slot;
-        e->retval = retval;
+        e->retval = f->snapshot ? 0 : retval;
         memcpy(e->args, f->args, sizeof e->args);
     }
 

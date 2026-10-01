@@ -1,0 +1,199 @@
+{
+  "result": {
+    "passed": true,
+    "evidence_tier": "MEASURED",
+    "scope": "source_and_compiled_inspection_only",
+    "witnesses": [
+      "TOOL",
+      "SELF"
+    ],
+    "build_id": "ca69b84f4f5c9e225813b2ed3997c59f18ba2a31",
+    "checked_sources": 16,
+    "source_receipt": "message-scope-discovery-02.json",
+    "source_sha256": "80baa9981872c732936054ae9ca6f51a38fb89148ec9f02bce2916f3d3efa1a3",
+    "source_references": [
+      {
+        "file": "src/base/flow_table.h",
+        "line": 60,
+        "text": "#define FLOW_CLIENTSIDE         0x40"
+      },
+      {
+        "file": "src/base/flow_table.h",
+        "line": 61,
+        "text": "#define FLOW_SERVERSIDE         0x80"
+      },
+      {
+        "file": "src/base/flow_table.h",
+        "line": 120,
+        "text": "#define IS_CLIENTSIDE(a) ((((a)->flow_type) & FLOW_CLIENTSIDE) != 0)"
+      },
+      {
+        "file": "src/base/flow_table.h",
+        "line": 380,
+        "text": "(union uflow *) ((uintptr_t) sf - 33)"
+      },
+      {
+        "file": "src/modules/hudfilter/flow_stream.h",
+        "line": 195,
+        "text": "uflow_is_clientside(union uflow *uf)\n{\n    return IS_CLIENTSIDE(&uf->cf);\n}"
+      },
+      {
+        "file": "src/modules/hudfilter/flow_stream.h",
+        "line": 185,
+        "text": "STATIC_ASSERT(offsetof(struct connflow, flow_type) ==\n        offsetof(struct streamflow, flow_type) + offsetof(union uflow, sf));"
+      },
+      {
+        "file": "src/modules/hudfilter/flow_stream.h",
+        "line": 210,
+        "text": "return uflow_is_clientside(uf) ? uf : uflow_peer(uf);"
+      },
+      {
+        "file": "src/modules/hudfilter/flow_stream.h",
+        "line": 151,
+        "text": "Note that the per-stream state is separate from the connection state."
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 532,
+        "text": "hud_json_init_scb(struct json_scb *scb, union uflow *uf)\n{\n    memset(scb, 0, sizeof(*scb));"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 542,
+        "text": "hud_json_uninit_scb(struct json_scb *scb)\n{\n    tmm_json_cache_release(scb->json);"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 573,
+        "text": "json_filter_reset_ingress_for_reuse(struct json_scb *scb)\n{\n    hud_ref_release(scb->msg_ref);\n    scb->msg_ref = NULL;\n    tmm_json_cache_release(scb->json);\n    scb->json = NULL;"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 1024,
+        "text": "case HUDEVT_FLOW_INIT:\n        hud_json_init_scb(scb, uf);"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 1042,
+        "text": "case HUDCTL_ABORT:\n    case HUDCTL_TEARDOWN:\n        hud_json_uninit_scb(scb);"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 1018,
+        "text": "if (scb->f_disabled && (msg != HUDCTL_ENABLE) && (msg != HUDEVT_TCL))"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 1225,
+        "text": "scb->f_msg_done = TRUE;\n        } else {\n            scb->f_done = TRUE;"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 960,
+        "text": "TCLRULE_JSON_REQUEST : TCLRULE_JSON_RESPONSE), scb);"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 935,
+        "text": "scb->sse->ctx = tmm_json_cache_addref(scb->json);"
+      },
+      {
+        "file": "src/modules/hudfilter/json/json_filter.c",
+        "line": 1666,
+        "text": ".scb_sz = sizeof(struct json_scb),\n    .pcb_sz = sizeof(struct json_scb),"
+      }
+    ],
+    "instructions": [
+      {
+        "address": "0xd93549",
+        "bytes": "49 89 d6",
+        "instruction": "mov    %rdx,%r14"
+      },
+      {
+        "address": "0xd93550",
+        "bytes": "49 89 f4",
+        "instruction": "mov    %rsi,%r12"
+      },
+      {
+        "address": "0xd9370a",
+        "bytes": "41 0f b6 46 25",
+        "instruction": "movzbl 0x25(%r14),%eax"
+      },
+      {
+        "address": "0xd93718",
+        "bytes": "83 e0 40",
+        "instruction": "and    $0x40,%eax"
+      },
+      {
+        "address": "0xd936e4",
+        "bytes": "41 f6 44 24 59 10",
+        "instruction": "testb  $0x10,0x59(%r12)"
+      },
+      {
+        "address": "0xd927fc",
+        "bytes": "48 c7 43 18 00 00 00",
+        "instruction": "movq   $0x0,0x18(%rbx)"
+      },
+      {
+        "address": "0xd94c4a",
+        "bytes": "b9 0c 00 00 00",
+        "instruction": "mov    $0xc,%ecx"
+      },
+      {
+        "address": "0xd94c52",
+        "bytes": "f3 48 ab",
+        "instruction": "rep stos %rax,%es:(%rdi)"
+      },
+      {
+        "address": "0xd947b8",
+        "bytes": "e8 03 42 00 00",
+        "instruction": "call   d989c0 <inet_ntoa@@Base+0x239e40>"
+      },
+      {
+        "address": "0xd9428f",
+        "bytes": "e8 ac f2 ff ff",
+        "instruction": "call   d93540 <inet_ntoa@@Base+0x2349c0>"
+      },
+      {
+        "address": "0xd9551f",
+        "bytes": "e8 9c d2 ff ff",
+        "instruction": "call   d927c0 <inet_ntoa@@Base+0x233c40>"
+      }
+    ],
+    "hooks": {
+      "json_filter_handle_json_complete": [
+        "0xd93540",
+        "pad",
+        "0",
+        "5"
+      ],
+      "json_filter_reset_ingress_for_reuse": [
+        "0xd927c0",
+        "pad",
+        "0",
+        "5"
+      ],
+      "hud_json_handler": [
+        "0xd94104",
+        "pad",
+        "4",
+        "5"
+      ]
+    },
+    "decisions": {
+      "flow_side": "qualified_source_candidate_not_live",
+      "scb_as_request_id": "rejected_reused_storage",
+      "scb_as_shared_connection": "rejected_connection_and_stream_contexts",
+      "lifecycle": "handler_events_and_reset_need_runtime_validation",
+      "peer_relationship": "not_a_qualified_common_lifetime"
+    },
+    "runtime_scope_validated": false,
+    "request_scope_validated": false,
+    "message_association_validated": false,
+    "authenticated_identity_validated": false
+  },
+  "verifier": {
+    "text": "#!/usr/bin/env python3\n\"\"\"Check pinned source/compiled scope evidence; never promote it to live scope.\"\"\"\nimport argparse\nimport hashlib\nimport json\nfrom pathlib import Path\nimport re\n\n\nRECEIPT_SHA256 = \"80baa9981872c732936054ae9ca6f51a38fb89148ec9f02bce2916f3d3efa1a3\"\nBUILD_ID = \"ca69b84f4f5c9e225813b2ed3997c59f18ba2a31\"\nBINARY_SHA256 = \"05d17517531d99b26eb9e8f00f5b5326f660b5bef492226c9555368b887a9611\"\nTREE = \"/home/starin/code/tmm/\"\n\n\ndef require(condition, message):\n    if not condition:\n        raise ValueError(message)\n\n\ndef verify(path):\n    data = path.read_bytes()\n    require(hashlib.sha256(data).hexdigest() == RECEIPT_SHA256, \"receipt hash mismatch\")\n    record = json.loads(data)\n    require(record[\"completed\"] is True, \"incomplete discovery\")\n    require(record[\"runtime\"] == dict(build_id=BUILD_ID, sha256=BINARY_SHA256), \"wrong runtime\")\n    require(record[\"binary_sha256\"] == BINARY_SHA256, \"wrong executable hash\")\n    require(record[\"tree_head\"] == \"e2104734a940a099a9190eb84bfbea01fb4b81d4\", \"wrong source revision\")\n    for name, row in record[\"files\"].items():\n        require(hashlib.sha256(row[\"text\"].encode()).hexdigest() == row[\"sha256\"], name)\n    for command in record[\"commands\"]:\n        require(type(command[\"rc\"]) is int and command[\"rc\"] == 0, \"failed capture command\")\n    statuses = [c for c in record[\"commands\"] if \"status\" in c[\"argv\"]]\n    require(len(statuses) == 1 and statuses[0][\"stdout\"] == \"\", \"modified inspected TMM sources\")\n    require(record[\"layout\"].endswith(\"$1 = 64\\n$2 = 44\\n\"), \"wrong HUD context offsets\")\n    require(\"/*     37      |       1 */    UINT8 flow_type;\" in record[\"layout\"], \"wrong flow-type offset\")\n    require(\"/*     24      |       8 */    struct tmm_json_cache *json;\" in record[\"layout\"], \"wrong cache offset\")\n    require(\"/*     89: 4   |       4 */    BOOL f_ingress_msg_mode : 1;\" in record[\"layout\"], \"wrong message-mode bit\")\n\n    references = []\n\n    def source(name, fragment):\n        text = record[\"files\"][TREE + name][\"text\"]\n        require(text.count(fragment) == 1, \"missing or ambiguous source fragment: \" + fragment)\n        line = text[:text.index(fragment)].count(\"\\n\") + 1\n        references.append(dict(file=name, line=line, text=fragment))\n\n    flow = \"src/base/flow_table.h\"\n    stream = \"src/modules/hudfilter/flow_stream.h\"\n    json_filter = \"src/modules/hudfilter/json/json_filter.c\"\n    for fragment in (\n        \"#define FLOW_CLIENTSIDE         0x40\",\n        \"#define FLOW_SERVERSIDE         0x80\",\n        \"#define IS_CLIENTSIDE(a) ((((a)->flow_type) & FLOW_CLIENTSIDE) != 0)\",\n        \"(union uflow *) ((uintptr_t) sf - 33)\",\n    ):\n        source(flow, fragment)\n    for fragment in (\n        \"uflow_is_clientside(union uflow *uf)\\n{\\n    return IS_CLIENTSIDE(&uf->cf);\\n}\",\n        \"STATIC_ASSERT(offsetof(struct connflow, flow_type) ==\\n        offsetof(struct streamflow, flow_type) + offsetof(union uflow, sf));\",\n        \"return uflow_is_clientside(uf) ? uf : uflow_peer(uf);\",\n        \"Note that the per-stream state is separate from the connection state.\",\n    ):\n        source(stream, fragment)\n    for fragment in (\n        \"hud_json_init_scb(struct json_scb *scb, union uflow *uf)\\n{\\n    memset(scb, 0, sizeof(*scb));\",\n        \"hud_json_uninit_scb(struct json_scb *scb)\\n{\\n    tmm_json_cache_release(scb->json);\",\n        \"json_filter_reset_ingress_for_reuse(struct json_scb *scb)\\n{\\n    hud_ref_release(scb->msg_ref);\\n    scb->msg_ref = NULL;\\n    tmm_json_cache_release(scb->json);\\n    scb->json = NULL;\",\n        \"case HUDEVT_FLOW_INIT:\\n        hud_json_init_scb(scb, uf);\",\n        \"case HUDCTL_ABORT:\\n    case HUDCTL_TEARDOWN:\\n        hud_json_uninit_scb(scb);\",\n        \"if (scb->f_disabled && (msg != HUDCTL_ENABLE) && (msg != HUDEVT_TCL))\",\n        \"scb->f_msg_done = TRUE;\\n        } else {\\n            scb->f_done = TRUE;\",\n        \"TCLRULE_JSON_REQUEST : TCLRULE_JSON_RESPONSE), scb);\",\n        \"scb->sse->ctx = tmm_json_cache_addref(scb->json);\",\n        \".scb_sz = sizeof(struct json_scb),\\n    .pcb_sz = sizeof(struct json_scb),\",\n    ):\n        source(json_filter, fragment)\n\n    instructions = []\n\n    def instruction(start, address, expected):\n        commands = [c for c in record[\"commands\"] if \"--start-address=\" + hex(start) in c[\"argv\"]]\n        require(len(commands) == 1, \"missing disassembly range\")\n        match = re.search(r\"^\\s*\" + format(address, \"x\") + r\":\\s+((?:[0-9a-f]{2} )*[0-9a-f]{2})\\s+(.+)$\",\n                          commands[0][\"stdout\"], re.M)\n        require(match is not None and bytes.fromhex(match[1]) == bytes.fromhex(expected),\n                \"wrong instruction at \" + hex(address))\n        instructions.append(dict(address=hex(address), bytes=expected, instruction=match[2]))\n\n    for address, expected in (\n        (0xd93549, \"49 89 d6\"), (0xd93550, \"49 89 f4\"),\n        (0xd9370a, \"41 0f b6 46 25\"), (0xd93718, \"83 e0 40\"),\n        (0xd936e4, \"41 f6 44 24 59 10\"),\n    ):\n        instruction(0xd93540, address, expected)\n    instruction(0xd927c0, 0xd927fc, \"48 c7 43 18 00 00 00\")\n    for address, expected in (\n        (0xd94c4a, \"b9 0c 00 00 00\"), (0xd94c52, \"f3 48 ab\"),\n        (0xd947b8, \"e8 03 42 00 00\"), (0xd9428f, \"e8 ac f2 ff ff\"),\n        (0xd9551f, \"e8 9c d2 ff ff\"),\n    ):\n        instruction(0xd94100, address, expected)\n\n    hooks = {row[0]: row[1:] for row in record[\"hooks\"]}\n    expected_hooks = {\n        \"json_filter_handle_json_complete\": [\"0xd93540\", \"pad\", \"0\", \"5\"],\n        \"json_filter_reset_ingress_for_reuse\": [\"0xd927c0\", \"pad\", \"0\", \"5\"],\n        \"hud_json_handler\": [\"0xd94104\", \"pad\", \"4\", \"5\"],\n    }\n    for name, expected in expected_hooks.items():\n        require(hooks.get(name) == expected, \"wrong hook: \" + name)\n    require(\"hud_json_init_scb\" not in hooks and \"hud_json_uninit_scb\" not in hooks,\n            \"recheck standalone lifecycle hooks\")\n    return dict(\n        passed=True, evidence_tier=\"MEASURED\", scope=\"source_and_compiled_inspection_only\",\n        witnesses=[\"TOOL\", \"SELF\"], build_id=BUILD_ID,\n        checked_sources=len(record[\"files\"]), source_receipt=path.name,\n        source_sha256=RECEIPT_SHA256, source_references=references,\n        instructions=instructions, hooks=expected_hooks,\n        decisions=dict(\n            flow_side=\"qualified_source_candidate_not_live\",\n            scb_as_request_id=\"rejected_reused_storage\",\n            scb_as_shared_connection=\"rejected_connection_and_stream_contexts\",\n            lifecycle=\"handler_events_and_reset_need_runtime_validation\",\n            peer_relationship=\"not_a_qualified_common_lifetime\",\n        ),\n        runtime_scope_validated=False, request_scope_validated=False,\n        message_association_validated=False, authenticated_identity_validated=False,\n    )\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--receipt\", type=Path, default=Path(__file__).resolve().parents[2] /\n                        \"evidence/cache/message-scope-discovery-02.json\")\n    parser.add_argument(\"--output\", type=Path)\n    parser.add_argument(\"--export\", action=\"store_true\")\n    args = parser.parse_args()\n    result = verify(args.receipt)\n    if args.output:\n        data = Path(__file__).read_bytes()\n        saved = dict(result=result, verifier=dict(text=data.decode(), sha256=hashlib.sha256(data).hexdigest()))\n        with args.output.open(\"x\") as output:\n            json.dump(saved, output, indent=2)\n    if not args.export:\n        result = {key: value for key, value in result.items() if key not in (\"source_references\", \"instructions\")}\n    print(json.dumps(result, indent=2))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+    "sha256": "90f52c69e229e09cdcc47ad73d1427e8cdf6c79f7d4c7af651f80e134d483a5a"
+  }
+}

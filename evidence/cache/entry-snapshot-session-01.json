@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-29",
+  "witness": "SELF: authored summary of session tool output",
+  "events": [
+    {
+      "stage": "first live-driver invocation",
+      "message": "assert image_build[\"passed\"] and build[\"passed\"]",
+      "result": "Stopped before opening a receipt or running live commands. The program receipt already recorded binding refusal. The fixture had been created before that refusal was inspected.",
+      "correction": "The driver now records failed prerequisites before exiting. json-initialization-live-preflight-02.json retains this refusal with an empty command list. The unused fixture was archived and removed."
+    },
+    {
+      "stage": "local saved-evidence verifier",
+      "message": "assert sha(value[\"text\"].encode()) == value[\"sha256\"]",
+      "result": "Stopped twice, first without a location, then identifying entry-snapshot-integration-01.json/build.log. The raw PTY log digest does not equal the newline-normalized text digest.",
+      "correction": "Check exact text hashes for source snapshots. Pin the complete receipt separately, including its log fields. The raw PTY log is not claimed to be rehashed from normalized text. The corrected saved-evidence check passes locally and on the build box."
+    }
+  ],
+  "limit": "This is a session summary, not an independent replay or a live initialization result."
+}

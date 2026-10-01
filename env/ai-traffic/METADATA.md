@@ -2,7 +2,18 @@
 
 **2026-09-28 — MEASURED root-object method-value extraction in the native A2A
 fixture, plus handler event-code extraction. The later [token-cache probe](TOKEN-METHOD.md)
-also extracts `tools/list` on the AIMCP/JSON path. Session fields remain unextracted.**
+also extracts `tools/list` on the AIMCP/JSON path. The subsequent
+[session/routing probe](SESSION-ROUTING.md) extracts saved session-header bytes
+and selected pool/endpoint state in a bounded fixture. The
+[response probe](RESPONSE-METADATA.md) adds HTTP status and local transfer
+completion, including paced and interrupted bodies. The
+[requested-target probe](OPERATION-TARGET.md) adds literal tool names and resource
+addresses. The [reply probe](REPLY-METADATA.md) adds result/error presence, error
+codes and Boolean tool-error reports. These describe requested activity and
+reported outcomes, not authenticated caller identity or proven remote success.
+The [message-ID probe](MESSAGE-ID.md) preserves ID type and raw bytes as an input
+to later request/reply association. The [combined ID/side probe](ID-FLOW.md) now
+adds flow side in the same record. That association remains unqualified.**
 
 [View the extracted values](EXTRACTED-METADATA.md) or run
 `python3 env/ai-traffic/metadata_export.py` from the repo root for the JSON export.
@@ -61,8 +72,13 @@ Addresses below are **patch addresses**, not necessarily function-entry addresse
 | Investigate | `hud_inference_egress` | `0xd2cbc4` | Response-buffer length and local filter state; not tokens, client delivery or model completion |
 | Investigate | `http_process_server_headers` | `0xca8100` | Server-header processing; call-path coverage and post-parse field validity remain open |
 
-The two handler entries and JSON string getter now have live attachment results.
-The other padded entries above remain inspection results.
+The two handler entries and JSON string getter have live attachment results.
+The later [session/routing gate](SESSION-ROUTING.md) also validates entry probes
+at the two AIMCP persistence clones. It observes saved header bytes before decode
+and selected routing state before response rewriting. Successful decode-return
+fields and the other candidates remain unvalidated. The
+[response gate](RESPONSE-METADATA.md) qualifies response-status and done fields at
+`hud_aimcp_handler`; these fields do not establish remote-operation success.
 The `.cold` entries listed as `displace` are not selected padded hooks. Compiler
 clones (`.constprop` and `.isra`) need their actual machine-code argument layout
 checked; the source signature alone is insufficient. Exit admission passed for
@@ -290,8 +306,9 @@ The 12-read / 320-byte cap and four-member walk are deliberate limits. A later
 member is unavailable to this probe even when TMM parsed it. The later
 [token-cache probe](TOKEN-METHOD.md) closes the measured AIMCP method gap with a
 different hook. It requires the JSON filter, literal keys and bounded traversal;
-it does not establish general MCP coverage. Session IDs, task IDs and tool fields
-remain separate work. The original getter gap remains part of the record.
+it does not establish general MCP coverage. Saved session-header bytes and selected
+routes now have a [separate measured gate](SESSION-ROUTING.md). Task IDs and tool
+fields remain separate work. The original getter gap remains part of the record.
 
 ### Implementation
 

@@ -1,0 +1,23 @@
+{
+  "record_kind": "SELF summary of captured tool output",
+  "date": "2026-09-29",
+  "host": "starin@10.145.37.36",
+  "attempts": [
+    {
+      "stage": "fixture formatting check before live driver",
+      "command": "docker exec eob-template-20260925-fixture-1 python3 -m black --check --diff /work/id_flow_suite.py /work/id_flow_cases.py",
+      "passed": false,
+      "message": "would reformat /work/id_flow_suite.py",
+      "correction": "Apply the two reported line-wrap changes before staging the live suite again. The later live receipt retains the passing Black and pylint checks and the tested source."
+    },
+    {
+      "stage": "saved-evidence verifier import, after fixture removal",
+      "command": "python3 /home/starin/eob-config-20260925/id_flow_verify.py --cache /home/starin/eob-config-20260925/id-flow-verification-inputs-01 --source-root /home/starin/eob-config-20260925 --substrate-root /home/starin/eob-tmm-staged/substrate --output /home/starin/eob-config-20260925/id-flow-check-01.json",
+      "passed": false,
+      "message": "ModuleNotFoundError: No module named 'message_id_verify'",
+      "ask": "NO RECORD for the literal error",
+      "correction": "Stage the unchanged message_id_verify.py dependency and repeat. Import failed before the output file was opened; check-01 was still unused."
+    }
+  ],
+  "limit": "This is an authored failure summary, not an automatically generated build-box receipt. No live probe or TMM build failure is asserted by these two checks."
+}

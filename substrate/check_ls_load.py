@@ -388,6 +388,17 @@ def main():
         n += 1
     print("  ok    arm/disarm CLI sends target requests without a catalog lookup")
 
+    with patch.object(m, "read_program", return_value=b"one ELF"), \
+         patch.object(m, "read_signature", return_value=(b"b" * 112, b"s" * 64)) as signature, \
+         patch.object(m, "send", return_value="OK") as sent, \
+         patch.object(sys, "argv", ["ls-load.py", "load-signed", "9", "activity.o", "http.sig", "1"]):
+        m.main()
+        signature.assert_called_once_with("activity.o", "http.sig")
+        sent.assert_called_once_with(m.msg(m.OP_LOAD, slot=9, mode=1,
+                                          prog=b"one ELF", binding=b"b" * 112, sig=b"s" * 64))
+        n += 1
+    print("  ok    explicit signature selects the binding for the same ELF")
+
     print("  ok    check_ls_load: %d assertions, 7 of them refusals" % n)
     return 0
 

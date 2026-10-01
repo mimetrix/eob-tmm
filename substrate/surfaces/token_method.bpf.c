@@ -4,6 +4,7 @@
 struct tm_ctx { jm_u64 arg[5], result, reserved[6]; };
 struct tm_state { jm_u64 instance, calls, failures, reserved; };
 struct tm_policy { jm_u64 run, reserved[3]; };
+#ifndef LS_ACTIVITY_EMBED
 struct ls_cfg_map_def metadata_token_state __attribute__((section("maps"), used))
     = {1, 4, 32, 1, 0};
 struct ls_cfg_map_def metadata_events __attribute__((section("maps"), used))
@@ -13,6 +14,7 @@ static long (*update)(void *, const void *, const void *, jm_u64) = (void *)2;
 static long (*read_mem)(void *, jm_u64, jm_u64) = (void *)4;
 static jm_u64 (*clock_ns)(void) = (void *)5;
 static long (*emit)(void *, void *, jm_u64, void *, jm_u64) = (void *)25;
+#endif
 #define INLINE static __attribute__((always_inline)) inline
 
 INLINE int read_field(struct jm_event *e, void *dst, jm_u32 size, jm_u64 address)
@@ -177,7 +179,11 @@ INLINE void extract(struct tm_ctx *ctx, struct jm_event *e)
     e->status = e->getter_result > 4 ? JM_BUDGET : TM_NO_LITERAL_METHOD;
 }
 
+#ifdef LS_ACTIVITY_EMBED
+static __attribute__((noinline))
+#else
 __attribute__((section("fentry/json_filter_handle_json_complete"), used))
+#endif
 jm_u64 token_method(struct tm_ctx *ctx)
 {
     struct jm_event event = {0};

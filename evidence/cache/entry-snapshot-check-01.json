@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "receipts": 11,
+  "source_snapshots": 69,
+  "native_cases_per_compiler": 78,
+  "json_native_records": 44,
+  "decoder_rejections": 13,
+  "archive_files": 1,
+  "live_initialization": false,
+  "admission": "refused: unwind imports"
+}

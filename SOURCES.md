@@ -10,6 +10,411 @@ cd evidence/cache && sha256sum * > MANIFEST.sha256
 
 ## Retrieved
 
+### Program ownership live validation, 2026-09-30
+
+**MEASURED: packaged TMM and isolated single-worker HTTP/1 traffic.**
+Image `tmm:PROGRAMS-20260930` has ID
+`sha256:0b96d57129bc62948f7bb38d7e8dbe4baa9dae5e1aeaed81b0c64b90018c1217`.
+Packaging rebuilds the runtime: its build ID is
+`2ab960fa38e447bab97738e47e1d5b2ce25c401a`, distinct from the earlier linked
+build. Runtime SHA-256:
+`50d5d1e711dc4a79adf1bd1bb30f6c306d36ad75bbda8e7d03998e88a5124fc8`.
+The runtime/debug pair, ownership symbols, TLS, image metadata and signing-key
+checks pass. The existing HTTP/2 CVE-fix revert remains in the build tree.
+
+The native-qualified two-entry test ELF is rebuilt byte-for-byte, then its
+entry sections are renamed and bound to this packaged binary. Executable
+section bytes remain unchanged. Both final entries pass pinned PREVAIL before
+one `@program-v1` signature is made. That ELF is loaded as two separate owners.
+
+Live attempt 03 passes **18/18 HTTP exchanges and 594 hook records**.
+Assertions require the expected request and response bodies and HTTP status 200.
+Eight phases cover shared hooks, partial detach, reattach, independent revoke,
+replacement with a fresh instance, disable/re-enable and final removal.
+Configuration markers and map sequences stay separate by owner. Both entries
+share a counter within their owner. A context write does not change the next
+owner's observed input. Duplicate attachment, signed-mode-ceiling violation,
+wrong/stale instance and stale configuration are refused. Both original entry
+pads are restored; the TMM process stays the same with zero restarts.
+All eight owner slots are empty at the end. The fixture is archived and removed.
+
+Witnesses: INDEPENDENT (PREVAIL), TOOL (compiler, package and image checks),
+SELF (clients, backend, bytecode records and assertions), KERNEL (executing
+binary, process identity and hook bytes). This is a two-owner, two-hook monitor
+test. Multiple workers, sustained concurrency/cost, enforce composition under
+live traffic, loader-timeout stress and collector durability remain unqualified.
+The dedicated ring drain is not a new activity-field or collector result.
+[Contract, phase table and commands](substrate/PROGRAMS.md#measured-live-result).
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `programs-package-01.json` | `95dcfe8c7ff945fe7232958294e575165de40ca6c4f482b7db35268c6158cea6` | Fresh DEBs, matching debug/runtime, checked image and preserved source/library inputs. |
+| `programs-live-build-01.json` | `4dbdbd25425f41a6e93ad49f149c00523ffe132060bc8b4ff86e442e9da46048` | Native object reproduced; executable bytes unchanged after binding; both final entries pass PREVAIL and are signed together. |
+| `programs-create-01.json` | `6877abcbe220a4d373e08b79a6b6afab28853795be58b71330513ab8099469cf` | Separate two-container SSA fixture with dedicated socket/ring volumes and pinned package image. |
+| `programs-live-01.json` | `fc839afc0d3f24708d7a8d879911286086bfd37fe9595c187a6a6a9e30656326` | Retained pre-load lint failure: test module directory missing from the search path. |
+| `programs-live-02.json` | `e550a75ecf9a237651b1eae68d397e492e733bbd6ce101b0e23966016e0d8fd8` | Retained pre-load Tao import failure: runner replaced the inherited protobuf module path. |
+| `programs-live-03.json` | `2228fad3d35b925d70c675824196d05bed1abeefc29100bba37923a68d085b51` | Eight phases, 18 exchanges, 594 records; Black/pylint and JSON/Tao reports pass. Separate owners, fresh replacement, negative controls, restored hooks, stable process and zero restarts. |
+| `programs-cleanup-01.json` | `ed0ccd03d633ec4021a929115d330e2f3e1f0d1d2fb342e4a2131abbef9d3a86` | Twelve-file archive checked before scoped removal. Both hooks checked again. Fixture containers, networks and volumes removed; toolchain identity/state unchanged. |
+| `programs-evidence-20260930.tar.gz` | `13d07e877d1c8677218df8de5c35269d84908edbe3c2fc64aa84e967ea543f9b` | Twelve fixture files: passing result/configurations/Tao records and failed attempt 02 logs. Attempt 01 stopped before a fixture evidence directory was created; its separate receipt is above. |
+
+### Program ownership and TMM build, 2026-09-30
+
+**MEASURED: pinned native/socket tests and linked TMM binary.** Native checks
+09 and 10 pass with GCC 13.3.0, clang 18.1.3 and the pinned uBPF/PREVAIL revisions.
+They cover two owners with two entries, shared sites, owner-local maps and
+configuration, stale controls, rollback, delayed calls, reclamation and bounded
+reuse. Both bytecode entries pass PREVAIL. Interpreter/JIT, sanitizer, signed
+socket and existing activity/context/trampoline/return-hook checks pass.
+
+The TMM build uses Docker GCC 11.4.0 and top-level `make tmm`. Attempt 01 fails
+because the loader did not enable the GNU declaration for `struct ucred`.
+Native check 10 repeats the suite after the source fix. It also compiles the
+loader without the harness's command-line feature macro. Attempt 02 compiles
+TMM successfully, then stops at a faulty name-based trampoline check.
+Verification 03 checks the same linked symbol table and exact symbol address
+ranges. All twelve trampolines pass. No second compile was needed for that check.
+
+Build ID: `5784e768cc4f5c25993aef7dfb050c54a14042ea`.
+Linked ELF SHA-256: `1dcd0231627fc55a25beeba621c225365e929c5100ff156a4c69864d20772966`.
+The 203,549,136-byte copy is at
+`/home/starin/eob-config-20260925/programs-integration-03/tmm.no_pgo` on the build box.
+Protected source/library hashes and container identities agree before and after
+verification. The existing HTTP/2 CVE-fix revert remains in this tree.
+
+Witnesses: SELF (test assertions and source comparisons), INDEPENDENT (PREVAIL),
+TOOL (compiler, linker, ELF symbols, instructions and globals check).
+These receipts cover the linked build. The later package and live test are
+[recorded separately](#program-ownership-live-validation-2026-09-30).
+Multiworker behavior and data-path cost remain unqualified.
+[Contract and commands](substrate/PROGRAMS.md).
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `programs-check-09.json` | `403c2612ca3b9f22a8b223c9b2ba1e9e24777cadada895478835f8c890d9a09e` | Native/socket suite passes before TMM compilation. |
+| `programs-check-10.json` | `7cce91bb5bc202352583f47aedd31b5955eb6d7d6007bc5f1063fb66f9c4d717` | Suite passes with the loader feature-macro fix and added compile check. Exact source snapshots retained. |
+| `programs-integration-01.json` | `0138238607da27a079e9afb72a3c83a4c47e970c6ef7a2645f3f628b68e69a7c` | Retained TMM compile failure: incomplete `struct ucred`. Sources and whitelist changes were already applied. |
+| `programs-integration-02.json` | `0e840ea30c3d4b4861d6492fe774079c20e2f39bf3468b4ed61af77769513e80` | `make tmm` returns zero. Follow-up check fails because name-filtered objdump emits no instructions for the slot-zero alias. |
+| `programs-integration-03.json` | `a7fc77acdff72ee9bcfc1f574ae3a4896df652013c80ca947a244dfcec2bb6f2` | Existing build passes symbol, TLS, twelve trampoline, globals, source and preservation checks. Linked ELF copied and hashed. |
+
+### Combined activity records, 2026-09-30
+
+**MEASURED: ten combined exchanges in the isolated, single-worker HTTP/1 fixture.**
+One ELF supplies both entry programs and their explicit exchange key. The run has
+80 JSON field records and 184 HTTP-handler records. Three requests reuse one
+connection; four concurrent connections use the same message ID. Exact fields,
+replay and cleanup pass. Identity remains unknown. HTTP/2, pipelining, multiple
+workers, silent missed hooks and sustained data-path cost remain unqualified.
+Witnesses: TOOL (source/layout/compiler), INDEPENDENT (PREVAIL), SELF
+(native/live fields and exporter checks), KERNEL (hook bytes and process state).
+[Contract, commands and limits](env/ai-traffic/ACTIVITY-COMBINED.md).
+
+Live attempt 03 uses the corrected discard handling. The later exporter check 02
+adds an explicit reply-before-header-confirmation check and replays that same
+measured journal through the current exporter and real Unix-socket API.
+
+The timestamp follow-up replays the same journal with UTC source-observation
+timestamps and monotonic elapsed time. Eight exporter/API tests pass on the build
+box. SELF witness: exact comparisons with saved raw records, clock/missing-time
+mutations and replay checks. This is not a new live traffic run.
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `activity-group-discovery-01.json` | `137a8e904a2e082067166eea63ecf753de497e092e03eb4d8a5cd9f3c8403f3e` | Source and runtime layouts. |
+| `activity-group-check-01.json` | `55a797e7af8659a6830bc0759710219aafb098adaa5fa60d5ad1b1b7f98cda48` | Macro redefinition refused. |
+| `activity-group-check-02.json` | `cdb358e55f2f95a01379229802333e627a5cc0a4fb51239be0f46681a3db5269` | Stack limit refused. |
+| `activity-group-check-03.json` | `a9df8f9a3a12bf04308d70949fddef1e098a880c0c48edc48d0489d9308c10b1` | PREVAIL passed; native loader refused a jump. |
+| `activity-group-check-04.json` | `992fa5073c9b2f908ef924e572ceef421bdebe639335e0ff3da94ae30f9df7ba` | Function sections: pinned PREVAIL, interpreter and JIT passed. |
+| `activity-group-live-01.json` | `ccc391cc4cc99f179adef84c37b220a8809625ee9986c4e3ff36017cc9bffc19` | Failed: no combined records. Client JSON precedes the AIMCP request-header event; request flags also reject the response-only test. |
+| `activity-group-check-05.json` | `ac68e9bff48e0d55d3c23bfa95564929d5b5a12ad38a75a6055610b75cca41e5` | Failed capacity assertion: the host HASH evicts on full instead of refusing admission. |
+| `activity-group-check-06.json` | `9fa6ed59191b3819e114c7eeba5e237d93d1028153dd2eefd29542d4259252dd` | ABI 2 passes both pinned PREVAIL entries and GCC/clang interpreter/JIT tests. Reserved admission counter, zero map evictions, release/reuse and target-parser checks pass. Signed ELF: 182,056 bytes. |
+| `activity-group-create-01.json` | `bf3ddd6d602dfc0aa6ecf7e72fbd4ce3a468d597ce94b4072ca933b708400f77` | Isolated fixture creation with collector mounts and recorded image identities. |
+| `activity-group-live-02.json` | `2f6dfe9ea8771173dc98f3f801bc0dcf756cfe8bb082770b0dff0600c3273503` | Failed exporter assertion: ring wrap-padding DISCARD incorrectly flushed a pending group. Bytecode emitted the new keys. |
+| `activity-group-live-03.json` | `f28d16847e4fcda84742933124c9097cad1e5996fa0d8d110f272da6d1f63b3f` | Ten combined exchanges, exact traffic/fields, counter deltas, second-cursor and single-row-page replay pass. Both hook patches/restorations observed; process unchanged, zero restarts. |
+| `activity-combine-check-01.json` | `770879bf54a7e7823a52427a764407414e5cd38ac183a14eb5d76b2a8d301c3c` | Five saved-journal/exporter/API tests pass after discard handling correction, using live attempt 02. |
+| `activity-combine-check-02.json` | `a98b1db0b6b7e7b71140e4f1113a6dac8e56547d93a821449b0db095c82c0dfd` | Six current-exporter tests pass on live attempt 03: page boundaries, 38 missing-record/discard mutations, producer/key/field mutations, bounded state and journal/socket equivalence. Includes ten measured combined examples and source snapshots. |
+| `activity-timestamps-check-01.json` | `d0e1dcadc04fd862e539e7fccc88bcd5f4cdf80b9f9620f1b671c9a2539785f6` | Eight exporter/API tests pass. Ten replayed exchanges now retain nanosecond UTC start/end/last-observed timestamps and monotonic duration. Missing/invalid time, unfinished exchanges and clock adjustments tested; source snapshots and examples retained. |
+| `activity-group-cleanup-01.json` | `765a8048aa7645cfafe36c99712d96be9ae67a2394599ba1451bca8d8b9a7760` | Archive checked before scoped removal. Hook bytes restored; retained programs disabled. Fixture containers, networks and volumes removed; unrelated toolchain container unchanged. |
+| `activity-group-evidence-20260930.tar.gz` | `a9bcf4b9ca570aa1cb88fcce7e200518b6ae6d65f471b2ab97297e96601d1e46` | 24 checked files from all three live attempts, including journals, failed/passing results and Tao output. |
+
+### Agent activity export, 2026-09-30
+
+**MEASURED: archived-record replay and collector API tests.** The versioned JSON
+exporter maps 468 metadata records from five saved live journals. It keeps all
+478 journal rows, including source/health diagnostics, and preserves replay cursors.
+Six tests pass on the build box. They cover the existing Unix-socket replay API,
+retention errors, raw/truncated strings, exact numeric IDs, gaps and malformed
+records. Injected identity/trace claims do not become bindings. SELF: exporter
+and tests. This is not a new TMM run or authenticated agent attribution.
+Identity and correlation remain unknown; program bindings are not verified by
+the exporter. [Format and commands](env/ai-traffic/AGENT-ACTIVITY.md).
+
+The first local check assumed one journal per archive; the token-method archive
+contains two attempts. The test now selects the passing run's journal. Both local
+checks also stopped when this workspace rejected socket `chmod` with `EINVAL`.
+The same API test passes on the build box without changing the collector.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Retained first archive-selection and socket-startup test failures / local session | `activity-export-check-01.json` | `1e49fa476315a5943ef22334c3813eb43c919e2e196ea6b3d841c26606480537` |
+| Archived replay passes; socket chmod failure retained / local session | `activity-export-check-02.json` | `fd7df707920428aeaaf843742875e69f0ea19c94099e549e924cb9f1d2ffd848` |
+| Six passing tests, five archive hashes, exact source snapshots and example event / build box | `activity-export-check-03.json` | `a8224446af3475b6a8b8faa72b43cfbbb77b5ba5f1b6f8b999ec53e1f588402a` |
+| Six legacy-export regression tests pass after grouped-frame support, with the same 468 metadata and ten diagnostic rows / build box | `activity-export-check-04.json` | `7373b64ec745af5fc143a2faba7e48eb2625f04d2f85565696442e7e60904378` |
+
+### Production entry snapshots, 2026-09-29
+
+**MEASURED native VM tests, TMM build and package. Live admission is refused.** Production return frames
+and the production VM pass 78 cases per compiler with GCC 13.3.0 and clang 18.1.3.
+These cover interpreter and JIT paths, two return-register values, nesting,
+capacity, skipped returns, failed capture, replacement and mode changes.
+PREVAIL accepts the test programs at a 256-byte stack limit. The old target parser
+refuses the new signed target version. Ordinary return/context regressions pass.
+SELF: programs, target fixture, output sink and assertions. TOOL: compilers and
+source capture. INDEPENDENT: PREVAIL. No live initialization result is claimed.
+[Contract](env/ai-traffic/ENTRY-SNAPSHOT.md).
+
+The JSON program passes 22 native cases in each execution mode and strict PREVAIL.
+The packaged image is build `7bbb06a0…`. Requalification checks the JSON source,
+layout and compiled initialization path. Binding then refuses unwind imports.
+Full-width `readelf` output finds `_Unwind_Resume`, `__cxa_begin_catch` and
+`__cxa_rethrow` in both this image and the previous `ca69b84f…` image. Shortened
+output hides all three from the old gate. Its zero-import conclusion is
+**FALSIFIED**. Corrected ordinary admission refuses both binaries; native positive
+controls and failed-tool tests pass. The isolated fixture was removed after
+archiving the refusal. Its hook stayed unchanged and all slots had zero fires.
+TOOL: binary inspection; SELF: admission checks; KERNEL: cleanup witnesses.
+No live initialization program was loaded. See `CONTESTED-PREMISES.md` §39.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Tracing-context write preflight / pinned build box | `entry-snapshot-preflight-01.json` | `349d5516a3e0ae3554da2fba505e93dbac5a7f7c94633c2a7023523ddc56c43a` |
+| Retained native link failure: omitted relocation module / build box | `entry-snapshot-build-01.json` | `ccd5e2dcf5aa41370ba263fb47a30fb7e15517c99b0fe117bb86bbcd8f54bddf` |
+| Passing production VM, return-frame, admission and target-parser tests / build box | `entry-snapshot-build-02.json` | `ae34e5c82afd93e325b6bea0b99b78b81ce9a0ad0cdc826503bfc1e82426b43b` |
+| Toolchain TMM build and protected-file checks / build box | `entry-snapshot-integration-01.json` | `2c89b2fd8163b1a9212360c6a0187e1ed84d48119a094db891ddb5e59f1d1d9d` |
+| Package and image gates / build box | `entry-snapshot-package-01.json` | `92082a158f1688e6f2336b8d41c9a0189aead553bff17e9c80cd41290e59bb87` |
+| JSON bytecode: PREVAIL and 44 native cases / build box | `json-initialization-program-01.json` | `f8e599689561bda615d9b8e03bbcfd4c9653cb906760650eaaff8f5fc0ba1b0d` |
+| New-build source/layout/instruction checks; binding refused / build box | `json-initialization-program-02.json` | `61b2c4fb32e9f4f7099e9eeb23a06756b0fd4d6f241a59ddbe19e80ec265be20` |
+| Isolated snapshot fixture creation / build box | `json-initialization-create-01.json` | `823bcd50d5346cecea48cd66bce91d47d1bbaaf35e991daaa7d3907da011260f` |
+| Refusal archive and scoped fixture removal / build box | `json-initialization-cleanup-01.json` | `0d6d7a98c54c45f44c895b4a4d2392d5c361059dbbac86051d83e8c57dfeed42` |
+| Archived refusal; no live program loaded / isolated fixture | `json-initialization-blocked-evidence-01.tar.gz` | `7520b1331236723cb9cda72a0a55d356901ecf0ce8297118891ce78a90e9de7c` |
+| Full-width versus shortened imports on both pinned binaries / build box | `snapshot-unwind-audit-01.json` | `a175f23a05c7ec26bb5e60ec7a4d4333e8248775331c76edd1cfb24d1c81685c` |
+| Corrected admission, positive controls and failed tools / build box | `snapshot-unwind-check-01.json` | `85a7f9c8c8572af9aa30b6ea91d1d5f0ca5b4c79d01ca2eac45d281bd87eacfb` |
+| Saved-evidence check: 69 source snapshots, 44 JSON records, 13 decoder refusals / build box | `entry-snapshot-check-01.json` | `f9eac7d98bfaf8a0a160029bfff9b7ec648ad5f8433bd9d28cc8320427e5c6f8` |
+| Failed program prerequisite retained before any live command / build box | `json-initialization-live-preflight-02.json` | `fc6ea889770eef7a9a70f275de808cd1bf883287947b927fcce70d11430e3a9d` |
+| Authored record of prerequisite and local-verifier stops / session tool output, SELF | `entry-snapshot-session-01.json` | `907a4c5ebaf9ffba468c8ea201753926f915271911ab6233622bd5de7d78d02e` |
+
+### Void-return completion test, 2026-09-29
+
+**MEASURED native fixture only.** GCC 13.3.0 and clang 18.1.3 each pass 24 cases
+and 1,100 observed returns. The real entry trampoline, shadow stack and return
+stub run with a test entry-snapshot adapter and native program stand-in. Ordinary
+return hooks and the 96-byte context contract also pass. The real TMM JSON handler,
+production entry capture and live lifecycle are not validated. SELF: fixture and
+assertions. TOOL: compilers and source capture.
+[Contract and results](env/ai-traffic/VOID-COMPLETION.md). Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Retained nonexistent-header source-capture stop / build box | `void-completion-build-01.json` | `2cae2546c1e2d9559bd71b04efcca51190d37133764df611b6c9a283e4f49bbc` |
+| Passing two-compiler native test and return/context regressions / build box | `void-completion-build-02.json` | `05d7cbaf045180bb43a66a3e2c56ee362b3f54a11a8c01e1d5b6247ebc16a09e` |
+| Passing saved-evidence check, 19 source snapshots / build box | `void-completion-check-01.json` | `c7b82d2aa5bfe812d4c7144f8e3b15b5d5ce70682fcc00e77d4694933d0a9e78` |
+| Authored summary of source-list and verifier stops / session tool output, SELF | `void-completion-preflight-01.json` | `8bd2f878f98ff385d1438f8f2aece6926e411d6f7c96de68ff79f63510504da1` |
+
+### JSON initialization-completion qualification, 2026-09-29
+
+**MEASURED source, compiled-code and admission checks only.** Two captures refuse
+the handler and reset return hooks for void return types. The enum-return control
+is admitted. Initialization helpers have no standalone entries. The compiled
+forwarding path shares a disabled bypass and calls the next node's handler.
+None of the tested candidates qualifies as an initialization-completion witness.
+No live probe was run. TOOL: captured source, debug, symbols and instructions.
+SELF: admission policy and saved-evidence verifier.
+[Contract and decisions](env/ai-traffic/JSON-INITIALIZATION.md).
+Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Registered contract, pinned source, two return refusals and admitted control / build box | `json-initialization-discovery-01.json` | `dfbb050dd97fc300d9cc5fc8beba043625666d4fccc8f315b9a431f854b8e7e5` |
+| Repeated admission, complete handler range, initialization jump table and xbuf binding refusal / build box | `json-initialization-discovery-02.json` | `787a96e8d860640f509a4143ff380530ef2708ad3ee01e16c24c9699c7c6b2f0` |
+| Passing verifier: 48 source snapshots, seven source references and 15 instruction locations / build box | `json-initialization-check-01.json` | `438f0727527f69ebbd7fc1e4aa75e18e0a02510ea6fa18526ef5a05953a34c97` |
+| Authored summary of symptom lookups, capture refinement and partial-copy recovery / session tool output, SELF | `json-initialization-preflight-01.json` | `ba022ee34a4b8191eff85c2f2332c4f241af957bfcb89aabc2c4998475586851` |
+
+### JSON-context boundary observations, 2026-09-29
+
+**MEASURED, bounded one-worker fixture.** Three entry probes observe handler,
+completion and reset calls. Live 02 has 13 exact HTTP exchanges and 306 records.
+Eleven records have no qualified context fields. The consumer therefore rejects
+the full window. Storage tags remain observations, not lifecycle or request IDs.
+SELF: fixtures, native checks, records, counters and replay. INDEPENDENT: PREVAIL.
+KERNEL: process and hook bytes. TOOL: source, layouts and container state.
+[Contract and results](env/ai-traffic/JSON-LIFECYCLE.md). Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Pinned source, event constants, debug layout and compiled paths / build box | `json-lifecycle-discovery-01.json` | `bea20f4ae1fba8feef7a1688bcfa3996fcccae570cccfbb8339bcad62e088889` |
+| Retained unused-helper compiler failure / build box | `json-lifecycle-build-01.json` | `3268d8533ee09bab2a8c2ec77e15ca66aa2142f123db4ed84989d0ce88aa9c53` |
+| First passing three-program PREVAIL and 312 native records / build box | `json-lifecycle-build-02.json` | `749fdff763922b0a8aedd20793a8e8d1df13044ce5e8309267433d2fb6246d63` |
+| Passing build with stricter consumer source checks / build box | `json-lifecycle-build-03.json` | `4499da7c9a09773f01c107ef1006de4c88ffb7e3e79ae0d1da1e1f89a6e72352` |
+| First isolated fixture creation / build box | `json-lifecycle-create-01.json` | `94d14c51118703c0732eba75181c1a9f632fa1ff0c8ca2238052698c5262cad1` |
+| Retained unavailable-state assertion and restored hooks / isolated fixture | `json-lifecycle-live-01.json` | `0da67c6ab7730f51290e20ed30d3307197b6302e7a8b74999bdbac9f56dff9e1` |
+| Failed-run archive and scoped removal / build box | `json-lifecycle-reset-01.json` | `708d971b611b116a43957954dc8f0eb86423747659fbedb6e8146749be8bc90e` |
+| Nine failed-run evidence files / isolated fixture | `json-lifecycle-failed-evidence-01.tar.gz` | `d284c8f35f13dad2f5918cbd5fc966355687aba6a19ffc68952b4aa52a2d91a1` |
+| Fresh isolated fixture with collector mount / build box | `json-lifecycle-create-02.json` | `6ef1e0e4808d09e255deee67f194a40f9ae6dd07b093470a70976c1793baad10` |
+| 13 exchanges, 306 boundary records, replay and three kernel witnesses / isolated fixture | `json-lifecycle-live-02.json` | `333b783145f5db506bdb0744d1f0eaf59b95c38a65a4523da4e8a08ec232ff59` |
+| Restored hooks, all slots inactive, archive and scoped removal / build box | `json-lifecycle-cleanup-01.json` | `9d6b947a5f068021dc64dd20f3e130742db4ed6e1537e3e7a14048a1e95f8600` |
+| Nine passing-run evidence files, including the journal / isolated fixture | `json-lifecycle-evidence-01.tar.gz` | `5ee964447821303138fa9f9ff43018cb8c3197b3611a762e798562ca830d071d` |
+| Authored summary of test-wrapper stops and symptom lookups / captured tool output, SELF | `json-lifecycle-preflight-01.json` | `d4d966bf522a05180c616ce105a94fd2084917fe632f6b1f4dbdb985b6e8d1a5` |
+| Retained saved-evidence check failure: hook-change rows omit process `stat` / build box | `json-lifecycle-check-01.json` | `26b67b4389b582fe980f627a6de6aa897557ce0424e0d0d7e7c9b7eb0bde32c2` |
+| Passing saved-evidence check: 125 source snapshots, 14 decoder rejections, native/live records and archives / build box | `json-lifecycle-check-02.json` | `3e3de515a2e12db248649cd6a639ece3ee92a89047b978b8d4720af281289092` |
+
+### Message ID and flow side, 2026-09-29
+
+**MEASURED, bounded one-worker fixture.** One record contains the literal message
+ID and the observed connection-flow side. Build 01 passes pinned PREVAIL and 224
+native invocations. Live 01 has 44 exact exchanges and 88 records. These include
+reused IDs on one client connection and equal IDs on four concurrent connections.
+The result establishes field extraction, not message role, common lifetime or
+request/reply association. SELF: fields, fixtures, counters and replay.
+INDEPENDENT: PREVAIL. KERNEL: process and hook bytes. TOOL: source/container checks.
+[Contract and results](env/ai-traffic/ID-FLOW.md). Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Registered contract, pinned build, PREVAIL and 224 native invocations / build box | `id-flow-build-01.json` | `39161b7bff14c1bed1db12fd8fb23444116a19e63e5bc2769355a5de6e9d07b6` |
+| Isolated fixture creation with collector mounts / build box | `id-flow-create-01.json` | `7bef2238908a64e1694c45af1621fc34ec32d7f3c36f28addbd82ea8a55e85f8` |
+| 44 exchanges, 88 same-record ID/side observations and kernel witnesses / isolated fixture | `id-flow-live-01.json` | `22db1a2a4459a5de9231036fea658b198e41ffc86de4611a7220bd60bf468727` |
+| Restored hook, inactive slots, archive and scoped removal / build box | `id-flow-cleanup-01.json` | `4804ea202f17ea5f4f3efe55b75c87491515f0d7a4e5efe11641d4ac60226142` |
+| Seven live evidence files, including the 90-event journal / isolated fixture | `id-flow-evidence-01.tar.gz` | `4636f9a7e6e2f069637c079dbae6037586bbc25864eaf82c5be1004a3fd3d2e8` |
+| Saved-evidence verification, 54 source snapshots and 12 decoder rejections / build box | `id-flow-check-01.json` | `09af1da3bce7c4673c9f550c26ee670f73a92e650af3f335a558da164c08ca6c` |
+| Authored summary of formatting and missing-import stops / captured tool output, SELF | `id-flow-preflight-01.json` | `0e78ffb2a04981c1d96a2f3803d9b3f1a98477226cd3f04188d62613fb8a35dd` |
+
+### Message scope qualification, 2026-09-29
+
+**MEASURED source and compiled-code inspection only.** The pinned JSON completion
+path uses flow-side state. Its context is reused between messages and has both
+connection and stream storage forms. Source and compiled reset/handler paths are
+checked. Runtime lifecycle, a common request/reply lifetime and message association
+remain unvalidated. TOOL: source, debug and instruction capture. SELF: qualification
+checks. [Contract and candidate decision](env/ai-traffic/MESSAGE-SCOPE.md).
+Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Initial JSON-filter source, layout, binary and hook capture / build box | `message-scope-discovery-01.json` | `abb4e381aa9ed768d73760c6801ea89998469de3adab14a6aa290ad0606024d5` |
+| Added flow-side definitions, stream/node sources and complete handler ranges; 16 embedded files / build box | `message-scope-discovery-02.json` | `80baa9981872c732936054ae9ca6f51a38fb89148ec9f02bce2916f3d3efa1a3` |
+| Passing pinned qualification with source references, 11 instruction checks, candidate decisions and verifier source / build box | `message-scope-check-01.json` | `12bac7f33221b3d72b7767202faa8af56d9bcb1af16b500a75b0277c797f13be` |
+
+### Observed message IDs, 2026-09-29
+
+**MEASURED, bounded one-worker fixture.** Literal root IDs retain type and raw
+bytes. Numeric values are not converted or rounded. Missing, null, duplicate and
+incomplete IDs do not establish matching keys. This result does not establish
+request/reply association or trusted caller identity.
+SELF: fixtures, values, counters and replay. INDEPENDENT: PREVAIL.
+KERNEL: process/hook bytes. TOOL: source and container inspection.
+[Contract and results](env/ai-traffic/MESSAGE-ID.md). Files are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Rechecked source, layout and compiled JSON-cache path / build box | `message-id-discovery-01-base.json` | `0c79f3bb14fddc567db25f41333acdc94b9ae371009274266bf39ad2588da70e` |
+| Registered ID field contract and discovery binding / build box | `message-id-discovery-01.json` | `88a3b4128b468d5189a5eff53a9296b071da6b89e5b54db94a85d350e9e1e734` |
+| Pinned PREVAIL at 256 bytes and 194 native invocations / build box | `message-id-build-01.json` | `c2826afbbccdd95fa92a73fbb9827f64dca503bbae43094b09a93eb8740c5a8e` |
+| Isolated fixture creation with the collector layer / build box | `message-id-create-01.json` | `18a4528ee6eaadfd233c677821c5e3f6c2eb3ecc6bda07d6329c358042a46954` |
+| 35 exact exchanges, 70 ID records, journal/replay and kernel witnesses / isolated fixture | `message-id-live-01.json` | `94439d801e899c64ca21a173920e4b35b50ec7ea73dcef164647d503968024e3` |
+| Restored hook, inactive slots, seven-file archive and scoped removal / build box | `message-id-cleanup-01.json` | `63221c42d9a9a8039d5cc9f60f88754e433af45d2a4c0f95e65fc07ae19ab66b` |
+| Live reports and 72-event SQLite journal / isolated fixture | `message-id-evidence-01.tar.gz` | `520a7f2251b407350784db65a7342962c4d23702a1c36685374bffac550fd919` |
+
+### Reported reply fields, 2026-09-29
+
+**MEASURED, bounded one-worker fixture.** Literal result/error presence, signed
+integer error codes and Boolean tool-error reports. These are reported fields,
+not proof of remote success, authenticated identity or request association.
+SELF: authored fixtures, values, counters and replay. INDEPENDENT: PREVAIL.
+KERNEL: process and hook bytes. TOOL: source and container inspection.
+[Contract, results and retained failures](env/ai-traffic/REPLY-METADATA.md).
+Files below are in `evidence/cache/`.
+
+| Evidence / origin | Cached file | SHA-256 |
+|---|---|---|
+| Rechecked JSON cache source, layouts and compiled path / build box | `reply-metadata-discovery-01-base.json` | `0c79f3bb14fddc567db25f41333acdc94b9ae371009274266bf39ad2588da70e` |
+| Registered field contract and discovery binding / build box | `reply-metadata-discovery-01.json` | `0adb9aeacf2c3d84e0ee27f46b9e413adb61f4fc50867d0d12e42ff59991ea0f` |
+| First pinned PREVAIL and 106 native checks / build box | `reply-metadata-build-01.json` | `206259091659faaab2ff33a3a07fac15fc06df990f025030b9f27776e2f8ee70` |
+| Build report compatibility and case formatting update; checks pass / build box | `reply-metadata-build-02.json` | `4a0849d712c14fc1aee403a799a8cad86821011aa8f9fbf3976a4c1d0c7cc56d` |
+| Final fixture formatting; pinned PREVAIL and 106 native checks / build box | `reply-metadata-build-03.json` | `ba935d09a6457e5c1de161fe766db072b387e4cd03328a360370eca619263f3b` |
+| Initial creation omitted collector mount layer / build box | `reply-metadata-create-01.json` | `133167771b9c84ef54545672a763fa06b059120e89248fd1aa991e69434da5c3` |
+| Collector API unavailable before probe load / isolated fixture | `reply-metadata-live-01.json` | `2d98f1016dc26a5b3613e95b976d3171b2b4820efddf60682736da7066bff98d` |
+| Missing read-only API mount checked and repaired / build box | `reply-metadata-mount-repair-01.json` | `654335576fc1c497e479326fd102a6668cacb4744845a0974b1437ea17577a65` |
+| Configuration wait timeout before probe load / isolated fixture | `reply-metadata-live-02.json` | `b38667b44c9d1b0bf8bca66ba84ece47880f18bc00b863e3427214167690c30e` |
+| Reset check expected hash in a final witness row; stopped / build box | `reply-metadata-reset-01.json` | `ab44504ef18619ef3bf1a3f71a03648c4528a73c4ac1f5d44e6044f519f7b0e6` |
+| Reset check matched a source-code guard string; stopped / build box | `reply-metadata-reset-02.json` | `e617f86177c94e667accd060a30e44c72f845735c88ae9ec85c6f53f29293ed2` |
+| Eight-file failure archive checked before scoped removal / build box | `reply-metadata-reset-03.json` | `ca64fa9aa4ee796be3d380e1e5a059899ab8fe6e40dd949822ca190003a54a20` |
+| Saved pre-arm failures and journals / isolated fixture | `reply-metadata-failed-evidence-01.tar.gz` | `346a58aac030f7b1fd507d51c8c296849558dfd462f07d23a1317fad842af5e3` |
+| Fresh creation with collector mount layer / build box | `reply-metadata-create-02.json` | `ad1e3e5da0d2d6b0641fe36b1cb836872f35853e090728bcba67c1ab2c9e9152` |
+| 38 exact exchanges, 76 field records, journal/replay and kernel witnesses / isolated fixture | `reply-metadata-live-03.json` | `955af1f0a649a9e0311c38e133b7508f9d290ec4dfe91c0391d67e3505bb1e18` |
+| Seven-file archive, restored hook, inactive slots and scoped removal / build box | `reply-metadata-cleanup-01.json` | `05da4b4f93deb34122f1b8ab4291cad5669edf845d95177d21bc53b8215a32f5` |
+| Successful live reports and SQLite journal / isolated fixture | `reply-metadata-evidence-01.tar.gz` | `70df07753ff3a3d086d9c62e94553d37220b68778519e0993cfd54d15c1c64d6` |
+
+### Requested operation targets, 2026-09-29
+
+**MEASURED bounded tool-name and resource-URI extraction.** The pinned build
+passes PREVAIL and 74 native invocations. The isolated live gate passes 28 cases.
+These are requested targets, not proof of authorization or successful access.
+Values/tests are SELF; PREVAIL is INDEPENDENT; hook/process checks are KERNEL.
+[Contract and results](env/ai-traffic/OPERATION-TARGET.md).
+
+| Evidence / source | Cached file in `evidence/cache/` | SHA-256 |
+|---|---|---|
+| Rechecked source, debug layouts and compiled JSON-completion path / build box | `operation-target-discovery-01-base.json` | `0c79f3bb14fddc567db25f41333acdc94b9ae371009274266bf39ad2588da70e` |
+| Registered target contract and bound discovery receipt / build box | `operation-target-discovery-01.json` | `340169f3446d1253b1cf5f05cbcd298e934e41a025a8735b9cf666f33da88d3c` |
+| Pinned PREVAIL at 256 bytes; 74 native interpreter/JIT invocations / build box | `operation-target-build-01.json` | `3d68bc32307b55fd3879ed71c1a27df769329416f3c7d3b20f3810e254671459` |
+| Isolated fixture creation and other container inventory / build box | `operation-target-create-01.json` | `273cf014a3cb6fbd00881c49348b2339bdb54d2050f6406b269db05d78b16929` |
+| Exact target bytes, explicit exclusions and replay across 28 cases / isolated fixture | `operation-target-live-01.json` | `97d61b045175d1ab71dff708e8e5efc21ba1d74ac9232312c6d64e6daa661a81` |
+| Restored hook, inactive slots, checked archive and fixture removal / build box | `operation-target-cleanup-01.json` | `c64dc5993c30728dbbfd95efd76b27049406d7001cf9b3158fe835815145d67e` |
+| Live reports and SQLite journal / isolated fixture | `operation-target-evidence-01.tar.gz` | `475591fb9b936c0dae2710c8b3d3b248208fe0d79d0f78f87f17bfeb837edcca` |
+
+### Response metadata qualification, 2026-09-29
+
+**MEASURED bounded response-status and local transfer-completion extraction.**
+Live attempt 02 passes nine isolated fixture cases. Values and comparisons are
+SELF; PREVAIL is INDEPENDENT; hook/process checks are KERNEL witnesses. Local
+status and done arguments do not establish remote-operation success.
+[Registered contract and results](env/ai-traffic/RESPONSE-METADATA.md).
+
+| Evidence / source | Cached file in `evidence/cache/` | SHA-256 |
+|---|---|---|
+| AIMCP/HTTP/JSON/SSE and proxy source; pinned binary, handler disassembly, status offsets and event values / build box | `response-metadata-discovery-01.json` | `3cd1175de563e84a9601aec6063681abd854eb7d63b1e01bdb11ae5c232ecbdf` |
+| Pinned PREVAIL at 256 bytes and 80 interpreter/JIT invocations; exact status/done fields, invalid state, guarded reads, output refusal, sequence saturation and instance replacement / build box | `response-metadata-build-01.json` | `1b07e162408928d488ab8f2810ff07940958227810fe9eb33cabff7720152d10` |
+| Isolated fixture creation and other container inventory / build box | `response-metadata-create-01.json` | `c30e3b8e17adcaf77d66acba8fd39a8f4269424df22504731daf62d5d2a43b9a` |
+| Attempt 01 rejects normal HTTP 200 as out of scope; hook restored / isolated fixture | `response-metadata-live-01.json` | `6e62d2df04cf41d527265f429b56df87fd83926cffc4f6844215a0840d130ec8` |
+| Cache-flag correction: HTTP/2 serializer source and compiled status accessor / build box | `response-metadata-discovery-02.json` | `42e8a5047f613ef9f29d9858d7042db9e3c0fd1c65b1412110d86dc569c32c45` |
+| Build 02 stops before compilation: reversed request/trailer names in layout assertion / build box | `response-metadata-build-02.json` | `b7443d94330a680c5f185da26317f834b43bf3ee6be9cc1a4fb1ee989038e4a8` |
+| Corrected cache semantics and layout assertion; pinned PREVAIL and 80 native invocations / build box | `response-metadata-build-03.json` | `0f70b542151709c8e2684bb08963240e1c28522e8328ca6ab7476937a0d94441` |
+| Attempt 02 passes nine cases, including paced, chunked, event-stream and interrupted responses / isolated fixture | `response-metadata-live-02.json` | `7d891d65dc52e690d34ff31d7ddc638f8c6ed1b1472509dfca08d8f432aa110a` |
+| Restored hook, inactive slots, checked archive and isolated fixture removal / build box | `response-metadata-cleanup-01.json` | `2d7b75c9f1beffe4b11c69634e35b73cb92caf83a08196feae0984eeb3426d92` |
+| Both live attempts, reports and SQLite journals / isolated fixture | `response-metadata-evidence-01.tar.gz` | `8fdcae0f7b981f54a4d81840d14e1f9c0a49060ae67a1b1e2a4965ad3f4ce159` |
+
+### Session and routing qualification, 2026-09-29
+
+**MEASURED bounded session-header and selected-route extraction.** The prepared
+build box supplied source, layouts, disassembly and native verification. Live
+attempt 04 passes the isolated fixture gate. Values and comparisons are SELF;
+PREVAIL is INDEPENDENT; hook/process checks are KERNEL witnesses. Identity profiles
+and blast-radius assessment remain IDEA consumer goals.
+[Registered contract](env/ai-traffic/SESSION-ROUTING.md).
+
+| Evidence / source | Cached file in `evidence/cache/` | SHA-256 |
+|---|---|---|
+| Initial AIMCP source, clone entries and field layouts / pinned build box | `session-routing-discovery-01.json` | `ee48a827e7e172abb4fd99840f7f02bb6dcd5613defaf6d8c0b0ffc22c7b9198` |
+| Registered header/selected-route limits, connection-flow and pool offsets / pinned build box | `session-routing-discovery-02.json` | `34a6e9b9cad7206e0438722e8b868919dc251c5a4f7343a7122f9a7ad24da357` |
+| Session and route programs: pinned PREVAIL at 256 bytes; 34 session and 38 route native records / build box | `session-routing-build-01.json` | `1be02535690d620026978f0ac25671962961bb2c883bea747b870437383f1a1f` |
+| Failed first live run: shared state-map name resets per-program sequences; restored hooks / isolated fixture | `session-routing-live-01.json` | `5904b0ff5fa1e6edc052ebe5eba513b0c4320f9b34fa1c6319a5b12e956f8b3c` |
+| Separate state-map names; pinned verification, 72 individual and eight interleaved native invocations / build box | `session-routing-build-02.json` | `025e8c91bf2bb0df51debccc2c63bbe613984f8aa48d0d005a27a7a2108fb1f6` |
+| Isolated fixture creation and other container inventory / build box | `session-routing-create-01.json` | `2c958ef14754e886e25a8232cbaeaca4a95c7ecfa029f4d36e130a569d8bd424` |
+| Attempt 02 stops before loading: retained journal contradicts empty-history assumption / isolated fixture | `session-routing-live-02.json` | `2fcc97fef8e7a3c945013e44ef2331758130a200ba0eefd133563c996c8929a3` |
+| Attempt 03 stops on replay JSON decoding after partial exact-value comparisons; HTTP status not captured / isolated fixture | `session-routing-live-03.json` | `4c2b2535c6784e1292dce21822327cbba6321f1fca725e516c6dca54dae26046` |
+| Attempt 04 passes: seven requests, five session-header records, seven selected-route records and replay / isolated fixture | `session-routing-live-04.json` | `440d7232b497fef22d99937be1d87ee5b1b30579b32ff07caef60f1df87cf6b6` |
+| Restored hooks, inactive slots, checked archive and isolated fixture removal / build box | `session-routing-cleanup-01.json` | `e6d704768a2e3705af85e617ef9b4766d9483d8d47145b83c68bc9fed8ced33e` |
+| Four retained live attempts, reports and SQLite journals / isolated fixture | `session-routing-evidence-01.tar.gz` | `920ba558e90c00373c5ec1eb9612dcd71e99dd364f5fc848b0910012e14a09d6` |
+
 ### Token-cache method extraction, 2026-09-28
 
 Authoritative source, debug types, binary inspection and native checks ran on
@@ -512,3 +917,42 @@ Three findings that closed open questions in the CVE-mitigation milestone plan (
    installed bundle, not a supported BNK path — which independently confirms §4C's conclusion that the
    `F5VirtualServer` route can never program here, and retires the idea that a better manifest would
    have fixed it.
+## Activity program — 2026-09-30
+
+Pinned build-box checks for one ELF with two entry programs. Check 05 passes
+PREVAIL for both sections and executes both contexts through interpreter and
+JIT with GCC and clang harnesses. It also checks signed target-set parsing with
+ASan/UBSan. Check 08 repeats those checks on the final, signed artifact. It also
+checks the new runtime's data layouts, legacy loading and old-parser refusal.
+
+**MEASURED — live attempt 02:** the same 176,176-byte ELF runs at both entries
+in isolated TMM build `f9a1ed8c8c54192e76e54bf7f1c59921b8a774c9`. Three request/reply
+exchanges produce 24 JSON field records from six hook calls and 63 HTTP-handler
+records. The collector replays all 87 records to a second cursor. Wrong-target
+arming is refused. Both entry patches are observed and restored through `/proc`;
+the process identity and restart count stay unchanged. The fixture is archived
+and removed. SELF: traffic comparisons, counters, exporter and replay checks.
+KERNEL: runtime identity and patch bytes. INDEPENDENT: PREVAIL. This original run
+does not qualify request/reply association. The later
+[combined-record result](#combined-activity-records-2026-09-30) qualifies the explicit
+exchange contract for one worker and non-pipelined HTTP/1. Identity binding and
+sustained data-path cost remain unqualified.
+[Artifact and commands](env/ai-traffic/ACTIVITY-PROGRAM.md).
+
+| Cached file | SHA-256 | Result |
+| --- | --- | --- |
+| `evidence/cache/activity-program-check-01.json` | `514a7584786abfd379d3f9c25ae449c2d0814360a39f64a67484852a9c0f8569` | Inlined JSON entry exceeds the 256-byte stack limit. |
+| `evidence/cache/activity-program-check-02.json` | `bc8b3180a72d8723b4b0c4422c84d3561b44da3d3cb5c48e4912f52107642e03` | PREVAIL passes; native export lacks `ls_tp.h`. |
+| `evidence/cache/activity-program-check-03.json` | `419119bad0339c0b1b418b8195e166af412c3815b6f5c9d3bce335f0294598b9` | uBPF refuses a subprogram ending. |
+| `evidence/cache/activity-program-check-04.json` | `ef626c7d673b7de79cca02231e57757705a7ee01c79e4d2202d16964747d1fe6` | Block placement disabled; JIT output exceeds its default buffer. |
+| `evidence/cache/activity-program-check-05.json` | `cd6840802f626ab703b13fc77f2a7647ac843859cb70ec100ed35d01ddcbef99` | Native two-context checks pass with a bounded 512 KiB JIT compiler buffer. |
+| `evidence/cache/activity-program-check-06.json` | `8d1d0955b3e798341f884486a2fbb1f3677cb8bfb2f1fbea1a777115c45faf18` | New-build checks pass; signing export lacks `shield_abi.h`. |
+| `evidence/cache/activity-program-check-07.json` | `fb4ea5df1dc8d6a85e41e497d43e5a627a5010a1b753ec87ed174a4b1f53a6d6` | Native, layout and regression checks pass; both bindings signed. ELF size is not yet checked. |
+| `evidence/cache/activity-program-check-08.json` | `39930c81d460eaecabc45379f0f96ab525e8fb3e05c686622ac9483dfc5a0efc` | Final artifact passes all checks and the existing 256 KiB file limit. Debug stripping leaves executable sections unchanged. |
+| `evidence/cache/activity-program-integration-01.json` | `8f589156a00216855ed4d7a176ce64c281bd86fe69d6c3b7f90dd51f04d43f31` | Three substrate files integrated; prescribed toolchain build passes. |
+| `evidence/cache/activity-program-package-01.json` | `61d47bb42400734fb2351feadf962d0c87113c586a906ba17ea9adbca8888056` | Package/image checks pass; runtime SHA and image ID recorded. |
+| `evidence/cache/activity-fixture-create-01.json` | `e938e71727d55cc925b5e867dd35102e5f993a2208940180d44ab460cc573de4` | Isolated fixture created with collector API mount; unrelated containers unchanged. |
+| `evidence/cache/activity-program-live-01.json` | `eb9ace8c7d8d8d704db32065dbf65b415302d61477e3f767b8a9a7c4501e6c65` | Loader refuses ELF over 256 KiB; neither hook is armed. |
+| `evidence/cache/activity-program-live-02.json` | `474beac275d2991a571447406e20a41e8c4fe93a63d3b0b253a51a796cdcb333` | Both hooks run together; exact fields, counters, export, replay and restored patch bytes pass. |
+| `evidence/cache/activity-program-cleanup-01.json` | `0ed2d87b992365eb0b106d03b5ff82212c5fd7d3c6e2c7d1ff776f58dc97029b` | Archive checked before scoped removal; all slots inactive, both hooks restored and unrelated containers unchanged. |
+| `evidence/cache/activity-program-evidence-20260930.tar.gz` | `b02ab6d4bdb64e6c64412106be99b1a26ba54bb698f2995eb190a3fa6919f1b0` | Both live attempts, Tao output and collector journals. No signing key or bytecode artifact. |

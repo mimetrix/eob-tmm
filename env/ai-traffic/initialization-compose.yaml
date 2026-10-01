@@ -1,0 +1,4 @@
+services:
+  tmm:
+    image: ${SNAPSHOT_IMAGE:?provide the checked snapshot image ID}
+    pull_policy: never

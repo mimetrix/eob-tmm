@@ -61,6 +61,7 @@
  */
 
 #include "ls_vm.h"
+#include "ls_program.h"
 #include "ls_vm_config.h"
 #include "ls_tp.h"          /* ls_tp_emit_shield --- the enforcement-evidence event */
 #include "vm_stack_policy.h"
@@ -82,7 +83,8 @@
  * at arm time against the count that file publishes --- see ls_arm.c --- because a
  * C-side constant larger than the real table indexes past .rodata and arms a wild
  * address. Raised from 8 on 2026-08-18 for the ssl__err tracepoint plus headroom. */
-#define LS_MAX_SLOTS 12
+#define LS_LEGACY_SLOTS 12
+#define LS_MAX_SLOTS (LS_LEGACY_SLOTS + LS_PROGRAM_MAX * LS_PROGRAM_ENTRIES)
 
 /*
  * Per-instance program stack, allocated once.
@@ -105,7 +107,7 @@
  * invokes it. */
 static void ls_vm_selftest(int slot, unsigned level);
 
-static uint8_t *g_prog_stack;
+static __thread uint8_t *g_prog_stack;
 #define LS_PROG_STACK_SIZE 4096
 
 /* Per TMM instance. Not shared, not locked --- see the header. `static` because
@@ -329,7 +331,8 @@ ls_function_in_section(const void *elf, size_t elf_len, const char *section,
 bool
 ls_vm_init(void)
 {
-    memset(g_slots, 0, sizeof g_slots);
+    if (!g_ready)
+        memset(g_slots, 0, sizeof g_slots);
     ls_vm_config_load(&g_cfg);
     if (g_prog_stack == NULL) {
         g_prog_stack = calloc(1, LS_PROG_STACK_SIZE);
@@ -369,6 +372,8 @@ ls_vm_stats(int slot, struct ls_stats *out)
     out->cycles = s->cycles;
     out->cycles_max = s->cycles_max;
     out->cycles_min = s->cycles_min;
+    out->snapshot_entry_errors = s->snapshot_entry_errors;
+    out->snapshot_return_errors = s->snapshot_return_errors;
     return true;
 }
 
@@ -471,6 +476,7 @@ ls_vm_bench_program(const void *elf, size_t elf_len,
 
     if (g_cfg.jit) {
         char *jerr = NULL;
+        ubpf_set_jit_code_size(vm, LS_JIT_CODE_MAX);
         jf = ubpf_compile_ex(vm, &jerr, ExtendedJitMode);
         if (jf == NULL) {
             fprintf(stderr, "ls_vm: bench: JIT failed (%s) --- measuring the interpreter "
@@ -629,14 +635,14 @@ ls_vm_target_btf(void)
     return g_ls_btf.state == 1 ? &g_ls_btf.b : NULL;
 }
 
-int
-ls_vm_arm(const void *elf, size_t elf_len,
-          const char *section, const char *function, enum ls_mode m)
+static int
+ls_vm_prepare_slot(int slot, const void *elf, size_t elf_len,
+                    const char *section, const char *function, enum ls_mode m)
 {
-    int slot = -1;
     char *err = NULL;
 
-    if (!g_ready || elf == NULL || section == NULL || function == NULL)
+    if (!g_ready || elf == NULL || section == NULL || function == NULL ||
+        slot < 0 || slot >= (int)LS_MAX_SLOTS || g_slots[slot].armed)
         return -1;
 
     /* O14: the verifier proved the program in `section`; uBPF is about to run the
@@ -648,16 +654,17 @@ ls_vm_arm(const void *elf, size_t elf_len,
         return -1;
     }
 
-    for (int i = 0; i < LS_MAX_SLOTS; i++) {
-        if (!g_slots[i].armed) { slot = i; break; }
-    }
-    if (slot < 0)
-        return -1;
-
     /* The hook KIND rides on the verified section: a program compiled for
      * fexit/<fn> is armed at the function's RETURN (ls_fexit_table), one for
      * fentry/<hook> at its ENTRY. Recorded now, read at arm --- see ls_arm_live. */
     g_slots[slot].is_exit = (strncmp(section, "fexit/", 6) == 0);
+    g_slots[slot].is_snapshot =
+        strncmp(section, LS_SNAPSHOT_SECTION, LS_SNAPSHOT_PREFIX_LEN) == 0;
+    g_slots[slot].snapshot_id.instance = g_ls_config.loading;
+    g_slots[slot].snapshot_id.epoch = 1;
+    if (g_slots[slot].is_snapshot &&
+        (!g_ls_config.loading || m > LS_MODE_MONITOR))
+        return -1;
 
     /* The safe-return value for THIS slot (item 7, v1: one configured value via
      * env, not yet the per-return-type policy table). Read here, off the data
@@ -779,6 +786,7 @@ ls_vm_arm(const void *elf, size_t elf_len,
          * is the unprobed 4 KB frame finding O7 is about. Extended mode takes the
          * stack as an argument, so the same per-instance buffer serves both the
          * interpreter and the compiled path. */
+        ubpf_set_jit_code_size(vm, LS_JIT_CODE_MAX);
         g_slots[slot].jit_fn = (void *)ubpf_compile_ex(vm, &jerr, ExtendedJitMode);
         if (g_slots[slot].jit_fn == NULL) {
             fprintf(stderr, "ls_vm: JIT requested but failed: %s\n", jerr ? jerr : "?");
@@ -803,10 +811,10 @@ ls_vm_arm(const void *elf, size_t elf_len,
                 slot, section, function, (int)m, (unsigned long)elf_len,
                 g_origin[0] ? g_origin : "builtin", (int)g_cfg.jit);
 
-    if (g_cfg.bench)
+    if (!g_slots[slot].owner && g_cfg.bench)
         ls_vm_bench(slot, g_cfg.bench);
 
-    if (g_cfg.selftest)
+    if (!g_slots[slot].owner && g_cfg.selftest)
         ls_vm_selftest(slot, g_cfg.selftest);
 
     return slot;
@@ -814,6 +822,17 @@ ls_vm_arm(const void *elf, size_t elf_len,
 fail:
     if (err) { fprintf(stderr, "ls_vm: arm failed: %s\n", err); free(err); }
     ubpf_destroy(vm);
+    g_slots[slot].vm = g_slots[slot].jit_fn = NULL;
+    return -1;
+}
+
+int
+ls_vm_arm(const void *elf, size_t elf_len,
+          const char *section, const char *function, enum ls_mode m)
+{
+    for (int slot = 0; slot < LS_LEGACY_SLOTS; slot++)
+        if (!g_slots[slot].armed)
+            return ls_vm_prepare_slot(slot, elf, elf_len, section, function, m);
     return -1;
 }
 
@@ -961,12 +980,13 @@ ls_vm_sig_enforce(void)
 
 
 
-enum ls_verdict
-ls_vm_call(int slot, void *ctx, size_t ctx_len)
+static enum ls_verdict
+ls_vm_run(int slot, void *ctx, size_t ctx_len,
+          const struct ls_snapshot_id *identity, int *completed)
 {
     uint64_t ret = 0;
 
-    if (slot < 0 || slot >= LS_MAX_SLOTS)
+    if (slot < 0 || slot >= LS_MAX_SLOTS || !g_prog_stack)
         return LS_FALLTHROUGH;
 
     if (ls_map_enter() != 0)
@@ -982,6 +1002,16 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
         ls_map_leave();
         return LS_FALLTHROUGH;
     }
+    if ((identity == NULL && s->is_snapshot) ||
+        (identity != NULL &&
+         (!s->is_snapshot || !identity->instance ||
+          identity->epoch == UINT64_MAX ||
+          identity->instance != s->snapshot_id.instance ||
+          identity->epoch != __atomic_load_n(&s->snapshot_id.epoch,
+                                             __ATOMIC_ACQUIRE)))) {
+        ls_map_leave();
+        return LS_FALLTHROUGH;
+    }
 
     /* PUBLISH WHICH SLOT IS RUNNING, for helpers that need it and cannot be told.
      * uBPF's external_function_t has no context parameter, so bpf_ringbuf_output has no
@@ -990,7 +1020,8 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
      * any instant. Set AFTER the early returns so a disabled or unarmed slot never
      * leaves a stale value behind, and cleared on every exit path below. */
     g_ls_cur_slot = slot;
-    ls_config_begin(&g_ls_config_view, (unsigned)slot);
+    ls_config_begin(&g_ls_config_view, s->owner ?
+                     LS_PROGRAM_CONFIG_BASE + s->owner - 1 : (unsigned)slot);
 
     /* A non-zero return from ubpf_exec is an execution fault --- fuel exhausted,
      * or a bounds check the interpreter enforces at run time. Fall through: a
@@ -1021,6 +1052,8 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
         s->errors++;
         return LS_FALLTHROUGH;
     }
+    if (completed != NULL)
+        *completed = 1;
 
     /* Sample the ctx. A fixed-size memcpy into a slot-resident ring: no
      * allocation, no lock, no syscall. Gated so the shipped path is untouched
@@ -1041,7 +1074,7 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     if (g_cfg.report_every && (s->fired % g_cfg.report_every) == 0)
         ls_vm_report();
 
-    if (ret != LS_SAFE_RETURN)
+    if (identity != NULL || ret != LS_SAFE_RETURN)
         return LS_FALLTHROUGH;
 
     s->safe_returns++;
@@ -1057,6 +1090,46 @@ ls_vm_call(int slot, void *ctx, size_t ctx_len)
     /* Monitor mode counts the selection and applies nothing. The counters above
      * are what make a monitor-mode hit distinguishable from a miss. */
     return (mode == LS_MODE_ENFORCE) ? LS_SAFE_RETURN : LS_FALLTHROUGH;
+}
+
+enum ls_verdict
+ls_vm_call(int slot, void *ctx, size_t ctx_len)
+{
+    /* Owned entries are reached only through their attachment dispatcher. */
+    if (slot >= LS_LEGACY_SLOTS)
+        return LS_FALLTHROUGH;
+    return ls_vm_run(slot, ctx, ctx_len, NULL, NULL);
+}
+
+int
+ls_vm_snapshot_identity(int slot, struct ls_snapshot_id *identity)
+{
+    int snapshot = 0;
+    memset(identity, 0, sizeof *identity);
+    if (slot >= 0 && slot < LS_MAX_SLOTS && g_slots[slot].is_snapshot) {
+        identity->instance = g_slots[slot].snapshot_id.instance;
+        identity->epoch = __atomic_load_n(&g_slots[slot].snapshot_id.epoch,
+                                          __ATOMIC_ACQUIRE);
+        snapshot = 1;
+    }
+    return snapshot;
+}
+
+int
+ls_vm_snapshot_call(int slot, const struct ls_snapshot_id *identity,
+                    struct ls_snapshot_ctx *ctx)
+{
+    int completed = 0;
+    uint32_t phase = ctx->phase;
+    if (identity != NULL)
+        (void)ls_vm_run(slot, ctx, sizeof *ctx, identity, &completed);
+    if (!completed && slot >= 0 && slot < LS_MAX_SLOTS) {
+        if (phase == LS_SNAPSHOT_ENTRY)
+            g_slots[slot].snapshot_entry_errors++;
+        else
+            g_slots[slot].snapshot_return_errors++;
+    }
+    return completed ? 0 : -1;
 }
 
 /*
@@ -1080,7 +1153,7 @@ int
 ls_vm_reload(int slot, const void *elf, size_t elf_len,
              const char *section, const char *function, enum ls_mode m)
 {
-    if (slot < 0 || slot >= LS_MAX_SLOTS || !g_ready)
+    if (slot < 0 || slot >= LS_LEGACY_SLOTS || !g_ready)
         return -1;
 
     /* Prepare into a spare slot: create, identity-check, load, JIT if asked.
@@ -1122,9 +1195,11 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
     __atomic_store_n(&live->jit_fn, NULL, __ATOMIC_RELEASE);
     __atomic_store_n(&live->vm, new->vm, __ATOMIC_RELEASE);   /* old VM leaked */
     __atomic_store_n(&live->jit_fn, new->jit_fn, __ATOMIC_RELEASE);
-    __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->armed = true;
     live->is_exit = new->is_exit;   /* the kind rides with the program on the swap */
+    live->is_snapshot = new->is_snapshot;
+    live->snapshot_id = new->snapshot_id;
+    __atomic_store_n(&live->mode, m, __ATOMIC_RELEASE);
     live->safe_value = new->safe_value; /* and its safe-return value (item 7) */
     live->gen++;              /* so STATUS can distinguish residue from result */
 
@@ -1141,11 +1216,23 @@ ls_vm_reload(int slot, const void *elf, size_t elf_len,
 void
 ls_vm_set_mode(int slot, enum ls_mode m)
 {
-    if (slot < 0 || slot >= LS_MAX_SLOTS)
+    if (slot < 0 || slot >= LS_LEGACY_SLOTS)
         return;
+    if (g_slots[slot].is_snapshot) {
+        if (m > LS_MODE_MONITOR)
+            m = LS_MODE_DISABLE;
+        uint64_t epoch = __atomic_load_n(&g_slots[slot].snapshot_id.epoch,
+                                         __ATOMIC_RELAXED);
+        if (epoch != UINT64_MAX)
+            __atomic_store_n(&g_slots[slot].snapshot_id.epoch, epoch + 1,
+                             __ATOMIC_RELEASE);
+    }
     __atomic_store_n(&g_slots[slot].mode, m, __ATOMIC_RELEASE);
     fprintf(stderr, "ls_vm: slot=%d mode -> %d\n", slot, (int)m);
 }
+
+/* Kept in this translation unit so VM ownership and reclamation have one owner. */
+#include "ls_program_impl.h"
 
 void
 ls_vm_fini(void)

@@ -22,6 +22,7 @@
 #include <setjmp.h>
 
 #include "ls_fexit.h"
+#include "check_snapshot_stubs.h"
 
 /* The exit program's stand-in. ls_fexit_leave now RUNS the program (step #2) via
  * ls_vm_call, handing it struct ls_ctx_exit; in TMM this is the real VM. Here it

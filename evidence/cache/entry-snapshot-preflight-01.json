@@ -1,0 +1,71 @@
+{
+  "passed": true,
+  "scope": "snapshot_context_verifier_preflight",
+  "sources": {
+    "ENTRY-SNAPSHOT.md": {
+      "sha256": "e25818370102cb68b9c8f499b54edbb3a2d818c2865ecab1f0da9db2dfe9ee3d",
+      "text": "# Production entry snapshots\n\n**2026-09-29 \u2014 IDEA. Registered before implementation.**\n\nThe objective is to save bounded entry state with the return frame. The same\nloaded program can then report an action after a matched normal return.\nThe [native test](VOID-COMPLETION.md) establishes the mechanism with a test\nadapter. This gate must use the production virtual machine and return frame.\n\n## Contract\n\n1. Use a separate signed target version and `fexit/snapshot/<function>` section.\n   Older hosts must refuse it. Ordinary entry and value-return hooks retain\n   their context layout and invocation count.\n2. Keep the tracing context at 96 bytes. Arguments occupy bytes 0\u201339. Bytes\n   40\u201347 are zero: this mode has no return value. Bytes 48\u201351 identify entry\n   or return. Bytes 52\u201355 identify a completed entry capture. Bytes 56\u201363\n   hold the invocation sequence. Bytes 64\u201395 hold 32 bytes of program state.\n3. At entry, run the program on a zeroed private context. Copy only those\n   32 state bytes into the matched shadow frame after successful execution.\n   Program writes to arguments, phase, sequence or return value cannot change\n   the saved arguments, host state, real return address or target body.\n4. At return, reconstruct the context from host-owned fields. A failed entry\n   execution supplies zero state and an invalid-capture flag. A successful\n   execution does not itself prove that the program captured its predicate.\n   The program must keep an explicit known/unknown state.\n5. Bind the frame to the loaded instance and a mode-change epoch. Replacement,\n   disable/re-enable, invalid identity or exhausted sequence must not transfer\n   entry state to another invocation or program. Count rejected return calls.\n6. Keep the 512-frame bound, skipped-return reclamation and caller transparency.\n   Overflow leaves the target's normal return path intact. No allocation,\n   waiting, application writes or application calls enter the hook path.\n7. Admission for the new mode requires an exact `void` return, matching debug\n   and runtime build IDs, a supported padded entry and complete unwind checks.\n   Missing or failed tools are refusals. The ordinary admission policy remains\n   a separate gate.\n8. Test with pinned GCC, clang, uBPF and PREVAIL on the x86-64 build box.\n   Exercise both interpreter and JIT execution. Test nesting, recursion, skipped\n   returns, capacity, entry errors, replacement, mode changes, context writes,\n   invalid capture, arbitrary return-register contents and unreadable context\n   after the target body. Test ordinary hooks and malformed target records.\n\n## JSON initialization probe\n\nOn the qualified JSON handler build, capture event 57, context presence and the\ndisabled flag at entry. A matched return with a known eligible snapshot reports\ncompleted initialization. Read application memory only at entry. Keep unknown,\ndisabled and other-event cases distinct. Use one bounded output attempt at return.\n\nThe [source qualification](JSON-INITIALIZATION.md#what-the-source-already-establishes)\ngives the conditional proof. Recheck the source, instructions and layout against\nthe rebuilt binary before a live claim. A completion record reports a past action;\nit does not establish that storage remains alive after forwarding.\n\n## Falsifiers and evidence\n\nReject this gate if old hosts accept the new contract, ordinary hooks change\nbehavior, an old snapshot reaches a replacement program, capture failure becomes\nknown state, a context write changes caller state, or a skipped return produces\ncompletion. Reject live initialization if entry guards do not establish the\nsource predicate, return code reads application storage, evidence is lost, or\nthe hooked process changes during the test.\n\n```text\nBUILD BOX: contract -> code -> PREVAIL + native VM tests -> TMM build + package\nTMM ENTRY: private context -> program -> frame-owned state + instance identity\nTMM RETURN: matched frame + same instance -> program -> bounded output attempt\nCOLLECTOR: journal -> replay -> exact evidence checks\n```\n\nRetain failed runs, source snapshots, commands and tool versions in unique\nreceipts. Archive fixture files before scoped removal. SELF witnesses cover\nfixtures, programs and assertions; TOOL covers compilation and source inspection;\nINDEPENDENT covers PREVAIL; KERNEL covers process and hook-memory checks.\n\nMultiworker execution, lifetime boundaries, request association and per-call\ndata-path cost require separate qualification. No production or live result is\nclaimed by this contract.\n"
+    },
+    "check_snapshot_context.bpf.c": {
+      "sha256": "368869fcc92bd2be5b75ff35006052e4b34707e1632d171626364786033cde11",
+      "text": "/* Admission preflight: the pinned tracing descriptor must permit this copy. */\ntypedef unsigned long long u64;\nstruct snapshot_context {\n    u64 args[5], no_return;\n    unsigned phase, captured;\n    u64 sequence, state[4];\n};\n__attribute__((section(\"fexit/snapshot/snapshot_victim\"), used))\nu64 snapshot_probe(struct snapshot_context *ctx)\n{\n    if (ctx->phase == 1) {\n        ctx->state[0] = ctx->args[1];\n        ctx->state[1] = 1;\n        ctx->state[2] = ctx->sequence;\n        ctx->state[3] = 0;\n    }\n    return 0;\n}\n"
+    },
+    "entry_snapshot_preflight.py": {
+      "sha256": "fdd9f30ff4f59b4a0380744dd992634308cc7549d52326d8146261d40ede3ac1",
+      "text": "#!/usr/bin/env python3\n\"\"\"Check the pinned verifier's context-write contract before host integration.\"\"\"\nimport argparse\nimport hashlib\nimport json\nfrom pathlib import Path\nimport subprocess\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--output\", type=Path, required=True)\n    args = parser.parse_args()\n    args.output.mkdir()\n    source = Path(__file__).resolve().parent\n    result = dict(passed=False, scope=\"snapshot_context_verifier_preflight\",\n                  sources={}, commands=[])\n    with (args.output / \"preflight.json\").open(\"x\") as receipt:\n        try:\n            for name in (\"ENTRY-SNAPSHOT.md\", \"check_snapshot_context.bpf.c\",\n                         \"entry_snapshot_preflight.py\"):\n                path = source / name\n                result[\"sources\"][name] = dict(\n                    sha256=hashlib.sha256(path.read_bytes()).hexdigest(),\n                    text=path.read_text())\n            obj = args.output / \"context.o\"\n            commands = [\n                [\"uname\", \"-m\"], [\"clang-18\", \"--version\"],\n                [\"clang-18\", \"-O2\", \"-Wall\", \"-Wextra\", \"-Werror\", \"-target\", \"bpf\",\n                 \"-c\", source / \"check_snapshot_context.bpf.c\", \"-o\", obj],\n                [\"/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail\", obj,\n                 \"fexit/snapshot/snapshot_victim\", \"--termination\", \"--strict\",\n                 \"--no-division-by-zero\", \"--stack-size\", \"256\"],\n            ]\n            for command in commands:\n                argv = list(map(str, command))\n                row = subprocess.run(argv, capture_output=True, text=True,\n                                     timeout=120, check=False)\n                result[\"commands\"].append(dict(argv=argv, rc=row.returncode,\n                                               stdout=row.stdout, stderr=row.stderr))\n                print(row.stdout, row.stderr, end=\"\", flush=True)\n                row.check_returncode()\n            result[\"passed\"] = True\n        except BaseException as error:\n            result[\"error\"] = repr(error)\n            raise\n        finally:\n            json.dump(result, receipt, indent=2)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    }
+  },
+  "commands": [
+    {
+      "argv": [
+        "uname",
+        "-m"
+      ],
+      "rc": 0,
+      "stdout": "x86_64\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "clang-18",
+        "--version"
+      ],
+      "rc": 0,
+      "stdout": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "clang-18",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-target",
+        "bpf",
+        "-c",
+        "/home/starin/eob-config-20260925/check_snapshot_context.bpf.c",
+        "-o",
+        "/home/starin/eob-config-20260925/entry-snapshot-preflight-01/context.o"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/home/starin/eob-tmm-staged/ebpf-verifier/bin/prevail",
+        "/home/starin/eob-config-20260925/entry-snapshot-preflight-01/context.o",
+        "fexit/snapshot/snapshot_victim",
+        "--termination",
+        "--strict",
+        "--no-division-by-zero",
+        "--stack-size",
+        "256"
+      ],
+      "rc": 0,
+      "stdout": "PASS: fexit/snapshot/snapshot_victim/snapshot_probe (terminates within 0 loop iterations)\n",
+      "stderr": ""
+    }
+  ]
+}

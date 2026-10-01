@@ -6,7 +6,268 @@ audit trail that makes the rest of this repository worth arguing with.
 
 Ordered newest first.
 
+## 41 · Native loader compilation covers TMM's header environment — FALSIFIED TEST ASSUMPTION
+
+**2026-09-30.** Native ownership check 09 passed with `-D_GNU_SOURCE=`.
+The actual Docker TMM compile did not supply that macro. It refused the new
+`struct ucred` declaration used for socket caller identity. The native compile
+check therefore missed a source dependency on its harness flags.
+[Native and build receipts](SOURCES.md#program-ownership-and-tmm-build-2026-09-30).
+
+The loader now sets `_GNU_SOURCE` before its headers, unless already defined.
+Native check 10 adds compilation without the harness macro and repeats the
+ownership, signed-socket and regression suite. It passes; Docker `make tmm`
+then returns zero. The caller-identity check is unchanged.
+
+The follow-up inspector also made a wrong assumption: objdump by symbol name
+would always print a trampoline body. Slot zero has an alias, and that command
+printed no instructions. Verification 03 uses exact ELF address ranges and
+confirms the previous build's symbol-table hash. All twelve checks pass without
+recompilation. Both failed attempts remain recorded. This qualifies a linked
+binary, not packaging, live ownership behavior or data-path cost.
+
+**Later package/live follow-up:** packaged build `2ab960fa…` passes the isolated
+two-owner/two-hook test. Its [separate receipts](SOURCES.md#program-ownership-live-validation-2026-09-30)
+record 18 HTTP exchanges and 594 records, restored hooks and fixture removal.
+Multiple workers, sustained cost and live enforce composition remain unqualified.
+
 ---
+
+## 40 · AIMCP sees request headers before client JSON completion — FALSIFIED
+
+**2026-09-30.** The first exchange-key candidate started at `HUDEVT_REQUEST`.
+The isolated live run observed client JSON completion first in all ten exchanges.
+Its response-only HTTP-kind check also refused the request event. Native tests
+had encoded the assumed event order and missed this. The run produced no combined
+records. [Retained evidence](SOURCES.md#combined-activity-records-2026-09-30).
+
+Revised candidate, registered before implementation: start at the first reader of
+a client JSON-completion invocation. Use that JSON instance and sequence as the
+key. Require the later HTTP request-header event before accepting server JSON.
+Keep the symmetric peer check and client response-end boundary. A second client
+JSON invocation before the end invalidates the group. The exporter must also see
+the request-header confirmation. This remains limited to one worker and
+non-pipelined HTTP/1; it does not establish identity or cover silent missed hooks.
+
+**Measured follow-up:** ABI 2 passes pinned native checks and live attempt 03.
+Ten exchanges combine correctly, including keep-alive and concurrent equal IDs.
+Current-exporter check 02 repeats the measured journal with the explicit
+reply-before-header-confirmation guard. The bounded scope above still applies.
+
+Two more failed assumptions remain in the same evidence series. Native check 05
+assumed a full host HASH would refuse insertion; it evicts. The bytecode now
+reserves an admission counter, releases completed entries and tests zero evictions.
+Live attempt 02 treated every DISCARD as lost metadata; ring wrap also emits
+DISCARD padding. The exporter keeps that diagnostic and uses producer sequences
+and required fields to reject incomplete groups. Missing-record/discard mutations
+pass the refusal checks. Neither correction changes the host map or ring policy.
+
+---
+
+## 39 · No unwind imports means return-hook admission is clear — FALSIFIED CHECK
+
+**2026-09-29.** The new completion-only admission check refused the packaged
+snapshot binary. Full-width symbol output contains `_Unwind_Resume`,
+`__cxa_begin_catch` and `__cxa_rethrow`. The previous `ca69b84f…` binary contains
+the same three imports. The old `exit_admit.py` used `readelf --dyn-syms` without
+`--wide`. Truncated, versioned names did not match its regular expressions.
+Both binaries incorrectly appeared to have no unwind imports.
+
+This invalidates the old binary-wide admission argument and the enum-return
+positive control in §38. It does not demonstrate an exception crossing the JSON
+handler, nor does it erase the earlier native or live observations. The August
+binaries were not re-examined; their historical observation is not a current gate.
+
+The corrected ordinary gate uses full-width output and refuses failed symbol
+or frame-inspection commands. On the build box, both TMM binaries are now refused.
+Native integer-return and void-completion positive controls still pass. Failed
+tools refuse admission. The new completion gate already used full-width output;
+its refusal was correct.
+
+Production snapshot tests pass 78 cases per compiler. The JSON program passes
+22 cases in each execution mode and strict PREVAIL. TMM build and packaging pass.
+Those results do not override return-hook admission. The isolated fixture was
+archived and removed with the hook unchanged and zero slot fires. No JSON
+initialization program was loaded.
+
+**Remaining work:** qualify a target-specific exception path, including indirect
+calls and shared-library calls, or change the return mechanism. Reject a proposed
+qualification if an exception can cross the overwritten return address, a call
+edge remains unqualified, or an error-path test cannot exercise the claimed limit.
+An import alone does not establish reachability; absence of a local catch table
+does not establish that an exception cannot cross the frame.
+
+[Contract and receipts](env/ai-traffic/ENTRY-SNAPSHOT.md),
+[cached binary audit and corrected checks](SOURCES.md#production-entry-snapshots-2026-09-29).
+
+## 38 · A return or forwarding entry supplies completed initialization — REJECTED CANDIDATES
+
+**Correction:** the enum-return control below passed a defective unwind check.
+Section 39 retains the failure and the corrected refusal. The conditional source
+proof remains separate from admission.
+
+**2026-09-29, before runtime implementation.** The registered gate checks existing
+return admission and the compiled forwarding path. Both captures refuse return
+hooks for `hud_json_handler` and reset because their return types are void. The
+enum-return control passes. This is an admission-policy limit, not proof that a
+void function cannot have a return observer.
+
+The initialization helper has no standalone entry. Its `xbuf_embed_init` call
+precedes the final state write and also fails current padded-entry binding.
+Forwarding is not a substitute: the disabled bypass can reach it, and the compiled
+initialization path passes the next node to its handler. The indexed upper-handler
+copy is not called on that path. The orbit wrapper's own entry precedes the wrapped
+handler's effects. Saved argument pointers do not establish post-return storage
+lifetime.
+
+**Surviving next step:** qualify a separate completion-only void-return contract,
+including invocation selection, valid fields, nested/missed returns and storage
+lifetime. The current gate changes no admission rule and runs no live probe.
+Its verifier passes on the build box. Local lifecycle and request/reply association
+remain unvalidated. [Contract/results](env/ai-traffic/JSON-INITIALIZATION.md),
+[receipts](SOURCES.md#json-initialization-completion-qualification-2026-09-29).
+
+**Source-derived clarification:** the source already determines the conditional
+proof: initialization event, present and enabled context at the handler's guards,
+then a normal return from that same invocation. Return matching uses the saved
+return-address slot; it does not require a meaningful return value. The missing
+work is admission support and capture of the entry conditions with that invocation.
+No post-return context read is needed to report the past action. This does not
+establish that the context remains alive after forwarding.
+[Detailed source references](env/ai-traffic/JSON-INITIALIZATION.md#what-the-source-already-establishes).
+
+**Native test result:** the [frame-bound snapshot fixture](env/ai-traffic/VOID-COMPLETION.md)
+passes with both pinned compilers. Each variant covers 24 cases and 1,100 observed
+returns, including protected post-return storage and skipped returns. This supports
+the conditional source claim. The old admission refusal remains an accurate record;
+production entry capture and live JSON initialization are still unvalidated.
+[Receipts](SOURCES.md#void-return-completion-test-2026-09-29).
+
+## 37 · Every JSON handler entry has qualified context — FALSIFIED
+
+**2026-09-29.** The first boundary fixture accepted only observed, address-only
+and disabled states. Live 01 stopped on a handler `HUDCTL_CONNECT` record with
+`unavailable` status, no tag and no source reads. The original contract allowed
+explicit unavailable states; the test incorrectly excluded them.
+
+Live 02 retains those records. Thirteen exact exchanges produce 306 records,
+including 11 unavailable handler entries. The consumer rejects the full window.
+This is a passing boundary-observation test, not a passing lifecycle test. A
+completion after late attachment does not invent initialization. Malformed client
+JSON reaches reset without a client-side JSON-completion record.
+
+Both attempts have checked nine-file archives and scoped removal. Pinned PREVAIL
+and 312 native records pass. The saved-evidence checker also needed a correction:
+it expected process `stat` in hook-change rows, while the witness emits that field
+only at the start and end. Failed check 01 remains; corrected check 02 passes.
+
+**Surviving limit:** keep unavailable observations and refuse the affected window.
+Entry arrival does not prove completed initialization or cleanup. Storage tags
+survive address reuse and have no lifetime meaning. Several required live paths
+remain unvalidated; no request/reply association follows from this test.
+[Contract/results](env/ai-traffic/JSON-LIFECYCLE.md),
+[receipts](SOURCES.md#json-context-boundary-observations-2026-09-29).
+
+## 36 · A JSON context address supplies request scope — REJECTED CANDIDATE
+
+**2026-09-29, before runtime implementation.** The proposed shortcut is to add
+the JSON context address to an ID and treat the pair as a scoped request key.
+The registered source/compiled gate rejects it. Reset releases the current message
+and cache but reuses the same context. The filter has both connection and stream
+context forms. Address equality therefore does not establish one request or a
+common connection lifetime.
+
+The completion path does supply a flow-side field. That is a candidate metadata
+field, not message role, authenticated identity or a shared request/reply owner.
+Initialization and cleanup operations are present inside the compiled handler;
+their source function names do not have separate entries in the captured index.
+Handler entry also precedes the event's effects, and reset can follow deferred
+rule completion. Those distinctions must enter the runtime test contract.
+
+**Surviving next step:** observe flow side and test local JSON-context lifecycle
+boundaries. Qualify a common owner and its binding lifetime separately. This is a
+source/compiled result, not a failed live run or a live association result.
+[Contract](env/ai-traffic/MESSAGE-SCOPE.md),
+[receipts](SOURCES.md#message-scope-qualification-2026-09-29).
+
+**Later that day:** the [combined ID/side gate](env/ai-traffic/ID-FLOW.md) passes
+44 live exchanges and 88 field records. Result-shaped client JSON and method-shaped
+server JSON retain their observed flow sides. That result does not reverse this
+candidate rejection. The [local boundary test](env/ai-traffic/JSON-LIFECYCLE.md)
+was registered next. Its later 306-record result is in §37. Local lifecycle and
+a common request/reply lifetime remain unqualified.
+
+## 35 · A live fixture already has the collector mount — FALSIFIED
+
+**2026-09-29.** Reply-field fixture creation omitted the collector Compose layer.
+The collector logged a listening socket, but the test container had no mount at
+`/collector-api`. Live attempt 01 stopped before probe load. A running collector
+does not establish that its consumer can reach the socket.
+
+The mount repair succeeded. Live attempt 02 then timed out in `get_conf_svr()`
+before configuration and probe load. Its cause remains unproved. Recreating the
+isolated fixture with the collector layer led to a passing attempt 03. That
+recovery does not establish the cause of the configuration timeout.
+
+Two reset checks also stopped before removal. One expected `sha256` in a final
+kernel-witness row; only the initial row has that field. The other matched a
+private-key guard string in the saved source code. Corrected checks retain the
+initial hash, check process/hook continuity, and test full private-key start
+markers. Both original receipts remain. Reset 03 archived eight failure files
+before removal. The successful run has a separate seven-file archive.
+
+**New limit and rule:** inspect the consumer mount before starting the collector.
+Include the collector layer at fixture creation. Save bounded readiness errors
+and create the evidence directory before readiness checks. A complete test
+fixture is a prerequisite for a field result; readiness alone is not that result.
+[Receipts](SOURCES.md#reported-reply-fields-2026-09-29),
+[field results and limits](env/ai-traffic/REPLY-METADATA.md).
+
+## 34 · An invalid cache flag means an invalid numeric status — FALSIFIED
+
+**2026-09-29.** Response-metadata attempt 01 forwarded HTTP 200 but classified
+both response observations as out of scope. The program treated
+`f_invalid_status` as a parsed-status validity flag. Source inspection shows that
+it invalidates the cached HTTP/2 pseudo-header instead. Cache reset sets it; the
+HTTP/2 serializer uses it to select a different header source. The compiled
+accessor confirms the numeric field offset.
+
+Build 03 removes that test and passes pinned PREVAIL plus 80 native invocations.
+The native fixture now accepts a valid numeric status with the cache flag set.
+Build 02 also remains recorded: its layout assertion reversed the request and
+trailer bit names and stopped before compilation. The actual probe rejects both
+bits. **Replacement limit:** field names and native tests do not establish field
+semantics. Status is a local response observation, not proof of delivery or remote
+success. Live attempt 02 passes nine cases with 18 exact status observations and
+18 done observations, including zero for the interrupted body. Both attempts are
+archived, and the fixture is removed.
+[Contract and receipts](env/ai-traffic/RESPONSE-METADATA.md).
+
+## 33 · Separate programs imply separate state maps — FALSIFIED
+
+**2026-09-29.** The session and routing programs passed their individual native
+tests, but both declared `metadata_state`. The registry shares storage for the
+same name and shape. Alternating live calls reset each other's instance-specific
+sequence state. Attempt 01 stopped on the sequence check and restored both hooks.
+
+Build 02 gives each state map a different name. It adds eight interleaved native
+invocations to the 72 individual checks. Pinned PREVAIL and live attempt 04 pass.
+**Replacement limit:** private state requires a private map identity. An isolated
+program test cannot establish correct interaction between loaded programs.
+
+Two later test assumptions also failed and remain recorded. Attempt 02 expected
+an empty journal despite retained records. The test now starts from a saved
+pre-arm cursor and validates new program instances. Attempt 03 received a replay
+response that the client could not decode as JSON. That client parsed the body
+before checking HTTP status, so the original status is unknown. The new test
+client reports status first and bounds HTTP 503 retries without advancing the
+cursor. Attempt 04 needed no retries; the underlying cause of attempt 03 remains
+unproved. The collector image was not changed.
+
+The measured result is seven requests, five saved session-header records and
+seven selected-route records. Authentication, policy-permitted reach and general
+protocol coverage are not established by those values.
+[Contract and receipts](env/ai-traffic/SESSION-ROUTING.md).
 
 ## 32 · A padded source-level callee covers the compiled path — FALSIFIED
 

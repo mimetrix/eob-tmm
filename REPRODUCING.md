@@ -1,5 +1,91 @@
 # Reproducing the live result
 
+**Starting from a TMM source-tree path:**
+[BUILD-FROM-SOURCE.md](docs/BUILD-FROM-SOURCE.md) lists the required inputs and
+the ordered TMM/package/bytecode steps. It marks the remaining fresh-tree
+integration gaps. The combined sequence is not yet tested
+on a fresh host.
+
+**Program ownership (2026-09-30, native/socket and isolated live TMM):**
+[PROGRAMS.md](substrate/PROGRAMS.md) records the pinned test command and
+incremental build, package and live drivers. Build `5784e768…` passes symbol,
+TLS, globals and trampoline checks. Packaged build `2ab960fa…` passes the
+two-owner/two-hook test: 18 exchanges, 594 records, restored entry pads and
+scoped cleanup. Multiple workers and sustained cost remain unqualified.
+
+**Combined activity records (2026-09-30):**
+[ACTIVITY-COMBINED.md](env/ai-traffic/ACTIVITY-COMBINED.md) gives the export,
+saved-journal/API test and prepared-build-box live procedures.
+[ACTIVITY-PROGRAM.md](env/ai-traffic/ACTIVITY-PROGRAM.md) gives the pinned build
+for one ELF with two entry hooks. Ten exchanges pass, including keep-alive and
+concurrent equal IDs. The fixture is archived and removed. Scope is one worker
+and non-pipelined HTTP/1; identity remains unknown.
+
+**Production entry snapshots (2026-09-29):**
+[ENTRY-SNAPSHOT.md](env/ai-traffic/ENTRY-SNAPSHOT.md) records native tests and
+the TMM build/package. Live initialization is blocked by corrected unwind admission.
+Both pinned binaries contain imports hidden by the old check. Reproduce the
+refusal before any new return-hook attachment; see the saved-evidence procedure
+on that page. The isolated fixture is archived and removed.
+
+**Void-return completion (2026-09-29, native fixture only):**
+[VOID-COMPLETION.md](env/ai-traffic/VOID-COMPLETION.md) gives the saved-evidence
+check and fresh build-box command. Both compiler variants pass 24 cases with a
+frame-bound entry-snapshot adapter. The real JSON handler is not run by this test.
+
+**Initialization-completion qualification (2026-09-29, no live probe):**
+[JSON-INITIALIZATION.md](env/ai-traffic/JSON-INITIALIZATION.md) gives the saved-evidence
+verifier/export and fresh build-box capture command. It retains return-admission
+refusals and rejects the forwarding shortcut. None of the tested candidates qualifies;
+completed initialization and local lifecycle remain unvalidated.
+
+**JSON-context boundary observations (2026-09-29):**
+[JSON-LIFECYCLE.md](env/ai-traffic/JSON-LIFECYCLE.md) gives the saved-evidence
+verifier/export and prepared-build-box procedure. Three probes produce 312 native
+records and 306 live records from 13 exchanges. Eleven unavailable-context records
+invalidate the full consumer window. Local lifecycle and request association remain
+unvalidated. Both attempts are archived and the fixtures are removed.
+
+**Message ID and flow side (2026-09-29):**
+[ID-FLOW.md](env/ai-traffic/ID-FLOW.md) gives the saved-evidence verifier/export
+and prepared-build-box procedure. The gate has 224 native invocations and 44 live
+exchanges, including keep-alive and concurrent equal IDs. It measures two fields
+in one record, not request/reply association. The separate boundary result above
+does not establish a lifecycle.
+
+**Message scope qualification (2026-09-29, source/compiled inspection only):**
+[MESSAGE-SCOPE.md](env/ai-traffic/MESSAGE-SCOPE.md) gives the saved-evidence check
+and fresh capture procedure. It identifies flow-side and lifecycle candidates;
+it does not reproduce a runtime scope or request/reply association result.
+
+**Observed message IDs (2026-09-29):**
+[MESSAGE-ID.md](env/ai-traffic/MESSAGE-ID.md) gives the pinned build, 35-case live
+procedure and saved-evidence verifier/export. IDs retain type and raw bytes,
+including large numbers without rounding. This supplies a field for later
+request/reply association; it does not establish that association or caller identity.
+
+**Reported reply fields (2026-09-29):**
+[REPLY-METADATA.md](env/ai-traffic/REPLY-METADATA.md) gives the pinned build,
+38-case live procedure and saved-evidence verifier/export. It extracts result/error
+presence, signed error codes and Boolean tool-error reports. Missing and ambiguous
+fields remain explicit. Reported fields do not prove remote success or identity.
+
+**Requested tool/resource metadata (2026-09-29):**
+[OPERATION-TARGET.md](env/ai-traffic/OPERATION-TARGET.md) gives the pinned build,
+28-case live procedure and saved-evidence verifier/export. The result supplies
+requested tool names and resource addresses, not authenticated caller identity.
+
+**Response metadata (2026-09-29):**
+[RESPONSE-METADATA.md](env/ai-traffic/RESPONSE-METADATA.md) gives the pinned build,
+nine-case live procedure and saved-evidence verifier/export. The measured fields
+are HTTP status and local transfer completion, not remote-operation success.
+
+**Session/routing extraction (2026-09-29):**
+[SESSION-ROUTING.md](env/ai-traffic/SESSION-ROUTING.md) gives the pinned build and
+isolated live procedure, plus a saved-evidence verifier and exact-value export.
+The bounded result has five saved session-header records and seven selected-route
+records. Identity profiles and full blast-radius assessment remain proposed uses.
+
 **Token-cache method extraction (2026-09-28):**
 [TOKEN-METHOD.md](env/ai-traffic/TOKEN-METHOD.md) gives the pinned build and isolated
 live procedure, plus a local saved-evidence check and exact-value export.

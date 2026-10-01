@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "ls_vm.h"
+#include "check_snapshot_stubs.h"
 static enum ls_verdict g_verdict; static uint64_t g_seen[5];
 enum ls_verdict ls_vm_call(int slot,void*ctx,size_t n){(void)slot;memcpy(g_seen,ctx,n<sizeof g_seen?n:sizeof g_seen);return g_verdict;}
 uint64_t ls_vm_safe_value(int slot){(void)slot;return 2;}

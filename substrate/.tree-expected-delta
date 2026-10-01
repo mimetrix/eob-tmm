@@ -105,3 +105,8 @@ M src/modules/hudfilter/http2/http2.c
 # entry the tree no longer has. The substrate now modifies THREE F5 files, all of them
 # build configuration: two whitelists and filelist. No F5 source file is modified.
 ?? src/base/ls_target.h
+# Frame-owned entry state for completion-only snapshots, 2026-09-29.
+?? src/base/ls_snapshot.h
+# Multi-program ownership and shared entry attachments, 2026-09-30.
+?? src/base/ls_program.h
+?? src/base/ls_program_impl.h

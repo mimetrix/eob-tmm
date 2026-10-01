@@ -220,6 +220,20 @@ is unproven again until the next ship.**
 
 ### P8 · Can a function EXIT (`fexit`) hook be installed without desyncing on a non-local exit?
 
+**Reopened 2026-09-29.** The binary-wide zero-import argument fails on the two
+re-examined packaged builds, `ca69b84f…` and `7bbb06a0…`. Full-width symbol output
+finds three unwind imports. The old gate matched truncated names and falsely
+reported clear. Corrected admission refuses both. The August survey below is a
+historical record, not a current authorization.
+[Audit and tests](SOURCES.md#production-entry-snapshots-2026-09-29),
+[`CONTESTED-PREMISES.md` §39](CONTESTED-PREMISES.md#39--no-unwind-imports-means-return-hook-admission-is-clear--falsified-check).
+
+**Next claim to test:** no exception can cross the selected overwritten return
+address on the qualified target paths. Reject it if a direct, indirect or library
+call remains unqualified, or an exception can cross the frame. Include error paths.
+Missing target catch metadata alone cannot settle this question. No such crossing
+has been demonstrated by the import audit.
+
 **The design (ROADMAP, `co-re-plan.md`).** Exit hooks are done by hijacking the return address from
 the entry trampoline — overwrite the caller-return on the stack with an exit stub, save the real one
 (and the entry args) on a per-core LIFO shadow stack, run the VM with the return value at the stub.
@@ -754,9 +768,167 @@ PREVAIL and 68 native invocations. Thirteen live requests produce 26 cache recor
 through the existing separate collector, with exact bytes, explicit exclusions,
 replay equality, restored hook and archived fixture removal. Bounds: four root
 members, four fragments per selected read, 64 value bytes, 40 reads and 1,024 source
-bytes. Literal first-match keys only; JSON filtering is required. Session fields,
-protocol identity, complete coverage and data-path cost remain unvalidated.
+bytes. Literal first-match keys only; JSON filtering is required. The follow-up
+below adds bounded session/routing fields. Protocol identity, complete coverage
+and data-path cost remain unvalidated.
 [Receipts](SOURCES.md#token-cache-method-extraction-2026-09-28).
+
+**Session/routing follow-up, 2026-09-29 — MEASURED subset.** The
+[registered field gate](env/ai-traffic/SESSION-ROUTING.md) now yields saved request
+session-header bytes and selected pool/endpoint state. Pinned verification and
+80 native invocations pass. Seven live requests yield five session and seven
+routing records, with exact values and replay. All failed attempts remain saved;
+the final fixture is archived and removed. Limits: 64 string bytes, 20 endpoint
+bytes, 80 reads and 256 source bytes; connection-flow storage only. Successful
+encrypted persistence decoding, authenticated identity and data-path cost remain
+open. Identity profiles and blast-radius assessment are registered consumer goals,
+with observed reach kept separate from policy-permitted reach.
+[Receipts](SOURCES.md#session-and-routing-qualification-2026-09-29).
+
+**Response-field follow-up, 2026-09-29 — MEASURED subset.** The
+[registered gate](env/ai-traffic/RESPONSE-METADATA.md) now yields HTTP status and
+local transfer-completion fields. Build 03 passes PREVAIL and 80 native invocations.
+Nine live requests produce 201 handler records, including 18 status and 18 done
+observations. Paced headers do not produce early done; an interrupted body yields
+done zero. Replay and cleanup pass. The original cache-validity assumption failed
+and remains recorded. Bounds are two reads, five source bytes and one 96-byte
+record. General request association, HTTP/2, remote-operation completion and
+data-path cost remain unvalidated.
+[Receipts](SOURCES.md#response-metadata-qualification-2026-09-29).
+
+**Requested-target follow-up, 2026-09-29 — MEASURED subset.** The
+[registered gate](env/ai-traffic/OPERATION-TARGET.md) extracts literal tool names
+and resource URIs. Pinned PREVAIL and 74 native invocations pass. Twenty-eight live
+requests yield 56 records with exact bytes and explicit exclusions. Nested decoys,
+first literal duplicates, wrong types and member limits are checked. Replay and
+cleanup pass. Requested activity is one input to an identity profile; trusted
+caller identity and a reliable association remain separate requirements.
+[Receipts](SOURCES.md#requested-operation-targets-2026-09-29).
+
+**Reply-field follow-up, 2026-09-29 — MEASURED subset.** The
+[registered gate](env/ai-traffic/REPLY-METADATA.md) extracts literal result/error
+presence, signed integer error codes and Boolean tool-error reports. Pinned PREVAIL
+and 106 native invocations pass. Thirty-eight live exchanges yield 76 records with
+exact fields and explicit missing, ambiguous, type and budget states. Replay,
+archive and cleanup pass. Reported fields are not remote-success or identity proof.
+Falsifiers remain: missing becomes false, numeric overflow wraps, conflicting
+fields select a guessed outcome, or values acquire an unproved request/identity
+association. [Receipts](SOURCES.md#reported-reply-fields-2026-09-29).
+
+**Message-ID follow-up, 2026-09-29 — MEASURED subset.** The
+[registered gate](env/ai-traffic/MESSAGE-ID.md) preserves literal root ID type and
+raw bytes. Pinned PREVAIL and 194 native invocations pass. Thirty-five live
+exchanges yield 70 records, with exact large numbers and explicit missing, null,
+duplicate and limited states. Reused and mismatched IDs remain observations.
+Journal/replay, archive and cleanup pass. Falsifiers remain: type loss, numeric
+rounding, incomplete or null matching keys, nested-ID selection, or guessed caller
+or request scope. A qualified connection/session lifetime and protocol equality
+are still needed for general association.
+[Receipts](SOURCES.md#observed-message-ids-2026-09-29).
+
+**Message-scope follow-up, 2026-09-29 — MEASURED source/compiled inspection only.**
+The [registered gate](env/ai-traffic/MESSAGE-SCOPE.md) rejects reused JSON storage
+as request or shared-connection identity. Check 01 passes on the build box with
+16 embedded files and 11 instruction checks. Flow-side state and handler/reset
+paths are source-qualified candidates. Event entry is not completed initialization;
+reset is not operation success. Runtime scope, a common owner and binding lifetime
+remain unvalidated. Falsifiers include invented births, stale state after reuse
+and association after missing boundaries.
+[Receipts](SOURCES.md#message-scope-qualification-2026-09-29).
+
+**Combined ID/side follow-up, 2026-09-29 — MEASURED subset.** The
+[registered gate](env/ai-traffic/ID-FLOW.md) preserves both fields in one invocation
+and one record. Pinned PREVAIL and 224 native invocations pass. Forty-four live
+exchanges yield 88 records, including keep-alive and concurrent equal IDs.
+JSON member names do not select side. Twelve malformed/incompatible decoder inputs
+are refused. Replay, archive and cleanup pass. Falsifiers remain: side guessed
+after read failure, side failure changing the ID, or fields presented as a join.
+[Receipts](SOURCES.md#message-id-and-flow-side-2026-09-29).
+
+**Next boundary test — IDEA, registered before implementation.**
+[JSON-LIFECYCLE.md](env/ai-traffic/JSON-LIFECYCLE.md) requires local initialization,
+completion, reuse and cleanup observations. Handler entry cannot prove a completed
+initialization. Reject invented births, stale scope after known gaps, silent
+capacity replacement and reuse of a closed lifecycle number. If the required
+completion witness or path cannot be qualified, lifecycle remains unknown.
+Common owner lifetime, message role and ID equality remain separate gates.
+
+**Boundary result, 2026-09-29 — MEASURED subset, lifecycle unknown.** Three probes
+pass pinned PREVAIL and 312 native records. Thirteen live exchanges yield 306
+records. Late attachment does not invent initialization. Malformed client JSON
+has no client completion. Keep-alive and concurrent equal-ID traffic are included.
+Eleven unavailable handler records invalidate the full consumer window. Both
+attempts are archived and removed. Interrupted transfer and live disabled,
+deferred, omitted-boundary, capacity and reload paths remain unvalidated.
+The registered lifecycle falsifiers still apply; entry alone remains insufficient.
+[Receipts](SOURCES.md#json-context-boundary-observations-2026-09-29).
+
+**Initialization-completion follow-up, 2026-09-29 — MEASURED qualification only.**
+The [contract](env/ai-traffic/JSON-INITIALIZATION.md) was registered before capture.
+Falsifiers reject admission refusals, forwarding after disabled bypass, loss of
+the original node, missing invocation links and unqualified post-return storage.
+Two captures refuse the void-return handler/reset candidates and admit the control.
+The compiled forwarding path does not qualify; the saved-evidence check passes.
+No live probe follows this negative qualification. Next candidate: a separately
+qualified completion-only void-return contract. Local lifecycle, common owner
+lifetime and association remain unvalidated.
+[Receipts](SOURCES.md#json-initialization-completion-qualification-2026-09-29).
+
+**Void-return follow-up, 2026-09-29 — MEASURED native fixture.** The
+[registered test](env/ai-traffic/VOID-COMPLETION.md) rejects wrong-frame capture,
+completion after a skipped return, return-register dependence and post-return
+context reads. Both compiler variants pass 24 cases and 1,100 observed returns.
+The next work is the host entry-snapshot interface, including loaded-instance
+binding and explicit valid fields. This native adapter is not production entry
+capture or a live JSON lifecycle result.
+[Receipts](SOURCES.md#void-return-completion-test-2026-09-29).
+
+**Production follow-up:** [ENTRY-SNAPSHOT.md](env/ai-traffic/ENTRY-SNAPSHOT.md)
+registered the new context, instance/epoch binding and falsifiers before code.
+Production VM tests pass 78 cases per compiler. The JSON program passes 44 native
+cases and strict PREVAIL. TMM build/package pass. Live admission is refused because
+the full-width unwind check falsifies the old zero-import premise. P8 is reopened;
+the isolated fixture is archived and removed. No live initialization is claimed.
+
+**Entry-only activity composition, 2026-09-30 — MEASURED live.** The
+[activity contract](env/ai-traffic/ACTIVITY-PROGRAM.md) was written before its first
+build and is indexed here after the result. Its falsifiers reject verifier
+failure, counter interference, changed extraction results, bad target admission
+or failure to run both hooks together. One ELF now passes pinned native checks
+and the isolated simultaneous-hook test: three exchanges, 87 records, exact
+replay, restored hooks and scoped cleanup. The retained oversized-load refusal
+adds a final-ELF size check. This result advances field collection. The follow-up
+below qualifies bounded association; identity binding, general lifecycle and
+sustained cost remain unqualified.
+[Receipts](SOURCES.md#activity-program--2026-09-30).
+
+**Combined-record follow-up, 2026-09-30 — MEASURED in the bounded fixture.** The
+[exchange-key contract](env/ai-traffic/ACTIVITY-COMBINED.md) registered a bounded
+HTTP/1 association before implementation. One bytecode artifact supplies the key.
+Reject guessed peers, stale/reused state, ID collisions, gaps and falsely complete
+groups. The first live run falsified header-first ordering. The corrected contract
+starts at client JSON completion and requires a later request-header confirmation.
+Pinned native tests and ten live exchanges pass, including keep-alive and concurrent
+equal IDs. Current-exporter checks pass against that measured journal, including
+missing/changed records and actual socket replay. The fixture is archived and removed.
+Scope remains one worker and non-pipelined HTTP/1. Identity, general lifecycle,
+silent missed hooks and sustained cost remain unqualified.
+[Receipts](SOURCES.md#combined-activity-records-2026-09-30).
+
+**Program-ownership follow-up, 2026-09-30 — MEASURED native/socket and build.**
+The [ownership contract](substrate/PROGRAMS.md#falsifiers-and-checks) was written
+before implementation; its result is indexed here afterward. Reject cross-owner
+map/configuration access, interference during detach, stale controls, partial
+publication, early reclamation and delayed calls reaching a new target.
+Pinned native/socket checks pass. Docker TMM build `5784e768…` passes linked
+function, TLS, globals and trampoline checks. The later packaged build
+`2ab960fa…` passes the registered live ownership gate: 18 exchanges, 594 records,
+eight phases, owner-local state/configuration, independent detach/revoke and
+fresh replacement. Both hooks are restored, with a stable process and zero
+restarts. The archive is checked and the fixture removed. Multiple workers,
+live enforce composition, sustained cost and loader-timeout stress remain open.
+[Receipts](SOURCES.md#program-ownership-and-tmm-build-2026-09-30).
+[Package/live receipts](SOURCES.md#program-ownership-live-validation-2026-09-30).
 
 ---
 

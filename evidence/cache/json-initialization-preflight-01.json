@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-29",
+  "witness": "SELF",
+  "kind": "authored_summary_of_session_tool_output_not_automatic_capture",
+  "symptom_lookups": [
+    {
+      "literal": "hud_json_handler completed initialization return hook",
+      "result": "NO RECORD"
+    },
+    {
+      "literal": "void return --- there is no value for the exit program to read",
+      "result": "NO RECORD"
+    },
+    {
+      "literal": "shell tool terminated command after exceeding timeout 30000 ms",
+      "result": "NO RECORD"
+    }
+  ],
+  "capture_refinement": {
+    "first_receipt": "json-initialization-discovery-01.json",
+    "first_handler_range": ["0xd94100", "0xd95600"],
+    "symbol_end_exclusive": "0xd95679",
+    "second_receipt": "json-initialization-discovery-02.json",
+    "second_handler_range": ["0xd94100", "0xd95680"],
+    "added_checks": [
+      "matching binary and debug build IDs",
+      "node-above offset and initialization-event value",
+      "initialization jump-table target",
+      "unchanged target binder refusal for xbuf_embed_init"
+    ]
+  },
+  "transfer_stop": {
+    "file": "json-initialization-discovery-02.json",
+    "partial_local_sha256": "d0e5ac71c7b4352867c29a2ec29fc50408c45a8659caeef0c86b77b38d44b4f7",
+    "authoritative_remote_sha256": "787a96e8d860640f509a4143ff380530ef2708ad3ee01e16c24c9699c7c6b2f0",
+    "resolution": "Repeat the copy with a longer tool timeout. The complete local file matches the authoritative remote SHA-256. The incomplete transfer was not used for qualification."
+  }
+}

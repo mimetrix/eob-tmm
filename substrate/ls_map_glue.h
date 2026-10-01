@@ -84,6 +84,28 @@
  */
 #define LS_MAP_NAME_MAX 32u
 
+/* Owned programs have separate name registries. Only entries of the same
+ * program share one registry. Legacy slots retain their original registry. */
+#define LS_MAP_NAMESPACES 8u
+struct ls_map_namespace {
+    struct ls_map_def shapes[LS_MAP_MAX];
+    char names[LS_MAP_MAX][LS_MAP_NAME_MAX];
+    _Atomic uint32_t count;
+    uint64_t generation;
+    unsigned bank;
+};
+struct ls_map_thread_namespace {
+    struct ls_map_set *maps;
+    int failed;
+};
+#ifdef LS_MAP_GLUE_IMPL
+__thread struct ls_map_namespace *g_ls_namespace;
+__thread struct ls_map_thread_namespace g_ls_map_namespaces[LS_MAP_NAMESPACES];
+#else
+extern __thread struct ls_map_namespace *g_ls_namespace;
+extern __thread struct ls_map_thread_namespace g_ls_map_namespaces[LS_MAP_NAMESPACES];
+#endif
+
 /* Registry reset is off the data path and never waits for a reader. References
  * carry a generation, so a retained VM cannot alias a replacement's maps. */
 struct ls_map_registry {
@@ -162,6 +184,34 @@ extern __thread int                g_ls_cur_slot;
 static inline struct ls_map_set *
 ls_map_current(void)
 {
+    if (g_ls_namespace) {
+        struct ls_map_namespace *ns = g_ls_namespace;
+        if (ns->bank >= LS_MAP_NAMESPACES || !ns->generation)
+            return NULL;
+        struct ls_map_thread_namespace *local = &g_ls_map_namespaces[ns->bank];
+        if (local->failed)
+            return NULL;
+        unsigned count = atomic_load_explicit(&ns->count, memory_order_acquire);
+        if (!count)
+            return NULL;
+        if (!local->maps) {
+            void *p = mmap(NULL, sizeof(struct ls_map_set), PROT_READ | PROT_WRITE,
+                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (p == MAP_FAILED) {
+                local->failed = 1;
+                return NULL;
+            }
+            local->maps = p;
+        }
+        if (local->maps->generation != ns->generation) {
+            memset(local->maps, 0, sizeof *local->maps);
+            local->maps->generation = ns->generation;
+        }
+        for (unsigned i = local->maps->n; i < count; i++)
+            if (ls_map_create(local->maps, &ns->shapes[i]) < 0)
+                return NULL;
+        return local->maps;
+    }
     uint32_t n, i;
     uint64_t generation = atomic_load(&g_ls_map_registry.generation);
     void *p;
@@ -247,6 +297,11 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
 {
     struct ls_map_def d;
     int idx;
+    struct ls_map_namespace *ns = g_ls_namespace;
+    struct ls_map_def *shapes = ns ? ns->shapes : g_ls_shapes;
+    char (*names)[LS_MAP_NAME_MAX] = ns ? ns->names : g_ls_names;
+    _Atomic uint32_t *count = ns ? &ns->count : &g_ls_nshapes;
+    uint64_t generation = ns ? ns->generation : atomic_load(&g_ls_map_registry.generation);
 
     if (data == 0)
         goto refused;
@@ -286,22 +341,22 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
      * A name match with a DIFFERENT shape is refused, not shared: the two
      * programs disagree about the layout of memory they would both write. */
     {
-        uint32_t i, have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
+        uint32_t i, have = atomic_load_explicit(count, memory_order_relaxed);
         for (i = 0; i < have; i++) {
-            if (strncmp(g_ls_names[i], symbol_name, LS_MAP_NAME_MAX) != 0)
+            if (strncmp(names[i], symbol_name, LS_MAP_NAME_MAX) != 0)
                 continue;
-            if (g_ls_shapes[i].type       == d.type &&
-                g_ls_shapes[i].map_flags  == d.map_flags &&
-                g_ls_shapes[i].key_size   == d.key_size &&
-                g_ls_shapes[i].value_size == d.value_size &&
-                g_ls_shapes[i].max_entries == d.max_entries)
-                return (atomic_load(&g_ls_map_registry.generation) << 8) | i;
+            if (shapes[i].type       == d.type &&
+                shapes[i].map_flags  == d.map_flags &&
+                shapes[i].key_size   == d.key_size &&
+                shapes[i].value_size == d.value_size &&
+                shapes[i].max_entries == d.max_entries)
+                return (generation << 8) | i;
             fprintf(stderr, "ls_map: REFUSED %s --- shape disagrees with the "
                             "map already registered under that name "
                             "(have key=%u val=%u max=%u, asked key=%u val=%u max=%u)\n",
                     symbol_name,
-                    g_ls_shapes[i].key_size, g_ls_shapes[i].value_size,
-                    g_ls_shapes[i].max_entries,
+                    shapes[i].key_size, shapes[i].value_size,
+                    shapes[i].max_entries,
                     d.key_size, d.value_size, d.max_entries);
             goto refused;
         }
@@ -311,25 +366,25 @@ ls_map_reloc(void *ctx, const uint8_t *data, uint64_t data_size,
      * ls_map_current(). Refuse here rather than at first use, so a descriptor we
      * cannot honour fails at load time where somebody is watching. */
     {
-        uint32_t have = atomic_load_explicit(&g_ls_nshapes, memory_order_relaxed);
+        uint32_t have = atomic_load_explicit(count, memory_order_relaxed);
         if (!ls_map_check_descriptor(&d) || have >= LS_MAP_MAX) {
             g_ls_config.load_error = 1;
             goto refused;
         }
         idx = (int)have;
-        g_ls_shapes[have] = d;
+        shapes[have] = d;
         /* Fill the shape AND THE NAME before publishing the count: a reader that
          * observes the count must be guaranteed to see the entry it indexes, and
          * the name is now part of that entry rather than a debug string. */
-        memset(g_ls_names[have], 0, LS_MAP_NAME_MAX);
-        memcpy(g_ls_names[have], symbol_name,
+        memset(names[have], 0, LS_MAP_NAME_MAX);
+        memcpy(names[have], symbol_name,
                strnlen(symbol_name, LS_MAP_NAME_MAX - 1u));
-        atomic_store_explicit(&g_ls_nshapes, have + 1u, memory_order_release);
+        atomic_store_explicit(count, have + 1u, memory_order_release);
     }
     fprintf(stderr, "ls_map: reloc %s -> idx %d (key=%u val=%u max=%u)\n",
             symbol_name ? symbol_name : "?", idx,
             d.key_size, d.value_size, d.max_entries);
-    return (atomic_load(&g_ls_map_registry.generation) << 8) | (uint64_t)idx;
+    return (generation << 8) | (uint64_t)idx;
 refused:
     g_ls_config.load_error = 1;
     return (uint64_t)LS_MAP_MAX + 1u;

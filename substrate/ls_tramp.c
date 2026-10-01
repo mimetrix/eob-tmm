@@ -16,6 +16,7 @@
 
 #include "ls_vm.h"
 #include "ls_arm.h"
+#include "ls_program.h"
 
 /* Slot numbers live in ls_slots.h, checked for collisions by the compiler. They
  * were here as a bare macro whose value (0, the shield slot) contradicted the
@@ -51,7 +52,7 @@
 /* struct ls_tramp_result lives in ls_arm.h */
 
 struct ls_tramp_result
-ls_tramp_dispatch(int slot, const struct ls_regs *regs)
+ls_tramp_dispatch_at(int slot, const struct ls_regs *regs, uint64_t return_ip)
 {
     struct ls_tramp_result r = { LS_TRAMP_FALLTHROUGH, 0 };
 
@@ -95,6 +96,9 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
     ctx.arg[3] = a3;
     ctx.arg[4] = a4;
 
+    if (return_ip && ls_program_dispatch((unsigned)slot, return_ip, &ctx, &r))
+        return r;
+
     /*
      * ONE PATH: the generic five-register context. There are no typed, per-hook ctx builders
      * any more. A program reads whatever fields it needs from the argument pointers via CO-RE
@@ -118,4 +122,10 @@ ls_tramp_dispatch(int slot, const struct ls_regs *regs)
     r.verdict    = LS_TRAMP_SAFE_RETURN;
     r.safe_value = ls_vm_safe_value(slot);
     return r;
+}
+
+struct ls_tramp_result
+ls_tramp_dispatch(int slot, const struct ls_regs *regs)
+{
+    return ls_tramp_dispatch_at(slot, regs, 0);
 }

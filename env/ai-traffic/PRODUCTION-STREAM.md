@@ -30,7 +30,47 @@ The same collector image retains 26 raw records from 13 requests. Consumer-side
 decoding and replay checks pass. This requires JSON filtering and does not establish
 general MCP coverage, tool arguments, request identity or session relationships.
 
+**Session/routing subset, 2026-09-29:** the
+[new field probes](SESSION-ROUTING.md) supply saved session-header bytes and
+selected pool/endpoint state. Seven isolated requests produce five session records
+and seven route records through the same collector. Exact values and replay pass.
+Identity profiles and blast-radius assessment are proposed consumers. Their
+authentication, authority and resource relationships still require qualified sources.
+
+**Response-field subset, 2026-09-29:** the
+[response probe](RESPONSE-METADATA.md) supplies HTTP status and local transfer
+completion. Nine cases produce 201 records through the same collector. The paced
+and interrupted cases distinguish header observation from completed transfer.
+General request association and remote-operation success remain unqualified.
+
 ## 1. Where each step runs
+
+The [requested-target subset](OPERATION-TARGET.md) now supplies bounded tool names
+and resource addresses through the same collector. Twenty-eight fixture requests
+produce 56 records with exact bytes and explicit exclusions. Linking this activity
+to a trusted identity remains separate work.
+
+The [reported-reply subset](REPLY-METADATA.md) adds result/error presence, signed
+error codes and Boolean tool-error reports through the same collector. Thirty-eight
+exchanges yield 76 records with exact fields and explicit exclusions. Consumers
+must keep these reports separate from transport status and proven remote success.
+
+The [message-ID subset](MESSAGE-ID.md) adds exact ID type and raw bytes through
+the same collector. Thirty-five exchanges yield 70 records. Numeric IDs are not
+rounded or normalized. Equal IDs alone do not establish request or caller identity;
+connection/session scope and protocol equality remain separate requirements.
+
+The [combined ID/side subset](ID-FLOW.md) supplies both fields in one record through
+the same collector. Forty-four exchanges yield 88 records, including keep-alive
+and concurrent equal IDs. This avoids joining separate field records by time.
+It does not establish common lifetime, message role or request/reply association.
+
+The separate [JSON-boundary subset](JSON-LIFECYCLE.md) sends 306 entry records
+through the same collector during 13 exchanges. Eleven unavailable-context
+records invalidate the full consumer window. The journal retains those records;
+the consumer does not replace missing qualification with a lifecycle claim.
+This probe set was tested separately from the ID/side probe. Simultaneous
+composition and collector replacement with this probe set remain unvalidated.
 
 ```text
 BUILD / CONTROL PLANE — off the traffic path
@@ -140,9 +180,11 @@ service is open; no transport integration is implemented by this document.
 | Workflow | Field requirement / current limit |
 |---|---|
 | Distribution of observed method values; detection of unfamiliar values | Current method values can supply input. Counts are getter or cache observations, not proven request counts. A production stream remains pending. |
-| Per-request latency and outcome | Needs qualified request/response association and completion fields. The current method record does not supply them. |
+| Per-request latency and outcome | Local response status/completion now has a [bounded measured source](RESPONSE-METADATA.md). Request/response association and remote-operation outcome remain unqualified; timestamps alone do not supply them. |
 | MCP tool activity | The token-cache probe extracts literal root methods on the configured AIMCP/JSON path. Tool identity, arguments, qualified protocol identity and general coverage remain pending. The earlier getter gap is retained. |
 | Agent/session activity graph | Needs qualified identities and relationships. Do not substitute pointer, connection or method identity. |
+| Identity profiles | Saved session-header bytes can describe observed values. Authentication result, issuer, tenant and qualified lifetime are still required to group activity under an identity. [Field register](SESSION-ROUTING.md#consumer-goals-identity-profiles-and-blast-radius) |
+| Blast-radius assessment | Selected pool/endpoint state can supply observed destinations. Policy-permitted reach, delegation and resource dependencies need separate sources. Missing traffic does not prove that a resource is unreachable. |
 
 Preserve unfamiliar values and status-only records. Do not require a recognized
 workflow before accepting an observation. Publication cannot supply fields that

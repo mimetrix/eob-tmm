@@ -1,0 +1,546 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "4f50c471438b\n3234e9336992\n4b13dd8f006f\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4f50c471438b",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4f50c471438b321e64a15a88294d20460f7e1b35bf2efb40eb63940895459249\",\"image\":\"sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054\",\"name\":\"/eob-template-20260925-collector-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"2026-09-29T16:18:01.340718157Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":0,\"Restarting\":false,\"Running\":false,\"StartedAt\":\"2026-09-29T16:17:50.684989247Z\",\"Status\":\"exited\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "3234e9336992",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"3234e9336992aac96cfbb1001c61556ecbce8a7e96e38ca55dff6f125cf61970\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"name\":\"/eob-template-20260925-tmm-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":4052694,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T16:17:09.702444888Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4b13dd8f006f",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4b13dd8f006ff1dd1e8b1937cb2c24dd0e6dcb55757905058863c8b678b52dd7\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"name\":\"/eob-template-20260925-fixture-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-29T16:20:07.732339159Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:07.675159909Z\"},{\"End\":\"2026-09-29T16:20:09.799846178Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:09.733172787Z\"},{\"End\":\"2026-09-29T16:20:11.854658357Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:11.801067259Z\"},{\"End\":\"2026-09-29T16:20:13.925820699Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:13.855566997Z\"},{\"End\":\"2026-09-29T16:20:15.963105908Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:15.927187754Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":4051928,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T16:17:06.936177567Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":37331,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-08-21T18:14:16.71521944Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "eob-template-20260925-fixture-1",
+        "--format",
+        "{{json .Mounts}}"
+      ],
+      "rc": 0,
+      "stdout": "[{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_nats-certs\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Destination\":\"/package/nats_certs/tmm\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"bind\",\"Source\":\"/home/starin/eob-config-20260925\",\"Destination\":\"/work\",\"Mode\":\"ro\",\"RW\":false,\"Propagation\":\"rprivate\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_evidence\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\"Destination\":\"/evidence\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_ls-stream\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"}]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "ls",
+        "-d",
+        "/evidence"
+      ],
+      "rc": 0,
+      "stdout": "/evidence\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "eob-template-20260925-fixture-1",
+        "mkdir",
+        "/evidence/reply-metadata-live-01"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "/home/starin/eob-config-20260925/reply-metadata-live-01.json",
+        "eob-template-20260925-fixture-1:/evidence/reply-metadata-live-01/reply-metadata-live-01.json"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "cp",
+        "/home/starin/eob-config-20260925/reply-metadata-source-01/events.sqlite",
+        "eob-template-20260925-fixture-1:/evidence/reply-metadata-live-01/events.sqlite"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "compose",
+        "--env-file",
+        "template-fixture.env",
+        "--project-name",
+        "eob-template-20260925",
+        "-f",
+        "icap-compose.yaml",
+        "-f",
+        "config-compose.yaml",
+        "-f",
+        "observability-compose.yaml",
+        "-f",
+        "collector-compose.yaml",
+        "up",
+        "-d",
+        "--no-deps",
+        "--wait",
+        "--wait-timeout",
+        "180",
+        "fixture"
+      ],
+      "rc": 0,
+      "stdout": "",
+      "stderr": " Container eob-template-20260925-fixture-1 Recreate \n Container eob-template-20260925-fixture-1 Recreated \n Container eob-template-20260925-fixture-1 Starting \n Container eob-template-20260925-fixture-1 Started \n Container eob-template-20260925-fixture-1 Waiting \n Container eob-template-20260925-fixture-1 Healthy \n"
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "eob-template-20260925-fixture-1",
+        "--format",
+        "{{json .Mounts}}"
+      ],
+      "rc": 0,
+      "stdout": "[{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_nats-certs\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data\",\"Destination\":\"/package/nats_certs/tmm\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"bind\",\"Source\":\"/home/starin/eob-config-20260925\",\"Destination\":\"/work\",\"Mode\":\"ro\",\"RW\":false,\"Propagation\":\"rprivate\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_evidence\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_evidence/_data\",\"Destination\":\"/evidence\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_ls-sockets\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data\",\"Destination\":\"/run/ls\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_ls-stream\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data\",\"Destination\":\"/run/ls-stream\",\"Driver\":\"local\",\"Mode\":\"rw\",\"RW\":true,\"Propagation\":\"\"},{\"Type\":\"volume\",\"Name\":\"eob-template-20260925_collector-api\",\"Source\":\"/var/lib/docker/volumes/eob-template-20260925_collector-api/_data\",\"Destination\":\"/collector-api\",\"Driver\":\"local\",\"Mode\":\"ro\",\"RW\":false,\"Propagation\":\"\"}]\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq"
+      ],
+      "rc": 0,
+      "stdout": "708b41472895\n4f50c471438b\n3234e9336992\n4d2afd1db4e7\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "708b41472895",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"708b41472895ee7a955c5b5353838a53d26e0a24b01188ed873ae3d0d3ee8d77\",\"image\":\"sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c\",\"name\":\"/eob-template-20260925-fixture-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"Health\":{\"FailingStreak\":0,\"Log\":[{\"End\":\"2026-09-29T16:20:31.723241529Z\",\"ExitCode\":0,\"Output\":\"\",\"Start\":\"2026-09-29T16:20:31.671885002Z\"}],\"Status\":\"healthy\"},\"OOMKilled\":false,\"Paused\":false,\"Pid\":4056118,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T16:20:29.42475349Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4f50c471438b",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4f50c471438b321e64a15a88294d20460f7e1b35bf2efb40eb63940895459249\",\"image\":\"sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054\",\"name\":\"/eob-template-20260925-collector-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"2026-09-29T16:18:01.340718157Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":0,\"Restarting\":false,\"Running\":false,\"StartedAt\":\"2026-09-29T16:17:50.684989247Z\",\"Status\":\"exited\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "3234e9336992",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"3234e9336992aac96cfbb1001c61556ecbce8a7e96e38ca55dff6f125cf61970\",\"image\":\"sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e\",\"name\":\"/eob-template-20260925-tmm-1\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":4052694,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-09-29T16:17:09.702444888Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "4d2afd1db4e7",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}"
+      ],
+      "rc": 0,
+      "stdout": "{\"id\":\"4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0\",\"image\":\"sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3\",\"name\":\"/10.207.3-HEAD.b13f8f034e\",\"state\":{\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":37331,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-08-21T18:14:16.71521944Z\",\"Status\":\"running\"},\"restarts\":0}\n",
+      "stderr": ""
+    }
+  ],
+  "sources": {
+    "reply_metadata_fixture_repair.py": {
+      "text": "#!/usr/bin/env python3\n\"\"\"Repair only the missing collector API mount in the isolated test fixture.\"\"\"\nimport argparse\nimport hashlib\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nfrom lifetime_fixture import COMPOSE, PROJECT, ROOT\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument('--output', type=Path, required=True)\n    args = parser.parse_args()\n    image = 'sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054'\n    source = ROOT / 'reply-metadata-source-01'\n    env = dict(os.environ, COLLECTOR_IMAGE=image, COLLECTOR_SOURCE_DIR=str(source))\n    record = dict(passed=False, commands=[], sources={})\n\n    def run(*argv):\n        p = subprocess.run(argv, cwd=ROOT, env=env, text=True, capture_output=True, timeout=240, check=False)\n        record['commands'].append(dict(argv=argv, rc=p.returncode, stdout=p.stdout, stderr=p.stderr))\n        p.check_returncode()\n        return p.stdout\n\n    def inventory():\n        return [json.loads(run('docker', 'inspect', identity, '--format',\n            '{\"id\":{{json .Id}},\"image\":{{json .Image}},\"name\":{{json .Name}},\"state\":{{json .State}},\"restarts\":{{.RestartCount}}}'))\n            for identity in run('docker', 'ps', '-aq').split()]\n\n    with args.output.open('x') as output:\n        try:\n            for name in ('reply_metadata_fixture_repair.py', 'collector-compose.yaml'):\n                path = ROOT / name\n                record['sources'][name] = dict(text=path.read_text(), sha256=hashlib.sha256(path.read_bytes()).hexdigest())\n            fixture = PROJECT + '-fixture-1'\n            record['before'] = inventory()\n            record['mounts_before'] = json.loads(run('docker', 'inspect', fixture, '--format', '{{json .Mounts}}'))\n            assert not any(m['Destination'] == '/collector-api' for m in record['mounts_before'])\n            failure = ROOT / 'reply-metadata-live-01.json'\n            doc = json.loads(failure.read_text())\n            assert not doc['passed'] and 'collector socket not ready' in doc['error']\n            assert not any('/work/reply-metadata-run.sh' in c['argv'] for c in doc['commands'])\n            run('docker', 'exec', fixture, 'ls', '-d', '/evidence')\n            run('docker', 'exec', fixture, 'mkdir', '/evidence/reply-metadata-live-01')\n            for path in (failure, source / 'events.sqlite'):\n                record[path.name + '_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()\n                run('docker', 'cp', str(path), fixture + ':/evidence/reply-metadata-live-01/' + path.name)\n            run(*COMPOSE, '-f', 'collector-compose.yaml', 'up', '-d', '--no-deps', '--wait', '--wait-timeout', '180', 'fixture')\n            record['mounts_after'] = json.loads(run('docker', 'inspect', fixture, '--format', '{{json .Mounts}}'))\n            mount, = [m for m in record['mounts_after'] if m['Destination'] == '/collector-api']\n            assert mount['Name'] == PROJECT + '_collector-api' and not mount['RW']\n            record['after'] = inventory()\n            assert [r for r in record['before'] if r['name'] != '/' + fixture] == [\n                r for r in record['after'] if r['name'] != '/' + fixture]\n            record['passed'] = True\n        except BaseException as error:\n            record['error'] = repr(error)\n            raise\n        finally:\n            json.dump(record, output, indent=2)\n    print(json.dumps(dict(passed=record['passed'])))\n\n\nif __name__ == '__main__':\n    main()\n",
+      "sha256": "66ffcc56126a6698a8dd52dda5b715bfc5f04af1cd152eb3fd346d5a4787c944"
+    },
+    "collector-compose.yaml": {
+      "text": "# Layer over the isolated template fixture. Source binding is controller-owned.\nservices:\n  fixture:\n    volumes:\n      - collector-api:/collector-api:ro\n  collector:\n    image: ${COLLECTOR_IMAGE:?provide the checked image ID}\n    pull_policy: never\n    pid: service:tmm\n    network_mode: none\n    init: true\n    read_only: true\n    cap_drop: [ALL]\n    cap_add: [SYS_PTRACE]\n    security_opt: [no-new-privileges:true, \"apparmor=unconfined\"]\n    cpus: 0.5\n    mem_limit: 128m\n    memswap_limit: 128m\n    pids_limit: 32\n    tmpfs: [\"/tmp:size=8m,noexec,nosuid,nodev\"]\n    restart: \"no\"\n    stop_grace_period: 15s\n    volumes:\n      - ls-stream:/run/ls-stream\n      - collector-journal:/journal\n      - collector-api:/api\n      - ${COLLECTOR_SOURCE_DIR:?provide the source binding directory}:/source:ro\nvolumes:\n  collector-journal:\n  collector-api:\n",
+      "sha256": "c4286a515af3ed3d7f2222ac53bb6b531f8f120add1f072ebbaacc74c47672e7"
+    }
+  },
+  "before": [
+    {
+      "id": "4f50c471438b321e64a15a88294d20460f7e1b35bf2efb40eb63940895459249",
+      "image": "sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054",
+      "name": "/eob-template-20260925-collector-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-09-29T16:18:01.340718157Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 0,
+        "Restarting": false,
+        "Running": false,
+        "StartedAt": "2026-09-29T16:17:50.684989247Z",
+        "Status": "exited"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "3234e9336992aac96cfbb1001c61556ecbce8a7e96e38ca55dff6f125cf61970",
+      "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+      "name": "/eob-template-20260925-tmm-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4052694,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T16:17:09.702444888Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "4b13dd8f006ff1dd1e8b1937cb2c24dd0e6dcb55757905058863c8b678b52dd7",
+      "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+      "name": "/eob-template-20260925-fixture-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Health": {
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "End": "2026-09-29T16:20:07.732339159Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:07.675159909Z"
+            },
+            {
+              "End": "2026-09-29T16:20:09.799846178Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:09.733172787Z"
+            },
+            {
+              "End": "2026-09-29T16:20:11.854658357Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:11.801067259Z"
+            },
+            {
+              "End": "2026-09-29T16:20:13.925820699Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:13.855566997Z"
+            },
+            {
+              "End": "2026-09-29T16:20:15.963105908Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:15.927187754Z"
+            }
+          ],
+          "Status": "healthy"
+        },
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4051928,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T16:17:06.936177567Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 37331,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-08-21T18:14:16.71521944Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    }
+  ],
+  "mounts_before": [
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_nats-certs",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data",
+      "Destination": "/package/nats_certs/tmm",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "bind",
+      "Source": "/home/starin/eob-config-20260925",
+      "Destination": "/work",
+      "Mode": "ro",
+      "RW": false,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_evidence",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_evidence/_data",
+      "Destination": "/evidence",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_ls-sockets",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data",
+      "Destination": "/run/ls",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_ls-stream",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data",
+      "Destination": "/run/ls-stream",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    }
+  ],
+  "reply-metadata-live-01.json_sha256": "2d98f1016dc26a5b3613e95b976d3171b2b4820efddf60682736da7066bff98d",
+  "events.sqlite_sha256": "b6a81898fe830d7643e1a5f27b7cccea327d27a059ed182ebc5000c38e8e8233",
+  "mounts_after": [
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_nats-certs",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_nats-certs/_data",
+      "Destination": "/package/nats_certs/tmm",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "bind",
+      "Source": "/home/starin/eob-config-20260925",
+      "Destination": "/work",
+      "Mode": "ro",
+      "RW": false,
+      "Propagation": "rprivate"
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_evidence",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_evidence/_data",
+      "Destination": "/evidence",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_ls-sockets",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-sockets/_data",
+      "Destination": "/run/ls",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_ls-stream",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_ls-stream/_data",
+      "Destination": "/run/ls-stream",
+      "Driver": "local",
+      "Mode": "rw",
+      "RW": true,
+      "Propagation": ""
+    },
+    {
+      "Type": "volume",
+      "Name": "eob-template-20260925_collector-api",
+      "Source": "/var/lib/docker/volumes/eob-template-20260925_collector-api/_data",
+      "Destination": "/collector-api",
+      "Driver": "local",
+      "Mode": "ro",
+      "RW": false,
+      "Propagation": ""
+    }
+  ],
+  "after": [
+    {
+      "id": "708b41472895ee7a955c5b5353838a53d26e0a24b01188ed873ae3d0d3ee8d77",
+      "image": "sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c",
+      "name": "/eob-template-20260925-fixture-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Health": {
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "End": "2026-09-29T16:20:31.723241529Z",
+              "ExitCode": 0,
+              "Output": "",
+              "Start": "2026-09-29T16:20:31.671885002Z"
+            }
+          ],
+          "Status": "healthy"
+        },
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4056118,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T16:20:29.42475349Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "4f50c471438b321e64a15a88294d20460f7e1b35bf2efb40eb63940895459249",
+      "image": "sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054",
+      "name": "/eob-template-20260925-collector-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-09-29T16:18:01.340718157Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 0,
+        "Restarting": false,
+        "Running": false,
+        "StartedAt": "2026-09-29T16:17:50.684989247Z",
+        "Status": "exited"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "3234e9336992aac96cfbb1001c61556ecbce8a7e96e38ca55dff6f125cf61970",
+      "image": "sha256:e5bbcb5ef4a188f3417188d2672f5aeeaf558c626808f031e09ca28f74e10d3e",
+      "name": "/eob-template-20260925-tmm-1",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 4052694,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-09-29T16:17:09.702444888Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    },
+    {
+      "id": "4d2afd1db4e764d37c1b5e751b721b537f74abce4ff0055a85919c50e2314aa0",
+      "image": "sha256:0b3fcc7653eab0b87b4ff138415a97ad0230446b5d0d6a477d0170d9251cf2f3",
+      "name": "/10.207.3-HEAD.b13f8f034e",
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 37331,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-08-21T18:14:16.71521944Z",
+        "Status": "running"
+      },
+      "restarts": 0
+    }
+  ]
+}

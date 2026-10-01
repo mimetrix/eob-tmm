@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-29",
+  "kind": "authored_summary_of_session_tool_output_not_automatic_capture",
+  "witness": "SELF",
+  "stops": [
+    {
+      "literal": "No such file or directory: '/home/starin/eob-tmm-staged/substrate/ls_tramp.h'",
+      "ask": "NO RECORD",
+      "stage": "void-completion-build-01, source capture before compilation",
+      "correction": "Remove the nonexistent header from the source list. Build 02 passes. The automatic receipt stores repr(error), which omits the filename."
+    },
+    {
+      "literal": "ValueError: lost preflight failure",
+      "ask": "NO RECORD",
+      "stage": "first saved-evidence verifier invocation, before opening check-01",
+      "correction": "Check the actual retained FileNotFoundError representation. The filename is preserved in this authored record and the session traceback, not in repr(error)."
+    }
+  ],
+  "retained_linker_output": "The native builds report read-only-section relocations and DT_TEXTREL in a PIE. The commands complete and both compiler variants pass. This is a native mechanism test, not TMM packaging validation."
+}

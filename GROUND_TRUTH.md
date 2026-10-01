@@ -29,6 +29,92 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 ## Mechanism
 
+**2026-09-30 — independent programs with multiple entry attachments.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Program-owned maps/configuration, shared-site dispatch and independent cleanup | **MEASURED (native/socket fixtures)** | SELF (fixtures and assertions); INDEPENDENT (PREVAIL); TOOL (compilers/sanitizers) | [Contract](substrate/PROGRAMS.md), [receipts](SOURCES.md#program-ownership-and-tmm-build-2026-09-30). Pinned GCC/clang interpreter/JIT, signed socket, paused-call reclamation, stale-control and bounded-reuse checks pass. Existing activity and hook regressions pass. Native tests do not establish live TMM ownership or multiworker behavior. |
+| Ownership sources compile and link into TMM | **MEASURED (Docker build and ELF checks)** | TOOL (compiler/linker, readelf, objdump and globals check); SELF (source and preservation assertions) | Same receipts. Build `5784e768cc4f5c25993aef7dfb050c54a14042ea` contains nine required functions, three TLS symbols and all twelve updated trampolines. First compile failure and later inspection failure remain recorded. The later package/live result is below. The existing CVE-fix revert remains; sustained data-path cost is unmeasured. |
+| Two independent program owners each use two entry hooks in live TMM | **MEASURED (bounded single-worker HTTP/1 fixture)** | SELF (clients, backend, bytecode records and assertions); INDEPENDENT (PREVAIL); TOOL (package/image); KERNEL (binary, process and hook bytes) | [Package/live receipts](SOURCES.md#program-ownership-live-validation-2026-09-30), [phase table](substrate/PROGRAMS.md#measured-live-result). Packaged build `2ab960fa…`: 18/18 HTTP exchanges with expected bodies and status 200, 594 records, eight phases. Owner-local configuration/maps, recorded context fields, detach/reattach, disable, revoke, fresh replacement and stale refusals pass. Both hooks restored; all owners empty; same process, zero restarts. Twelve-file archive checked and fixture removed. Multiple workers, sustained concurrency/cost, live enforce composition, timeout stress and collector durability remain unqualified. |
+
+**2026-09-30 — combined activity records from one ELF and two entry hooks.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Bytecode-generated exchange keys combine request, reply and HTTP fields | **MEASURED (bounded single-worker HTTP/1 fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields, counters, exporter/API tests); KERNEL (process/hook bytes); TOOL (layout/compiler) | [Contract and commands](env/ai-traffic/ACTIVITY-COMBINED.md), [receipts](SOURCES.md#combined-activity-records-2026-09-30). Ten exchanges from 264 probe records: three individual, three keep-alive and four concurrent with equal IDs. Exact fields and replay pass. Current exporter passes six tests against the measured journal, including loss/key/field mutations and real socket replay. Identity remains unknown; producer binding is not verified by the exporter. Multiple workers, HTTP/2, pipelining, streamed JSON, silent missed hooks and sustained cost remain unqualified. |
+| Grouped activity fixture archived and removed | **MEASURED** | KERNEL (restored hooks/process); TOOL/SELF (archive and resource checks) | Same receipts. Both entry patches restored; process unchanged with zero restarts. All three live attempts retained in a 24-file archive. Fixture containers, networks and volumes removed; unrelated toolchain container unchanged. |
+| Combined records retain source timestamps and monotonic duration | **MEASURED (saved live journal and API replay)** | SELF (exporter, source-record comparisons and mutations) | [Timestamp contract](env/ai-traffic/ACTIVITY-COMBINED.md#export-combined-json), [receipt](SOURCES.md#combined-activity-records-2026-09-30). Eight exporter tests pass on the build box. All ten exchanges retain UTC timestamps with nine fractional digits. Duration uses the monotonic clock. Missing times stay null; unfinished exchanges have no end/duration. These are observation times, not remote execution boundaries. |
+
+**2026-09-30 — identity-ready activity format.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Versioned JSON activity events from existing collector replay | **MEASURED (archived replay and collector API tests)** | SELF (exporter and tests) | [Format/commands](env/ai-traffic/AGENT-ACTIVITY.md), [receipts](SOURCES.md#agent-activity-export-2026-09-30). Six tests pass on the build box; 468 metadata records and ten diagnostic rows retain cursors, fields and explicit gaps. Supports method, target, ID/flow side and reported response fields. Identity and correlation remain unknown; no cross-record association, producer-binding verification, new live TMM run or authenticated agent attribution is claimed. |
+
+**2026-09-29 — production entry snapshots and a corrected admission result.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Production frame-owned entry state, instance/epoch checks and completion-only bytecode | **MEASURED (native tests, TMM build and package)** | SELF (fixtures and assertions); TOOL (compiler/build); INDEPENDENT (PREVAIL) | [Contract](env/ai-traffic/ENTRY-SNAPSHOT.md), [receipts](SOURCES.md#production-entry-snapshots-2026-09-29). 78 cases per compiler; JSON reader passes 22 cases each in interpreter/JIT. Packaged build `7bbb06a0…`. Source/layout/instruction requalification passes before binding refuses unwind imports. No live initialization program was loaded. |
+| The old return gate establishes zero unwind imports on the tested TMM binaries | **FALSIFIED** | TOOL (full-width symbol output); SELF (corrected admission tests) | [Contested premise §39](CONTESTED-PREMISES.md#39--no-unwind-imports-means-return-hook-admission-is-clear--falsified-check). Both `ca69b84f…` and `7bbb06a0…` import `_Unwind_Resume`, `__cxa_begin_catch`, `__cxa_rethrow`. Shortened output hid them. Corrected gates refuse both binaries. Target-specific unwind reachability is unqualified; no unsafe unwind was demonstrated. |
+| The blocked initialization fixture is archived and removed | **MEASURED** | KERNEL (process/hook checks); TOOL/SELF (archive and ownership checks) | Same receipts. One-file refusal archive; unchanged hook, zero fires in all 12 slots, no collector start. Other container identities and states remain unchanged. |
+
+**2026-09-29 — void-return completion native test.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| A frame-bound entry snapshot can report native void-function completion without reading the return value or post-return context | **MEASURED (native fixture only)** | SELF (adapter, fixture and assertions); TOOL (compilers and source capture) | [Contract/results](env/ai-traffic/VOID-COMPLETION.md), [receipts](SOURCES.md#void-return-completion-test-2026-09-29). GCC 13.3.0 and clang 18.1.3 each pass 24 cases and 1,100 observed returns. Covers changed flags, nesting, address reuse, recursion, protected context, skipped return, capacity and omitted capture. Ordinary return and context-contract regressions pass. Uses unchanged return machinery with a native test adapter. Production entry capture, verified bytecode, real JSON-handler execution and live lifecycle remain unvalidated. |
+
+**2026-09-29 — initialization-completion qualification.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Current return admission and tested forwarding candidates do not qualify an initialization-completion witness | **MEASURED (source/compiled/admission only)** | TOOL (source, debug, symbols and instructions); SELF (admission policy and verifier) | [Contract/decisions](env/ai-traffic/JSON-INITIALIZATION.md), [receipts](SOURCES.md#json-initialization-completion-qualification-2026-09-29). Two captures refuse handler/reset void returns and admit the enum-return control. No standalone initialization entry; xbuf binding refused. Disabled and initialized paths share forwarding to the next node. Build-box check passes against 48 source snapshots and 15 instruction locations. No live probe was run. Storage lifetime after forwarding, completed initialization, local lifecycle and message association remain unqualified. A completion-only void-return contract is the next candidate, not a measured capability. |
+
+**2026-09-29 — message ID and flow side in one record.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Literal message ID and qualified connection-flow side from one completion-hook invocation | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields and replay); KERNEL/TOOL (hook, process and fixture state) | [Contract/results](env/ai-traffic/ID-FLOW.md), [receipts](SOURCES.md#message-id-and-flow-side-2026-09-29). 224 native invocations; 44 live exchanges yield 88 records, split equally by side. Includes three exchanges on one client connection and four concurrent connections with equal IDs. JSON shape does not select side. Twelve malformed/incompatible decoder inputs are refused. Journal/replay, hook restoration, seven-file archive and scoped removal pass. Flow side is not message role. Local lifecycle, common owner lifetime, request/reply association, trusted identity, stream-flow coverage and data-path cost remain unvalidated. |
+| JSON-context handler, completion and reset entry observations | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields, counters and replay); KERNEL/TOOL (process, hooks and fixture state) | [Contract/results](env/ai-traffic/JSON-LIFECYCLE.md), [receipts](SOURCES.md#json-context-boundary-observations-2026-09-29). 312 native records; 13 live exchanges produce 306 records: 255 handler, 25 completion, 26 reset. Late attachment does not invent initialization; malformed client JSON has no client completion. Eleven unavailable-context records invalidate the full consumer window. Both attempts are archived and fixtures removed. Handler entry is not completed initialization; storage tags are not lifecycle IDs. Interrupted transfer, live disabled/deferred/omitted-boundary/capacity/reload paths, common owner lifetime, association and data-path cost remain unvalidated. |
+
+**2026-09-29 — message scope source qualification.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Flow-side field and JSON-context lifecycle candidates checked against the pinned source and binary | **MEASURED (source/compiled inspection only)** | TOOL (source, debug layouts and instructions); SELF (qualification check) | [Candidate decisions](env/ai-traffic/MESSAGE-SCOPE.md), [receipts](SOURCES.md#message-scope-qualification-2026-09-29). Check 01 passes on the build box with 16 embedded files and 11 instruction checks. Reused JSON storage is not a request ID or a shared connection ID. Handler/reset paths need runtime tests. Flow side is not message role. Runtime scope, common owner lifetime, request/reply association and authenticated identity remain unvalidated. |
+
+**2026-09-29 — observed message IDs.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Literal root ID type and raw bytes from the JSON completion cache | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields and journal); KERNEL/TOOL (hook, process and fixture state) | [Contract/results](env/ai-traffic/MESSAGE-ID.md), [receipts](SOURCES.md#observed-message-ids-2026-09-29). 194 native invocations; 35 live exchanges yield 70 records. Exact large numbers, strings, null and explicit missing/ambiguous/limited states. Reused and mismatched IDs remain observations, not joins. Journal/replay, hook restoration, seven-file archive and fixture removal pass. Connection/session scope, protocol equality, authenticated identity, general request association and data-path cost remain unqualified. |
+
+**2026-09-29 — reported reply fields.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Literal result/error presence, signed error code and Boolean tool-error report | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields and journal); KERNEL/TOOL (hook, process and fixture state) | [Contract/results](env/ai-traffic/REPLY-METADATA.md), [receipts](SOURCES.md#reported-reply-fields-2026-09-29). 106 native invocations; 38 live exchanges yield 76 records. Exact Boolean/integer fields, missing/conflicting keys, type and budget limits pass. Journal/replay agree; hook restored; successful and failed runs archived; fixture removed. Retains two pre-arm failures and two stopped reset checks. These are reported fields, not proof of remote success, response direction, caller identity or request association. Data-path cost remains unmeasured. |
+
+**2026-09-29 — requested tool and resource fields.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Literal tool name and resource URI from the JSON completion cache | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live values and journal); KERNEL/TOOL (hook, process and fixture state) | [Contract/results](env/ai-traffic/OPERATION-TARGET.md), [receipts](SOURCES.md#requested-operation-targets-2026-09-29). 74 native invocations; 28 live requests yield 56 records, including 14 complete and two truncated targets. Nested decoys, duplicate rules and explicit exclusions pass. Replay, restored hook, seven-file archive and fixture removal are checked. This supplies requested activity for proposed identity profiles, not caller identity, authorization, successful access or general request association. Data-path cost remains unmeasured. |
+
+**2026-09-29 — response status and local transfer completion.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| HTTP status and qualified response-done Boolean at the AIMCP handler | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native/live fields and journal); KERNEL/TOOL (hook, process and fixture state) | [Contract/results](env/ai-traffic/RESPONSE-METADATA.md), [receipts](SOURCES.md#response-metadata-qualification-2026-09-29). Build 03: 80 native invocations. Live attempt 02: nine requests, 201 handler records, 18 status and 18 done observations. Paced headers precede done; an interrupted five-byte body advertised as 25 bytes yields done zero. Exact fields, replay and counters pass. Restored hook, 14-file archive and fixture removal. Retains failed cache-validity rule and layout assertion. Local fields do not establish request identity, remote-operation success, HTTP/2 coverage or data-path cost. |
+
+**2026-09-29 — session/routing fields and consumer goals.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Saved AIMCP request-session-header bytes and selected pool/endpoint state | **MEASURED (bounded one-worker fixture)** | INDEPENDENT (PREVAIL); SELF (native fixtures, values and journal/replay checks); KERNEL/TOOL (hook, process and container state) | [Contract](env/ai-traffic/SESSION-ROUTING.md), [receipts](SOURCES.md#session-and-routing-qualification-2026-09-29). Build 02 passes 80 native invocations, including eight interleaved calls. Live attempt 04: seven requests, five header records and seven routing records, exact fields and replay. Stable process, restored hooks, 30-file archive and fixture removal. Three failed attempts remain recorded. Limits: 64 string bytes, 20 endpoint bytes, connection-flow storage, no successful encrypted-persistence decode or general request/identity association. Data-path cost remains unmeasured. |
+| Identity profiles and blast-radius assessment from qualified metadata | **IDEA** | NONE (consumer goal) | [Field register](env/ai-traffic/SESSION-ROUTING.md#consumer-goals-identity-profiles-and-blast-radius). Keep observed activity, policy-permitted reach and inferred relationships separate. Authentication, issuer/tenant, authority, delegation and resource relationships require qualified sources. Session values and selected destinations alone do not establish authenticated identity or full blast radius. |
+
 **2026-09-28 — controlled correlation gaps: MEASURED, with a coverage limit.**
 The new collector guard invalidates a whole result window after a controller-reported
 hook detach or tracking-capacity diagnostic. Resuming hooks cannot restore that
@@ -288,7 +374,7 @@ isolated fixture only. See [`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPE
 
 | claim | tier | witness | anchor |
 |---|---|---|---|
-| Application-metadata hook shortlist checked against the repaired package | **MEASURED (source and packaged-binary inspection only), 2026-09-28** | TOOL (build-box source, hook index, ELF notes and disassembly) | [Probe contract](env/ai-traffic/METADATA.md), [receipts](SOURCES.md#application-metadata-hook-discovery-2026-09-28). Build `ca69b84f…`: padded `hud_a2a_handler`, `hud_aimcp_handler`, `a2a_response`, MCP persistence clones and JSON accessors. No exact or clone-prefixed index entries for `a2a_request`, `a2a_lookup_method`, `aimcp_request`. Source describes lazy JSON parsing and escaped, length-delimited strings. Handler reachability and one method-field path are now measured below; session fields remain pending. |
+| Application-metadata hook shortlist checked against the repaired package | **MEASURED (source and packaged-binary inspection only), 2026-09-28** | TOOL (build-box source, hook index, ELF notes and disassembly) | [Probe contract](env/ai-traffic/METADATA.md), [receipts](SOURCES.md#application-metadata-hook-discovery-2026-09-28). Build `ca69b84f…`: padded `hud_a2a_handler`, `hud_aimcp_handler`, `a2a_response`, MCP persistence clones and JSON accessors. No exact or clone-prefixed index entries for `a2a_request`, `a2a_lookup_method`, `aimcp_request`. Source describes lazy JSON parsing and escaped, length-delimited strings. Handler reachability and method-field paths are now measured. Saved session-header bytes and selected routing state also have a [separate bounded result](env/ai-traffic/SESSION-ROUTING.md); successful persistence decoding and authenticated identity remain open. |
 | Native-handler event-code extraction | **MEASURED, 2026-09-28** | INDEPENDENT (PREVAIL); SELF (native checks, clients, counters and records); KERNEL (hook bytes and process identity) | [Receipts](SOURCES.md#native-handler-event-probes-2026-09-28). Pinned interpreter/JIT and live native-filter checks passed. Eight requests, 192 records / 192 calls, 96 records and 22 codes per handler; no reported loss, new VM errors or restart. Pads restored; fixture removed. These records contain event code, presence bits and probe provenance, **not method names or session IDs**. The unfamiliar method was forwarded, not extracted. These counts did not satisfy the application-field goal; the next row records the subsequent value-comparison test. |
 | Root-object method-field extraction at JSON getter return | **MEASURED, 2026-09-28** | INDEPENDENT (PREVAIL); SELF (native objects/output sink, clients, comparisons and counters); KERNEL (hook bytes and stable process) | [Receipts](SOURCES.md#root-object-method-extraction-2026-09-28), [scope](env/ai-traffic/METADATA.md#7-field-result--measured-on-the-pinned-build). Build 01 exceeded the 256-byte stack limit; build 02 passed the same limit and exit admission. Interpreter/JIT: 40 records, exact bytes, guarded buffers, failures, scope and budget. Live: six exact value/prefix comparisons, getter error and budget exhaustion; eight calls/eight records from ten requests. No reported loss/new VM errors/restart; restored pad and removed fixture. **Limits:** escaped bytes, at most 64 copied; four-member walk; only values the application getter consumes. Nested-only and AIMCP inputs produced no getter calls. This run makes no MCP method/session extraction, protocol/request identity or data-path cost claim. The later token-cache row supplies a different method path. |
 | Literal root method from the JSON token cache on the AIMCP path | **MEASURED (bounded one-worker fixture), 2026-09-28** | INDEPENDENT (PREVAIL); SELF (native fixtures, values, counters and journal/replay checks); KERNEL/TOOL (hook, process, binary and container state) | [Contract/results](env/ai-traffic/TOKEN-METHOD.md), [receipts](SOURCES.md#token-cache-method-extraction-2026-09-28). Initial padded `json_http_set_cache` entry misses the compiled inline path: zero live records. Revised `json_filter_handle_json_complete` probe passes pinned PREVAIL at 256 bytes and 68 interpreter/JIT invocations. Thirteen live requests yield 26 exact/status cache records through the existing separate collector, with 28 journal events and equal replay. Tests include exact `tools/list`, unfamiliar/escaped/empty values, truncation, nested and duplicate keys, member limit, nonstring and root array. Stable process/binary, restored hook, 14-file archive and fixture removal. Limits: JSON filtering required; first literal key only; four root members, four fragments per read, 64 value bytes, 40 reads and 1,024 source bytes. No general MCP coverage, protocol/request identity, session metadata or data-path cost claim. |
@@ -303,7 +389,7 @@ isolated fixture only. See [`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPE
 | OpenSSL's 1,781 linked symbols are unreachable | MEASURED | KERNEL | no entry padding outside TMM core; the index records them as displacement-only |
 | Displacement reaches them | ROADMAP | — | designed, unimplemented |
 | Function EXIT (`fexit`) hooks — read a function's return value / post-execution state, time its own duration | ROADMAP | — | designed, unbuilt; return-address hijack + per-core shadow stack, gated on the `longjmp` survey (`02-RESEARCH-PARAMETERS.md` P8) |
-| …its gate is clear: TMM contains **no `setjmp`/`longjmp` and no C++ unwind machinery** | MEASURED | KERNEL | `readelf` on build box, builds `ef2496ca`/`80aff243`: zero `longjmp`/`setjmp` symbols, zero `_Unwind_*`/`__cxa_*` imports. So no non-local exit can desync the shadow stack. `02-RESEARCH-PARAMETERS.md` P8 |
+| …the old binary-wide gate establishes no C++ unwind machinery | **FALSIFIED as a current gate** | TOOL | The August `ef2496ca`/`80aff243` survey remains historical and was not repeated. Full-width inspection of `ca69b84f…` and `7bbb06a0…` finds three unwind imports that the old admission check hid. Both are now refused. No target-specific unwind reachability conclusion follows. [§39](CONTESTED-PREMISES.md#39--no-unwind-imports-means-return-hook-admission-is-clear--falsified-check), `02-RESEARCH-PARAMETERS.md` P8. |
 | …its trampoline mechanism (return-address hijack + stack-pointer-keyed shadow stack + reclaim) works | MEASURED (harness) | SELF | `substrate/check_fexit.c` on the build box arms four stand-ins: return captured, caller transparent, entry args carried, nested LIFO, 8-deep recursion, and a `longjmp`-skipped return **reclaimed** without desync. Passes `-O2`, `-O0`, and `-fcf-protection=full`. Standalone harness, not yet in TMM |
 
 | …and is now **compiled into TMM**: the exit trampoline + shadow stack build and link into the binary | MEASURED | KERNEL | build `01680045`, `nm`: `ls_fexit_slot0`/`ls_fexit_stub`/`ls_fexit_table` + all 9 `g_ls_fexit_*` present; `diff-globals` (globals whitelist) passed `no_pgo` and `debug`. Not yet armed/run on traffic |
@@ -416,3 +502,25 @@ isolated fixture only. See [`env/ai-traffic/INSPECTION.md`](env/ai-traffic/INSPE
 | uBPF is `iovisor/ubpf @ c900ed9f` plus one recorded patch | MEASURED | KERNEL | `substrate/check_vendor_pin.sh` — git revision compared, patch applied to it cleanly |
 | PREVAIL is `vbpf/ebpf-verifier @ 06769f7b` (v0.2.5), unmodified | MEASURED | KERNEL | same check; no tracked file differs; the binary reports `v0.2.5` |
 | The uBPF revision "cannot be stated" | **FALSIFIED** | — | `CONTESTED-PREMISES.md` #6 |
+## Activity artifact: two live entry hooks (2026-09-30)
+
+**MEASURED — native and isolated live TMM.** One ELF has JSON-completion and HTTP-handler entry
+programs. Both pass pinned PREVAIL. Two VMs execute the same artifact through
+interpreter and JIT. The tests check fields, alternating contexts, independent
+hook counters, shared JSON-reader counters, guarded reads and output refusal.
+GCC and clang harnesses pass. Signed target-set parser tests pass with
+ASan/UBSan. Witnesses: SELF (fixtures and counters), TOOL (compiler and parser
+tests), INDEPENDENT (PREVAIL).
+
+The original signed ELF ran at both entries in build `f9a1ed8c…`. Three exchanges
+produce 87 records: 24 JSON field records and 63 HTTP-handler records. Exact fields,
+large numeric ID spelling, reported error fields, HTTP status/completion, counter
+totals, export and second-cursor replay pass. Wrong-target arming is refused.
+KERNEL witnesses show both entry patches and their restoration, with unchanged
+process identity and zero restarts. SELF counters report no errors or safe returns.
+The fixture is archived and removed. This replaced the earlier native-only limit.
+The later [combined-record result](env/ai-traffic/ACTIVITY-COMBINED.md) qualifies
+bounded request/reply association with explicit bytecode keys. Identity binding,
+general storage lifetime and sustained cost remain unqualified. Arming the two
+hooks is not atomic.
+[Sources](SOURCES.md#activity-program--2026-09-30).
