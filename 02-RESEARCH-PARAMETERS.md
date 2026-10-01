@@ -1025,6 +1025,31 @@ hook cycles and no restart. The output bridge's delivery/drop/off results are
 tested natively against the real bridge. Live output-pressure and cost tests
 remain open. [Retained records](SOURCES.md#unsampled-observability-repairs-2026-09-25).
 
+### P23 · Does each activity record state how TMM handled client TLS?
+
+Registered 2026-10-01, before implementation. Owner question: the proxy does not
+always end TLS. Activity records exist only where TMM parses plaintext, so an
+identity claim needs the client TLS state of the same connection.
+
+**Claim to test:** at the existing HTTP entry, a bounded walk of the client
+connection's filter chain classifies it as `terminated`, `ssl_filter_not_decrypting`,
+`no_ssl_filter` or `unknown`, and reports protocol, cipher-suite ID, certificate
+mode and TMM's verify result for `terminated`.
+
+**Falsifiers:** a client SSL connection not classified `terminated`; a plain
+virtual server not classified `no_ssl_filter`; a server-side SSL filter read as
+client TLS; `client_certificate=verified` for an untrusted, missing or unrequested
+certificate (the initial verify result is already 0, so presence is required); protocol or cipher different from the client's own record; any
+malformed chain giving a class other than `unknown`; an identity or a chosen value
+under conflicting readings; any change to the existing combined-activity checks.
+
+**Scope gate:** `no_ssl_filter` is not proof of client plaintext, and passthrough
+produces no HTTP record to annotate. Certificate subject, TLS state before TMM,
+HTTP/2, multiple workers, resumption and cost stay outside this test.
+[Contract](env/ai-traffic/TLS-MODE.md).
+
+**Status:** unrun, IDEA.
+
 ## Retired
 
 ### R1 · "Per-call cost cannot be obtained from a live TMM" — RETIRED
