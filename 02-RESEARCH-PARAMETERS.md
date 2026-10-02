@@ -1058,6 +1058,48 @@ give only `unknown`. Existing combined-activity checks pass unchanged. Identity
 stays `unknown`. [Result](env/ai-traffic/TLS-MODE.md#measured-result),
 [receipts](SOURCES.md#client-tls-mode-2026-10-01).
 
+### P24 · Can eBPF probes attribute an AI gateway request's latency to its stages?
+
+Registered 2026-10-02, before implementation. Owner question: when an AI request
+is slow, where did the time go: the gateway, the session store, the provider, or
+delivery to the client?
+
+**Claim to test:** entry probes on TMM's own aigw host functions, joined on the
+request's client-side `aigw_scb` address, time each request's stages from
+the monotonic clock:
+
+| Stage | From → to (function entries) |
+|---|---|
+| admission | `aigw_rbac_admit` → `FORWARDED` event at `aigw_host_session_event` |
+| store, each round trip | `aigw_dssm_send` → `aigw_host_store_reply` (joined on `hc->scb`) |
+| provider until first byte | `FORWARDED` → server-side `aigw_host_reply_parse` |
+| provider body | first server-side reply pass → server-side `aigw_host_reply_done` |
+| delivery to client | server-side `reply_done` → client-side `reply_done` |
+| total | `aigw_rbac_admit` → client-side `reply_done` |
+
+A mock provider with set delays gives an independent reference: D1 before the
+response headers, D2 between two body chunks.
+
+**Falsifiers:** a stage cannot be joined to exactly one request; any stage is
+negative; stages do not sum to the total within 1 ms; the provider-until-first-byte
+stage is shorter than D1 or exceeds it by more than 20 ms (single-worker lab
+bound); the provider-body stage does not reflect D2 the same way; the store stage
+does not appear exactly once per Redis round trip; the probe total differs from
+the gateway's own `latency_total_us` by more than 1 ms, or the probe's first-byte
+point differs from its `latency_ttft_us` by more than 1 ms; any traffic result
+changes while armed; any probe error, safe return or restart. Concurrent requests
+on separate connections must not cross-attribute; a refused request must show
+admission and no provider stage.
+
+**Scope gate:** monitor only; one worker; HTTP/1; plain-HTTP provider; Redis
+on the fixture network. The `aigw_scb` address is a private join key, reused
+across requests on a keep-alive connection, so a stage that starts before the
+previous request ends is a falsifier. Probe overhead is measured as a side
+result, not claimed as a per-call cost. Tool and inspection time are not
+available in this gateway build.
+
+**Status:** unrun, IDEA.
+
 ## Retired
 
 ### R1 · "Per-call cost cannot be obtained from a live TMM" — RETIRED
