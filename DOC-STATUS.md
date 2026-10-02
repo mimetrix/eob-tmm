@@ -16,7 +16,9 @@ rule, not a substitute for it.
 **2026-10-02 AI gateway TMM:** [env/aigw/README.md](env/aigw/README.md) records an
 isolated build and smoke test of MR !21165, unmodified. The gateway library loads,
 forwards with the provider key, answers the model list and refuses an unknown
-model and an empty config. No eBPF is in this build yet.
+model and an empty config. With the eBPF substrate added, a signed probe at the
+record-publish callback captures each per-request record live, with identical
+traffic results. Candidate hooks: [TRACEPOINTS.md](env/aigw/TRACEPOINTS.md).
 
 **2026-10-01 client TLS mode:** [TLS-MODE.md](env/ai-traffic/TLS-MODE.md) is the
 current record. Each combined activity record states how TMM handled client TLS.

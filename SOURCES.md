@@ -72,6 +72,25 @@ restarts. Fixture removed. [Record](env/aigw/README.md).
 The full fixture archive (`9ff87075…`) and the TMM log (`cde84178…`) stay on the
 build box in `aigw-build-20261002/`, because the log carries internal detail.
 
+**eBPF added and a probe armed, 2026-10-02 — MEASURED.** Local branch
+`eob/aigw-ebpf` on the isolated clone: 40 added and 3 modified files (substrate
+only; no HTTP/2 CVE revert). Packaged build `2521bd2322b651d4e9b9aec79f935127469692b7`,
+runtime SHA-256 `755f34f01fcf877388ddb79c7ed9a06aba5444cd89a13409f5d94ec331e2b5de`,
+image `eob-aigw/tmm-ls:mr21165-ebpf`. Probe `aigw_record.bpf.o` SHA-256
+`3b02fc1aae0e87c181d1772f20b4a3146d3292d413862bc2cd660894b33d0d56`, signature
+`b45592cf…`, bound to `aigw_host_obs_publish` at `0xbcf400`. Pinned PREVAIL;
+GCC and clang native interpreter/JIT pass. [Record](env/aigw/README.md#the-gateway-with-ebpf-added).
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `aigw-ebpf-01-result.json` | `a85766f45b1699cc04ce95b94b26580f01012fa7c4b03651753a073adcd3508d` | Retained failure before arming: the output ring is created on TMM's first probe event, and the test treated its absence as an error. |
+| `aigw-ebpf-02-result.json` | `cd7c9db1e638f404f2f68418d3a1509ee111fd5254d49e5a759d546004fce4ae` | Identical HTTP results before, while armed and after; 2 calls, 2 complete records (chat 200 and `model_not_found` 404); no VM errors or safe returns. |
+
+Kept on the build box: fixture archive (`5dec20d7…`, both attempts) and TMM log
+(`f0f96b98…`, with the audit lines for arm, disarm and revoke). Kernel read after
+disarm: original pad `f30f1efa9090909090` at `0xbcf400`; executable hash equals
+the packaged runtime; zero restarts.
+
 ### Client TLS mode, 2026-10-01
 
 **MEASURED: native tests, pinned build checks and isolated single-worker HTTP/1

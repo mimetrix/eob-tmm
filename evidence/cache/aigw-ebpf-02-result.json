@@ -1,0 +1,840 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790965558450584",
+      "generation": 0,
+      "sequence": 0,
+      "status": 0
+    },
+    {
+      "description": "reset_config_timestamp=1790965558450584",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "load-signed",
+        "4",
+        "/work/probe/aigw_record.bpf.o",
+        "/work/probe/aigw_record.sig",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK loaded slot=4 mode=1 signature=verified\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "{\n  \"abi\": 1,\n  \"session\": \"ba1ff4fe6d03b328\",\n  \"instance\": \"8000000000000044\",\n  \"revision\": 0,\n  \"schema\": 0,\n  \"entries\": 0,\n  \"program_sha256\": \"3b02fc1aae0e87c181d1772f20b4a3146d3292d413862bc2cd660894b33d0d56\"\n}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-publish",
+        "4",
+        "/evidence/aigw-ebpf-02/probe-config.json"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK config published slot=4 revision=1\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK armed=1 mode=1 gen=1 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0 snapshot_entry_errors=0 snapshot_return_errors=0\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "arm",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK ARMED LIVE entry=0xbcf400 slot=4 kind=fentry (no restart)\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "status",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK armed=1 mode=1 gen=1 fired=2 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0 snapshot_entry_errors=0 snapshot_return_errors=0\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "disarm",
+        "aigw_host_obs_publish"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK DISARMED LIVE entry=0xbcf400\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "revoke",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK disabled (not reclaimed --- see item 0c)\n"
+    }
+  ],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-gateway-port-list-anchor",
+        "id": "e657e15e-be8e-11f1-8fe4-561dd6ba44c5",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-gateway-address-list-anchor",
+        "id": "e657e3fc-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "e6582826-be8e-11f1-8fe4-561dd6ba44c5",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-gateway-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "e658297a-be8e-11f1-8fe4-561dd6ba44c5",
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-gateway-address-list-anchor",
+        "destPorts": "aigw-smoke-gateway-port-list-anchor",
+        "id": "e6582a24-be8e-11f1-8fe4-561dd6ba44c5",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "e6582826-be8e-11f1-8fe4-561dd6ba44c5",
+        "enabled": true,
+        "id": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "e6582a24-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "e6583d34-be8e-11f1-8fe4-561dd6ba44c5",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "e658297a-be8e-11f1-8fe4-561dd6ba44c5",
+        "members": [
+          "e6583d34-be8e-11f1-8fe4-561dd6ba44c5"
+        ],
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "e658621e-be8e-11f1-8fe4-561dd6ba44c5",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658b5de-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658621e-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "e6587f9c-be8e-11f1-8fe4-561dd6ba44c5",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658b728-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e6587f9c-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "e6588eb0-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658b804-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e6588eb0-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "e6589d56-be8e-11f1-8fe4-561dd6ba44c5",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "e6589d56-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658b8c2-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e6589d56-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "e658a97c-be8e-11f1-8fe4-561dd6ba44c5",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "e658a97c-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658b976-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658a97c-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "36885897-06e5-4b33-977f-65540eaf9a43",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": false, \"rate_limit\": false, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": true}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"e6582826-be8e-11f1-8fe4-561dd6ba44c5\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}]}",
+        "name": "36885897-06e5-4b33-977f-65540eaf9a43",
+        "providerSecrets": [
+          "<omitted sha256=6a3d96f2c6cb37489a1a7622428f70a355bd4913aaa04cf1b6d7e59061acdb21>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658bee4-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "36885897-06e5-4b33-977f-65540eaf9a43",
+        "virtualServer": "e6582ae2-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-refused-port-list-anchor",
+        "id": "e658c038-be8e-11f1-8fe4-561dd6ba44c5",
+        "ports": [
+          18102,
+          18102
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-refused-address-list-anchor",
+        "id": "e658c0ce-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "e658c290-be8e-11f1-8fe4-561dd6ba44c5",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-refused-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "e658c326-be8e-11f1-8fe4-561dd6ba44c5",
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-refused-address-list-anchor",
+        "destPorts": "aigw-smoke-refused-port-list-anchor",
+        "id": "e658c3a8-be8e-11f1-8fe4-561dd6ba44c5",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "e658c290-be8e-11f1-8fe4-561dd6ba44c5",
+        "enabled": true,
+        "id": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "e658c3a8-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "e658c5ba-be8e-11f1-8fe4-561dd6ba44c5",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "e658c326-be8e-11f1-8fe4-561dd6ba44c5",
+        "members": [
+          "e658c5ba-be8e-11f1-8fe4-561dd6ba44c5"
+        ],
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "e658c6e6-be8e-11f1-8fe4-561dd6ba44c5",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658cc0e-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658c6e6-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "e658c8b2-be8e-11f1-8fe4-561dd6ba44c5",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658ccc2-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658c8b2-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "e658ca38-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658cd76-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658ca38-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "e658cac4-be8e-11f1-8fe4-561dd6ba44c5",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "e658cac4-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658ce2a-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658cac4-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "e658cb5a-be8e-11f1-8fe4-561dd6ba44c5",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "e658cb5a-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658cee8-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "e658cb5a-be8e-11f1-8fe4-561dd6ba44c5",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "86747c3a-091d-4bd6-8322-f1c9ba0813b7",
+        "name": "86747c3a-091d-4bd6-8322-f1c9ba0813b7"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "e658d00a-be8e-11f1-8fe4-561dd6ba44c5",
+        "profile": "86747c3a-091d-4bd6-8322-f1c9ba0813b7",
+        "virtualServer": "e658c43e-be8e-11f1-8fe4-561dd6ba44c5"
+      }
+    }
+  ],
+  "drains": [
+    {
+      "absent_before_first_event": true,
+      "rc": null
+    },
+    {
+      "lines": 7398,
+      "rc": 0,
+      "stderr": "ls_drain: /run/ls-stream/ls_tp_ring mapped, 16 rings x 65536 bytes\nls_drain: exit, 16 record(s) delivered, 0 drop(s) seen\n"
+    }
+  ],
+  "finished_ns": 1790965640859838841,
+  "frames": 16,
+  "passed": true,
+  "phases": [
+    {
+      "cases": [
+        {
+          "body_prefix": "{\"id\": \"chatcmpl-smoke\", \"object\": \"chat.completion\", \"model\": \"smoke-model\", \"choices\": [{\"index\": 0, \"message\": {\"role",
+          "case": "chat",
+          "mock_requests": 1,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"object\":\"list\",\"data\":[{\"id\":\"smoke-model\",\"object\":\"model\",\"created\":0,\"owned_by\":\"bnk-ai-gateway\",\"type\":\"model\",\"di",
+          "case": "models",
+          "mock_requests": 0,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"No provider serves the requested model\",\"type\":\"model_not_found\",\"param\":null,\"code\":\"404\"}}",
+          "case": "unknown-model",
+          "mock_requests": 0,
+          "status": 404
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"AI gateway unavailable\",\"type\":\"internal_server_error\",\"param\":null,\"code\":\"503\"}}",
+          "case": "empty-config",
+          "mock_requests": 0,
+          "status": 503
+        }
+      ],
+      "phase": "before"
+    },
+    {
+      "cases": [
+        {
+          "body_prefix": "{\"id\": \"chatcmpl-smoke\", \"object\": \"chat.completion\", \"model\": \"smoke-model\", \"choices\": [{\"index\": 0, \"message\": {\"role",
+          "case": "chat",
+          "mock_requests": 1,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"object\":\"list\",\"data\":[{\"id\":\"smoke-model\",\"object\":\"model\",\"created\":0,\"owned_by\":\"bnk-ai-gateway\",\"type\":\"model\",\"di",
+          "case": "models",
+          "mock_requests": 0,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"No provider serves the requested model\",\"type\":\"model_not_found\",\"param\":null,\"code\":\"404\"}}",
+          "case": "unknown-model",
+          "mock_requests": 0,
+          "status": 404
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"AI gateway unavailable\",\"type\":\"internal_server_error\",\"param\":null,\"code\":\"503\"}}",
+          "case": "empty-config",
+          "mock_requests": 0,
+          "status": 503
+        }
+      ],
+      "phase": "armed"
+    },
+    {
+      "cases": [
+        {
+          "body_prefix": "{\"id\": \"chatcmpl-smoke\", \"object\": \"chat.completion\", \"model\": \"smoke-model\", \"choices\": [{\"index\": 0, \"message\": {\"role",
+          "case": "chat",
+          "mock_requests": 1,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"object\":\"list\",\"data\":[{\"id\":\"smoke-model\",\"object\":\"model\",\"created\":0,\"owned_by\":\"bnk-ai-gateway\",\"type\":\"model\",\"di",
+          "case": "models",
+          "mock_requests": 0,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"No provider serves the requested model\",\"type\":\"model_not_found\",\"param\":null,\"code\":\"404\"}}",
+          "case": "unknown-model",
+          "mock_requests": 0,
+          "status": 404
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"AI gateway unavailable\",\"type\":\"internal_server_error\",\"param\":null,\"code\":\"503\"}}",
+          "case": "empty-config",
+          "mock_requests": 0,
+          "status": 503
+        }
+      ],
+      "phase": "after"
+    }
+  ],
+  "record_docs": [
+    {
+      "error.type": "",
+      "gen_ai.f5.cost_no_cache_usd_micros": 0,
+      "gen_ai.f5.cost_usd_micros": 0,
+      "gen_ai.f5.failover.attempts": 0,
+      "gen_ai.f5.failover.failed_providers": [],
+      "gen_ai.f5.failover.failed_statuses": [],
+      "gen_ai.f5.identity_state": "none",
+      "gen_ai.f5.latency_gate_us": 28,
+      "gen_ai.f5.latency_ms": 4,
+      "gen_ai.f5.latency_total_us": 4135,
+      "gen_ai.f5.latency_ttft_us": 4135,
+      "gen_ai.f5.meter.status": "metered",
+      "gen_ai.f5.usage.cost": 0.0,
+      "gen_ai.f5.usage.total_tokens": 4,
+      "gen_ai.operation.name": "chat",
+      "gen_ai.provider.name": "openai",
+      "gen_ai.request.max_tokens": -1,
+      "gen_ai.request.model": "smoke-model",
+      "gen_ai.request.stream": 0,
+      "gen_ai.response.finish_reasons": [
+        "stop"
+      ],
+      "gen_ai.response.model": "smoke-model",
+      "gen_ai.usage.cache_read.input_tokens": 0,
+      "gen_ai.usage.cache_write.input_tokens": 0,
+      "gen_ai.usage.input_tokens": 3,
+      "gen_ai.usage.output_tokens": 1,
+      "http.response.status_code": 200,
+      "org_id": "",
+      "principal_id": "",
+      "provider": "mock-openai",
+      "team_id": "",
+      "ts_ms": 1790965640678,
+      "vk_id": ""
+    },
+    {
+      "error.type": "model_not_found",
+      "gen_ai.f5.cost_no_cache_usd_micros": 0,
+      "gen_ai.f5.cost_usd_micros": 0,
+      "gen_ai.f5.failover.attempts": 0,
+      "gen_ai.f5.failover.failed_providers": [],
+      "gen_ai.f5.failover.failed_statuses": [],
+      "gen_ai.f5.identity_state": "none",
+      "gen_ai.f5.latency_gate_us": 15,
+      "gen_ai.f5.latency_ms": 0,
+      "gen_ai.f5.latency_total_us": 15,
+      "gen_ai.f5.latency_ttft_us": -1,
+      "gen_ai.f5.meter.status": "unmetered_not_inspected",
+      "gen_ai.f5.usage.cost": 0.0,
+      "gen_ai.f5.usage.total_tokens": 0,
+      "gen_ai.operation.name": "",
+      "gen_ai.provider.name": "",
+      "gen_ai.request.max_tokens": -1,
+      "gen_ai.request.model": "no-such-model",
+      "gen_ai.request.stream": 0,
+      "gen_ai.response.finish_reasons": [],
+      "gen_ai.response.model": "",
+      "gen_ai.usage.cache_read.input_tokens": 0,
+      "gen_ai.usage.cache_write.input_tokens": 0,
+      "gen_ai.usage.input_tokens": 0,
+      "gen_ai.usage.output_tokens": 0,
+      "http.response.status_code": 404,
+      "org_id": "",
+      "principal_id": "",
+      "provider": "",
+      "team_id": "",
+      "ts_ms": 1790965640686,
+      "vk_id": ""
+    }
+  ],
+  "records": [
+    {
+      "complete": true,
+      "flags": 0,
+      "sequence": 1,
+      "text": "{\"ts_ms\":1790965640678,\"vk_id\":\"\",\"principal_id\":\"\",\"team_id\":\"\",\"org_id\":\"\",\"gen_ai.request.model\":\"smoke-model\",\"provider\":\"mock-openai\",\"gen_ai.provider.name\":\"openai\",\"gen_ai.usage.input_tokens\":3,\"gen_ai.usage.output_tokens\":1,\"gen_ai.usage.cache_read.input_tokens\":0,\"gen_ai.usage.cache_write.input_tokens\":0,\"gen_ai.f5.usage.total_tokens\":4,\"gen_ai.f5.cost_usd_micros\":0,\"gen_ai.f5.cost_no_cache_usd_micros\":0,\"gen_ai.f5.usage.cost\":0.000000,\"gen_ai.response.finish_reasons\":[\"stop\"],\"http.response.status_code\":200,\"gen_ai.f5.latency_ms\":4,\"gen_ai.request.max_tokens\":-1,\"error.type\":\"\",\"gen_ai.f5.identity_state\":\"none\",\"gen_ai.request.stream\":0,\"gen_ai.f5.latency_total_us\":4135,\"gen_ai.f5.latency_gate_us\":28,\"gen_ai.f5.latency_ttft_us\":4135,\"gen_ai.operation.name\":\"chat\",\"gen_ai.response.model\":\"smoke-model\",\"gen_ai.f5.meter.status\":\"metered\",\"gen_ai.f5.failover.attempts\":0,\"gen_ai.f5.failover.failed_providers\":[],\"gen_ai.f5.failover.failed_statuses\":[]}",
+      "total_len": 970
+    },
+    {
+      "complete": true,
+      "flags": 0,
+      "sequence": 2,
+      "text": "{\"ts_ms\":1790965640686,\"vk_id\":\"\",\"principal_id\":\"\",\"team_id\":\"\",\"org_id\":\"\",\"gen_ai.request.model\":\"no-such-model\",\"provider\":\"\",\"gen_ai.provider.name\":\"\",\"gen_ai.usage.input_tokens\":0,\"gen_ai.usage.output_tokens\":0,\"gen_ai.usage.cache_read.input_tokens\":0,\"gen_ai.usage.cache_write.input_tokens\":0,\"gen_ai.f5.usage.total_tokens\":0,\"gen_ai.f5.cost_usd_micros\":0,\"gen_ai.f5.cost_no_cache_usd_micros\":0,\"gen_ai.f5.usage.cost\":0.000000,\"gen_ai.response.finish_reasons\":[],\"http.response.status_code\":404,\"gen_ai.f5.latency_ms\":0,\"gen_ai.request.max_tokens\":-1,\"error.type\":\"model_not_found\",\"gen_ai.f5.identity_state\":\"none\",\"gen_ai.request.stream\":0,\"gen_ai.f5.latency_total_us\":15,\"gen_ai.f5.latency_gate_us\":15,\"gen_ai.f5.latency_ttft_us\":-1,\"gen_ai.operation.name\":\"\",\"gen_ai.response.model\":\"\",\"gen_ai.f5.meter.status\":\"unmetered_not_inspected\",\"gen_ai.f5.failover.attempts\":0,\"gen_ai.f5.failover.failed_providers\":[],\"gen_ai.f5.failover.failed_statuses\":[]}",
+      "total_len": 961
+    }
+  ],
+  "started_ns": 1790965633411661064,
+  "status_after": "OK armed=1 mode=1 gen=1 fired=2 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0 snapshot_entry_errors=0 snapshot_return_errors=0\n",
+  "status_before": "OK armed=1 mode=1 gen=1 fired=0 safe_returns=0 errors=0 cycles=0 cycles_max=0 cycles_min=0 snapshot_entry_errors=0 snapshot_return_errors=0\n"
+}

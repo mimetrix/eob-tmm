@@ -21,6 +21,9 @@ env/scripts/ask 'Waiting for one or more dependent CRs'
 
 | symptom (literal) | what it actually means | where |
 |---|---|---|
+| `cannot open /run/ls-stream/ls_tp_ring as a tracepoint segment` before any probe has fired | TMM creates the ring on its first probe event (`ls_tp_seg_bootstrap`), not at startup. Before that, absence means no records yet, not a fault. After arming, the same message is a real failure. `ask` returned NO RECORD. | [aigw eBPF attempt 01](SOURCES.md#ai-gateway-in-tmm-mr-21165-and-bnk-as-llm-gateway-2026-10-02) |
+| PREVAIL `Invalid size (r2.value >= 0)` on a `read_mem` length | clang folded the tail length so it can reach 0. Read a constant size for a whole chunk, and a masked, non-zero size for the tail. `ask` returned NO RECORD. | [aigw_record.bpf.c](substrate/surfaces/aigw_record.bpf.c) |
+| PREVAIL `Lower bound must be at least r10.stack_offset - subprogram_stack_size` | The program's locals exceed the 256-byte stack; here a 248-byte frame. Shrink the frame (128-byte chunks). | [aigw_record.bpf.c](substrate/surfaces/aigw_record.bpf.c) |
 | `aigw_dssm: conn_open(TLS) to 127.0.0.1 port 6379 -> ERR_INIT` (repeating) | The AI gateway TMM has no session store (Redis) in the isolated fixture. Expected while RBAC, budget and rate limit are off; requests still pass. `ask` returned NO RECORD. | [env/aigw](env/aigw/README.md#expected-noise) |
 | `required variable AIGW_IMAGE is missing a value` | The aigw Compose file needs the checked image ID: `AIGW_IMAGE=$(docker image inspect -f {{.Id}} eob-aigw/tmm:mr21165-74cf09df69)`. | [env/aigw](env/aigw/README.md) |
 | `loop not unrolled: the optimizer was unable to perform the requested transformation` | clang-18 cannot unroll a BPF loop that contains `break` or `return`. Move one iteration into a `noinline` step function that is a no-op when finished, and unroll a loop with no early exit. `ask` returned NO RECORD. | [TLS mode build 02](SOURCES.md#client-tls-mode-2026-10-01) |

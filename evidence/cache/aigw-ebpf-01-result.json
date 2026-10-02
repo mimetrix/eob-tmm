@@ -1,0 +1,589 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790965558450584",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "commands": [],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-gateway-port-list-anchor",
+        "id": "c2961d30-be8e-11f1-9b7c-561dd6ba44c5",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-gateway-address-list-anchor",
+        "id": "c29620b4-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "c29788e6-be8e-11f1-9b7c-561dd6ba44c5",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-gateway-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "c2978aee-be8e-11f1-9b7c-561dd6ba44c5",
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-gateway-address-list-anchor",
+        "destPorts": "aigw-smoke-gateway-port-list-anchor",
+        "id": "c2978b8e-be8e-11f1-9b7c-561dd6ba44c5",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "c29788e6-be8e-11f1-9b7c-561dd6ba44c5",
+        "enabled": true,
+        "id": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "c2978b8e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "c297c414-be8e-11f1-9b7c-561dd6ba44c5",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "c2978aee-be8e-11f1-9b7c-561dd6ba44c5",
+        "members": [
+          "c297c414-be8e-11f1-9b7c-561dd6ba44c5"
+        ],
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "c298d4ee-be8e-11f1-9b7c-561dd6ba44c5",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a3ece-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c298d4ee-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "c2999866-be8e-11f1-9b7c-561dd6ba44c5",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a4040-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c2999866-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "c299c322-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a40fe-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c299c322-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "c299ef14-be8e-11f1-9b7c-561dd6ba44c5",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "c299ef14-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a41c6-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c299ef14-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "c29a152a-be8e-11f1-9b7c-561dd6ba44c5",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "c29a152a-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a4284-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a152a-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "742c09dc-341d-4e2b-9ba6-4bdb189cf059",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": false, \"rate_limit\": false, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": true}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"c29788e6-be8e-11f1-9b7c-561dd6ba44c5\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}]}",
+        "name": "742c09dc-341d-4e2b-9ba6-4bdb189cf059",
+        "providerSecrets": [
+          "<omitted sha256=651e3d44f8232e74e1e06d79aad201f1b2d87411f1812b65ed3da88c020146d1>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a46c6-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "742c09dc-341d-4e2b-9ba6-4bdb189cf059",
+        "virtualServer": "c2978c4c-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-refused-port-list-anchor",
+        "id": "c29a47de-be8e-11f1-9b7c-561dd6ba44c5",
+        "ports": [
+          18102,
+          18102
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-refused-address-list-anchor",
+        "id": "c29a4874-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "c29a4a86-be8e-11f1-9b7c-561dd6ba44c5",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-refused-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "c29a4b30-be8e-11f1-9b7c-561dd6ba44c5",
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-refused-address-list-anchor",
+        "destPorts": "aigw-smoke-refused-port-list-anchor",
+        "id": "c29a4bb2-be8e-11f1-9b7c-561dd6ba44c5",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "c29a4a86-be8e-11f1-9b7c-561dd6ba44c5",
+        "enabled": true,
+        "id": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "c29a4bb2-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "c29a4d9c-be8e-11f1-9b7c-561dd6ba44c5",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "c29a4b30-be8e-11f1-9b7c-561dd6ba44c5",
+        "members": [
+          "c29a4d9c-be8e-11f1-9b7c-561dd6ba44c5"
+        ],
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "c29a4edc-be8e-11f1-9b7c-561dd6ba44c5",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a538c-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a4edc-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "c29a5058-be8e-11f1-9b7c-561dd6ba44c5",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a544a-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a5058-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "c29a51b6-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a54fe-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a51b6-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "c29a5238-be8e-11f1-9b7c-561dd6ba44c5",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "c29a5238-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a55b2-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a5238-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "c29a52ce-be8e-11f1-9b7c-561dd6ba44c5",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "c29a52ce-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a5670-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "c29a52ce-be8e-11f1-9b7c-561dd6ba44c5",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "1d9936cd-d549-44e0-bccc-dd46984f44c0",
+        "name": "1d9936cd-d549-44e0-bccc-dd46984f44c0"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "c29a5792-be8e-11f1-9b7c-561dd6ba44c5",
+        "profile": "1d9936cd-d549-44e0-bccc-dd46984f44c0",
+        "virtualServer": "c29a4c3e-be8e-11f1-9b7c-561dd6ba44c5"
+      }
+    }
+  ],
+  "drains": [
+    {
+      "lines": 0,
+      "rc": 1,
+      "stderr": "*** cannot open /run/ls-stream/ls_tp_ring as a tracepoint segment.\n    If the file is all zeros, this process mapped its OWN tmpfs\n    rather than a segment shared with TMM --- in Kubernetes that\n    means /dev/shm is not an emptyDir with medium: Memory in BOTH\n    containers. It looks exactly like 'no traffic'.\n"
+    }
+  ],
+  "error": "AssertionError({'argv': ['/work/ls_drain', '--segment', '/run/ls-stream/ls_tp_ring', '--once'], 'rc': 1, 'stdout': '', 'stderr': \"*** cannot open /run/ls-stream/ls_tp_ring as a tracepoint segment.\\n    If the file is all zeros, this process mapped its OWN tmpfs\\n    rather than a segment shared with TMM --- in Kubernetes that\\n    means /dev/shm is not an emptyDir with medium: Memory in BOTH\\n    containers. It looks exactly like 'no traffic'.\\n\"})",
+  "finished_ns": 1790965579456579850,
+  "passed": false,
+  "phases": [
+    {
+      "cases": [
+        {
+          "body_prefix": "{\"id\": \"chatcmpl-smoke\", \"object\": \"chat.completion\", \"model\": \"smoke-model\", \"choices\": [{\"index\": 0, \"message\": {\"role",
+          "case": "chat",
+          "mock_requests": 1,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"object\":\"list\",\"data\":[{\"id\":\"smoke-model\",\"object\":\"model\",\"created\":0,\"owned_by\":\"bnk-ai-gateway\",\"type\":\"model\",\"di",
+          "case": "models",
+          "mock_requests": 0,
+          "status": 200
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"No provider serves the requested model\",\"type\":\"model_not_found\",\"param\":null,\"code\":\"404\"}}",
+          "case": "unknown-model",
+          "mock_requests": 0,
+          "status": 404
+        },
+        {
+          "body_prefix": "{\"error\":{\"message\":\"AI gateway unavailable\",\"type\":\"internal_server_error\",\"param\":null,\"code\":\"503\"}}",
+          "case": "empty-config",
+          "mock_requests": 0,
+          "status": 503
+        }
+      ],
+      "phase": "before"
+    }
+  ],
+  "started_ns": 1790965574975441372
+}

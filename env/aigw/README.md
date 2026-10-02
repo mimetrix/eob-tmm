@@ -1,8 +1,9 @@
 # AI gateway TMM (MR !21165): isolated build and smoke test
 
 **2026-10-02 — MEASURED: the unmodified merge request builds and serves AI
-traffic in an isolated TMM.** This is exploration only. No code was merged, and
-no eBPF substrate is in this build yet.
+traffic in an isolated TMM. With the eBPF substrate added, a signed probe
+captures the gateway's per-request records live** ([below](#the-gateway-with-ebpf-added)).
+This is exploration only. No code was merged.
 [Sources and build record](../../SOURCES.md#ai-gateway-in-tmm-mr-21165-and-bnk-as-llm-gateway-2026-10-02).
 
 ## What the gateway is
@@ -71,6 +72,76 @@ and no enabled capability needs one.
 
 ## Next
 
-Add the eBPF substrate to this source in a separate branch of the isolated
-clone, build it the same way, and repeat this smoke test with and without
-probes attached. Then survey the gateway's decision points for tracepoints.
+Done below: the eBPF substrate was added and a probe was attached.
+
+## The gateway with eBPF added
+
+**2026-10-02 — MEASURED: the eBPF substrate builds into the AI gateway TMM, and
+a signed probe at the gateway's record-publish callback captures every
+per-request record live, with no change to traffic.** Still exploration only.
+
+### Build
+
+The same isolated clone, on a local branch `eob/aigw-ebpf` (never pushed), on
+top of the unmodified merge request. The changes are the substrate only:
+
+| Change | Detail |
+|---|---|
+| Added | 39 files under `src/base/` (the substrate), `Makefile.overrides`, uBPF at `c900ed9f` in `.ubpf/` |
+| Modified | `src/compile/filelist` (substrate block), both x86-64 globals whitelists (43 substrate symbols each, additions only) |
+| Not applied | The HTTP/2 CVE-fix revert from our main tree. This build keeps the fix. |
+
+uBPF was built in the aigw toolchain container (GCC 11.4.0). The compile passed
+with no globals-whitelist failures. The aigw functions now have the 5-byte entry
+pad. Packaging, the substrate-content check and the tools bake all passed.
+Packaged build `2521bd23…`; image `eob-aigw/tmm-ls:mr21165-ebpf`; runtime
+SHA-256 `755f34f0…`. Shared image tags were saved and restored; a before/after
+check of our main tree, its changes and its toolchain container is identical.
+
+### Probe
+
+[`aigw_record.bpf.c`](../../substrate/surfaces/aigw_record.bpf.c) attaches at the
+entry of `aigw_host_obs_publish`. The library calls that TMM function once per
+settled or refused request, with its finished per-request record (JSON). The probe
+copies the record in 128-byte chunks, up to 12 chunks, and marks truncation. It
+reads only the arguments, never the library's own memory, and it is
+monitor-only. It passes pinned PREVAIL (256-byte stack) before and after binding.
+[`check_aigw_record.c`](../../substrate/check_aigw_record.c) passes with GCC and
+clang, in interpreter and JIT: eight record lengths, truncation, bad arguments,
+an unreadable tail and output refusal. It is bound to `0xbcf400` and signed for
+build `2521bd23` in monitor mode.
+
+### Live result (attempt 02)
+
+| Phase | Chat | Model list | Unknown model | Empty config |
+|---|---|---|---|---|
+| Before load | 200, provider called | 200 | 404 | 503 |
+| Probe armed | 200, provider called | 200 | 404 | 503 |
+| After disarm and revoke | 200, provider called | 200 | 404 | 503 |
+
+While armed, the probe fired twice and produced two complete records (16 frames):
+the chat request (`smoke-model`, provider `mock-openai`, 3 input and 1 output
+tokens, status 200, total latency 4,135 µs) and the refused request
+(`no-such-model`, `error.type` `model_not_found`, status 404). The model list and
+the empty-config refusal publish no record, so they produce none. Probe calls
+equal records; zero VM errors and zero safe returns. TMM's audit log records
+`ARMED LIVE entry=0xbcf400` and `DISARMED LIVE`. After disarm, the kernel shows
+the original pad at that address, and the running executable's hash equals the
+packaged runtime. The TMM process did not restart.
+
+Attempt 01 failed before arming: the output ring does not exist until TMM's
+first probe event, and the test treated its absence as an error. It is retained.
+
+Witnesses: INDEPENDENT (PREVAIL); SELF (clients, mock provider, probe records);
+TMM's own audit log; KERNEL (hook bytes, executable hash).
+
+### What this shows, and its limits
+
+The gateway's own per-request record can be observed live, without enabling a
+log pipeline and without rebuilding TMM for the probe. The record carries the
+model, provider, usage, status, refusal type and latencies. Limits: one worker,
+HTTP/1, one plain-HTTP provider, no Redis (so no identity, budget or rate-limit
+fields are populated), no streaming. The probe's data-path cost is not measured.
+The record format is the library's, not a versioned interface, so a consumer
+must not rely on its fields across library versions. The candidate hook list
+is in [TRACEPOINTS.md](TRACEPOINTS.md).

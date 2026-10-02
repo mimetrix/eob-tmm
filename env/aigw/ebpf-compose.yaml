@@ -1,0 +1,23 @@
+# Layer over compose.yaml for the eBPF build: loader socket and output ring,
+# shared with the fixture so ls-load.py and ls_drain run there.
+services:
+  fixture:
+    environment:
+      LS_LOAD_SOCKET: /run/ls/ls_load.sock
+    volumes:
+      - ls-sockets:/run/ls
+      - ls-stream:/run/ls-stream
+  tmm:
+    environment:
+      LS_SHIELD_BUILTIN: "0"
+      LS_VM_SELFTEST: "0"
+      LS_SHIELD_MODE: monitor
+      LS_VM_JIT: "1"
+      LS_LOAD_SOCKET: /run/ls/ls_load.sock
+      LS_TP_RING: /run/ls-stream/ls_tp_ring
+    volumes:
+      - ls-sockets:/run/ls
+      - ls-stream:/run/ls-stream
+volumes:
+  ls-sockets:
+  ls-stream:

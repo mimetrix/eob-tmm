@@ -67,7 +67,7 @@ def library_config(pool):
                 "guardrail",
             )
         }
-        | {"observability": False},
+        | {"observability": os.environ.get("AIGW_OBSERVE") == "1"},
         "providers": [
             {
                 "name": "mock-openai",

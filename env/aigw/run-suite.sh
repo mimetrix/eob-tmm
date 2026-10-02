@@ -6,7 +6,7 @@ run=${1:?provide a unique run name}
 mkdir "/evidence/$run"
 export AIGW_RESULT="/evidence/$run/result.json"
 export ICAP_RESULT="$AIGW_RESULT"
-export TAO_TEST_PATH=/work/aigw_smoke_suite.py
+export TAO_TEST_PATH=/work/${AIGW_SUITE:-aigw_smoke_suite.py}
 export PYTHONPATH="/work:${PYTHONPATH:-}"
 export TAO_OUTPUT_FILE="/evidence/$run/tao.xml"
 export TAO_TIME_OUT=240 TAO_LOG_DISPLAY=all TAO_LOG_LEVEL=INFO
