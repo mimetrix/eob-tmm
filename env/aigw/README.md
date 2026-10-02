@@ -145,3 +145,32 @@ fields are populated), no streaming. The probe's data-path cost is not measured.
 The record format is the library's, not a versioned interface, so a consumer
 must not rely on its fields across library versions. The candidate hook list
 is in [TRACEPOINTS.md](TRACEPOINTS.md).
+
+## Build-box state and backup (2026-10-02)
+
+**Kept** (the next test runs on these):
+
+- `~/code/tmm-aigw`: the merge request at `74cf09df69`, plus one local commit
+  `5e2b79b7` on `eob/aigw-ebpf` with the substrate. The branch has no upstream
+  and has never been pushed.
+- The aigw toolchain container `10.204.15_0.1.58-HEAD.cf619836a9`.
+- Images `eob-aigw/tmm:*`, `eob-aigw/tmm_gdb:*` and `eob-aigw/tmm-ls:mr21165-ebpf`.
+  They are not in any registry.
+- `~/aigw-build-20261002/`: logs, sources, probe builds, fixture files and records.
+
+**Backup**, in `~/aigw-build-20261002/backup/` with a `SHA256SUMS` file:
+
+| File | SHA-256 | Restores |
+|---|---|---|
+| `tmm-aigw-ebpf.bundle` | `555bcdea4177fbdfcdc128b8a9ab3378cbb539cc479c083f4d7a9249ee008780` | The local branch: `git fetch <bundle> eob/aigw-ebpf` on a clone that has `74cf09df69` |
+| `tmm-ls-mr21165-ebpf.tar.gz` | `852dcb94aa52f2b6265170418bda69d65c0d3d6f59e331c68816fbaf0134e8ce` | The probe-ready image: `gunzip -c … \| docker load` |
+
+These are F5 source and an F5 image, so they stay on the build box. Do not copy
+them to this repository or to a public registry.
+
+**Removed** in the scratch cleanup: temporary files under `/tmp` (the PDF tool
+environment, the schema extract, the survey's DEB extract, extracted archives
+and copied files), the extra `publish.artifactory…/test/tmm-img:v10.204.15-*`
+tags on the aigw images, and the `eob-pre-aigw/*` safety tags. A before/after
+check shows the main tree, its changes, the shared image tags and the main
+toolchain container are unchanged.
