@@ -77,6 +77,10 @@ def fields(kind, record):
             outcome[name] = {"status": record[state + "_name"]}
             if record[state] == 1:
                 outcome[name]["value"] = bool(record[value]) if name == "local_transfer_complete" else record[value]
+        if record.get("client_tls", {}).get("mode", "not_applicable") != "not_applicable":
+            # TMM's client-side SSL filter state. Evidence of a TMM state,
+            # not an identity; see TLS-MODE.md.
+            activity["client_tls"] = record["client_tls"]
     return activity, outcome
 
 

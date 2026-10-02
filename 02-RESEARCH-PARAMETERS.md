@@ -1048,7 +1048,15 @@ produces no HTTP record to annotate. Certificate subject, TLS state before TMM,
 HTTP/2, multiple workers, resumption and cost stay outside this test.
 [Contract](env/ai-traffic/TLS-MODE.md).
 
-**Status:** unrun, IDEA.
+**Result, 2026-10-01 — MEASURED, isolated live TMM, one worker, HTTP/1:** no
+falsifier fired. 16 exchanges through plain and client-SSL virtual servers give
+the expected class; protocol and cipher ID match the client's own record in all
+15 TLS exchanges. Trusted, untrusted and missing client certificates give
+`verified`, `failed` and `none_observed`. TLS 1.3 with no certificate reports
+verify code 0, which confirms that presence is required. Malformed native chains
+give only `unknown`. Existing combined-activity checks pass unchanged. Identity
+stays `unknown`. [Result](env/ai-traffic/TLS-MODE.md#measured-result),
+[receipts](SOURCES.md#client-tls-mode-2026-10-01).
 
 ## Retired
 

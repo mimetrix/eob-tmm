@@ -1,10 +1,16 @@
 # Client TLS mode for each activity record
 
-**2026-10-01 — IDEA, registered before implementation.** Nothing on this page has
-run. Source and layout facts below are from the pinned tree `e2104734a9` and the
-debug file of packaged build `2ab960fa…` (SHA-256 of the debug file
-`92a14f17…`). They are TOOL observations of source and layout, not runtime
-results. [Pre-registration P23](../../02-RESEARCH-PARAMETERS.md#p23--does-each-activity-record-state-how-tmm-handled-client-tls).
+**2026-10-01 — MEASURED in isolated live TMM, one worker, HTTP/1.** Each combined
+activity record now states how TMM handled TLS on the client connection.
+16 live exchanges through plain and client-SSL virtual servers give the expected
+class. Protocol and cipher ID match the client's own record in all 15 TLS
+exchanges. Identity stays `unknown`. [Result](#measured-result),
+[evidence](../../SOURCES.md#client-tls-mode-2026-10-01).
+
+The contract below was registered before implementation, in commit `053b858`.
+Source and layout facts are from the pinned tree `e2104734a9` and the debug file
+of packaged build `2ab960fa…` (SHA-256 `92a14f17…`).
+[Pre-registration P23](../../02-RESEARCH-PARAMETERS.md#p23--does-each-activity-record-state-how-tmm-handled-client-tls).
 
 ## Why this comes before identity
 
@@ -150,3 +156,81 @@ A pass establishes that each combined record states TMM's client-side SSL
 filter state on one worker for HTTP/1 in this fixture. It does not establish
 identity, certificate subjects, TLS state before TMM, passthrough detection,
 HTTP/2, multiple workers, session resumption behavior or data-path cost.
+
+## Measured result
+
+Live attempt 02, packaged build `2ab960fa…`, artifact `a15f5135…` (186,704 bytes).
+Every row is one combined exchange; the client column is the fixture client's
+own `ssl` record.
+
+| Case | `mode` | Protocol, cipher | `peer_cert_mode` | `client_certificate` | Verify code |
+|---|---|---|---|---|---|
+| Plain | `no_ssl_filter` | none (client used no TLS) | – | – | – |
+| Client SSL | `terminated` | TLS 1.2 `0xc02f`; TLS 1.3 `0x1301` | ignore | `not_requested` | 0 |
+| REQUEST, trusted certificate | `terminated` | 1.2 and 1.3 | request | `verified` | 0 |
+| REQUEST, untrusted certificate | `terminated` | 1.2 and 1.3 | request | `failed` | 20 |
+| REQUEST, no certificate | `terminated` | 1.2 and 1.3 | request | `none_observed` | 50 (1.2), **0 (1.3)** |
+| Keep-alive, three requests | `terminated` | 1.3 | ignore | `not_requested` | 0 |
+| Four concurrent connections | `terminated` | 1.2 | ignore | `not_requested` | 0 |
+
+The plain chain had six filter nodes; each client-SSL chain had seven. Hook calls:
+32 JSON and 362 HTTP, with zero VM errors and zero safe returns. Replay with
+one-row pages gives identical combined records. Both hooks were patched and
+restored; the TMM process and binary stayed the same with zero restarts. The
+fixture was archived (eight files) and removed.
+
+**The TLS 1.3 no-certificate row confirms the registered premise.** TLS 1.3
+gives verify code 0 with no certificate, the same value as success. A probe
+that used the verify code alone would report `verified`. The derivation
+requires a presence bit, so it reports `none_observed`.
+
+Native checks: pinned PREVAIL passes both entries; GCC and clang pass in
+interpreter and JIT. Chains test each class, the 16/17-node limit, a cycle, five
+unreadable pointers, an unreadable type and node, each cleared context flag, a
+server-side SSL entity and two SSL filters. Each failure gives `unknown` with a
+reason, never a class. The existing combined-activity checks still pass on the
+measured 2026-09-30 journal.
+
+Retained failures: builds 01–05 (sign comparison, loop unroll, missing header,
+test setup, old parser path) and live attempt 01 (pylint, before any arm).
+
+### Limits
+
+- One worker, HTTP/1, one fixture. HTTP/2, multiple workers and data-path cost
+  are not tested.
+- `no_ssl_filter` means TMM had no client SSL filter. It does not prove the
+  client sent plaintext; an earlier hop may have ended TLS.
+- Passthrough produces no HTTP record, so this probe cannot detect it.
+- A certificate state other than `unknown` needs `retain_certificate` (TMM's
+  default) or a chain not yet freed. Session resumption was disabled in the
+  fixture and stays unqualified.
+- `verified` is TMM's verify result. It names no subject. Identity binding is
+  the next step: read the certificate subject, and bind it only when the record
+  shows `terminated` and `verified`.
+- The client's TLS record is fixture code (SELF), not an independent audit.
+
+### Repeat
+
+On the build box, from a source snapshot containing this repository's
+`substrate/` and `env/` files:
+
+```sh
+R=/home/starin/eob-config-20260925; P=$R/programs-package-01
+python3 SOURCE/env/ai-traffic/activity_program_build.py --source SOURCE \
+  --output $R/tls-mode-build-NEW --package $P/image-context --sign \
+  --debug $P/debug/usr/lib/debug/usr/bin/tmm64.no_pgo.debug
+python3 $R/json_initialization_fixture.py --package $P create --output CREATE.json \
+  --collector-image sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054 \
+  --collector-source NEW_SOURCE_DIR
+python3 $R/json_initialization_live.py --run NEW --artifact-dir tls-mode-build-NEW \
+  --image-build $R/collector-image-02/image-build.json --source-dir NEW_SOURCE_DIR \
+  --output LIVE.json --tls-mode
+python3 $R/json_initialization_fixture.py --package $P archive-cleanup --live LIVE.json \
+  --archive ARCHIVE.tar.gz --output CLEANUP.json \
+  --collector-image sha256:26f3184a4e3fe96b61f780761497933facc385f3d62d6f1cf66f04e56abd5054 \
+  --collector-source NEW_SOURCE_DIR
+```
+
+The live and fixture scripts must be the versions in this repository; the shared
+build-box directory keeps the 2026-09-30 versions, and the exact files used are
+in `tls-mode-live-source-02/`. Use new names for every output.

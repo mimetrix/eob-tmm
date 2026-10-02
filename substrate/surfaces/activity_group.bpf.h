@@ -144,6 +144,7 @@ activity_emit(void *ctx, void *map, jm_u64 flags, void *payload, jm_u64 length)
     frame.magic = AG_MAGIC; frame.abi = 2; frame.length = length;
     activity_scope(ctx, payload, &frame);
     if (length == 144) __builtin_memcpy(frame.payload, payload, 144);
+    else if (length == 128) __builtin_memcpy(frame.payload, payload, 128);
     else if (length == 104) __builtin_memcpy(frame.payload, payload, 104);
     else if (length == 96) __builtin_memcpy(frame.payload, payload, 96);
     else return -1;

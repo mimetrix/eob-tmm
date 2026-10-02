@@ -34,6 +34,12 @@ def complete(rows, **limits):
     return [r for r in combined(rows, **limits) if r["correlation"]["status"] == "observed_exchange"]
 
 
+def project_rows(rows):
+    from activity_export import project_page  # pylint: disable=import-outside-toplevel
+    return project_page(dict(events=rows, next_cursor=rows[-1]["cursor"]))["events"] if len(rows) <= 128 else \
+        [r for i in range(0, len(rows), 128) for r in project_rows(rows[i:i + 128])]
+
+
 def edit(row, offset, value, fmt="<Q"):
     payload = bytearray.fromhex(row["event"]["raw"]["data"])
     struct.pack_into(fmt, payload, offset, value)
@@ -198,6 +204,86 @@ class CombinedTests(unittest.TestCase):
             for i, row in enumerate(rows):
                 row["cursor"] = "test:" + str(i + 1)
             self.assertNotIn(first["activity_id"], {r["activity_id"] for r in complete(rows)})
+
+    def test_measured_journal_has_no_tls_reading(self):
+        # The measured journal predates ABI 2: no TLS claim may appear.
+        for row in combined(ROWS):
+            self.assertEqual(row["transport"], {"client_tls": {"status": "not_observed"}})
+            self.assertEqual(row["identity_binding"], "unknown")
+
+    def test_client_tls_block_and_derivation(self):
+        from response_metadata_decode import FORMAT, TLS, decode
+        base = bytearray(FORMAT.size)
+        struct.pack_into("<II6Q10I", base, 0, 0x5253504D, 2, 1, 1, 1, 1, 1, 0,
+                         142, 7, 0, 1, 1, 0, 0, 0, 0, 0)
+
+        def reading(*fields):
+            return decode(bytes(base) + TLS.pack(*fields))["client_tls"]
+
+        HSOK, PASS, CHAIN, SCERT, RETAIN = 1, 2, 4, 8, 16
+        self.assertEqual(reading(3, 0, 3, 0, 0, 0, 0, 0), dict(mode="no_ssl_filter", filter_nodes=3))
+        cases = [  # (pcm, vfy, bits, expected)
+            (0, 0, HSOK, "not_requested"),
+            (2, 0, HSOK | SCERT | RETAIN, "verified"),
+            (2, 0, HSOK | CHAIN, "verified"),
+            (2, 20, HSOK | CHAIN | RETAIN, "failed"),
+            (2, 0, HSOK | RETAIN, "none_observed"),
+            (2, 0, HSOK, "unknown"),  # freed chain, nothing retained
+            (1, 0, HSOK, "unknown"),
+        ]
+        for pcm, vfy, bits, expected in cases:
+            value = reading(1, 0, 3, bits, 6, 0x1302, pcm, vfy)
+            self.assertEqual(value["client_certificate"], expected, (pcm, vfy, bits))
+            self.assertEqual((value["protocol"], value["cipher_suite_id"]), ("TLSv1.3", 0x1302))
+        self.assertEqual(reading(2, 0, 3, PASS | HSOK, 5, 0xc02f, 0, 0)["mode"], "ssl_filter_not_decrypting")
+        self.assertEqual(reading(4, 3, 4, 0, 0, 0, 0, 0)["reason"], "multiple_ssl_filters")
+        refused = [
+            (1, 0, 3, PASS | HSOK, 6, 1, 0, 0),   # terminated but passthru
+            (1, 0, 3, 0, 6, 1, 0, 0),             # terminated without handshake
+            (2, 0, 3, HSOK, 6, 1, 0, 0),          # not-decrypting with handshake
+            (3, 0, 3, HSOK, 0, 0, 0, 0),          # values without an SSL filter
+            (4, 0, 1, 0, 0, 0, 0, 0),             # unknown without reason
+            (3, 2, 1, 0, 0, 0, 0, 0),             # reason on a class
+            (0, 0, 2, 0, 0, 0, 0, 0),             # walk on inapplicable event
+            (5, 0, 0, 0, 0, 0, 0, 0), (1, 0, 17, HSOK, 6, 1, 0, 0),
+            (1, 0, 3, HSOK | 256, 6, 1, 0, 0), (1, 0, 3, HSOK, 10, 1, 0, 0),
+            (1, 0, 3, HSOK, 6, 1, 3, 0), (1, 0, 3, HSOK, 6, 1, 0, 128),
+        ]
+        for fields in refused:
+            with self.assertRaises(ValueError, msg=fields):
+                reading(*fields)
+        other = bytearray(base)
+        struct.pack_into("<I", other, 56, 144)
+        struct.pack_into("<I", other, 76, 7)
+        with self.assertRaises(ValueError):  # TLS reading on the wrong event
+            decode(bytes(other) + TLS.pack(3, 0, 1, 0, 0, 0, 0, 0))
+        with self.assertRaises(ValueError):  # ABI 1 with a TLS block
+            one = bytearray(base)
+            struct.pack_into("<I", one, 4, 1)
+            decode(bytes(one) + TLS.pack(*[0] * 8))
+        REPORT["tls_decoder_cases"] = len(cases) + len(refused) + 4
+
+    def test_client_tls_conflict_is_reported(self):
+        # Two confirming readings that disagree must not be resolved.
+        rows = copy.deepcopy(ROWS)
+        reference = complete(rows)[0]
+        group = [r for r in rows if r["event"]["type"] == "record"
+                 and reference["evidence"]["first_cursor"] <= r["cursor"] <= reference["evidence"]["last_cursor"]]
+        self.assertTrue(group)
+        combiner = ActivityCombiner()
+        key = (reference["evidence"]["source_id"], reference["evidence"]["ring"], reference["evidence"]["run"],
+               reference["evidence"]["owner_instance"], reference["evidence"]["exchange"])
+        projected = [r for r in project_rows(rows) if r["cursor"] in {g["cursor"] for g in group}]
+        readings = [p for p in projected if p["event"]["evidence"]["observation"] == "http_response"
+                    and p["event"]["evidence"]["group"]["side"] == 1]
+        self.assertGreaterEqual(len(readings), 2)
+        readings[0]["event"]["activity"]["client_tls"] = dict(mode="no_ssl_filter", filter_nodes=2)
+        readings[1]["event"]["activity"]["client_tls"] = dict(mode="unknown", filter_nodes=1, reason="read_failed")
+        combiner.pending[key] = dict(first=projected[0]["cursor"], rows=projected, issues=[], confirmed=True)
+        row = combiner.finish(key)
+        self.assertEqual(row["transport"]["client_tls"]["status"], "conflicting")
+        self.assertIn("conflicting_client_tls", row["correlation"]["issues"])
+        self.assertEqual(row["correlation"]["status"], "incomplete")
 
     def test_cli_journal_socket_and_errors(self):
         command = [sys.executable, HERE / "activity_combine.py"]

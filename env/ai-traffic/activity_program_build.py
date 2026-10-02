@@ -85,6 +85,52 @@ print(json.dumps(result,sort_keys=True))
                     layouts.append(json.loads(next(line for line in text.splitlines() if line.startswith("{"))))
                 assert layouts[0] == layouts[1], "metadata layout changed since the live-qualified build"
                 record["layout"] = dict(reference_sha256=sha(previous), debug_sha256=sha(args.debug), values=layouts[1])
+                # Client TLS walk (TLS-MODE.md): assert every offset and bit
+                # position the bytecode uses against this debug file.
+                tls_script = '''import gdb,json
+def at(t,path):
+ t=gdb.lookup_type(t); off=0
+ for name in path.split("."):
+  f=[x for x in t.strip_typedefs().fields() if x.name==name][0]
+  off+=f.bitpos; t=f.type
+ return [off, f.bitsize]
+checks={"connflow.ipproto":at("struct connflow","ipproto"),"connflow.flow_type":at("struct connflow","flow_type"),
+"connflow.bottom_node":at("struct connflow","bottom_node"),"hudnode.above":at("struct hudnode","above"),
+"hudnode.f_active":at("struct hudnode","f_active"),"hudnode.f_ctx":at("struct hudnode","f_ctx"),
+"hudnode.private":at("struct hudnode","private"),"hudnode.ctx":at("struct hudnode","ctx"),
+"hudfilter.private":at("struct hudfilter","private"),"hudfilter.base.typeid":at("struct hudfilter","base.typeid"),
+"hud_typeid.name":at("struct hud_typeid","name"),
+"ssl_pcb.vfyresult":at("struct ssl_pcb","vfyresult"),"ssl_pcb.pcm":at("struct ssl_pcb","pcm"),
+"ssl_pcb.entity":at("struct ssl_pcb","entity"),"ssl_pcb.passthru":at("struct ssl_pcb","passthru"),
+"ssl_pcb.hsok":at("struct ssl_pcb","hsok"),"ssl_pcb.st_resume":at("struct ssl_pcb","st_resume"),
+"ssl_pcb.ss_resume":at("struct ssl_pcb","ss_resume"),"ssl_pcb.allow_nonssl":at("struct ssl_pcb","allow_nonssl"),
+"ssl_pcb.prf":at("struct ssl_pcb","prf"),"ssl_pcb.session":at("struct ssl_pcb","session"),
+"ssl_pcb.peercertchain":at("struct ssl_pcb","peercertchain"),"ssl_pcb.suite.id":at("struct ssl_pcb","suite.id"),
+"ssl_pcb.suite.proto":at("struct ssl_pcb","suite.proto"),"ssl_session.certmsg":at("struct ssl_session","certmsg"),
+"ssl_profile.retain_certificate":at("struct ssl_profile","retain_certificate")}
+checks["values"]=[int(gdb.parse_and_eval(n)) for n in ["SSL_E_SERVER","SSL_PCM_IGNORE","SSL_PCM_REQUIRE","SSL_PCM_REQUEST","SSL_VFY_OK","SSL_PROTO_TLS1_2","SSL_PROTO_TLS1_3"]]
+print(json.dumps(checks,sort_keys=True))
+'''
+                text = run("gdb", "-q", "-nx", "-batch", args.debug, "-ex", "python exec(" + repr(tls_script) + ")")
+                tls = json.loads(next(line for line in text.splitlines() if line.startswith("{")))
+                expected = {
+                    "connflow.ipproto": [288, 0], "connflow.flow_type": [296, 0],
+                    "connflow.bottom_node": [640, 0], "hudnode.above": [192, 0],
+                    "hudnode.f_active": [374, 1], "hudnode.f_ctx": [375, 1],
+                    "hudnode.private": [384, 0], "hudnode.ctx": [512, 0],
+                    "hudfilter.private": [1088, 0], "hudfilter.base.typeid": [512, 0],
+                    "hud_typeid.name": [0, 0],
+                    "ssl_pcb.vfyresult": [22, 7], "ssl_pcb.pcm": [47, 2], "ssl_pcb.entity": [96, 1],
+                    "ssl_pcb.passthru": [112, 1], "ssl_pcb.hsok": [122, 1],
+                    "ssl_pcb.st_resume": [169, 1], "ssl_pcb.ss_resume": [171, 1],
+                    "ssl_pcb.allow_nonssl": [340, 1], "ssl_pcb.prf": [576, 0],
+                    "ssl_pcb.session": [640, 0], "ssl_pcb.peercertchain": [832, 0],
+                    "ssl_pcb.suite.id": [4224, 0], "ssl_pcb.suite.proto": [4264, 4],
+                    "ssl_session.certmsg": [1728, 0], "ssl_profile.retain_certificate": [5747, 1],
+                    "values": [1, 0, 1, 2, 0, 5, 6],
+                }
+                assert tls == expected, ("client TLS layout differs", tls)
+                record["tls_layout"] = tls
             obj = args.output / "agent_activity.bpf.o"
             # Keep nested calls relocatable when uBPF selects one entry.
             run("clang-18", "-target", "bpf", "-O2", "-g", "-Wall", "-Wextra", "-Werror",
@@ -149,7 +195,10 @@ print(json.dumps(result,sort_keys=True))
             if args.sign:
                 run("env", "PREVAIL=" + str(prevail), "python3", base / "check_target.py")
                 run("python3", base / "check_ls_load.py")
-                old_header = args.package.parent / "originals/ls_target.h"
+                # The pre-multi-target parser, from the activity integration's
+                # preserved originals. Later packages do not carry a copy.
+                old_header = Path("/home/starin/eob-config-20260925/activity-integration-01/originals/ls_target.h")
+                assert sha(old_header) == "cc699a4b45ca05530fe56e897bb161638e0d2fe4d2308d66edf89f9c9401013e"
                 record["old_target_parser"] = dict(sha256=sha(old_header), text=old_header.read_text())
                 old_check = args.output / "old-target-check"
                 run("gcc", "-O2", "-Wall", "-Wextra", "-Werror", "-I" + str(base),

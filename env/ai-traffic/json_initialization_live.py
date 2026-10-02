@@ -22,7 +22,11 @@ def main():
     parser.add_argument("--activity", action="store_true",
                         help="run the two-entry activity artifact")
     parser.add_argument("--combined", action="store_true")
+    parser.add_argument("--tls-mode", action="store_true",
+                        help="combined activity with plain and client-SSL virtual servers")
     args = parser.parse_args()
+    if args.tls_mode:
+        args.combined = True
     if args.combined:
         args.activity = True
     assert args.run.replace("-", "").isalnum()
@@ -75,6 +79,8 @@ def main():
                            "token_method_decode.py", "method_decode.py", "ls-load.py")
             if args.combined:
                 names += ("activity_combined_suite.py", "activity_combine.py")
+            if args.tls_mode:
+                names += ("tls_mode_suite.py", "TLS-MODE.md")
             for name in names:
                 path = ROOT / name
                 record["sources"][name] = dict(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), text=path.read_text())
@@ -85,7 +91,8 @@ def main():
             run("docker", "exec", fixture, "mkdir", "/evidence/" + args.run)
             record["fixture_mounts"] = json.loads(run("docker", "inspect", fixture, "--format", "{{json .Mounts}}"))
             assert any(m["Destination"] == "/collector-api" and not m["RW"] for m in record["fixture_mounts"])
-            suite = "activity_combined_suite.py" if args.combined else "activity_program_suite.py" if args.activity else "json_initialization_suite.py"
+            suite = ("tls_mode_suite.py" if args.tls_mode else "activity_combined_suite.py" if args.combined
+                     else "activity_program_suite.py" if args.activity else "json_initialization_suite.py")
             run("docker", "exec", fixture, "python3", "-m", "black", "--check", "/work/" + suite, "/work/metadata_suite.py")
             run("docker", "exec", fixture, "python3", "-m", "pylint", "--disable=C,R,broad-exception-caught", "/work/" + suite, "/work/metadata_suite.py")
             for label, program in build["programs"].items():
@@ -122,6 +129,7 @@ else: raise RuntimeError("collector socket not ready")
 '''
             record["api_initial"] = json.loads(run("docker", "exec", fixture, "python3", "-c", ready, timeout=20))
             run("docker", "exec", "-e", "ACTIVITY_COMBINED=" + ("1" if args.combined else "0"),
+                "-e", "ACTIVITY_TLS_MODE=" + ("1" if args.tls_mode else "0"),
                 "-e", "TEMPLATE_PROGRAM_DIR=" + str(Path("/work") / args.artifact_dir), fixture,
                 "bash", "/work/" + ("activity-program-run.sh" if args.activity else "json-initialization-run.sh"), args.run, timeout=300)
             record["passed"] = True

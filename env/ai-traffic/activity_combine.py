@@ -131,13 +131,30 @@ class ActivityCombiner:
                     sources[name] = row["cursor"]
         if "http_status" not in outcome or "local_transfer_complete" not in outcome:
             issues.append("incomplete_http")
+        # Client TLS: read only at the confirming client request-header event.
+        # Disagreeing readings are reported, never resolved by choice.
+        readings = [row for row in rows
+                    if row["event"]["evidence"]["observation"] == "http_response"
+                    and row["event"]["evidence"]["group"]["side"] == 1
+                    and "client_tls" in row["event"]["activity"]]
+        transport = {}
+        if readings:
+            values = [row["event"]["activity"]["client_tls"] for row in readings]
+            if all(v == values[0] for v in values):
+                transport["client_tls"] = dict(values[0], status="observed")
+            else:
+                transport["client_tls"] = dict(status="conflicting", readings=values)
+                issues.append("conflicting_client_tls")
+            sources["client_tls"] = [row["cursor"] for row in readings]
+        else:
+            transport["client_tls"] = dict(status="not_observed")
         identity = hashlib.sha256(json.dumps(key, separators=(",", ":")).encode()).hexdigest()
         issues = sorted(set(issues))
         return dict(schema_version=1, event_type="agent.activity.combined",
                     activity_id=identity, identity_binding="unknown", identity=None,
                     correlation=dict(status="incomplete" if issues else "observed_exchange",
                                      scope="single_worker_nonpipelined_http1", issues=issues),
-                    activity=activity, reported_outcome=outcome,
+                    activity=activity, reported_outcome=outcome, transport=transport,
                     timing=observation_timing(rows),
                     evidence=dict(source_id=key[0], ring=key[1], run=key[2],
                                   owner_instance=key[3], exchange=key[4],

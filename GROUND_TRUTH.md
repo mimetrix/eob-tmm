@@ -29,6 +29,13 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 ## Mechanism
 
+**2026-10-01 — client TLS mode on combined activity records.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| Each combined record states TMM's client-side SSL filter state: `terminated`, `ssl_filter_not_decrypting`, `no_ssl_filter` or `unknown`, with protocol, cipher ID, certificate mode and verify result | **MEASURED (bounded single-worker HTTP/1 fixture)** | INDEPENDENT (PREVAIL); TOOL (compilers, debug-layout check); SELF (fixture clients, records, exporter); KERNEL (binary, process, hook bytes) | [Contract/result](env/ai-traffic/TLS-MODE.md), [receipts](SOURCES.md#client-tls-mode-2026-10-01). Build `2ab960fa…`: 16 live exchanges, all expected classes; protocol and cipher match the client's record in 15/15 TLS exchanges. Trusted/untrusted/missing certificates give `verified`/`failed`/`none_observed`. Native malformed chains give only `unknown`. Hooks restored; zero restarts. `no_ssl_filter` does not prove client plaintext; passthrough produces no record; resumption, HTTP/2, multiple workers and cost untested. Not identity: no subject is read. |
+| A TLS verify result of 0 means a verified client certificate | **FALSIFIED (as a standalone signal)** | SELF (live record); TOOL (source) | Registered before the run from `ssl.c:3703`; live TLS 1.3 REQUEST with no certificate reports 0. The derivation requires a certificate presence bit. |
+
 **2026-09-30 — independent programs with multiple entry attachments.**
 
 | Claim | Tier | Witness | Evidence and limit |

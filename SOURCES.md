@@ -10,6 +10,51 @@ cd evidence/cache && sha256sum * > MANIFEST.sha256
 
 ## Retrieved
 
+### Client TLS mode, 2026-10-01
+
+**MEASURED: native tests, pinned build checks and isolated single-worker HTTP/1
+traffic.** Contract registered first in commit `053b858`
+([TLS-MODE.md](env/ai-traffic/TLS-MODE.md), P23). Target: packaged build
+`2ab960fa38e447bab97738e47e1d5b2ce25c401a`, image
+`sha256:0b96d57129bc62948f7bb38d7e8dbe4baa9dae5e1aeaed81b0c64b90018c1217`.
+
+Build 06 artifact `agent_activity.bpf.o`, 186,704 bytes, SHA-256
+`a15f513534270936b4e999b5b306019e4e7b8ccd7686dca181aea5ff87fd2f23`. Both entries
+pass pinned PREVAIL (256-byte stack). GCC 13.3.0 and clang 18.1.3 native tests
+pass in interpreter and JIT, including authored chains for every class, the
+16-node limit, a cycle, unreadable pointers, cleared context flags, a server-side
+SSL entity and two SSL filters. All 26 offsets and bit positions are asserted
+against the debug file (SHA-256 `92a14f17…`).
+
+Live attempt 02: three AIMCP virtual servers (plain, client SSL, client SSL with
+`peer_cert_mode=request`). 16 combined exchanges; each TLS reading matches the
+client's own protocol and cipher ID. Trusted, untrusted and missing client
+certificates yield `verified`, `failed` (code 20) and `none_observed`. Identity
+stays `unknown`. 32 JSON and 362 HTTP hook calls; zero errors or safe returns.
+Both hooks restored; same process; zero restarts. Per-run keys and certificates
+were deleted; receipts keep only certificate SHA-256 fingerprints.
+
+Witnesses: INDEPENDENT (PREVAIL), TOOL (compilers, debug-layout check), SELF
+(fixture clients, bytecode records, exporter), KERNEL (binary, process, hook
+bytes). The client's TLS record is fixture code, not an independent TLS audit.
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `tls-mode-build-01.json` | `dd28a85aed64d9edeb4ddf5b1e9a0295381f71d0639a4136d2c98b824aa52196` | Retained failure: clang `-Wsign-compare` on the walk loop counter. |
+| `tls-mode-build-02.json` | `bf90cd5c9b49e51cbc5d38ef7f11de973645bd11796f0a13c114de5bbe1b187d` | Retained failure: clang could not unroll a loop with early exits. |
+| `tls-mode-build-03.json` | `3730522af5fc55aa98800e3fb4a55ea931a3a522ccc2e7b77b6681ae5991b80b` | Retained failure: source snapshot lacked `ls_program.h`. Bytecode and PREVAIL had already passed. |
+| `tls-mode-build-04.json` | `d71789171f3c7a076a5035659421f637b5cc7fa7b1ced887f35cae5e880fe12e` | Retained failure: the native test inherited a server-side flow from an earlier case (test setup error, not a probe defect). |
+| `tls-mode-build-05.json` | `87c89f443ddd5fa91edba04207ef1a33564bb60d5fef1eb28ffa075c439124ce` | Retained failure after all native tests passed: old-parser header path absent from the new package. |
+| `tls-mode-build-06.json` | `f6c9a0aa08321cb3626af2e7503e88b4441cf11cb8bf3107c9f3706b86c01386` | Pass: layouts, PREVAIL, native tests, target-set mutations, old-parser refusal, both signatures. |
+| `tls-mode-combine-check-01.json` | `23553a68d5a8cb2073cf8030ce44442b64ef10da0ce9fa9b872393c685faf278` | 11/11 combiner tests on the measured 2026-09-30 journal: eight existing, no TLS claim on ABI 1 records, 24 decoder cases, conflict reporting. |
+| `tls-mode-export-check-01.json` | `ee7dceea60a46f64d0dd80631a293cd12afa9954e68d296a0f0dfe2237095b2a` | Retained failure: check copy lacked `MANIFEST.sha256`. |
+| `tls-mode-export-check-02.json` | `637727056f454b2997208fd657f651273ef8a9e9edfd79e185b180f63b6247f1` | 6/6 export tests unchanged. |
+| `tls-mode-create-01.json` | `fa245ed9393dbbb70da8a536255051d188e932d941bd8a2c030ba0ce1f8daa32` | Isolated fixture with the packaged image and collector API; other containers unchanged. |
+| `tls-mode-live-01.json` | `997d69225300c85ff79ae1d57a8e8d6318b23ea6c7f33ccb9967154133094540` | Retained failure before any arm: pylint `no-member` on a generated protobuf field. |
+| `tls-mode-live-02.json` | `a6dc1141262440863cfd49b59b708671ad7df0e216122e8ac071e193b9b987b7` | 16 exchanges, readings match the client record, replay identical, hooks restored, zero restarts. |
+| `tls-mode-cleanup-01.json` | `3c23e289c8e19fa4fb52aa5cc9a28149323d49f346ef5ca405d03e3ab0df7cec` | Eight-file archive checked; hooks and slots checked; fixture removed; toolchain container unchanged. |
+| `tls-mode-evidence-01.tar.gz` | `5691e88cbf369899044778de688f2da47630dd28cf4998acb6693dd211e2f0ba` | Attempt 02 fixture files and journal. Attempt 01 created no files. |
+
 ### Program ownership live validation, 2026-09-30
 
 **MEASURED: packaged TMM and isolated single-worker HTTP/1 traffic.**

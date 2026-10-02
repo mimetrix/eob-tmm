@@ -1,0 +1,972 @@
+{
+  "live_sha256": "f28d16847e4fcda84742933124c9097cad1e5996fa0d8d110f272da6d1f63b3f",
+  "journal": "/home/starin/eob-config-20260925/activity-group-collector-03/events.sqlite",
+  "journal_sha256": "d8b05d3375d89b51ebaf47ec9e792bdc64e2f35c48e5368038bdae2a7f219e47",
+  "after": "5c481bac91f8400d8d8ab2ea04b9f368:531",
+  "sources": {
+    "check_activity_combine.py": {
+      "sha256": "f4c046dd269619aad01d7aaf9411ca8b2aa87322d6c92c57609dafb7747b8bb1",
+      "text": "#!/usr/bin/env python3\n\"\"\"Replay live exchange frames and attack incomplete or ambiguous joins.\"\"\"\nimport argparse\nimport copy\nfrom datetime import datetime, timezone\nimport hashlib\nimport json\nfrom pathlib import Path\nimport select\nimport struct\nimport subprocess\nimport sys\nimport tempfile\nimport unittest\n\nfrom activity_combine import ActivityCombiner\nfrom activity_export import project_event\n\nHERE = Path(__file__).resolve().parent\nROWS = []\nREPORT = {}\n\n\ndef combined(rows, size=128, **limits):\n    combiner, result = ActivityCombiner(**limits), []\n    for offset in range(0, len(rows), size):\n        chunk = rows[offset:offset + size]\n        result.extend(combiner.feed(dict(events=chunk, next_cursor=chunk[-1][\"cursor\"])))\n    result.extend(combiner.flush(\"end_of_input\"))\n    return [r for r in result if r[\"event_type\"] == \"agent.activity.combined\"]\n\n\ndef complete(rows, **limits):\n    return [r for r in combined(rows, **limits) if r[\"correlation\"][\"status\"] == \"observed_exchange\"]\n\n\ndef project_rows(rows):\n    from activity_export import project_page  # pylint: disable=import-outside-toplevel\n    return project_page(dict(events=rows, next_cursor=rows[-1][\"cursor\"]))[\"events\"] if len(rows) <= 128 else \\\n        [r for i in range(0, len(rows), 128) for r in project_rows(rows[i:i + 128])]\n\n\ndef edit(row, offset, value, fmt=\"<Q\"):\n    payload = bytearray.fromhex(row[\"event\"][\"raw\"][\"data\"])\n    struct.pack_into(fmt, payload, offset, value)\n    row[\"event\"][\"raw\"][\"data\"] = payload.hex()\n\n\nclass CombinedTests(unittest.TestCase):\n    def test_live_values_and_page_boundaries(self):\n        baseline = combined(ROWS)\n        self.assertEqual(len(baseline), 10)\n        self.assertTrue(all(r[\"correlation\"][\"status\"] == \"observed_exchange\" for r in baseline))\n        self.assertEqual(len({r[\"activity_id\"] for r in baseline}), 10)\n        for size in (1, 2, 3, 7, 17, 127):\n            self.assertEqual(combined(ROWS, size), baseline)\n        values = {r[\"activity\"][\"target\"][\"value\"]: r for r in baseline}\n        for i in range(4):\n            row = values[\"concurrent-\" + str(i)]\n            self.assertEqual(row[\"activity\"][\"message_id\"][\"value\"], \"same\")\n            self.assertEqual(row[\"reported_outcome\"][\"tool_error\"][\"value\"], bool(i % 2))\n        self.assertEqual(values[\"file:///one\"][\"activity\"][\"message_id\"][\"value\"], \"9007199254740993\")\n        self.assertEqual(values[\"file:///one\"][\"reported_outcome\"][\"error_code\"][\"value\"], -32601)\n        REPORT[\"combined\"] = baseline\n\n    def test_each_missing_record_and_discard(self):\n        # Delete every record of the first exchange. Also replace it with a\n        # DISCARD while retaining its cursor, to test sequence/field checks.\n        reference = complete(ROWS)[0]\n        first = next(i for i, r in enumerate(ROWS) if r[\"cursor\"] == reference[\"evidence\"][\"first_cursor\"])\n        last = next(i for i, r in enumerate(ROWS) if r[\"cursor\"] == reference[\"evidence\"][\"last_cursor\"])\n        tested = 0\n        for i in range(first, last + 1):\n            if ROWS[i][\"event\"][\"type\"] != \"record\":\n                continue\n            for discard in (False, True):\n                rows = copy.deepcopy(ROWS)\n                if discard:\n                    rows[i][\"event\"] = dict(type=\"discard\", source_id=rows[i][\"event\"][\"source_id\"], raw={})\n                else:\n                    del rows[i]\n                self.assertNotIn(reference[\"activity_id\"], {r[\"activity_id\"] for r in complete(rows)})\n                tested += 1\n        REPORT[\"missing_record_mutations\"] = tested\n\n    def test_source_timestamps_and_clock_adjustment(self):\n        by_cursor = {row[\"cursor\"]: row for row in ROWS}\n\n        def epoch_ns(value):\n            seconds, fraction = value.removesuffix(\"Z\").split(\".\")\n            self.assertEqual(len(fraction), 9)\n            date = datetime.strptime(seconds, \"%Y-%m-%dT%H:%M:%S\").replace(tzinfo=timezone.utc)\n            delta = date - datetime(1970, 1, 1, tzinfo=timezone.utc)\n            return (delta.days * 86400 + delta.seconds) * 1_000_000_000 + int(fraction)\n\n        for row in complete(ROWS):\n            first = by_cursor[row[\"evidence\"][\"first_cursor\"]]\n            last = by_cursor[row[\"evidence\"][\"last_cursor\"]]\n            timing = row[\"timing\"]\n            self.assertEqual(timing[\"status\"], \"complete\")\n            self.assertEqual(epoch_ns(timing[\"started_at\"]), int(first[\"event\"][\"raw\"][\"ts_ns\"]))\n            self.assertEqual(epoch_ns(timing[\"ended_at\"]), int(last[\"event\"][\"raw\"][\"ts_ns\"]))\n            self.assertEqual(timing[\"last_observed_at\"], timing[\"ended_at\"])\n            start = int(project_event(first[\"event\"])[\"evidence\"][\"record\"][\"monotonic_ns\"])\n            end = int(project_event(last[\"event\"])[\"evidence\"][\"record\"][\"monotonic_ns\"])\n            self.assertEqual(timing[\"duration_ns\"], str(end - start))\n\n        reference = complete(ROWS)[0]\n        first_cursor, last_cursor = [reference[\"evidence\"][k] for k in (\"first_cursor\", \"last_cursor\")]\n        rows = copy.deepcopy(ROWS)\n        first = next(r for r in rows if r[\"cursor\"] == first_cursor)\n        last = next(r for r in rows if r[\"cursor\"] == last_cursor)\n        last[\"event\"][\"raw\"][\"ts_ns\"] = str(int(first[\"event\"][\"raw\"][\"ts_ns\"]) - 1_000_000_001)\n        changed = complete(rows)[0][\"timing\"]\n        self.assertLess(changed[\"ended_at\"], changed[\"started_at\"])\n        self.assertEqual(changed[\"duration_ns\"], reference[\"timing\"][\"duration_ns\"])\n        self.assertEqual(changed[\"status\"], \"complete\")\n\n        start = int(project_event(first[\"event\"])[\"evidence\"][\"record\"][\"monotonic_ns\"])\n        edit(last, 48 + 32, start - 1)\n        invalid = complete(rows)[0][\"timing\"]\n        self.assertEqual(invalid[\"status\"], \"invalid\")\n        self.assertIsNone(invalid[\"duration_ns\"])\n\n    def test_unfinished_and_missing_timestamps(self):\n        reference = complete(ROWS)[0]\n        first = next(i for i, r in enumerate(ROWS) if r[\"cursor\"] == reference[\"evidence\"][\"first_cursor\"])\n        last = next(i for i, r in enumerate(ROWS) if r[\"cursor\"] == reference[\"evidence\"][\"last_cursor\"])\n        unfinished = combined(ROWS[first:last])[0][\"timing\"]\n        self.assertEqual(unfinished[\"status\"], \"incomplete\")\n        self.assertIsNone(unfinished[\"ended_at\"])\n        self.assertIsNone(unfinished[\"duration_ns\"])\n        self.assertIsNotNone(unfinished[\"last_observed_at\"])\n        for bad in (None, \"\", \"bad\", \"-1\", \"0\", str(1 << 64), 1.5, True):\n            rows = copy.deepcopy(ROWS)\n            rows[first][\"event\"][\"raw\"][\"ts_ns\"] = bad\n            timing = complete(rows)[0][\"timing\"]\n            self.assertIsNone(timing[\"started_at\"])\n            self.assertEqual(timing[\"status\"], \"incomplete\")\n        rows = copy.deepcopy(ROWS)\n        del rows[last][\"event\"][\"raw\"][\"ts_ns\"]\n        edit(rows[first], 48 + 32, 0)\n        timing = complete(rows)[0][\"timing\"]\n        self.assertIsNone(timing[\"ended_at\"])\n        self.assertIsNone(timing[\"duration_ns\"])\n        self.assertEqual(timing[\"status\"], \"incomplete\")\n\n    def test_binding_and_payload_mutations(self):\n        first = complete(ROWS)[0]\n        field_cursor = first[\"evidence\"][\"field_sources\"]\n        mutations = [(field_cursor[\"target\"], 16, 999, \"<Q\"),\n                     (field_cursor[\"reply\"], 48 + 8, 999, \"<Q\"),\n                     (field_cursor[\"http_status\"], 48 + 8, 999, \"<Q\"),\n                     (field_cursor[\"reply\"], 48 + 24, 999, \"<Q\"),\n                     (field_cursor[\"reply\"], 40, 999, \"<Q\"),\n                     (field_cursor[\"reply\"], 48 + 48, 1, \"<Q\"),\n                     (field_cursor[\"target\"], 4, 1, \"<I\"),\n                     (field_cursor[\"target\"], 12, 2, \"<I\")]\n        for cursor, offset, value, fmt in mutations:\n            rows = copy.deepcopy(ROWS)\n            row = next(r for r in rows if r[\"cursor\"] == cursor)\n            edit(row, offset, value, fmt)\n            self.assertNotIn(first[\"activity_id\"], {r[\"activity_id\"] for r in complete(rows)})\n        rows = copy.deepcopy(ROWS)\n        row = next(r for r in rows if r[\"cursor\"] == field_cursor[\"target\"])\n        edit(row, 48 + 56, 2, \"<I\")\n        edit(row, 48 + 64, 65, \"<I\")\n        edit(row, 48 + 68, 64, \"<I\")\n        data = bytearray.fromhex(row[\"event\"][\"raw\"][\"data\"])\n        data[128:] = b\"x\" * 64\n        row[\"event\"][\"raw\"][\"data\"] = data.hex()\n        self.assertEqual(project_event(row[\"event\"])[\"activity\"][\"target\"][\"status\"], \"truncated\")\n        self.assertNotIn(first[\"activity_id\"], {r[\"activity_id\"] for r in complete(rows)})\n\n    def test_duplicate_start_and_capacity(self):\n        rows = copy.deepcopy(ROWS)\n        first = complete(rows)[0]\n        index = next(i for i, r in enumerate(rows) if r[\"cursor\"] == first[\"evidence\"][\"first_cursor\"])\n        rows.insert(index, copy.deepcopy(rows[index]))\n        for i, row in enumerate(rows):\n            row[\"cursor\"] = \"test:\" + str(i + 1)\n        self.assertNotIn(first[\"activity_id\"], {r[\"activity_id\"] for r in complete(rows)})\n        self.assertLess(len(complete(ROWS, capacity=2)), 10)\n        self.assertFalse(complete(ROWS, max_records=3))\n        self.assertFalse(complete(ROWS[:index + 3]))\n\n    def test_id_mismatch_and_explicit_gap(self):\n        first = complete(ROWS)[0]\n        rows = copy.deepcopy(ROWS)\n        for row in rows:\n            event = project_event(row[\"event\"])\n            evidence = event[\"evidence\"]\n            if (evidence.get(\"group\", {}).get(\"exchange\") == first[\"evidence\"][\"exchange\"]\n                    and evidence.get(\"observation\") == \"message_id\" and evidence[\"group\"][\"side\"] == 2):\n                payload = bytearray.fromhex(row[\"event\"][\"raw\"][\"data\"])\n                payload[128:131] = b\"two\"\n                row[\"event\"][\"raw\"][\"data\"] = payload.hex()\n        result = combined(rows)[0]\n        self.assertIn(\"reply_id_mismatch\", result[\"correlation\"][\"issues\"])\n        for kind in (\"observation_gap\", \"source_boundary\"):\n            rows = copy.deepcopy(ROWS)\n            index = next(i for i, r in enumerate(rows) if r[\"cursor\"] == first[\"evidence\"][\"first_cursor\"])\n            rows.insert(index + 1, dict(cursor=\"\", event=dict(type=kind)))\n            for i, row in enumerate(rows):\n                row[\"cursor\"] = \"test:\" + str(i + 1)\n            self.assertNotIn(first[\"activity_id\"], {r[\"activity_id\"] for r in complete(rows)})\n\n    def test_measured_journal_has_no_tls_reading(self):\n        # The measured journal predates ABI 2: no TLS claim may appear.\n        for row in combined(ROWS):\n            self.assertEqual(row[\"transport\"], {\"client_tls\": {\"status\": \"not_observed\"}})\n            self.assertEqual(row[\"identity_binding\"], \"unknown\")\n\n    def test_client_tls_block_and_derivation(self):\n        from response_metadata_decode import FORMAT, TLS, decode\n        base = bytearray(FORMAT.size)\n        struct.pack_into(\"<II6Q10I\", base, 0, 0x5253504D, 2, 1, 1, 1, 1, 1, 0,\n                         142, 7, 0, 1, 1, 0, 0, 0, 0, 0)\n\n        def reading(*fields):\n            return decode(bytes(base) + TLS.pack(*fields))[\"client_tls\"]\n\n        HSOK, PASS, CHAIN, SCERT, RETAIN = 1, 2, 4, 8, 16\n        self.assertEqual(reading(3, 0, 3, 0, 0, 0, 0, 0), dict(mode=\"no_ssl_filter\", filter_nodes=3))\n        cases = [  # (pcm, vfy, bits, expected)\n            (0, 0, HSOK, \"not_requested\"),\n            (2, 0, HSOK | SCERT | RETAIN, \"verified\"),\n            (2, 0, HSOK | CHAIN, \"verified\"),\n            (2, 20, HSOK | CHAIN | RETAIN, \"failed\"),\n            (2, 0, HSOK | RETAIN, \"none_observed\"),\n            (2, 0, HSOK, \"unknown\"),  # freed chain, nothing retained\n            (1, 0, HSOK, \"unknown\"),\n        ]\n        for pcm, vfy, bits, expected in cases:\n            value = reading(1, 0, 3, bits, 6, 0x1302, pcm, vfy)\n            self.assertEqual(value[\"client_certificate\"], expected, (pcm, vfy, bits))\n            self.assertEqual((value[\"protocol\"], value[\"cipher_suite_id\"]), (\"TLSv1.3\", 0x1302))\n        self.assertEqual(reading(2, 0, 3, PASS | HSOK, 5, 0xc02f, 0, 0)[\"mode\"], \"ssl_filter_not_decrypting\")\n        self.assertEqual(reading(4, 3, 4, 0, 0, 0, 0, 0)[\"reason\"], \"multiple_ssl_filters\")\n        refused = [\n            (1, 0, 3, PASS | HSOK, 6, 1, 0, 0),   # terminated but passthru\n            (1, 0, 3, 0, 6, 1, 0, 0),             # terminated without handshake\n            (2, 0, 3, HSOK, 6, 1, 0, 0),          # not-decrypting with handshake\n            (3, 0, 3, HSOK, 0, 0, 0, 0),          # values without an SSL filter\n            (4, 0, 1, 0, 0, 0, 0, 0),             # unknown without reason\n            (3, 2, 1, 0, 0, 0, 0, 0),             # reason on a class\n            (0, 0, 2, 0, 0, 0, 0, 0),             # walk on inapplicable event\n            (5, 0, 0, 0, 0, 0, 0, 0), (1, 0, 17, HSOK, 6, 1, 0, 0),\n            (1, 0, 3, HSOK | 256, 6, 1, 0, 0), (1, 0, 3, HSOK, 10, 1, 0, 0),\n            (1, 0, 3, HSOK, 6, 1, 3, 0), (1, 0, 3, HSOK, 6, 1, 0, 128),\n        ]\n        for fields in refused:\n            with self.assertRaises(ValueError, msg=fields):\n                reading(*fields)\n        other = bytearray(base)\n        struct.pack_into(\"<I\", other, 56, 144)\n        struct.pack_into(\"<I\", other, 76, 7)\n        with self.assertRaises(ValueError):  # TLS reading on the wrong event\n            decode(bytes(other) + TLS.pack(3, 0, 1, 0, 0, 0, 0, 0))\n        with self.assertRaises(ValueError):  # ABI 1 with a TLS block\n            one = bytearray(base)\n            struct.pack_into(\"<I\", one, 4, 1)\n            decode(bytes(one) + TLS.pack(*[0] * 8))\n        REPORT[\"tls_decoder_cases\"] = len(cases) + len(refused) + 4\n\n    def test_client_tls_conflict_is_reported(self):\n        # Two confirming readings that disagree must not be resolved.\n        rows = copy.deepcopy(ROWS)\n        reference = complete(rows)[0]\n        group = [r for r in rows if r[\"event\"][\"type\"] == \"record\"\n                 and reference[\"evidence\"][\"first_cursor\"] <= r[\"cursor\"] <= reference[\"evidence\"][\"last_cursor\"]]\n        self.assertTrue(group)\n        combiner = ActivityCombiner()\n        key = (reference[\"evidence\"][\"source_id\"], reference[\"evidence\"][\"ring\"], reference[\"evidence\"][\"run\"],\n               reference[\"evidence\"][\"owner_instance\"], reference[\"evidence\"][\"exchange\"])\n        projected = [r for r in project_rows(rows) if r[\"cursor\"] in {g[\"cursor\"] for g in group}]\n        readings = [p for p in projected if p[\"event\"][\"evidence\"][\"observation\"] == \"http_response\"\n                    and p[\"event\"][\"evidence\"][\"group\"][\"side\"] == 1]\n        self.assertGreaterEqual(len(readings), 2)\n        readings[0][\"event\"][\"activity\"][\"client_tls\"] = dict(mode=\"no_ssl_filter\", filter_nodes=2)\n        readings[1][\"event\"][\"activity\"][\"client_tls\"] = dict(mode=\"unknown\", filter_nodes=1, reason=\"read_failed\")\n        combiner.pending[key] = dict(first=projected[0][\"cursor\"], rows=projected, issues=[], confirmed=True)\n        row = combiner.finish(key)\n        self.assertEqual(row[\"transport\"][\"client_tls\"][\"status\"], \"conflicting\")\n        self.assertIn(\"conflicting_client_tls\", row[\"correlation\"][\"issues\"])\n        self.assertEqual(row[\"correlation\"][\"status\"], \"incomplete\")\n\n    def test_cli_journal_socket_and_errors(self):\n        command = [sys.executable, HERE / \"activity_combine.py\"]\n        expected = complete(ROWS)\n        args = [\"--journal\", REPORT[\"journal\"], \"--after\", REPORT[\"after\"]]\n        direct = subprocess.run(command + args, capture_output=True, text=True, timeout=30, check=True)\n        rows = [json.loads(line) for line in direct.stdout.splitlines()]\n        self.assertEqual([r for r in rows if r[\"event_type\"] == \"agent.activity.combined\"], expected)\n        with tempfile.TemporaryDirectory(dir=HERE) as temporary:\n            socket = Path(temporary) / \"api.sock\"\n            server = subprocess.Popen([sys.executable, HERE / \"stream_collector.py\", \"serve\", \"--journal\",\n                                       REPORT[\"journal\"], \"--unix-socket\", socket],\n                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)\n            try:\n                self.assertTrue(select.select([server.stdout], [], [], 10)[0])\n                self.assertIn(\"listening\", server.stdout.readline())\n                result = subprocess.run(command + [\"--socket\", socket, \"--after\", REPORT[\"after\"]],\n                                        capture_output=True, text=True, timeout=30, check=True)\n                self.assertEqual(result.stdout, direct.stdout)\n                failed = subprocess.run(command + [\"--socket\", socket, \"--after\", \"wrong:0\"],\n                                        capture_output=True, text=True, timeout=30)\n                self.assertNotEqual(failed.returncode, 0)\n                self.assertEqual(failed.stdout, \"\")\n                self.assertIn(\"wrong_journal\", failed.stderr)\n            finally:\n                server.terminate()\n                server.communicate(timeout=10)\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    parser.add_argument(\"--live\", type=Path, required=True)\n    parser.add_argument(\"--journal\", type=Path, required=True)\n    parser.add_argument(\"--report\", type=Path, required=True)\n    args = parser.parse_args()\n    record = json.loads(args.live.read_text())\n    result = json.loads(record[\"files\"][\"result.json\"])\n    ROWS.extend(result[\"replay_consumer\"][\"events\"])\n    REPORT.update(live_sha256=hashlib.sha256(args.live.read_bytes()).hexdigest(),\n                  journal=str(args.journal), journal_sha256=hashlib.sha256(args.journal.read_bytes()).hexdigest(),\n                  after=result[\"initial_cursor\"], sources={})\n    suite = unittest.defaultTestLoader.loadTestsFromTestCase(CombinedTests)\n    outcome = unittest.TextTestRunner(verbosity=2).run(suite)\n    REPORT.update(passed=outcome.wasSuccessful(), tests=outcome.testsRun,\n                  failures=[text for _, text in outcome.errors + outcome.failures])\n    for path in [HERE / name for name in (\"check_activity_combine.py\", \"activity_combine.py\", \"activity_export.py\",\n                                         \"collector_client.py\", \"stream_collector.py\")] + list(HERE.glob(\"*decode.py\")):\n        REPORT[\"sources\"][path.name] = dict(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), text=path.read_text())\n    with args.report.open(\"x\") as output:\n        json.dump(REPORT, output, indent=2)\n    return 0 if outcome.wasSuccessful() else 1\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+    },
+    "activity_combine.py": {
+      "sha256": "fda0395da16857c05482c1e96d54d84ed06791a13585fb2f0d4f82f0145de180",
+      "text": "#!/usr/bin/env python3\n\"\"\"Combine explicitly keyed activity records across collector replay pages.\"\"\"\nimport argparse\nfrom datetime import datetime, timedelta, timezone\nimport hashlib\nimport json\nfrom pathlib import Path\nimport time\n\nfrom activity_export import project_page\n\n\ndef nanoseconds(value):\n    \"\"\"Read an exact positive uint64 timestamp, without float conversion.\"\"\"\n    if isinstance(value, str) and value.isascii() and value.isdecimal() and len(value) <= 20:\n        value = int(value)\n    return value if type(value) is int and 0 < value < 1 << 64 else None\n\n\ndef timestamp(value):\n    value = nanoseconds(value)\n    if value is None:\n        return None\n    seconds, fraction = divmod(value, 1_000_000_000)\n    date = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=seconds)\n    return date.strftime(\"%Y-%m-%dT%H:%M:%S\") + f\".{fraction:09d}Z\"\n\n\ndef observation_timing(rows):\n    \"\"\"Source observation times; an invalidation/flush is not a response end.\"\"\"\n    first, last = [row[\"event\"][\"evidence\"] for row in (rows[0], rows[-1])]\n    ended = last[\"group\"][\"phase\"] == 3\n    start = nanoseconds(first[\"record\"].get(\"monotonic_ns\"))\n    end = nanoseconds(last[\"record\"].get(\"monotonic_ns\")) if ended else None\n    duration = str(end - start) if start is not None and end is not None and end >= start else None\n    timing = dict(started_at=timestamp(first[\"raw\"].get(\"ts_ns\")),\n                  ended_at=timestamp(last[\"raw\"].get(\"ts_ns\")) if ended else None,\n                  last_observed_at=timestamp(last[\"raw\"].get(\"ts_ns\")),\n                  duration_ns=duration)\n    timing[\"status\"] = \"complete\" if all(v is not None for v in timing.values()) else \"incomplete\"\n    if start is not None and end is not None and end < start:\n        timing[\"status\"] = \"invalid\"\n    return timing\n\n\nclass ActivityCombiner:\n    \"\"\"Bounded HTTP/1 exchange groups. IDs and addresses never select a group.\"\"\"\n\n    def __init__(self, capacity=128, max_records=128):\n        self.capacity, self.max_records = capacity, max_records\n        self.pending, self.sequences = {}, {}\n        self.cursor = None\n\n    def flush(self, reason):\n        rows = [self.finish(key, reason) for key in list(self.pending)]\n        self.sequences.clear()\n        return rows\n\n    def finish(self, key, reason=None):\n        group = self.pending.pop(key)\n        rows = group[\"rows\"]\n        fields = {}\n        issues = list(group[\"issues\"])\n        if reason:\n            issues.append(reason)\n        calls = {1: set(), 2: set()}\n        http_producers, confirmations = set(), []\n        for row in rows:\n            event = row[\"event\"]\n            evidence = event[\"evidence\"]\n            frame, kind = evidence[\"group\"], evidence[\"observation\"]\n            if kind == \"http_response\":\n                http_producers.add((evidence[\"record\"][\"instance\"], evidence[\"record\"][\"revision\"]))\n                if frame[\"side\"] == 1 and evidence[\"record\"][\"code\"] == 142:\n                    confirmations.append(row[\"cursor\"])\n                continue\n            side = frame[\"side\"]\n            if side not in calls:\n                issues.append(\"unknown_side\")\n                continue\n            record = evidence[\"record\"]\n            calls[side].add((record[\"instance\"], record[\"revision\"], frame[\"invocation\"]))\n            name = (side, kind)\n            if name in fields:\n                issues.append(\"duplicate_field\")\n            fields[name] = row\n        for side in (1, 2):\n            if len(calls[side]) != 1:\n                issues.append(\"missing_or_multiple_json_messages\")\n            for kind in (\"method\", \"operation_target\", \"message_id\", \"reply\"):\n                if (side, kind) not in fields:\n                    issues.append(\"missing_field\")\n        if len({call[:2] for side in calls.values() for call in side}) != 1:\n            issues.append(\"json_producer_changed\")\n        if len(http_producers) != 1 or len(confirmations) != 1:\n            issues.append(\"missing_or_conflicting_http_confirmation\")\n        activity, outcome, sources = {}, {}, {}\n        for name, kind in ((\"method\", \"method\"), (\"target\", \"operation_target\"),\n                           (\"message_id\", \"message_id\")):\n            row = fields.get((1, kind))\n            if row:\n                value = row[\"event\"][\"activity\"].get(name)\n                if value:\n                    activity[name] = value\n                    sources[name] = row[\"cursor\"]\n                    if value[\"status\"] != \"complete\" or \"text_error\" in value:\n                        issues.append(\"incomplete_\" + name)\n        ids = [fields.get((side, \"message_id\")) for side in (1, 2)]\n        if all(ids):\n            values = [row[\"event\"][\"activity\"][\"message_id\"] for row in ids]\n            if any(v[\"status\"] != \"complete\" for v in values):\n                issues.append(\"incomplete_id\")\n            elif (values[0][\"kind\"], values[0][\"raw_hex\"]) != (values[1][\"kind\"], values[1][\"raw_hex\"]):\n                issues.append(\"reply_id_mismatch\")\n        reply = fields.get((2, \"reply\"))\n        if reply:\n            outcome.update(reply[\"event\"][\"reported_outcome\"])\n            sources[\"reply\"] = reply[\"cursor\"]\n            if outcome.get(\"status\") != \"complete\":\n                issues.append(\"incomplete_reply\")\n        for row in rows:\n            event = row[\"event\"]\n            if event[\"evidence\"][\"group\"][\"side\"] != 1:\n                continue\n            for name in (\"http_status\", \"local_transfer_complete\"):\n                value = event[\"reported_outcome\"].get(name)\n                if value and value[\"status\"] == \"complete\":\n                    if name in outcome and outcome[name] != value:\n                        issues.append(\"conflicting_\" + name)\n                    outcome[name] = value\n                    sources[name] = row[\"cursor\"]\n        if \"http_status\" not in outcome or \"local_transfer_complete\" not in outcome:\n            issues.append(\"incomplete_http\")\n        # Client TLS: read only at the confirming client request-header event.\n        # Disagreeing readings are reported, never resolved by choice.\n        readings = [row for row in rows\n                    if row[\"event\"][\"evidence\"][\"observation\"] == \"http_response\"\n                    and row[\"event\"][\"evidence\"][\"group\"][\"side\"] == 1\n                    and \"client_tls\" in row[\"event\"][\"activity\"]]\n        transport = {}\n        if readings:\n            values = [row[\"event\"][\"activity\"][\"client_tls\"] for row in readings]\n            if all(v == values[0] for v in values):\n                transport[\"client_tls\"] = dict(values[0], status=\"observed\")\n            else:\n                transport[\"client_tls\"] = dict(status=\"conflicting\", readings=values)\n                issues.append(\"conflicting_client_tls\")\n            sources[\"client_tls\"] = [row[\"cursor\"] for row in readings]\n        else:\n            transport[\"client_tls\"] = dict(status=\"not_observed\")\n        identity = hashlib.sha256(json.dumps(key, separators=(\",\", \":\")).encode()).hexdigest()\n        issues = sorted(set(issues))\n        return dict(schema_version=1, event_type=\"agent.activity.combined\",\n                    activity_id=identity, identity_binding=\"unknown\", identity=None,\n                    correlation=dict(status=\"incomplete\" if issues else \"observed_exchange\",\n                                     scope=\"single_worker_nonpipelined_http1\", issues=issues),\n                    activity=activity, reported_outcome=outcome, transport=transport,\n                    timing=observation_timing(rows),\n                    evidence=dict(source_id=key[0], ring=key[1], run=key[2],\n                                  owner_instance=key[3], exchange=key[4],\n                                  first_cursor=group[\"first\"], last_cursor=rows[-1][\"cursor\"],\n                                  record_count=len(rows), field_sources=sources,\n                                  program_binding=\"not_verified_by_exporter\",\n                                  continuity=\"observed_records_only\"))\n\n    def feed(self, page):\n        if \"error\" in page:\n            raise ValueError(page)\n        output = []\n        for row in project_page(page)[\"events\"]:\n            cursor = row[\"cursor\"]\n            journal, number = cursor.rsplit(\":\", 1)\n            number = int(number)\n            if self.cursor:\n                previous, offset = self.cursor.rsplit(\":\", 1)\n                if journal != previous or number <= int(offset):\n                    raise ValueError(\"replay cursor changed journal or moved backwards\")\n                if journal != previous or number != int(offset) + 1:\n                    output += self.flush(\"cursor_discontinuity\")\n            self.cursor = cursor\n            event = row[\"event\"]\n            evidence = event[\"evidence\"]\n            frame = evidence.get(\"group\")\n            if event[\"event_type\"] != \"agent.activity\" or not frame:\n                # DISCARD includes ring wrap padding. Keep the diagnostic;\n                # producer sequence gaps and missing fields still invalidate\n                # an exchange if actual metadata was lost.\n                if event[\"event_type\"] not in (\"agent.ring_health\", \"agent.discard\"):\n                    output += self.flush(\"diagnostic_or_unqualified_record\")\n                output.append(event)\n                continue\n            record, raw = evidence[\"record\"], evidence[\"raw\"]\n            kind = evidence[\"observation\"]\n            http = kind == \"http_response\"\n            expected = int(record[\"sequence\"]) if http else (int(record[\"sequence\"]) - 1) // 4 + 1\n            valid = (isinstance(evidence[\"source_id\"], str) and bool(evidence[\"source_id\"])\n                     and type(raw.get(\"ring\")) is int and 0 <= raw[\"ring\"] < 16\n                     and int(frame[\"invocation\"]) in (0, expected))\n            if frame[\"exchange\"] != \"0\":\n                valid &= (frame[\"invocation\"] == str(expected) and\n                          (http or frame[\"owner_instance\"] == record[\"instance\"]))\n                if frame[\"phase\"] == 1:\n                    valid &= (kind == \"method\" and frame[\"side\"] == 1\n                              and frame[\"exchange\"] == record[\"sequence\"] and frame[\"status\"] == 1)\n                elif frame[\"phase\"] == 3:\n                    valid &= http and frame[\"side\"] == 1 and record[\"code\"] == 29 and frame[\"status\"] == 1\n                elif frame[\"phase\"] == 4:\n                    valid &= ((http and record[\"code\"] in (1, 5, 57, 142)) or\n                              (kind == \"method\" and frame[\"side\"] == 1 and frame[\"status\"] == 4))\n                elif not http:\n                    valid &= (int(record[\"sequence\"]) - 1) % 4 == {\n                        \"method\": 0, \"operation_target\": 1, \"message_id\": 2, \"reply\": 3}[kind]\n                    if kind == \"message_id\":\n                        valid &= (record.get(\"flow_status\") == 1 and\n                                  record.get(\"flow_side\") == frame[\"side\"])\n            if not valid:\n                output += self.flush(\"invalid_frame_binding\")\n                event[\"event_type\"] = \"agent.observation\"\n                evidence[\"status\"] = \"invalid_frame_binding\"\n                output.append(event)\n                continue\n            producer = (evidence[\"source_id\"], raw[\"ring\"], record[\"instance\"], record[\"run\"])\n            sequence = int(record[\"sequence\"])\n            previous = self.sequences.get(producer)\n            if previous is not None and sequence <= previous:\n                output += self.flush(\"duplicate_or_regressed_sequence\")\n                self.sequences[producer] = previous\n                event[\"event_type\"] = \"agent.observation\"\n                evidence[\"status\"] = \"duplicate_or_regressed_sequence\"\n                output.append(event)\n                continue\n            if (previous is not None and sequence != previous + 1) or int(record[\"output_failures\"]):\n                output += self.flush(\"producer_gap\")\n            if len(self.sequences) >= self.capacity and producer not in self.sequences:\n                output += self.flush(\"producer_capacity\")\n            self.sequences[producer] = sequence\n            if not frame[\"exchange\"] or frame[\"exchange\"] == \"0\":\n                output.append(event)\n                continue\n            key = (evidence[\"source_id\"], raw[\"ring\"], record[\"run\"],\n                   frame[\"owner_instance\"], frame[\"exchange\"])\n            if frame[\"phase\"] == 1:\n                if key in self.pending:\n                    output.append(self.finish(key, \"duplicate_start\"))\n                    output.append(event)\n                    continue\n                if len(self.pending) >= self.capacity:\n                    output.append(self.finish(next(iter(self.pending)), \"capacity\"))\n                self.pending[key] = dict(first=cursor, rows=[], issues=[], confirmed=False)\n            group = self.pending.get(key)\n            if group is None:\n                event[\"correlation\"] = dict(status=\"unknown\", reason=\"unobserved_start\")\n                output.append(event)\n                continue\n            group[\"rows\"].append(row)\n            if http and record[\"code\"] == 142 and frame[\"side\"] == 1 and frame[\"status\"] == 1:\n                group[\"confirmed\"] = True\n            if not http and frame[\"side\"] == 2 and not group[\"confirmed\"]:\n                group[\"issues\"].append(\"reply_before_http_confirmation\")\n            if frame[\"status\"] != 1:\n                group[\"issues\"].append(\"invalid_group\")\n            if frame[\"phase\"] in (3, 4):\n                output.append(self.finish(key, \"invalidated\" if frame[\"phase\"] == 4 else None))\n            elif len(group[\"rows\"]) >= self.max_records:\n                output.append(self.finish(key, \"record_capacity\"))\n        return output\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    source = parser.add_mutually_exclusive_group(required=True)\n    source.add_argument(\"--journal\", type=Path)\n    source.add_argument(\"--socket\", type=Path)\n    parser.add_argument(\"--after\")\n    parser.add_argument(\"--follow\", action=\"store_true\")\n    args = parser.parse_args()\n    if args.follow and not args.socket:\n        parser.error(\"--follow requires --socket\")\n    combiner, cursor = ActivityCombiner(), args.after\n    try:\n        while True:\n            if args.journal:\n                from stream_collector import replay\n                status, page = replay(args.journal, cursor, 128)\n                if status != 200:\n                    raise ValueError(page)\n            else:\n                from collector_client import page as read_page\n                page = read_page(args.socket, cursor, 128)\n            if \"error\" in page:\n                raise ValueError(page)\n            for event in combiner.feed(page):\n                print(json.dumps(event, separators=(\",\", \":\")), flush=True)\n            cursor = page[\"next_cursor\"]\n            if not page[\"events\"]:\n                if not args.follow:\n                    break\n                time.sleep(.1)\n    finally:\n        for event in combiner.flush(\"end_of_input\"):\n            print(json.dumps(event, separators=(\",\", \":\")), flush=True)\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "activity_export.py": {
+      "sha256": "814cf35f5f214b3b34280608761ba686cb8ff93214d1967721fb4473ed0138f4",
+      "text": "#!/usr/bin/env python3\n\"\"\"Export one collector replay page as versioned agent activity observations.\"\"\"\nimport argparse\nimport json\nfrom pathlib import Path\nimport sqlite3\nimport sys\n\nfrom id_flow_decode import decode as decode_id_flow\nfrom message_id_decode import decode as decode_id\nfrom method_decode import decode as decode_method\nfrom operation_target_decode import decode as decode_target\nfrom reply_metadata_decode import decode as decode_reply\nfrom response_metadata_decode import decode as decode_response\nfrom token_method_decode import decode as decode_token_method\nfrom activity_group_decode import MAGIC as GROUP_MAGIC, unwrap\n\n\nDECODERS = {\n    0x4A4D4554: (\"method\", decode_method),\n    0x544D4554: (\"method\", decode_token_method),\n    0x4F544754: (\"operation_target\", decode_target),\n    0x52504C59: (\"reply\", decode_reply),\n    0x5253504D: (\"http_response\", decode_response),\n    0x4D534749: (\"message_id\", decode_id),\n    0x4944464C: (\"message_id\", decode_id_flow),\n}\nCOUNTERS = (\"instance\", \"revision\", \"run\", \"monotonic_ns\", \"sequence\", \"output_failures\")\nDIAGNOSTICS = {\"source_boundary\", \"observation_gap\", \"discard\", \"ring_health\"}\n\n\ndef string_field(record):\n    \"\"\"Keep bytes and extraction state; decode text only for complete strings.\"\"\"\n    field = {\"status\": record[\"status_name\"], \"raw_hex\": record[\"value_hex\"],\n             \"representation\": \"json_string_escaped_bytes\",\n             \"original_length\": record[\"original_length\"]}\n    if record[\"status\"] == 1:\n        try:\n            field[\"value\"] = json.loads('\"' + bytes.fromhex(record[\"value_hex\"]).decode(\"utf-8\") + '\"')\n        except (ValueError, UnicodeError):\n            field[\"text_error\"] = \"invalid_json_string_bytes\"\n    return field\n\n\ndef fields(kind, record):\n    activity, outcome = {}, {}\n    if kind == \"method\":\n        activity[\"method\"] = string_field(record)\n    elif kind == \"operation_target\":\n        activity[\"target\"] = dict(string_field(record), kind=record[\"target_kind_name\"])\n    elif kind == \"message_id\":\n        if record[\"id_kind\"] == 1:\n            value = string_field(record)\n        else:\n            value = {\"status\": record[\"status_name\"], \"raw_hex\": record[\"value_hex\"],\n                     \"representation\": \"json_token_bytes\"}\n            if record[\"status\"] == 1:\n                # Numeric spelling is an observation, not a floating-point number.\n                value[\"value\"] = bytes.fromhex(record[\"value_hex\"]).decode(\"ascii\")\n        activity[\"message_id\"] = dict(value, kind=record[\"id_kind_name\"])\n        if \"flow_status_name\" in record:\n            activity[\"flow_side\"] = {\"status\": record[\"flow_status_name\"],\n                                     \"value\": record[\"flow_side_name\"]}\n    elif kind == \"reply\":\n        outcome[\"status\"] = record[\"status_name\"]\n        if record[\"status\"] == 1:\n            outcome.update(result_present=bool(record[\"result_present\"]),\n                           error_present=bool(record[\"error_present\"]))\n            for name, state, value in ((\"error_code\", \"code_state\", \"error_code\"),\n                                       (\"tool_error\", \"tool_error_state\", \"tool_error\")):\n                outcome[name] = {\"status\": record[state + \"_name\"]}\n                if record[state] == 1:\n                    outcome[name][\"value\"] = bool(record[value]) if name == \"tool_error\" else record[value]\n    elif kind == \"http_response\":\n        for name, state, value in ((\"http_status\", \"http_status_state\", \"http_status\"),\n                                   (\"local_transfer_complete\", \"completion_state\", \"transfer_complete\")):\n            outcome[name] = {\"status\": record[state + \"_name\"]}\n            if record[state] == 1:\n                outcome[name][\"value\"] = bool(record[value]) if name == \"local_transfer_complete\" else record[value]\n        if record.get(\"client_tls\", {}).get(\"mode\", \"not_applicable\") != \"not_applicable\":\n            # TMM's client-side SSL filter state. Evidence of a TMM state,\n            # not an identity; see TLS-MODE.md.\n            activity[\"client_tls\"] = record[\"client_tls\"]\n    return activity, outcome\n\n\ndef project_event(event):\n    \"\"\"One observation per input. No identity inference or cross-record joins.\"\"\"\n    evidence = {\"source_id\": event.get(\"source_id\"), \"event_id\": event.get(\"event_id\"),\n                \"source\": event.get(\"source\"), \"continuity\": \"not_established\",\n                \"program_binding\": \"not_verified_by_exporter\"}\n    output = {\"schema_version\": 1, \"event_type\": \"agent.observation\",\n              \"identity_binding\": \"unknown\", \"identity\": None,\n              \"correlation\": {\"status\": \"unknown\"},\n              \"activity\": {}, \"reported_outcome\": {}, \"evidence\": evidence}\n    kind = event.get(\"type\")\n    if kind != \"record\":\n        output[\"event_type\"] = \"agent.\" + kind if kind in DIAGNOSTICS else \"agent.observation\"\n        evidence.update(status=\"diagnostic\", diagnostic=event)\n        return output\n    raw = event.get(\"raw\", {})\n    evidence[\"raw\"] = raw\n    try:\n        if not isinstance(raw, dict) or not isinstance(raw.get(\"data\"), str) or len(raw[\"data\"]) > 1024:\n            raise ValueError(\"invalid or oversize record\")\n        payload = bytes.fromhex(raw[\"data\"])\n        if int.from_bytes(payload[:4], \"little\") == GROUP_MAGIC:\n            evidence[\"group\"], payload = unwrap(payload)\n        decoder = DECODERS.get(int.from_bytes(payload[:4], \"little\"))\n        if raw.get(\"schema\") != 100 or decoder is None:\n            evidence[\"status\"] = \"unsupported_schema\"\n            return output\n        kind, decode = decoder\n        record = decode(payload)\n    except (ValueError, TypeError) as error:\n        evidence.update(status=\"malformed_record\", error=str(error))\n        return output\n    evidence.update(status=\"decoded\", observation=kind,\n                    record={k: str(v) if k in COUNTERS else v for k, v in record.items()},\n                    output_loss_reported=bool(record[\"output_failures\"]))\n    if record[\"flags\"] or not all(record[key] for key in (\"instance\", \"revision\", \"run\", \"sequence\")):\n        evidence[\"status\"] = \"unqualified_record\"\n        return output\n    output[\"event_type\"] = \"agent.activity\"\n    output[\"activity\"], output[\"reported_outcome\"] = fields(kind, record)\n    return output\n\n\ndef project_page(page):\n    \"\"\"Keep replay boundaries and every cursor, including diagnostic rows.\"\"\"\n    if not isinstance(page, dict):\n        raise ValueError(\"expected a collector replay object\")\n    if \"error\" in page:\n        return dict(page)\n    if not isinstance(page.get(\"events\"), list) or len(page[\"events\"]) > 128:\n        raise ValueError(\"expected a bounded collector replay page\")\n    if not isinstance(page.get(\"next_cursor\"), str):\n        raise ValueError(\"missing replay cursor\")\n    if any(not isinstance(row, dict) or not isinstance(row.get(\"cursor\"), str)\n           or not isinstance(row.get(\"event\"), dict) for row in page[\"events\"]):\n        raise ValueError(\"invalid replay row\")\n    result = dict(page)\n    result[\"format\"] = \"agent_activity/v1\"\n    result[\"events\"] = [{\"cursor\": row[\"cursor\"], \"event\": project_event(row[\"event\"])}\n                        for row in page[\"events\"]]\n    return result\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    source = parser.add_mutually_exclusive_group(required=True)\n    source.add_argument(\"--socket\", type=Path, help=\"existing collector replay socket\")\n    source.add_argument(\"--journal\", type=Path, help=\"local collector SQLite journal, read-only\")\n    source.add_argument(\"--page\", type=Path, help=\"saved collector replay page (JSON)\")\n    parser.add_argument(\"--after\", help=\"last cursor accepted by this consumer\")\n    parser.add_argument(\"--limit\", type=int, default=128)\n    args = parser.parse_args()\n    if not 1 <= args.limit <= 128:\n        parser.error(\"limit must be 1..128\")\n    if args.page and args.after:\n        parser.error(\"--after applies to a socket or journal, not a saved page\")\n    status = 200\n    try:\n        if args.socket:\n            from collector_client import page\n            document = page(args.socket, args.after, args.limit)\n        elif args.journal:\n            from stream_collector import replay\n            status, document = replay(args.journal, args.after, args.limit)\n        else:\n            document = json.loads(args.page.read_text())\n        result = project_page(document)\n        print(json.dumps(result, ensure_ascii=True, separators=(\",\", \":\")))\n        return 0 if status == 200 and \"error\" not in result else 1\n    except (OSError, ValueError, KeyError, TypeError, sqlite3.Error) as error:\n        print(\"activity export failed; cursor not advanced: \" + str(error), file=sys.stderr)\n        return 1\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n"
+    },
+    "collector_client.py": {
+      "sha256": "ed5f396eea983ddb387fd14f0409b8a1a4a971376353006e19c5d0c26f2c0bf2",
+      "text": "\"\"\"Read one bounded replay page through the collector's local Unix socket.\"\"\"\nimport http.client\nimport json\nimport socket\nfrom urllib.parse import urlencode\n\n\ndef page(path, cursor=None, limit=128, wait_ms=0):\n    class Connection(http.client.HTTPConnection):\n        def connect(self):\n            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n            self.sock.settimeout(self.timeout)\n            self.sock.connect(str(path))\n\n    query = {\"limit\": limit, \"wait_ms\": wait_ms}\n    if cursor is not None:\n        query[\"after\"] = cursor\n    connection = Connection(\"localhost\", timeout=15)\n    try:\n        connection.request(\"GET\", \"/events?\" + urlencode(query))\n        response = connection.getresponse()\n        data = json.loads(response.read())\n        if response.status != 200:\n            raise ValueError((response.status, data))\n        return data\n    finally:\n        connection.close()\n"
+    },
+    "stream_collector.py": {
+      "sha256": "13c866ed9eb88f9d1added9b57a438c4d35f20922030e386d71d2b9927b3b275",
+      "text": "#!/usr/bin/env python3\n\"\"\"Continuous acknowledged collection, bounded SQLite journal and HTTP replay.\n\nThe C reader retains its ring cursor until this process commits and sends ACK.\nReplay clients own their cursors; they never acknowledge the producer ring.\n\"\"\"\nimport argparse\nimport fcntl\nimport hashlib\nfrom http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\nimport json\nimport os\nfrom pathlib import Path\nimport socket\nimport socketserver\nimport sqlite3\nimport stat\nimport subprocess\nimport threading\nimport time\nfrom urllib.parse import parse_qs, urlsplit\nimport uuid\n\nfrom method_decode import decode\n\nMAX_FRAME = 8192\n\n\ndef canonical(value):\n    return json.dumps(value, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=True)\n\n\nclass Journal:\n    \"\"\"One writer; retained event bodies and source checkpoints share a transaction.\"\"\"\n\n    def __init__(self, path, retain=10000, max_pages=32768):\n        if retain < 2 or max_pages < 32:\n            raise ValueError(\"retain >= 2 and max_pages >= 32 required\")\n        path = Path(path).resolve()\n        self.lock = Path(str(path) + \".lock\").open(\"a+b\")\n        try:\n            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\n            self.db = sqlite3.connect(path, timeout=1, isolation_level=None)\n            self.db.execute(\"PRAGMA journal_mode=DELETE\")\n            self.db.execute(\"PRAGMA synchronous=FULL\")\n            actual = self.db.execute(f\"PRAGMA max_page_count={max_pages}\").fetchone()[0]\n            if actual > max_pages:\n                raise ValueError(\"existing journal exceeds the requested page limit\")\n            self.db.executescript(\"\"\"\n                CREATE TABLE IF NOT EXISTS events (\n                    id INTEGER PRIMARY KEY AUTOINCREMENT,\n                    event_key TEXT UNIQUE NOT NULL,\n                    fingerprint TEXT NOT NULL,\n                    body TEXT NOT NULL);\n                CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT NOT NULL);\n            \"\"\")\n            self.db.execute(\"INSERT OR IGNORE INTO state VALUES ('journal_id', ?)\", (uuid.uuid4().hex,))\n            self.retain = retain\n            self.source = None\n            self.source_frame = None\n        except BaseException:\n            if hasattr(self, \"db\"):\n                self.db.close()\n            self.lock.close()\n            raise\n\n    def close(self):\n        self.db.close()\n        self.lock.close()\n\n    def get(self, key):\n        row = self.db.execute(\"SELECT value FROM state WHERE key=?\", (key,)).fetchone()\n        return json.loads(row[0]) if row else None\n\n    def put(self, key, value):\n        self.db.execute(\"INSERT OR REPLACE INTO state VALUES (?,?)\", (key, canonical(value)))\n\n    def insert(self, key, fingerprint, body):\n        row = self.db.execute(\"SELECT id,fingerprint FROM events WHERE event_key=?\", (key,)).fetchone()\n        if row:\n            if row[1] != fingerprint:\n                raise ValueError(\"conflicting bytes for an existing event identity\")\n            return row[0]\n        # Delete before insert. SQLite reuses freed pages; the page limit also\n        # bounds high-water storage if event sizes change. No WAL grows behind readers.\n        self.db.execute(\n            \"DELETE FROM events WHERE id NOT IN (SELECT id FROM events ORDER BY id DESC LIMIT ?)\",\n            (self.retain - 1,),\n        )\n        return self.db.execute(\n            \"INSERT INTO events(event_key,fingerprint,body) VALUES (?,?,?)\",\n            (key, fingerprint, canonical(body)),\n        ).lastrowid\n\n    def accept(self, frame):\n        raw = {k: v for k, v in frame.items() if k != \"token\"}\n        if len(canonical(raw)) > MAX_FRAME:\n            raise ValueError(\"oversize reader frame\")\n        kind = raw[\"kind\"]\n        if kind == \"source\":\n            source = hashlib.sha256(canonical(raw).encode()).hexdigest()\n            self.db.execute(\"BEGIN IMMEDIATE\")\n            try:\n                if self.get(\"source_id\") != source:\n                    self.db.execute(\"DELETE FROM state WHERE key LIKE 'ring:%' OR key LIKE 'drops:%'\")\n                    self.put(\"source_id\", source)\n                    epoch = uuid.uuid4().hex\n                    self.put(\"source_epoch\", epoch)\n                    self.insert(\"source:\" + epoch, source, {\n                        \"type\": \"source_boundary\", \"source_id\": epoch, \"source\": raw,\n                        \"history\": \"unknown_before_first_collection\",\n                    })\n                self.db.execute(\"COMMIT\")\n            except BaseException:\n                if self.db.in_transaction:\n                    self.db.execute(\"ROLLBACK\")\n                raise\n            self.source = self.get(\"source_epoch\")\n            self.source_frame = raw\n            return\n        if not self.source or kind not in (\"record\", \"discard\", \"ring_health\"):\n            raise ValueError(\"record without a registered source or unknown frame kind\")\n        ring = raw[\"ring\"]\n        if not isinstance(ring, int) or not 0 <= ring < 16:\n            raise ValueError(\"invalid ring index\")\n        progress_key = (\"drops:\" if kind == \"ring_health\" else \"ring:\") + str(ring)\n        if kind == \"ring_health\":\n            position = int(raw[\"drops\"])\n            if position < 0:\n                raise ValueError(\"invalid drop count\")\n            # Drop count and byte count are separately sampled. Only count is\n            # used as the health event identity; it is not an atomic pair.\n            raw.pop(\"drop_bytes\", None)\n            key = f\"{self.source}:drops:{ring}:{position}\"\n        else:\n            begin, position = int(raw[\"begin\"]), int(raw[\"end\"])\n            if begin < 0 or position <= begin:\n                raise ValueError(\"invalid ring interval\")\n            key = f\"{self.source}:record:{ring}:{begin}\"\n        fingerprint = hashlib.sha256(canonical(raw).encode()).hexdigest()\n        body = {\"type\": kind, \"source_id\": self.source, \"source\": self.source_frame,\n                \"event_id\": key, \"raw\": raw, \"schema\": \"application_stream/v1\"}\n        if kind == \"record\":\n            payload = bytes.fromhex(raw[\"data\"])\n            if len(payload) > 512:\n                raise ValueError(\"oversize record\")\n            if raw[\"schema\"] == 100 and len(payload) == 144 and payload[:4] == b\"TEMJ\":\n                try:\n                    body[\"decoded\"] = {\n                        \"schema\": \"method/v1\", \"binding\": \"not_verified_by_collector\",\n                        \"record\": {k: str(v) if k in (\n                            \"instance\", \"revision\", \"run\", \"monotonic_ns\", \"sequence\",\n                            \"output_failures\") else v for k, v in decode(payload).items()},\n                    }\n                except ValueError as error:\n                    body[\"decode_error\"] = str(error)\n        self.db.execute(\"BEGIN IMMEDIATE\")\n        try:\n            previous = self.get(progress_key)\n            if previous:\n                if position < previous[\"position\"]:\n                    raise ValueError(\"source position regressed\")\n                if position == previous[\"position\"]:\n                    if previous[\"fingerprint\"] != fingerprint:\n                        raise ValueError(\"conflicting replay at checkpoint\")\n                    self.db.execute(\"COMMIT\")\n                    return\n                if kind != \"ring_health\" and begin != previous[\"position\"]:\n                    raise ValueError(\"unaccounted source position gap\")\n            if kind == \"ring_health\":\n                body[\"type\"] = \"ring_health\" if position == 0 else \"observation_gap\"\n                body[\"dropped_since_checkpoint\"] = (\n                    position - previous[\"position\"] if previous else None\n                )\n            self.insert(key, fingerprint, body)\n            self.put(progress_key, {\"position\": position, \"fingerprint\": fingerprint})\n            self.db.execute(\"COMMIT\")\n        except BaseException:\n            if self.db.in_transaction:\n                self.db.execute(\"ROLLBACK\")\n            raise\n\n\ndef collect(args):\n    journal = Journal(args.journal, args.retain, args.max_pages)\n    child = None\n    try:\n        deadline = time.monotonic() + args.wait_segment\n        while args.wait_segment:\n            try:\n                with args.segment.open(\"rb\") as stream:\n                    magic = int.from_bytes(stream.read(8), \"little\")\n                if magic == 0x4C53534547303031:\n                    break\n            except FileNotFoundError:\n                pass\n            if time.monotonic() >= deadline:\n                raise TimeoutError(\"source segment was not published before startup deadline\")\n            time.sleep(0.05)\n        command = [str(args.reader), str(args.segment), str(args.pid), str(args.start)]\n        if args.once:\n            command.append(\"--once\")\n        child = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE)\n        while True:\n            line = child.stdout.readline(MAX_FRAME + 1)\n            if not line:\n                break\n            if len(line) > MAX_FRAME or not line.endswith(b\"\\n\"):\n                raise ValueError(\"incomplete or oversize reader frame; no ACK\")\n            frame = json.loads(line)\n            journal.accept(frame)\n            child.stdin.write((\"ACK \" + frame[\"token\"] + \"\\n\").encode())\n            child.stdin.flush()\n        if child.wait() != 0:\n            raise RuntimeError(\"reader stopped with an error; source continuity is unknown\")\n    finally:\n        if child:\n            if child.poll() is None:\n                child.terminate()\n                try:\n                    child.wait(timeout=3)\n                except subprocess.TimeoutExpired:\n                    child.kill()\n                    child.wait()\n            child.stdin.close()\n            child.stdout.close()\n        journal.close()\n\n\ndef replay(path, cursor, limit=100):\n    if not 1 <= limit <= 128:\n        raise ValueError(\"limit must be 1..128\")\n    db = sqlite3.connect(path.resolve().as_uri() + \"?mode=ro\", uri=True, timeout=1, isolation_level=None)\n    try:\n        db.execute(\"BEGIN\")\n        identity = db.execute(\"SELECT value FROM state WHERE key='journal_id'\").fetchone()[0]\n        oldest, newest = db.execute(\"SELECT min(id),max(id) FROM events\").fetchone()\n        oldest, newest = oldest or 1, newest or 0\n        boundary = {\"journal_id\": identity, \"oldest_cursor\": f\"{identity}:{oldest - 1}\",\n                    \"latest_cursor\": f\"{identity}:{newest}\"}\n        if cursor is None:\n            after = oldest - 1\n            boundary[\"start\"] = \"oldest_retained; earlier history not requested\"\n        else:\n            journal_id, offset = cursor.split(\":\", 1)\n            if journal_id != identity:\n                return 409, dict(boundary, error=\"wrong_journal\")\n            after = int(offset)\n            if after < oldest - 1:\n                return 409, dict(boundary, error=\"retention_gap\", requested_cursor=cursor)\n            if after > newest:\n                return 409, dict(boundary, error=\"future_cursor\")\n        rows = db.execute(\"SELECT id,body FROM events WHERE id>? ORDER BY id LIMIT ?\", (after, limit)).fetchall()\n        events = [{\"cursor\": f\"{identity}:{row[0]}\", \"event\": json.loads(row[1])} for row in rows]\n        return 200, dict(boundary, events=events, next_cursor=f\"{identity}:{rows[-1][0] if rows else after}\")\n    finally:\n        db.close()\n\n\ndef serve(args):\n    class Handler(BaseHTTPRequestHandler):\n        def setup(self):\n            super().setup()\n            self.connection.settimeout(5)\n\n        def do_GET(self):\n            try:\n                url = urlsplit(self.path)\n                if url.path != \"/events\":\n                    self.send_error(404)\n                    return\n                query = parse_qs(url.query, strict_parsing=True)\n                cursor = query.get(\"after\", [None])[0]\n                limit = int(query.get(\"limit\", [\"100\"])[0])\n                wait = int(query.get(\"wait_ms\", [\"0\"])[0])\n                if not 0 <= wait <= 10000:\n                    raise ValueError(\"wait_ms must be 0..10000\")\n                deadline = time.monotonic() + wait / 1000\n                while True:\n                    status, body = replay(args.journal, cursor, limit)\n                    if status != 200 or body[\"events\"] or time.monotonic() >= deadline:\n                        break\n                    time.sleep(0.05)\n                data = canonical(body).encode()\n                self.send_response(status)\n                self.send_header(\"Content-Type\", \"application/json\")\n                self.send_header(\"Content-Length\", str(len(data)))\n                self.send_header(\"Connection\", \"close\")\n                self.end_headers()\n                self.wfile.write(data)\n                self.close_connection = True\n            except (ValueError, KeyError) as error:\n                self.send_error(400, str(error))\n            except sqlite3.Error:\n                self.send_error(503, \"journal unavailable; no cursor advanced\")\n\n        def log_message(self, *_args):\n            pass\n\n    class Server(ThreadingHTTPServer):\n        daemon_threads = True\n        gate = threading.BoundedSemaphore(8)\n\n        def process_request(self, request, client_address):\n            if not self.gate.acquire(blocking=False):\n                request.close()\n                return\n            try:\n                super().process_request(request, client_address)\n            except BaseException:\n                self.gate.release()\n                raise\n\n        def process_request_thread(self, request, client_address):\n            try:\n                super().process_request_thread(request, client_address)\n            finally:\n                self.gate.release()\n\n    class UnixServer(Server):\n        address_family = socket.AF_UNIX\n\n        def server_bind(self):\n            socketserver.TCPServer.server_bind(self)\n            self.server_name, self.server_port = \"localhost\", 0\n\n    lock = None\n    try:\n        if args.unix_socket:\n            path = args.unix_socket\n            lock = Path(str(path) + \".lock\").open(\"a+b\")\n            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)\n            if path.exists():\n                if not stat.S_ISSOCK(path.lstat().st_mode):\n                    raise ValueError(\"API path exists and is not a socket\")\n                path.unlink()\n            server = UnixServer(str(path), Handler)\n            os.chmod(path, 0o600)\n        else:\n            server = Server((args.host, args.port), Handler)\n        with server:\n            print(canonical({\"listening\": server.server_address}), flush=True)\n            server.serve_forever()\n    finally:\n        if lock:\n            lock.close()\n\n\ndef main():\n    parser = argparse.ArgumentParser(description=__doc__)\n    commands = parser.add_subparsers(dest=\"command\", required=True)\n    writer = commands.add_parser(\"collect\")\n    writer.add_argument(\"--journal\", required=True, type=Path)\n    writer.add_argument(\"--reader\", required=True, type=Path)\n    writer.add_argument(\"--segment\", required=True, type=Path)\n    writer.add_argument(\"--pid\", required=True, type=int)\n    writer.add_argument(\"--start\", required=True, type=int)\n    writer.add_argument(\"--retain\", type=int, default=10000)\n    writer.add_argument(\"--max-pages\", type=int, default=32768)\n    writer.add_argument(\"--once\", action=\"store_true\")\n    writer.add_argument(\"--wait-segment\", type=float, default=0,\n                        help=\"startup wait in seconds for a lazily created source segment\")\n    reader = commands.add_parser(\"serve\")\n    reader.add_argument(\"--journal\", required=True, type=Path)\n    reader.add_argument(\"--host\", default=\"127.0.0.1\", choices=(\"127.0.0.1\",))\n    reader.add_argument(\"--port\", default=18096, type=int)\n    reader.add_argument(\"--unix-socket\", type=Path)\n    args = parser.parse_args()\n    if args.command == \"collect\" and not 0 <= args.wait_segment <= 120:\n        parser.error(\"--wait-segment must be 0..120\")\n    try:\n        (collect if args.command == \"collect\" else serve)(args)\n    except KeyboardInterrupt:\n        pass\n\n\nif __name__ == \"__main__\":\n    main()\n"
+    },
+    "id_flow_decode.py": {
+      "sha256": "ed35ff373ee4ab28eae61aa7cf225006b93b5de5893ab058bbe8884998c3b384",
+      "text": "\"\"\"Decode same-invocation ID and flow side; never infer a common lifetime.\"\"\"\nimport struct\nfrom message_id_decode import decode as decode_id\n\nMAGIC = 0x4944464c\nSIDES = {0: None, 1: 'clientside', 2: 'serverside'}\nSTATES = {0: 'unavailable', 1: 'complete', 2: 'out_of_scope',\n          3: 'read_failed', 4: 'invalid', 5: 'budget_exhausted'}\n\n\ndef decode(payload):\n    if len(payload) != 144 or struct.unpack_from('<II', payload) != (MAGIC, 1):\n        raise ValueError('ID/flow size or schema')\n    flags, = struct.unpack_from('<H', payload, 72)\n    side, status = (flags >> 4) & 3, (flags >> 8) & 7\n    if (flags & ~0x073f or side not in SIDES or status not in STATES\n            or (status == 1) != (side in (1, 2))\n            or ((flags & 3) and (side or status))):\n        raise ValueError('invalid flow side')\n    base = bytearray(payload)\n    struct.pack_into('<I', base, 0, 0x4d534749)\n    struct.pack_into('<H', base, 72, flags & 15)\n    event = decode_id(base)\n    event.update(magic=MAGIC, wire_flags=flags, flow_side=side,\n                 flow_side_name=SIDES[side], flow_status=status,\n                 flow_status_name=STATES[status])\n    return event\n"
+    },
+    "reply_metadata_decode.py": {
+      "sha256": "7486bfae6713530a62cca6e1650e7afe0c74f0aba442d4817880000df6c33ee9",
+      "text": "\"\"\"Decode reported fields, with explicit missing and ambiguous states.\"\"\"\nimport struct\n\nFORMAT = struct.Struct('<II6Q7Ii4I')\nFIELDS = ('status', 'result_present', 'error_present', 'code_state', 'error_code',\n          'tool_error_state', 'tool_error')\nSTATES = {0: 'not_applicable', 1: 'complete', 3: 'read_failed',\n          4: 'out_of_scope', 5: 'budget_exhausted', 7: 'unavailable',\n          9: 'invalid_cache', 10: 'wrong_type', 11: 'ambiguous'}\n\n\ndef decode(payload):\n    if len(payload) != FORMAT.size:\n        raise ValueError('reply metadata size')\n    names = ('magic', 'abi', 'instance', 'revision', 'run', 'monotonic_ns',\n             'sequence', 'output_failures', 'flags', 'reads', 'source_bytes',\n             *FIELDS, 'reserved0', 'reserved1')\n    event = dict(zip(names, FORMAT.unpack(payload)))\n    if (event['magic'] != 0x52504c59 or event['abi'] != 1\n            or event['flags'] & ~15 or event['reads'] > 80\n            or event['source_bytes'] > 2048 or event['reserved0'] or event['reserved1']\n            or any(event[k] not in STATES for k in ('status', 'code_state', 'tool_error_state'))\n            or any(event[k] not in (0, 1) for k in ('result_present', 'error_present', 'tool_error'))):\n        raise ValueError('invalid reply metadata')\n    if event['status'] == 1:\n        if event['result_present'] + event['error_present'] != 1:\n            raise ValueError('invalid reply presence')\n        if bool(event['code_state']) != bool(event['error_present']):\n            raise ValueError('invalid error field state')\n        if bool(event['tool_error_state']) != bool(event['result_present']):\n            raise ValueError('invalid result field state')\n    elif any(event[k] for k in FIELDS[1:]):\n        raise ValueError('fields on unqualified reply')\n    if ((event['code_state'] != 1 and event['error_code'])\n            or (event['tool_error_state'] != 1 and event['tool_error'])):\n        raise ValueError('value without complete field')\n    for key in ('status', 'code_state', 'tool_error_state'):\n        event[key + '_name'] = STATES[event[key]]\n    return event\n"
+    },
+    "response_metadata_decode.py": {
+      "sha256": "6af53fb44a86d527be1674178944078b50131373f1ba9f9c02e2cd6cb27fa37e",
+      "text": "\"\"\"Decode observed HTTP status and local response-done arguments.\"\"\"\nimport struct\n\nFORMAT = struct.Struct('<II6Q10I')\nTLS = struct.Struct('<8I')\nSTATES = {0: 'not_applicable', 1: 'complete', 3: 'read_failed',\n          4: 'out_of_scope', 7: 'unavailable'}\nEVENTS = {28: 'HUDCTL_RESPONSE', 144: 'HUDEVT_RESPONSE',\n          29: 'HUDCTL_RESPONSE_DONE', 145: 'HUDEVT_RESPONSE_DONE',\n          1: 'HUDCTL_ABORT', 34: 'HUDEVT_ABORTED', 5: 'HUDCTL_TEARDOWN',\n          142: 'HUDEVT_REQUEST', 27: 'HUDCTL_REQUEST_DONE', 143: 'HUDEVT_REQUEST_DONE'}\nTLS_MODES = {0: 'not_applicable', 1: 'terminated', 2: 'ssl_filter_not_decrypting',\n             3: 'no_ssl_filter', 4: 'unknown'}\nTLS_REASONS = {0: None, 1: 'read_failed', 2: 'walk_limit', 3: 'multiple_ssl_filters',\n               4: 'server_side_entity', 5: 'inactive_context', 6: 'invalid_flow'}\nTLS_BITS = ('handshake_ok', 'passthru', 'chain_present', 'session_cert_present',\n            'retain_certificate', 'ticket_resumed', 'session_resumed', 'allow_nonssl')\nPROTOCOLS = {0: None, 1: 'SSLv2', 2: 'SSLv3', 3: 'TLSv1', 4: 'TLSv1.1', 5: 'TLSv1.2',\n             6: 'TLSv1.3', 7: 'DTLSv1', 8: 'DTLSv1.2', 9: 'GMSSLv1.1'}\nCERT_MODES = {0: 'ignore', 1: 'require', 2: 'request'}\n\n\ndef decode_tls(payload):\n    \"\"\"Raw TLS facts plus a derived certificate state (TLS-MODE.md).\"\"\"\n    mode, reason, nodes, bits, proto, suite, pcm, vfy = TLS.unpack(payload)\n    if (mode not in TLS_MODES or reason not in TLS_REASONS or nodes > 16\n            or bits >> len(TLS_BITS) or proto not in PROTOCOLS or suite > 0xffff\n            or pcm not in CERT_MODES or vfy > 127):\n        raise ValueError('invalid TLS block')\n    if (mode == 4) != bool(reason):\n        raise ValueError('TLS reason on wrong mode')\n    detail = mode in (1, 2)\n    if not detail and (bits or proto or suite or pcm or vfy):\n        raise ValueError('TLS values without an SSL filter reading')\n    if mode == 0 and nodes:\n        raise ValueError('TLS walk on an inapplicable event')\n    flags = {name: bool(bits >> i & 1) for i, name in enumerate(TLS_BITS)}\n    result = dict(mode=TLS_MODES[mode], filter_nodes=nodes)\n    if mode == 4:\n        result['reason'] = TLS_REASONS[reason]\n    if mode == 1 and (not flags['handshake_ok'] or flags['passthru']):\n        raise ValueError('terminated without a completed decrypting handshake')\n    if mode == 2 and flags['handshake_ok'] and not flags['passthru']:\n        raise ValueError('not-decrypting with a completed decrypting handshake')\n    if detail:\n        present = flags['chain_present'] or flags['session_cert_present']\n        if pcm == 0:\n            certificate = 'not_requested'\n        elif present:\n            certificate = 'verified' if vfy == 0 else 'failed'\n        elif flags['retain_certificate']:\n            certificate = 'none_observed'\n        else:\n            certificate = 'unknown'\n        result.update(protocol=PROTOCOLS[proto], protocol_number=proto,\n                      cipher_suite_id=suite, peer_cert_mode=CERT_MODES[pcm],\n                      verify_result=vfy, client_certificate=certificate, flags=flags)\n    return result\n\n\ndef decode(payload):\n    if len(payload) not in (FORMAT.size, FORMAT.size + TLS.size):\n        raise ValueError('response metadata size')\n    names = ('magic', 'abi', 'instance', 'revision', 'run', 'monotonic_ns',\n             'sequence', 'output_failures', 'code', 'presence', 'flags', 'reads',\n             'source_bytes', 'http_status_state', 'http_status',\n             'completion_state', 'transfer_complete', 'reserved')\n    event = dict(zip(names, FORMAT.unpack_from(payload)))\n    status, done = event['http_status_state'], event['completion_state']\n    if (event['magic'] != 0x5253504d or event['abi'] not in (1, 2)\n            or len(payload) != (FORMAT.size if event['abi'] == 1 else FORMAT.size + TLS.size)\n            or event['reserved']\n            or event['presence'] > 7 or event['flags'] & ~15\n            or event['reads'] > 4 or event['source_bytes'] > 16\n            or status not in STATES or done not in (0, 1, 4, 7)):\n        raise ValueError('invalid response metadata')\n    if (event['code'] in (28, 144)) != (status != 0):\n        raise ValueError('status on wrong event')\n    if (event['code'] in (29, 145)) != (done != 0):\n        raise ValueError('completion on wrong event')\n    if status == 1:\n        if not 100 <= event['http_status'] <= 999:\n            raise ValueError('invalid HTTP status')\n    elif event['http_status']:\n        raise ValueError('value on unavailable HTTP status')\n    if done == 1:\n        if event['transfer_complete'] not in (0, 1):\n            raise ValueError('invalid completion Boolean')\n    elif event['transfer_complete']:\n        raise ValueError('value on unavailable completion')\n    if event['abi'] == 2:\n        tls = decode_tls(payload[FORMAT.size:])\n        if event['code'] != 142 and tls['mode'] != 'not_applicable':\n            raise ValueError('TLS reading on wrong event')\n        event['client_tls'] = tls\n    event['http_status_state_name'] = STATES[status]\n    event['completion_state_name'] = STATES[done]\n    event['event_name'] = EVENTS.get(event['code'])\n    return event\n"
+    },
+    "session_routing_decode.py": {
+      "sha256": "5d56ca916dc482a776e5d2159373c57cd0b59b272b34ba8e4222a21fe59aa8ce",
+      "text": "\"\"\"Decode session-header and selected-route observations without identity inference.\"\"\"\nimport ipaddress\nimport struct\n\nFORMAT = struct.Struct('<II6Q4IHHI64s16sHHI')\nSTATUS = {1: 'complete', 2: 'truncated', 3: 'read_failed', 4: 'out_of_scope',\n          5: 'budget_exhausted', 7: 'unavailable'}\n\n\ndef decode(payload):\n    if len(payload) != FORMAT.size:\n        raise ValueError('session/routing record size')\n    names = ('magic', 'abi', 'instance', 'revision', 'run', 'monotonic_ns',\n             'sequence', 'output_failures', 'status', 'kind', 'original_length',\n             'copied_length', 'flags', 'reads', 'source_bytes', 'value',\n             'address', 'port', 'domain', 'endpoint_status')\n    event = dict(zip(names, FORMAT.unpack(payload)))\n    value, address = event.pop('value'), event.pop('address')\n    n = event['copied_length']\n    status, endpoint = event['status'], event['endpoint_status']\n    if (event['magic'] != 0x53524d45 or event['abi'] != 1 or event['kind'] not in (1, 2)\n            or status not in STATUS or n > 64 or any(value[n:])\n            or event['reads'] > 80 or event['source_bytes'] > 256):\n        raise ValueError('invalid session/routing record')\n    if status not in (1, 2) and n:\n        raise ValueError('value on unavailable field')\n    if status == 1 and n != event['original_length']:\n        raise ValueError('incomplete complete field')\n    if status == 2 and not (n == 64 < event['original_length']):\n        raise ValueError('invalid truncated field')\n    if event['kind'] == 1 and endpoint != 0:\n        raise ValueError('endpoint on session header')\n    if event['kind'] == 2 and endpoint not in (1, 3, 4, 5, 7):\n        raise ValueError('invalid endpoint status')\n    if endpoint != 1 and (any(address) or event['port'] or event['domain']):\n        raise ValueError('bytes on unavailable endpoint')\n    event['field'] = 'observed_session_header' if event['kind'] == 1 else 'selected_pool_name'\n    event['value_hex'] = value[:n].hex()\n    event['status_name'] = STATUS[status]\n    event['original_length_known'] = event['original_length'] != 0xffffffff\n    event['endpoint_status_name'] = STATUS.get(endpoint, 'not_applicable')\n    event['address_hex'] = address.hex() if endpoint == 1 else None\n    if endpoint == 1:\n        ip = ipaddress.IPv6Address(address)\n        event['address'] = str(ip.ipv4_mapped or ip)\n    else:\n        event['address'] = None\n    return event\n"
+    },
+    "activity_group_decode.py": {
+      "sha256": "521c621b68bae6473c5fa2b07640a402b67d400e8e022c8d5399c5583aaec5b0",
+      "text": "\"\"\"Decode the explicit exchange frame emitted by the combined activity ELF.\"\"\"\nimport struct\n\nMAGIC = 0x41474331\nHEADER = struct.Struct(\"<4I2Q2IQ\")\n\n\ndef unwrap(payload):\n    if len(payload) < HEADER.size:\n        raise ValueError(\"short activity group frame\")\n    magic, abi, length, side, owner, exchange, status, phase, invocation = HEADER.unpack_from(payload)\n    if (magic != MAGIC or abi != 2 or length not in (96, 104, 128, 144)\n            or len(payload) != HEADER.size + length or side not in (0, 1, 2)\n            or status not in range(7) or phase not in range(5)):\n        raise ValueError(\"invalid activity group frame\")\n    if (bool(owner) != bool(exchange) or bool(phase) != bool(exchange)\n            or (exchange and (not side or not invocation))\n            or (status == 1 and not exchange)):\n        raise ValueError(\"inconsistent activity group key\")\n    return dict(owner_instance=str(owner), exchange=str(exchange), status=status,\n                phase=phase, side=side, invocation=str(invocation)), payload[HEADER.size:]\n"
+    },
+    "method_decode.py": {
+      "sha256": "6579dd63f44f806c6a3bcbbefce7022548eb0d44b47ded55805cbbff55ec78a7",
+      "text": "\"\"\"Decode a bounded, escaped root-object method value; never infer absence.\"\"\"\nimport struct\n\nRECORD = struct.Struct(\"<II6Q4IHHI64s\")\nFIELDS = (\n    \"magic\",\n    \"abi\",\n    \"instance\",\n    \"revision\",\n    \"run\",\n    \"monotonic_ns\",\n    \"sequence\",\n    \"output_failures\",\n    \"status\",\n    \"getter_result\",\n    \"original_length\",\n    \"copied_length\",\n    \"flags\",\n    \"reads\",\n    \"source_bytes\",\n    \"value\",\n)\nSTATUSES = {\n    1: \"complete\",\n    2: \"truncated\",\n    3: \"read_failed\",\n    4: \"out_of_scope\",\n    5: \"budget_exhausted\",\n    6: \"getter_error\",\n    7: \"unavailable\",\n}\n\n\ndef decode(payload):\n    if len(payload) != RECORD.size:\n        raise ValueError(\"wrong method record size\")\n    event = dict(zip(FIELDS, RECORD.unpack(payload)))\n    if event[\"magic\"] != 0x4A4D4554 or event[\"abi\"] != 1:\n        raise ValueError(\"wrong method record schema\")\n    status = event[\"status\"]\n    copied = event[\"copied_length\"]\n    original = event[\"original_length\"]\n    if (\n        status not in STATUSES\n        or copied > 64\n        or copied > original\n        or event[\"reads\"] > 12\n        or event[\"source_bytes\"] > 320\n    ):\n        raise ValueError(\"invalid method extraction bounds\")\n    if (\n        status == 1\n        and copied != original\n        or status == 2\n        and not (copied == 64 and original > 64)\n        or status not in (1, 2)\n        and copied\n    ):\n        raise ValueError(\"inconsistent method extraction status\")\n    value = event.pop(\"value\")\n    if any(value[copied:]):\n        raise ValueError(\"nonzero bytes outside copied value\")\n    event[\"value_hex\"] = value[:copied].hex()\n    event[\"status_name\"] = STATUSES[status]\n    event[\"representation\"] = \"json_string_escaped_bytes\"\n    return event\n"
+    },
+    "token_method_decode.py": {
+      "sha256": "09bf5f83c4accbdea4fa1bda95b9bf5565db63a30c9fd014631c96b5aede6f5d",
+      "text": "\"\"\"Decode bounded method bytes from the token-cache probe, not from inputs.\"\"\"\nimport struct\n\nFORMAT = struct.Struct(\"<II6Q4IHHI64s\")\nSTATUS = {1: \"complete\", 2: \"truncated\", 3: \"read_failed\", 4: \"out_of_scope\",\n          5: \"budget_exhausted\", 7: \"unavailable\", 8: \"no_literal_method\",\n          9: \"invalid_cache\", 10: \"nonstring\"}\n\n\ndef decode(payload):\n    if len(payload) != FORMAT.size:\n        raise ValueError(\"token method record size\")\n    names = (\"magic\", \"abi\", \"instance\", \"revision\", \"run\", \"monotonic_ns\",\n             \"sequence\", \"output_failures\", \"status\", \"root_members\",\n             \"original_length\", \"copied_length\", \"flags\", \"reads\", \"source_bytes\", \"value\")\n    event = dict(zip(names, FORMAT.unpack(payload)))\n    value = event.pop(\"value\")\n    n = event[\"copied_length\"]\n    if (event[\"magic\"] != 0x544D4554 or event[\"abi\"] != 1 or\n            event[\"status\"] not in STATUS or n > 64 or\n            event[\"reads\"] > 40 or event[\"source_bytes\"] > 1024 or any(value[n:])):\n        raise ValueError(\"invalid token method record\")\n    if event[\"status\"] not in (1, 2) and n:\n        raise ValueError(\"value on unavailable token method record\")\n    if event[\"status\"] == 1 and n != event[\"original_length\"]:\n        raise ValueError(\"incomplete complete token method record\")\n    if event[\"status\"] == 2 and not (n == 64 < event[\"original_length\"]):\n        raise ValueError(\"invalid truncated token method record\")\n    event[\"status_name\"] = STATUS[event[\"status\"]]\n    event[\"value_hex\"] = value[:n].hex()\n    event[\"representation\"] = \"escaped JSON string bytes; literal key; first match\"\n    return event\n"
+    },
+    "operation_target_decode.py": {
+      "sha256": "64f6cc61bb0c5c04552948f13c92ded070c58a7c39310ece04cc1d9a7450d722",
+      "text": "\"\"\"Decode bounded raw JSON target bytes without assigning request identity.\"\"\"\nimport struct\n\nFORMAT = struct.Struct('<II6Q4IHHI64s')\nSTATES = {1: 'complete', 2: 'truncated', 3: 'read_failed', 4: 'out_of_scope',\n          5: 'budget_exhausted', 7: 'unavailable', 8: 'no_literal_method',\n          9: 'invalid_cache', 10: 'nonstring', 11: 'no_literal_target',\n          12: 'unsupported_method'}\n\n\ndef decode(payload):\n    if len(payload) != FORMAT.size:\n        raise ValueError('operation target size')\n    names = ('magic', 'abi', 'instance', 'revision', 'run', 'monotonic_ns',\n             'sequence', 'output_failures', 'status', 'target_kind',\n             'original_length', 'copied_length', 'flags', 'reads', 'source_bytes', 'value')\n    e = dict(zip(names, FORMAT.unpack(payload)))\n    n = e['copied_length']\n    if (e['magic'] != 0x4f544754 or e['abi'] != 1 or e['status'] not in STATES\n            or e['target_kind'] not in (0, 1, 2) or e['flags'] & ~15\n            or e['reads'] > 96 or e['source_bytes'] > 4096 or n > 64\n            or any(e['value'][n:])):\n        raise ValueError('invalid operation target')\n    if e['status'] in (1, 2):\n        if (not e['target_kind'] or n != min(e['original_length'], 64)\n                or (e['status'] == 2) != (e['original_length'] > 64)):\n            raise ValueError('invalid target length or kind')\n    elif n:\n        raise ValueError('value on unavailable target')\n    e['value_hex'] = e.pop('value')[:n].hex()\n    e['status_name'] = STATES[e['status']]\n    e['target_kind_name'] = {0: None, 1: 'tool_name', 2: 'resource_uri'}[e['target_kind']]\n    e['representation'] = 'raw_json_string_bytes'\n    return e\n"
+    },
+    "json_lifecycle_decode.py": {
+      "sha256": "88052e48bc8b52c8d0fa0a51f5b34c1c7375c70c41d3895d73ea7e34aec51ce7",
+      "text": "\"\"\"Decode boundary observations without promoting tags to lifecycle identity.\"\"\"\nimport struct\n\nNAMES = ('magic abi instance revision run monotonic_ns sequence output_failures '\n         'context_tag kind code status flags flow_side scb_flags cache_present '\n         'seen_mask reads source_bytes payload_bytes reserved').split()\nSTATES = ('unavailable', 'observed', 'address_only', 'unsupported', 'read_failed',\n          'disabled', 'capacity', 'overflow', 'map_failed', 'run_mismatch')\n\n\ndef decode(payload):\n    if len(payload) != 112:\n        raise ValueError('boundary size')\n    e = dict(zip(NAMES, struct.unpack('<II7Q12I', payload)))\n    if (e['magic'] != 0x4a4c4244 or e['abi'] != 1 or e['kind'] not in (1, 2, 3)\n            or e['status'] >= len(STATES) or e['flags'] & ~15 or e['reserved']\n            or e['flow_side'] > 2 or e['scb_flags'] & ~0x3fff or e['cache_present'] > 1\n            or e['seen_mask'] & ~15 or e['reads'] > 4 or e['source_bytes'] > 29\n            or e['context_tag'] > 128):\n        raise ValueError('boundary fields')\n    if e['kind'] == 3 and any(e[k] for k in ('code', 'flow_side', 'scb_flags',\n                                            'cache_present', 'reads', 'source_bytes', 'payload_bytes')):\n        raise ValueError('reset has no qualified source fields')\n    if e['status'] in (1, 5) and (e['kind'] == 3 or e['flow_side'] not in (1, 2)):\n        raise ValueError('observed storage requires side')\n    e['status_name'] = STATES[e['status']]\n    e['lifecycle_validated'] = False\n    return e\n\n\ndef window(events, breaks=()):\n    \"\"\"Report boundary evidence only; known breaks invalidate the whole window.\"\"\"\n    invalid = list(breaks)\n    identities = {}\n    run = events[0]['run'] if events else None\n    for n, e in enumerate(events, 1):\n        identity = (e['instance'], e['revision'])\n        previous = identities.setdefault(e['kind'], identity)\n        if identity != previous or e['run'] != run:\n            invalid.append('source_changed')\n        if e['sequence'] != n or e['flags'] or e['output_failures'] or e['status'] not in (1, 2):\n            invalid.append('diagnostic_or_gap')\n    return dict(boundaries_usable=not invalid, reasons=invalid,\n                lifecycle_validated=False, request_scope_validated=False,\n                message_association_validated=False)\n"
+    },
+    "metadata_decode.py": {
+      "sha256": "f31a6bf911e65b38282f5ec3d899993ee44771ee7daf3c8594509c1866ce6494",
+      "text": "\"\"\"Decode handler metadata without interpreting agent activity.\"\"\"\n\nimport struct\n\nFORMAT = struct.Struct(\"<II6Q4I\")\nFIELDS = (\n    \"magic\",\n    \"abi\",\n    \"instance\",\n    \"revision\",\n    \"run\",\n    \"monotonic_ns\",\n    \"sequence\",\n    \"output_failures\",\n    \"kind\",\n    \"code\",\n    \"presence\",\n    \"flags\",\n)\n\n\ndef decode(data, event_names):\n    \"\"\"Keep unknown numeric codes; names come from the build's enum manifest.\"\"\"\n    if len(data) != FORMAT.size:\n        raise ValueError(\"invalid metadata record length\")\n    result = dict(zip(FIELDS, FORMAT.unpack(data)))\n    if result[\"magic\"] != 0x4D455441 or result[\"abi\"] != 1:\n        raise ValueError(\"unsupported metadata record schema\")\n    if result[\"kind\"] not in (1, 2) or result[\"presence\"] & ~7:\n        raise ValueError(\"invalid metadata record fields\")\n    result[\"event_name\"] = event_names.get(str(result[\"code\"]))\n    return result\n"
+    },
+    "json_initialization_decode.py": {
+      "sha256": "8449bb7315694673b6fd26297b2a0971dd787d1d93458d510a8b9bdb24395c86",
+      "text": "\"\"\"Decode bounded initialization records. Completion is not storage lifetime.\"\"\"\nimport struct\n\nFORMAT = struct.Struct(\"<II7Q8I\")\nFIELDS = (\"magic\", \"abi\", \"instance\", \"revision\", \"run\", \"invocation\", \"monotonic_ns\",\n          \"sequence\", \"output_failures\", \"code\", \"status\", \"flags\", \"flow_side\",\n          \"reads\", \"source_bytes\", \"guards\", \"reserved\")\n\n\ndef decode(data):\n    if len(data) != FORMAT.size:\n        raise ValueError(\"initialization record length\")\n    value = dict(zip(FIELDS, FORMAT.unpack(data)))\n    if value[\"magic\"] != 0x4A494E49 or value[\"abi\"] != 1:\n        raise ValueError(\"initialization record ABI\")\n    if value[\"reserved\"] or value[\"status\"] > 6 or value[\"flags\"] & ~15:\n        raise ValueError(\"initialization record fields\")\n    if value[\"reads\"] > 3 or value[\"source_bytes\"] > 9:\n        raise ValueError(\"initialization read budget\")\n    if value[\"guards\"] > 3 or value[\"flow_side\"] > 2:\n        raise ValueError(\"initialization guard fields\")\n    if value[\"status\"] == 1 and (value[\"code\"] != 57 or value[\"guards\"] != 3\n                                  or value[\"flow_side\"] not in (1, 2)\n                                  or value[\"reads\"] != 3 or value[\"source_bytes\"] != 9):\n        raise ValueError(\"initialization completion without entry guards\")\n    value[\"initialization_completed\"] = bool(\n        value[\"status\"] == 1 and not value[\"flags\"] and not value[\"output_failures\"]\n        and all(value[key] for key in (\"instance\", \"revision\", \"run\", \"invocation\",\n                                      \"sequence\", \"monotonic_ns\")))\n    value[\"lifecycle_validated\"] = False\n    return value\n"
+    },
+    "message_id_decode.py": {
+      "sha256": "b8e69a78058d7128908272c206b4a4f57222f275bf7d57e8c282ed667045f219",
+      "text": "\"\"\"Decode exact ID bytes and types without assigning request or caller identity.\"\"\"\nimport re\nimport struct\n\nFORMAT = struct.Struct('<II6Q4IHHI64s')\nSTATES = {1: 'complete', 2: 'truncated', 3: 'read_failed', 4: 'out_of_scope',\n          5: 'budget_exhausted', 7: 'unavailable', 8: 'missing',\n          9: 'invalid_cache', 10: 'wrong_type', 11: 'ambiguous'}\nNUMBER = re.compile(rb'-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?')\n\n\ndef decode(payload):\n    if len(payload) != FORMAT.size:\n        raise ValueError('message ID size')\n    names = ('magic', 'abi', 'instance', 'revision', 'run', 'monotonic_ns',\n             'sequence', 'output_failures', 'status', 'id_kind',\n             'original_length', 'copied_length', 'flags', 'reads', 'source_bytes', 'value')\n    e = dict(zip(names, FORMAT.unpack(payload)))\n    n = e['copied_length']\n    if (e['magic'] != 0x4d534749 or e['abi'] != 1 or e['status'] not in STATES\n            or e['id_kind'] not in (0, 1, 2, 3) or e['flags'] & ~15\n            or e['reads'] > 80 or e['source_bytes'] > 2048 or n > 64\n            or any(e['value'][n:])):\n        raise ValueError('invalid message ID')\n    value = e.pop('value')[:n]\n    if e['status'] in (1, 2):\n        if (not e['id_kind'] or n != min(e['original_length'], 64)\n                or (e['status'] == 2) != (e['original_length'] > 64)):\n            raise ValueError('invalid ID length or kind')\n        if e['id_kind'] == 2 and (e['status'] != 1 or NUMBER.fullmatch(value) is None):\n            raise ValueError('invalid numeric ID')\n        if e['id_kind'] == 3 and (e['status'] != 1 or value != b'null'):\n            raise ValueError('invalid null ID')\n    elif n or e['id_kind'] not in (0, 1):\n        raise ValueError('value on unavailable ID')\n    e['value_hex'] = value.hex()\n    e['status_name'] = STATES[e['status']]\n    e['id_kind_name'] = {0: None, 1: 'string', 2: 'number', 3: 'null'}[e['id_kind']]\n    e['representation'] = 'raw_json_string_bytes' if e['id_kind'] == 1 else 'raw_json_token_bytes'\n    return e\n"
+    }
+  },
+  "tls_decoder_cases": 24,
+  "missing_record_mutations": 38,
+  "combined": [
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "e35dac038371304e2a7cba59e159e5d6c546ba56efdcc905ff78ff2c0707d7c1",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "73756d",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 3,
+          "value": "sum",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "6f6e65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 3,
+          "value": "one",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": false
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:07.456368731Z",
+        "ended_at": "2026-09-30T14:32:07.463149243Z",
+        "last_observed_at": "2026-09-30T14:32:07.463149243Z",
+        "duration_ns": "6786271",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "1",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:533",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:551",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:533",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:534",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:535",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:547",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:549",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:551"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "ae728b4ff146e498034a11e5140c8a522d42cc775a81683dfa88a6cb1974d944",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "7265736f75726365732f72656164",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 14,
+          "value": "resources/read"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "66696c653a2f2f2f6f6e65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 11,
+          "value": "file:///one",
+          "kind": "resource_uri"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "39303037313939323534373430393933",
+          "representation": "json_token_bytes",
+          "value": "9007199254740993",
+          "kind": "number"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": false,
+        "error_present": true,
+        "error_code": {
+          "status": "complete",
+          "value": -32601
+        },
+        "tool_error": {
+          "status": "not_applicable"
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:08.012902690Z",
+        "ended_at": "2026-09-30T14:32:08.017135184Z",
+        "last_observed_at": "2026-09-30T14:32:08.017135184Z",
+        "duration_ns": "4237781",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "9",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:562",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:580",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:562",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:563",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:564",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:576",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:578",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:580"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "b89dc176beb3b6fffa7b43acb1f62d3fed0d8565db252fb59915f13c063e5ab5",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "6d697373696e67",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 7,
+          "value": "missing",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "7468726565",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 5,
+          "value": "three",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": true
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:08.409863074Z",
+        "ended_at": "2026-09-30T14:32:08.414229763Z",
+        "last_observed_at": "2026-09-30T14:32:08.414229763Z",
+        "duration_ns": "4370367",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "17",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:591",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:609",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:591",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:592",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:593",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:605",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:607",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:609"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "ffdee14e0eda57a84d58039a5aab750957ba32c00e2467d1bbeb9d5322c816f7",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "6b6565702d30",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 6,
+          "value": "keep-0",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": false
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:08.761833022Z",
+        "ended_at": "2026-09-30T14:32:08.769725360Z",
+        "last_observed_at": "2026-09-30T14:32:08.769725360Z",
+        "duration_ns": "7899193",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "25",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:620",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:638",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:620",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:621",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:622",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:634",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:636",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:638"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "1fa332d35d9d01123d2091e4bc5c4159c8fc8c0c9209c56401070ad499f81840",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "6b6565702d31",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 6,
+          "value": "keep-1",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": true
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:08.771737339Z",
+        "ended_at": "2026-09-30T14:32:08.774801302Z",
+        "last_observed_at": "2026-09-30T14:32:08.774801302Z",
+        "duration_ns": "3072338",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "33",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:639",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:654",
+        "record_count": 16,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:639",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:640",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:641",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:650",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:652",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:654"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "3d68f8d74c1de6285b50557a57c8075a4cba1d7e237acb0419c891faa2822fcf",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "6b6565702d32",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 6,
+          "value": "keep-2",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": false
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:08.778455029Z",
+        "ended_at": "2026-09-30T14:32:08.785730418Z",
+        "last_observed_at": "2026-09-30T14:32:08.785730418Z",
+        "duration_ns": "7279132",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "41",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:655",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:670",
+        "record_count": 16,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:655",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:656",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:657",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:666",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:668",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:670"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "fb0680815118734a6d482a769ec144474130ecfd0fc70491260249cf16ce88c5",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "636f6e63757272656e742d30",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 12,
+          "value": "concurrent-0",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": false
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:09.346808124Z",
+        "ended_at": "2026-09-30T14:32:09.351062990Z",
+        "last_observed_at": "2026-09-30T14:32:09.351062990Z",
+        "duration_ns": "4260349",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "49",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:685",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:736",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:685",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:686",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:687",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:732",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:734",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:736"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "32c6ca6f5f1dee494091b29d3c6a0788f76d76ec8a7c7e1e98ff00b6871c4f35",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "636f6e63757272656e742d31",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 12,
+          "value": "concurrent-1",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": true
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:09.346888476Z",
+        "ended_at": "2026-09-30T14:32:09.351106279Z",
+        "last_observed_at": "2026-09-30T14:32:09.351106279Z",
+        "duration_ns": "4220050",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "53",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:693",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:747",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:693",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:694",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:695",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:743",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:745",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:747"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "cb3d5a28e757db01d3f5fbabdd576f67090709a9101d959242f0ceaa9ae83ffc",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "636f6e63757272656e742d32",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 12,
+          "value": "concurrent-2",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": false
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:09.346936815Z",
+        "ended_at": "2026-09-30T14:32:09.351132599Z",
+        "last_observed_at": "2026-09-30T14:32:09.351132599Z",
+        "duration_ns": "4197632",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "57",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:701",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:758",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:701",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:702",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:703",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:754",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:756",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:758"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    },
+    {
+      "schema_version": 1,
+      "event_type": "agent.activity.combined",
+      "activity_id": "f460ba4d8813ae8302a560eb7255f7a91d6ff6d6a8b5349fe0df9498dad67121",
+      "identity_binding": "unknown",
+      "identity": null,
+      "correlation": {
+        "status": "observed_exchange",
+        "scope": "single_worker_nonpipelined_http1",
+        "issues": []
+      },
+      "activity": {
+        "method": {
+          "status": "complete",
+          "raw_hex": "746f6f6c732f63616c6c",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 10,
+          "value": "tools/call"
+        },
+        "target": {
+          "status": "complete",
+          "raw_hex": "636f6e63757272656e742d33",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 12,
+          "value": "concurrent-3",
+          "kind": "tool_name"
+        },
+        "message_id": {
+          "status": "complete",
+          "raw_hex": "73616d65",
+          "representation": "json_string_escaped_bytes",
+          "original_length": 4,
+          "value": "same",
+          "kind": "string"
+        }
+      },
+      "reported_outcome": {
+        "status": "complete",
+        "result_present": true,
+        "error_present": false,
+        "error_code": {
+          "status": "not_applicable"
+        },
+        "tool_error": {
+          "status": "complete",
+          "value": true
+        },
+        "http_status": {
+          "status": "complete",
+          "value": 200
+        },
+        "local_transfer_complete": {
+          "status": "complete",
+          "value": true
+        }
+      },
+      "transport": {
+        "client_tls": {
+          "status": "not_observed"
+        }
+      },
+      "timing": {
+        "started_at": "2026-09-30T14:32:09.346958572Z",
+        "ended_at": "2026-09-30T14:32:09.352223508Z",
+        "last_observed_at": "2026-09-30T14:32:09.352223508Z",
+        "duration_ns": "5266516",
+        "status": "complete"
+      },
+      "evidence": {
+        "source_id": "49d8a96ac86746599c61ec2b62bc8bab",
+        "ring": 0,
+        "run": "12761957049485156178",
+        "owner_instance": "9223372036854776139",
+        "exchange": "61",
+        "first_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:709",
+        "last_cursor": "5c481bac91f8400d8d8ab2ea04b9f368:769",
+        "record_count": 18,
+        "field_sources": {
+          "method": "5c481bac91f8400d8d8ab2ea04b9f368:709",
+          "target": "5c481bac91f8400d8d8ab2ea04b9f368:710",
+          "message_id": "5c481bac91f8400d8d8ab2ea04b9f368:711",
+          "reply": "5c481bac91f8400d8d8ab2ea04b9f368:765",
+          "http_status": "5c481bac91f8400d8d8ab2ea04b9f368:767",
+          "local_transfer_complete": "5c481bac91f8400d8d8ab2ea04b9f368:769"
+        },
+        "program_binding": "not_verified_by_exporter",
+        "continuity": "observed_records_only"
+      }
+    }
+  ],
+  "passed": true,
+  "tests": 11,
+  "failures": []
+}

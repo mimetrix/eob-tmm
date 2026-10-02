@@ -9,7 +9,7 @@ def unwrap(payload):
     if len(payload) < HEADER.size:
         raise ValueError("short activity group frame")
     magic, abi, length, side, owner, exchange, status, phase, invocation = HEADER.unpack_from(payload)
-    if (magic != MAGIC or abi != 2 or length not in (96, 104, 144)
+    if (magic != MAGIC or abi != 2 or length not in (96, 104, 128, 144)
             or len(payload) != HEADER.size + length or side not in (0, 1, 2)
             or status not in range(7) or phase not in range(5)):
         raise ValueError("invalid activity group frame")

@@ -13,6 +13,12 @@ rule, not a substitute for it.
 
 ## Start here
 
+**2026-10-01 client TLS mode:** [TLS-MODE.md](env/ai-traffic/TLS-MODE.md) is the
+current record. Each combined activity record states how TMM handled client TLS.
+16 live exchanges give the expected class, and protocol and cipher match the
+client's own record. Identity is still unknown. `no_ssl_filter` does not prove
+client plaintext, and passthrough produces no record.
+
 **2026-09-30 program ownership:** [PROGRAMS.md](substrate/PROGRAMS.md) is the
 current contract and native/socket/build/live record. Independent programs with
 multiple entry attachments pass pinned native checks. The new sources compile
@@ -79,6 +85,7 @@ construction, kept that way on purpose, and carrying its own dated accuracy note
 
 | document | covers |
 |---|---|
+| [`env/ai-traffic/TLS-MODE.md`](env/ai-traffic/TLS-MODE.md) | **MEASURED native tests and isolated live TMM, 2026-10-01.** Client TLS class, protocol, cipher, certificate mode and derived certificate state on each combined record. 16 exchanges, plain and client SSL, TLS 1.2/1.3, trusted/untrusted/missing certificates. One worker, HTTP/1; identity, passthrough, resumption and cost remain open. |
 | [`substrate/PROGRAMS.md`](substrate/PROGRAMS.md) | **MEASURED native/socket tests, package and isolated live TMM, 2026-09-30.** Two owners, two shared entry hooks, 18 exchanges, 594 records; separate maps/configuration, independent detach/revoke and replacement. Restored hooks and removed fixture. Multiple workers and sustained cost remain unqualified. |
 | [`env/ai-traffic/VOID-COMPLETION.md`](env/ai-traffic/VOID-COMPLETION.md) | **MEASURED native fixture only, 2026-09-29.** Both pinned compilers pass 24 cases and 1,100 observed returns. Tests a frame-bound entry snapshot with the unchanged return machinery. Production entry capture and live initialization remain unvalidated. |
 | [`env/ai-traffic/JSON-INITIALIZATION.md`](env/ai-traffic/JSON-INITIALIZATION.md) | **MEASURED source/compiled/admission qualification only, 2026-09-29.** Handler/reset void-return refusals, admitted control and rejected forwarding shortcut. Build-box verifier checks 48 source snapshots and 15 instruction locations. No live probe; completed initialization and lifecycle remain unqualified. |
