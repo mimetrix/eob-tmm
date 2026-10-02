@@ -144,7 +144,7 @@ HTTP/1, one plain-HTTP provider, no Redis (so no identity, budget or rate-limit
 fields are populated), no streaming. The probe's data-path cost is not measured.
 The record format is the library's, not a versioned interface, so a consumer
 must not rely on its fields across library versions. The candidate hook list
-is in [TRACEPOINTS.md](TRACEPOINTS.md).
+is in [HOOK-CANDIDATES.md](HOOK-CANDIDATES.md).
 
 ## Build-box state and backup (2026-10-02)
 
@@ -174,3 +174,54 @@ and copied files), the extra `publish.artifactory…/test/tmm-img:v10.204.15-*`
 tags on the aigw images, and the `eob-pre-aigw/*` safety tags. A before/after
 check shows the main tree, its changes, the shared image tags and the main
 toolchain container are unchanged.
+
+## Access control with the session store (2026-10-02)
+
+**MEASURED.** Redis (pinned by digest) runs on the fixture's data network; TMM
+reaches it over plain TCP (`SESSIONDB_DISABLE_SSL=true`,
+`SESSIONDB_EXTERNAL_SERVICE_ADDR`). The test seeds fixture identities in the
+gateway's own key layout. [`aigw_rbac_suite.py`](aigw_rbac_suite.py), attempt 03:
+
+| Case | Result | Provider called |
+|---|---|---|
+| Valid virtual key | 200 | once, with the provider key only |
+| No key | 401 `auth_error` | no |
+| Unknown key | 401 `token_not_found_in_db` | no |
+| Revoked key (`active` = 0) | 401 | no |
+| Key scoped to another model | 403 `model_not_allowed` | no |
+| Rate limit 2/hour: requests 1, 2, 3 | 200, 200, 429 `rate_limit_exceeded` | 1, 1, 0 |
+
+Redis counter after the run: 2. The record probe captured all eight decisions,
+including `vk_id`, `principal_id`, `team_id` and `identity_state` for keyed
+requests. Retained failures: attempt 01 named a second probe that was not built;
+attempt 02 found that the gateway treats a **missing** principal, team or org
+record as deny-all (a deleted team must not read as unrestricted), so the
+fixture must seed them.
+
+## Latency attribution (P24, 2026-10-02)
+
+**MEASURED, with one stage definition falsified and corrected.** One owned eBPF
+program, [`aigw_timing.bpf.c`](../../substrate/surfaces/aigw_timing.bpf.c), has
+eight entries: admission, the two store requests (`aigw_host_hgetall`,
+`aigw_host_eval`), store replies, session events, reply passes, reply completion
+and record publish. Events are joined on the request's client-side `aigw_scb`.
+A mock provider holds headers for D1 = 200 ms and pauses D2 = 150 ms mid-body.
+
+Result (attempt 03, medians): admission 4.3 ms, of which store round trips
+4.1 ms; provider until complete reply 356.4 ms (D1 + D2 = 350 ms); reply
+processing in TMM 0.1 ms; delivery 2 µs; total 360.9 ms. The stages sum to the
+total within 2 µs. The full table is in
+[P24](../../02-RESEARCH-PARAMETERS.md#p24--can-ebpf-probes-attribute-an-ai-gateway-requests-latency-to-its-stages).
+
+**Finding (attempt 02):** for a buffered JSON reply, TMM raises the response
+event only after the whole body is parsed. The registered "first byte" stage
+therefore measured complete-reply time (about D1 + D2), and so does the gateway's
+own `latency_ttft_us` field, which is set on the same event. A true first-byte
+time needs a header-level hook and a streamed request.
+
+**Also found (attempt 01):** `aigw_dssm_send`'s callback argument is the host
+context only for a key lookup; for a Lua script it is a script-call record. The
+probe hooks the two host-table entries instead.
+
+Not yet checked: the probe totals against the gateway record's own latency fields
+(needs both probes armed together). Data-path cost of the probes is not measured.

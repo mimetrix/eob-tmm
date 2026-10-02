@@ -1,0 +1,1440 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790968586415681",
+      "generation": 0,
+      "sequence": 0,
+      "status": 0
+    },
+    {
+      "description": "reset_config_timestamp=1790968586415681",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "clients": [
+    {
+      "case": "seq-0",
+      "client_ms": 363.071555737406,
+      "status": 200
+    },
+    {
+      "case": "seq-1",
+      "client_ms": 364.6948956884444,
+      "status": 200
+    },
+    {
+      "case": "seq-2",
+      "client_ms": 363.7227499857545,
+      "status": 200
+    },
+    {
+      "case": "concurrent-0",
+      "client_ms": 366.99989531189203,
+      "status": 200
+    },
+    {
+      "case": "concurrent-1",
+      "client_ms": 367.0025202445686,
+      "status": 200
+    },
+    {
+      "case": "refused",
+      "status": 401
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-load",
+        "0",
+        "/work/probe/aigw_timing.bpf.o",
+        "/work/probe/aigw_timing.sig"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=0 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "56"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "{\n  \"abi\": 1,\n  \"session\": \"90eb654aa3928e69\",\n  \"instance\": \"8000000000000138\",\n  \"revision\": 0,\n  \"schema\": 0,\n  \"entries\": 0,\n  \"program_sha256\": \"f54ecdafc12cd32910ccd083734e9ac33eb35d2cfa9439115df3989070c57a1f\"\n}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-publish",
+        "56",
+        "/evidence/aigw-timing-01/timing-config.json"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK config published slot=56 revision=1\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=1 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=2 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "2"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=3 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "3"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=4 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=5 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "5"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=6 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776120",
+        "6"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-mode",
+        "0",
+        "9223372036854776120",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-status",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-status",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=6 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=5 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "2"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=4 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "3"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=3 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=2 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "5"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=1 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776120",
+        "6"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776120 entries=7 attached=0 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-revoke",
+        "0",
+        "9223372036854776120"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=0 entries=0 attached=0 mode=0 config_slot=56\n"
+    }
+  ],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-rbac-port-list-anchor",
+        "id": "469579da-be96-11f1-9f08-ba3c8592215f",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-rbac-address-list-anchor",
+        "id": "46957c28-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "4695c41c-be96-11f1-9f08-ba3c8592215f",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-rbac-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "4695c5ac-be96-11f1-9f08-ba3c8592215f",
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-rbac-address-list-anchor",
+        "destPorts": "aigw-rbac-port-list-anchor",
+        "id": "4695c656-be96-11f1-9f08-ba3c8592215f",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "4695c41c-be96-11f1-9f08-ba3c8592215f",
+        "enabled": true,
+        "id": "4695c714-be96-11f1-9f08-ba3c8592215f",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "4695c656-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "4695d7ae-be96-11f1-9f08-ba3c8592215f",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "4695c5ac-be96-11f1-9f08-ba3c8592215f",
+        "members": [
+          "4695d7ae-be96-11f1-9f08-ba3c8592215f"
+        ],
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "4695fbee-be96-11f1-9f08-ba3c8592215f",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "46964248-be96-11f1-9f08-ba3c8592215f",
+        "profile": "4695fbee-be96-11f1-9f08-ba3c8592215f",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "4696176e-be96-11f1-9f08-ba3c8592215f",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4696432e-be96-11f1-9f08-ba3c8592215f",
+        "profile": "4696176e-be96-11f1-9f08-ba3c8592215f",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "469625b0-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "469643b0-be96-11f1-9f08-ba3c8592215f",
+        "profile": "469625b0-be96-11f1-9f08-ba3c8592215f",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "46962fd8-be96-11f1-9f08-ba3c8592215f",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "46962fd8-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4696441e-be96-11f1-9f08-ba3c8592215f",
+        "profile": "46962fd8-be96-11f1-9f08-ba3c8592215f",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "46963960-be96-11f1-9f08-ba3c8592215f",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "46963960-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "46964496-be96-11f1-9f08-ba3c8592215f",
+        "profile": "46963960-be96-11f1-9f08-ba3c8592215f",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "6a8663b3-88b5-46fe-bfde-283a4843ccfb",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": true, \"rate_limit\": true, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": true}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"4695c41c-be96-11f1-9f08-ba3c8592215f\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}], \"store\": {\"key_prefix\": \"eob:\"}}",
+        "name": "6a8663b3-88b5-46fe-bfde-283a4843ccfb",
+        "providerSecrets": [
+          "<omitted sha256=4f5adaa0b22a6331e068640cf076c1b61b6e7d5bf77b60e352db4b10f9fe5386>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "469648d8-be96-11f1-9f08-ba3c8592215f",
+        "profile": "6a8663b3-88b5-46fe-bfde-283a4843ccfb",
+        "virtualServer": "4695c714-be96-11f1-9f08-ba3c8592215f"
+      }
+    }
+  ],
+  "d1_s": 0.2,
+  "d2_s": 0.15,
+  "drains": [
+    {
+      "lines": 14336,
+      "rc": 0,
+      "stderr": "ls_drain: /run/ls-stream/ls_tp_ring mapped, 16 rings x 65536 bytes\nls_drain: exit, 64 record(s) delivered, 0 drop(s) seen\n"
+    }
+  ],
+  "error": "AssertionError({'admission': 4164, 'store_round_trips': [], 'store_sends': 0, 'store_replies': 2, 'provider_first_byte': 355030, 'provider_body': 129, 'delivery': 2, 'total': 359327, 'published': True, 'admit_consistent': True, 'points': ['admit', 'store_reply', 'store_reply', 'event', 'reply_parse', 'publish', 'reply_parse', 'reply_done', 'reply_done']})",
+  "events": [
+    {
+      "a": 0,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852128713871,
+      "point": "admit",
+      "scb": 65677544927552,
+      "seq": 1
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852128826639,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 2
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852130758058,
+      "point": "store_reply",
+      "scb": 65677544927552,
+      "seq": 3
+    },
+    {
+      "a": 26,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852130772469,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 4
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852132856096,
+      "point": "store_reply",
+      "scb": 65677544927552,
+      "seq": 5
+    },
+    {
+      "a": 4,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852132878470,
+      "point": "event",
+      "scb": 65677544927552,
+      "seq": 6
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852487908630,
+      "point": "reply_parse",
+      "scb": 65677544927552,
+      "seq": 7
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852128713871,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852487944510,
+      "point": "publish",
+      "scb": 65677544927552,
+      "seq": 8
+    },
+    {
+      "a": 28,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852487970849,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 9
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852487998569,
+      "point": "reply_parse",
+      "scb": 65677544927552,
+      "seq": 10
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852488038462,
+      "point": "reply_done",
+      "scb": 65677544927552,
+      "seq": 11
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852128713871,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852488041231,
+      "point": "reply_done",
+      "scb": 65677544927552,
+      "seq": 12
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852492122764,
+      "point": "admit",
+      "scb": 65677544936576,
+      "seq": 13
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852492151654,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 14
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852494156481,
+      "point": "store_reply",
+      "scb": 65677544936576,
+      "seq": 15
+    },
+    {
+      "a": 26,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852494173399,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 16
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852496322212,
+      "point": "store_reply",
+      "scb": 65677544936576,
+      "seq": 17
+    },
+    {
+      "a": 4,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852496343780,
+      "point": "event",
+      "scb": 65677544936576,
+      "seq": 18
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852852557064,
+      "point": "reply_parse",
+      "scb": 65677544936576,
+      "seq": 19
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852492122764,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852852595532,
+      "point": "publish",
+      "scb": 65677544936576,
+      "seq": 20
+    },
+    {
+      "a": 28,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852852615722,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 21
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852852649279,
+      "point": "reply_parse",
+      "scb": 65677544936576,
+      "seq": 22
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852852678672,
+      "point": "reply_done",
+      "scb": 65677544936576,
+      "seq": 23
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852492122764,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852852681443,
+      "point": "reply_done",
+      "scb": 65677544936576,
+      "seq": 24
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852857450918,
+      "point": "admit",
+      "scb": 65677544932096,
+      "seq": 25
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852857484171,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 26
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852858919920,
+      "point": "store_reply",
+      "scb": 65677544932096,
+      "seq": 27
+    },
+    {
+      "a": 26,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633852858939957,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 28
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852860978437,
+      "point": "store_reply",
+      "scb": 65677544932096,
+      "seq": 29
+    },
+    {
+      "a": 4,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633852860996881,
+      "point": "event",
+      "scb": 65677544932096,
+      "seq": 30
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853216238882,
+      "point": "reply_parse",
+      "scb": 65677544932096,
+      "seq": 31
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852857450918,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853216272408,
+      "point": "publish",
+      "scb": 65677544932096,
+      "seq": 32
+    },
+    {
+      "a": 28,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853216296789,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 33
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853216320963,
+      "point": "reply_parse",
+      "scb": 65677544932096,
+      "seq": 34
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853216345625,
+      "point": "reply_done",
+      "scb": 65677544932096,
+      "seq": 35
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633852857450918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853216348859,
+      "point": "reply_done",
+      "scb": 65677544932096,
+      "seq": 36
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853220473973,
+      "point": "admit",
+      "scb": 65677544942976,
+      "seq": 37
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853220499057,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 38
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853220520099,
+      "point": "admit",
+      "scb": 65677544934336,
+      "seq": 39
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853220559242,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 40
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853222557202,
+      "point": "store_reply",
+      "scb": 65677544942976,
+      "seq": 41
+    },
+    {
+      "a": 26,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853222571437,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 42
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853224660415,
+      "point": "store_reply",
+      "scb": 65677544934336,
+      "seq": 43
+    },
+    {
+      "a": 26,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853224667974,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 44
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853224674986,
+      "point": "store_reply",
+      "scb": 65677544942976,
+      "seq": 45
+    },
+    {
+      "a": 4,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853224689819,
+      "point": "event",
+      "scb": 65677544942976,
+      "seq": 46
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853226744900,
+      "point": "store_reply",
+      "scb": 65677544934336,
+      "seq": 47
+    },
+    {
+      "a": 4,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853226753526,
+      "point": "event",
+      "scb": 65677544934336,
+      "seq": 48
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853580706331,
+      "point": "reply_parse",
+      "scb": 65677544942976,
+      "seq": 49
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220473973,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853580739251,
+      "point": "publish",
+      "scb": 65677544942976,
+      "seq": 50
+    },
+    {
+      "a": 28,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853580756431,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 51
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853580786626,
+      "point": "reply_parse",
+      "scb": 65677544942976,
+      "seq": 52
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853580819857,
+      "point": "reply_done",
+      "scb": 65677544942976,
+      "seq": 53
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220473973,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853580822615,
+      "point": "reply_done",
+      "scb": 65677544942976,
+      "seq": 54
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853583374521,
+      "point": "reply_parse",
+      "scb": 65677544934336,
+      "seq": 55
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220520099,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853583399132,
+      "point": "publish",
+      "scb": 65677544934336,
+      "seq": 56
+    },
+    {
+      "a": 28,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853583412490,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 57
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853583428070,
+      "point": "reply_parse",
+      "scb": 65677544934336,
+      "seq": 58
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853583443530,
+      "point": "reply_done",
+      "scb": 65677544934336,
+      "seq": 59
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853220520099,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853583445799,
+      "point": "reply_done",
+      "scb": 65677544934336,
+      "seq": 60
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853587410247,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853587410247,
+      "point": "admit",
+      "scb": 65677544934016,
+      "seq": 61
+    },
+    {
+      "a": 4,
+      "admit_ns": 0,
+      "b": 0,
+      "flags": 4,
+      "instance": 9223372036854776120,
+      "ns": 3633853587434293,
+      "point": "store_send",
+      "scb": 0,
+      "seq": 62
+    },
+    {
+      "a": 1,
+      "admit_ns": 3633853587410247,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853589536016,
+      "point": "store_reply",
+      "scb": 65677544934016,
+      "seq": 63
+    },
+    {
+      "a": 0,
+      "admit_ns": 3633853587410247,
+      "b": 969,
+      "flags": 0,
+      "instance": 9223372036854776120,
+      "ns": 3633853589545158,
+      "point": "publish",
+      "scb": 65677544934016,
+      "seq": 64
+    }
+  ],
+  "finished_ns": 1790968811205797049,
+  "passed": false,
+  "program_status_end": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=1 config_slot=56\n",
+  "program_status_start": "OK program=0 instance=9223372036854776120 entries=7 attached=7 mode=1 config_slot=56\n",
+  "requests": [
+    {
+      "admission": 4164,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_reply",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 129,
+      "provider_first_byte": 355030,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": 359327
+    },
+    {
+      "admission": 4221,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_reply",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 121,
+      "provider_first_byte": 356213,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": 360558
+    },
+    {
+      "admission": 3545,
+      "admit_consistent": true,
+      "delivery": 3,
+      "points": [
+        "admit",
+        "store_reply",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 106,
+      "provider_first_byte": 355242,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": 358897
+    },
+    {
+      "admission": 4215,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_reply",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 113,
+      "provider_first_byte": 356016,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": 360348
+    },
+    {
+      "admission": 6233,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_reply",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 69,
+      "provider_first_byte": 356620,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": 362925
+    },
+    {
+      "admission": null,
+      "admit_consistent": true,
+      "delivery": null,
+      "points": [
+        "admit",
+        "store_reply",
+        "publish"
+      ],
+      "provider_body": null,
+      "provider_first_byte": null,
+      "published": true,
+      "store_replies": 1,
+      "store_round_trips": [],
+      "store_sends": 0,
+      "total": null
+    }
+  ],
+  "started_ns": 1790968797504564568
+}

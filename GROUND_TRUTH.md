@@ -29,6 +29,15 @@ weaker evidence than something an independent tool observed, and conflating the 
 
 ## Mechanism
 
+**2026-10-02 — AI gateway TMM (MR !21165) with eBPF.**
+
+| Claim | Tier | Witness | Evidence and limit |
+|---|---|---|---|
+| The eBPF substrate builds into the unmodified AI gateway TMM and a signed probe captures each per-request record live without changing traffic | **MEASURED (isolated, one worker, HTTP/1)** | INDEPENDENT (PREVAIL); SELF (clients, mock provider, records); TMM audit log; KERNEL (pads, executable hash) | [Record](env/aigw/README.md#the-gateway-with-ebpf-added). Not merged; local branch only. |
+| Gateway access control (virtual key, revocation, model scope, rate limit) works with Redis in the fixture, and each decision is observable | **MEASURED (isolated)** | SELF; Redis counter | [Record](env/aigw/README.md#access-control-with-the-session-store-2026-10-02). Fixture identities only; no JWT; no budget. |
+| Per-request latency can be attributed to admission, store round trips, provider and delivery by joined entry probes | **MEASURED (isolated, five requests)** | SELF (probe events, mock delays); KERNEL (pads) | [P24](02-RESEARCH-PARAMETERS.md#p24--can-ebpf-probes-attribute-an-ai-gateway-requests-latency-to-its-stages). Stages sum to total within 2 µs. Comparison with the gateway's own latency fields not run; probe cost unmeasured. |
+| For a non-streamed JSON reply, the gateway's response event (and `latency_ttft_us`) marks the first provider byte | **FALSIFIED** | SELF (mock delays D1, D2) | P24 attempt 02: the event fires after the whole body (`json_filter.c:649`); measured ≈ D1 + D2. |
+
 **2026-10-01 — client TLS mode on combined activity records.**
 
 | Claim | Tier | Witness | Evidence and limit |

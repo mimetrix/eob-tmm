@@ -1,0 +1,351 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790968586415681",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "cases": [],
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "load-signed",
+        "4",
+        "/work/probe/aigw_record.bpf.o",
+        "/work/probe/aigw_record.sig",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK loaded slot=4 mode=1 signature=verified\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "{\n  \"abi\": 1,\n  \"session\": \"90eb654aa3928e69\",\n  \"instance\": \"8000000000000044\",\n  \"revision\": 0,\n  \"schema\": 0,\n  \"entries\": 0,\n  \"program_sha256\": \"3b02fc1aae0e87c181d1772f20b4a3146d3292d413862bc2cd660894b33d0d56\"\n}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-publish",
+        "4",
+        "/evidence/aigw-rbac-01/record-config.json"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK config published slot=4 revision=1\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "load-signed",
+        "5",
+        "/work/probe/aigw_verdict.bpf.o",
+        "/work/probe/aigw_verdict.sig",
+        "1"
+      ],
+      "rc": 1,
+      "stderr": "*** cannot read '/work/probe/aigw_verdict.bpf.o': No such file or directory\n    This wants a compiled and verified object --- clang -O2 -target bpf, then\n    PREVAIL. The image carries some at /usr/share/ls/*.bpf.o.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "revoke",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK disabled (not reclaimed --- see item 0c)\n"
+    }
+  ],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-rbac-port-list-anchor",
+        "id": "d5566eb4-be95-11f1-9452-ba3c8592215f",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-rbac-address-list-anchor",
+        "id": "d55670d0-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "d557956e-be95-11f1-9452-ba3c8592215f",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-rbac-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "d5579730-be95-11f1-9452-ba3c8592215f",
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-rbac-address-list-anchor",
+        "destPorts": "aigw-rbac-port-list-anchor",
+        "id": "d5579852-be95-11f1-9452-ba3c8592215f",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "d557956e-be95-11f1-9452-ba3c8592215f",
+        "enabled": true,
+        "id": "d5579b86-be95-11f1-9452-ba3c8592215f",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "d5579852-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "d557e118-be95-11f1-9452-ba3c8592215f",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "d5579730-be95-11f1-9452-ba3c8592215f",
+        "members": [
+          "d557e118-be95-11f1-9452-ba3c8592215f"
+        ],
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "d558cdee-be95-11f1-9452-ba3c8592215f",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a1d7a-be95-11f1-9452-ba3c8592215f",
+        "profile": "d558cdee-be95-11f1-9452-ba3c8592215f",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "d55987de-be95-11f1-9452-ba3c8592215f",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a1eb0-be95-11f1-9452-ba3c8592215f",
+        "profile": "d55987de-be95-11f1-9452-ba3c8592215f",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "d559acdc-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a1f32-be95-11f1-9452-ba3c8592215f",
+        "profile": "d559acdc-be95-11f1-9452-ba3c8592215f",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "d559d23e-be95-11f1-9452-ba3c8592215f",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "d559d23e-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a1fb4-be95-11f1-9452-ba3c8592215f",
+        "profile": "d559d23e-be95-11f1-9452-ba3c8592215f",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "d559f75a-be95-11f1-9452-ba3c8592215f",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "d559f75a-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a202c-be95-11f1-9452-ba3c8592215f",
+        "profile": "d559f75a-be95-11f1-9452-ba3c8592215f",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "6f4f2c63-fb6e-4473-89f5-f98b5152f133",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": true, \"rate_limit\": true, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": true}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"d557956e-be95-11f1-9452-ba3c8592215f\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}], \"store\": {\"key_prefix\": \"eob:\"}}",
+        "name": "6f4f2c63-fb6e-4473-89f5-f98b5152f133",
+        "providerSecrets": [
+          "<omitted sha256=d9476b786a41c1c19a40bc478d1b85953207c9444d605cf3f187e515dd8f24f2>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "d55a2536-be95-11f1-9452-ba3c8592215f",
+        "profile": "6f4f2c63-fb6e-4473-89f5-f98b5152f133",
+        "virtualServer": "d5579b86-be95-11f1-9452-ba3c8592215f"
+      }
+    }
+  ],
+  "drains": [],
+  "error": "AssertionError({'argv': ['python3', '/work/ls-load.py', 'load-signed', '5', '/work/probe/aigw_verdict.bpf.o', '/work/probe/aigw_verdict.sig', '1'], 'rc': 1, 'stdout': '', 'stderr': \"*** cannot read '/work/probe/aigw_verdict.bpf.o': No such file or directory\\n    This wants a compiled and verified object --- clang -O2 -target bpf, then\\n    PREVAIL. The image carries some at /usr/share/ls/*.bpf.o.\\n\"})",
+  "finished_ns": 1790968617635730003,
+  "passed": false,
+  "started_ns": 1790968608204338938
+}

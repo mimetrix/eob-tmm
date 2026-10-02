@@ -48,6 +48,9 @@ services:
       TMM_ENFORCE_LICENSING: "false"
       ENABLE_TMROUTED_PROXY: "false"
       SESSIONDB_EXTERNAL_STORAGE: "FALSE"
+      SESSIONDB_DISABLE_SSL: "true"
+      SESSIONDB_EXTERNAL_SERVICE_ADDR: ${AIGW_REDIS_ADDR:-127.0.0.1}
+      SESSIONDB_EXTERNAL_SERVICE_PORT: "6379"
       MSG_BUS_ADDR: fixture
       MSG_BUS_PORT: "4222"
       MSG_BUS_USER: tmm
@@ -64,6 +67,15 @@ services:
     networks:
       management: {ipv4_address: 10.203.81.10, priority: 100}
       data: {ipv4_address: 10.203.82.10, priority: 50}
+
+  redis:
+    # Pinned by digest; pulled once through the Artifactory Docker Hub proxy.
+    image: artifactory.f5net.com/dockerhub-remote/library/redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    pull_policy: never
+    command: [redis-server, --save, "", --appendonly, "no", --protected-mode, "no"]
+    networks:
+      data: {ipv4_address: 10.203.82.20}
+    profiles: [store]
 
 networks:
   management:

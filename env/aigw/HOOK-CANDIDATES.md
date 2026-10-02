@@ -1,6 +1,9 @@
-# AI gateway tracepoint candidates (MR !21165)
+# AI gateway hook candidates (MR !21165)
 
-**2026-10-02 — source and symbol survey only. Nothing here has been armed.**
+These are function-entry hooks on existing TMM functions, not tracepoints.
+No tracepoint call site has been added to TMM.
+
+**2026-10-02 — source and symbol survey.** Since armed: `aigw_host_obs_publish` (record probe) and eight entries for P24 timing, listed in [README.md](README.md#latency-attribution-p24-2026-10-02).
 Function names, files and sizes come from the merge request's source at
 `74cf09df69` and the plain build's debug symbols. Offsets come from that
 build's debug information. Every row is a candidate until a live probe

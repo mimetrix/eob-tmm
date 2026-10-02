@@ -1098,7 +1098,7 @@ previous request ends is a falsifier. Probe overhead is measured as a side
 result, not claimed as a per-call cost. Tool and inspection time are not
 available in this gateway build.
 
-**Status:** in progress. **Attempt 02 falsified one registered stage definition**,
+**Status:** MEASURED with one falsified stage definition and one check not run. **Attempt 02 falsified one registered stage definition**,
 2026-10-02. With the mock holding headers D1 = 200 ms and pausing D2 = 150 ms
 between two body chunks, "provider until first byte" measured 354.9–356.9 ms in
 all five served requests, about D1 + D2, outside the 20 ms bound. The server-side
@@ -1115,6 +1115,31 @@ to "provider until complete reply", reference D1 + D2 within the same 20 ms boun
 "Provider body" then measures only reply processing inside TMM, not D2. A true
 first-byte point needs a server-side HTTP response-header hook and a streamed
 (SSE) request; that is a separate test.
+
+**Result, attempt 03 — MEASURED, isolated live TMM, one worker, HTTP/1, with Redis.**
+Five served requests (three sequential, two concurrent) and one refused request;
+64 events, all keyed, sequence continuous, no flags; eight entry pads restored;
+zero restarts. Medians (min–max), microseconds:
+
+| Stage | Median | Range |
+|---|---|---|
+| admission (store lookups, rate/budget script, routing) | 4,270 | 3,469–6,382 |
+| … of which store round trips (2 per request) | 4,148 | 3,353–6,347 |
+| provider until complete reply (reference D1 + D2 = 350,000) | 356,426 | 355,130–356,579 |
+| reply processing in TMM | 101 | 65–116 |
+| delivery to client after the server side finished | 2 | 2–2 |
+| total | 360,871 | 359,369–362,876 |
+
+Stages sum to the total within 2 µs. The provider stage exceeds D1 + D2 by
+5.1–6.6 ms, inside the 20 ms bound. The refused request shows admission and one
+store round trip, with no provider stage. Concurrent requests on separate
+connections did not cross-attribute. Admission is almost entirely store time:
+the gateway's own work outside Redis is about 100 µs per request.
+
+**Not run:** the registered comparison with the gateway's own `latency_total_us`
+and `latency_ttft_us`. The timing probe records the publish point but not the
+record's fields. That falsifier stays open; it needs the record probe and the
+timing probe armed together, joined on the same request.
 
 ## Retired
 

@@ -91,6 +91,27 @@ Kept on the build box: fixture archive (`5dec20d7…`, both attempts) and TMM lo
 disarm: original pad `f30f1efa9090909090` at `0xbcf400`; executable hash equals
 the packaged runtime; zero restarts.
 
+### AI gateway access control and latency attribution, 2026-10-02
+
+Build `2521bd23` (image `eob-aigw/tmm-ls:mr21165-ebpf`). Redis
+`artifactory.f5net.com/dockerhub-remote/library/redis@sha256:858f009f…`.
+Timing program `aigw_timing.bpf.o` SHA-256
+`04d791c822fe85ea20f07ccf00fc5ecfb25f9e3891dc07f9f473abea7c26143a`, signature
+`9d123d2e…`, `@program-v1`, eight entries bound and PREVAIL-checked; native
+GCC/clang interpreter/JIT pass. [Record](env/aigw/README.md#latency-attribution-p24-2026-10-02).
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `aigw-rbac-01-result.json` | `14b6b20f49e74246c3a98316ac0343ba30ea7aa091c6cfaa6a3b3e7c8f1bc79a` | Retained failure: suite named an unbuilt second probe. |
+| `aigw-rbac-03-result.json` | `ee06a31a9da7b54fa70f8452ace9697945fcbdbca4fd2cd9b755d8bee4aa6071` | Eight access cases exact; counter 2; eight records with identity fields. |
+| `aigw-timing-01-result.json` | `eb418c2c5baff3306deda57702a1e3d8d37606b38784c8f7066fb3bb5b4708e2` | Retained failure: `aigw_dssm_send`'s callback argument is not the host context for scripts; 16 sends unkeyed. |
+| `aigw-timing-02-result.json` | `564c3d2977ba9ca8ce0b92cc25d659580e6e5f939e92c29ecf7008219994ae53` | Retained failure that falsified the "first byte" stage for buffered JSON (355–357 ms vs D1 = 200 ms). |
+| `aigw-timing-03-result.json` | `25df7017847c9428ed89614e746771386ffdc9cacd010044daba99760d727b7d` | Pass with corrected stage: six requests, 64 keyed events, stages sum to total within 2 µs. |
+
+Attempt `aigw-rbac-02` wrote an empty result (a JSON encoding error after an
+assertion); its Tao log is in the build-box archive (`cd80d18c…`) with the TMM
+log (`682e9db4…`).
+
 ### Client TLS mode, 2026-10-01
 
 **MEASURED: native tests, pinned build checks and isolated single-worker HTTP/1

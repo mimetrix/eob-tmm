@@ -46,7 +46,7 @@ async def run(*argv):
 
 
 async def cli(result, *args):
-    row = await run("python3", "/work/ls-load.py", *args)
+    row = await run("python3", "/work/ls-load.py", *map(str, args))
     result["commands"].append(row)
     assert row["rc"] == 0, row
     return row["stdout"]

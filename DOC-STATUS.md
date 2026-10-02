@@ -18,7 +18,9 @@ isolated build and smoke test of MR !21165, unmodified. The gateway library load
 forwards with the provider key, answers the model list and refuses an unknown
 model and an empty config. With the eBPF substrate added, a signed probe at the
 record-publish callback captures each per-request record live, with identical
-traffic results. Candidate hooks: [TRACEPOINTS.md](env/aigw/TRACEPOINTS.md).
+traffic results. With Redis, access control works and each decision is observable;
+joined probes attribute each request's latency to admission, store, provider and
+delivery (P24). Candidate hooks: [HOOK-CANDIDATES.md](env/aigw/HOOK-CANDIDATES.md).
 
 **2026-10-01 client TLS mode:** [TLS-MODE.md](env/ai-traffic/TLS-MODE.md) is the
 current record. Each combined activity record states how TMM handled client TLS.

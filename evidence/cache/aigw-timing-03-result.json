@@ -1,0 +1,1505 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790968586415681",
+      "generation": 0,
+      "sequence": 0,
+      "status": 0
+    },
+    {
+      "description": "reset_config_timestamp=1790968586415681",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "clients": [
+    {
+      "case": "seq-0",
+      "client_ms": 365.4193948023021,
+      "status": 200
+    },
+    {
+      "case": "seq-1",
+      "client_ms": 364.0730744227767,
+      "status": 200
+    },
+    {
+      "case": "seq-2",
+      "client_ms": 370.0452810153365,
+      "status": 200
+    },
+    {
+      "case": "concurrent-0",
+      "client_ms": 367.06237122416496,
+      "status": 200
+    },
+    {
+      "case": "concurrent-1",
+      "client_ms": 367.0651810243726,
+      "status": 200
+    },
+    {
+      "case": "refused",
+      "status": 401
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-load",
+        "0",
+        "/work/probe/aigw_timing.bpf.o",
+        "/work/probe/aigw_timing.sig"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=0 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-status",
+        "56"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "{\n  \"abi\": 1,\n  \"session\": \"90eb654aa3928e69\",\n  \"instance\": \"80000000000001b8\",\n  \"revision\": 0,\n  \"schema\": 0,\n  \"entries\": 0,\n  \"program_sha256\": \"04d791c822fe85ea20f07ccf00fc5ecfb25f9e3891dc07f9f473abea7c26143a\"\n}\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "config-publish",
+        "56",
+        "/evidence/aigw-timing-03/timing-config.json"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK config published slot=56 revision=1\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=1 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=2 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "2"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=3 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "3"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=4 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=5 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "5"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=6 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "6"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=7 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-attach",
+        "0",
+        "9223372036854776248",
+        "7"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=0 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-mode",
+        "0",
+        "9223372036854776248",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-status",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-status",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "0"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=7 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "1"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=6 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "2"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=5 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "3"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=4 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "4"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=3 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "5"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=2 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "6"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=1 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-detach",
+        "0",
+        "9223372036854776248",
+        "7"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=9223372036854776248 entries=8 attached=0 mode=1 config_slot=56\n"
+    },
+    {
+      "argv": [
+        "python3",
+        "/work/ls-load.py",
+        "program-revoke",
+        "0",
+        "9223372036854776248"
+      ],
+      "rc": 0,
+      "stderr": "",
+      "stdout": "OK program=0 instance=0 entries=0 attached=0 mode=0 config_slot=56\n"
+    }
+  ],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-rbac-port-list-anchor",
+        "id": "4cd80852-be97-11f1-ab66-ba3c8592215f",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-rbac-address-list-anchor",
+        "id": "4cd80bea-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "4cd8549c-be97-11f1-ab66-ba3c8592215f",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-rbac-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "4cd855f0-be97-11f1-ab66-ba3c8592215f",
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-rbac-address-list-anchor",
+        "destPorts": "aigw-rbac-port-list-anchor",
+        "id": "4cd85686-be97-11f1-ab66-ba3c8592215f",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "4cd8549c-be97-11f1-ab66-ba3c8592215f",
+        "enabled": true,
+        "id": "4cd8573a-be97-11f1-ab66-ba3c8592215f",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "4cd85686-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "4cd869fa-be97-11f1-ab66-ba3c8592215f",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "4cd855f0-be97-11f1-ab66-ba3c8592215f",
+        "members": [
+          "4cd869fa-be97-11f1-ab66-ba3c8592215f"
+        ],
+        "name": "aigw-rbac-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "4cd89812-be97-11f1-ab66-ba3c8592215f",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd8f99c-be97-11f1-ab66-ba3c8592215f",
+        "profile": "4cd89812-be97-11f1-ab66-ba3c8592215f",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "4cd8b630-be97-11f1-ab66-ba3c8592215f",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd8faf0-be97-11f1-ab66-ba3c8592215f",
+        "profile": "4cd8b630-be97-11f1-ab66-ba3c8592215f",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "4cd8c5ee-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd8fbc2-be97-11f1-ab66-ba3c8592215f",
+        "profile": "4cd8c5ee-be97-11f1-ab66-ba3c8592215f",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "4cd8d3c2-be97-11f1-ab66-ba3c8592215f",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "4cd8d3c2-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd8fc94-be97-11f1-ab66-ba3c8592215f",
+        "profile": "4cd8d3c2-be97-11f1-ab66-ba3c8592215f",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "4cd8eaba-be97-11f1-ab66-ba3c8592215f",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "4cd8eaba-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd8fd66-be97-11f1-ab66-ba3c8592215f",
+        "profile": "4cd8eaba-be97-11f1-ab66-ba3c8592215f",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "901ded5b-6b9e-41f6-b5c6-f841d0ada5ed",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": true, \"rate_limit\": true, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": true}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"4cd8549c-be97-11f1-ab66-ba3c8592215f\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}], \"store\": {\"key_prefix\": \"eob:\"}}",
+        "name": "901ded5b-6b9e-41f6-b5c6-f841d0ada5ed",
+        "providerSecrets": [
+          "<omitted sha256=5b3bee66dc62051a98ab73e7df397dbb7217f2982afa997dc4b0fa774e19bdf8>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "4cd9037e-be97-11f1-ab66-ba3c8592215f",
+        "profile": "901ded5b-6b9e-41f6-b5c6-f841d0ada5ed",
+        "virtualServer": "4cd8573a-be97-11f1-ab66-ba3c8592215f"
+      }
+    }
+  ],
+  "d1_s": 0.2,
+  "d2_s": 0.15,
+  "drains": [
+    {
+      "lines": 14336,
+      "rc": 0,
+      "stderr": "ls_drain: /run/ls-stream/ls_tp_ring mapped, 16 rings x 65536 bytes\nls_drain: exit, 64 record(s) delivered, 0 drop(s) seen\n"
+    }
+  ],
+  "events": [
+    {
+      "a": 0,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292329772478,
+      "point": "admit",
+      "scb": 65677544938176,
+      "seq": 1
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292329772478,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292329821076,
+      "point": "store_send",
+      "scb": 65677544938176,
+      "seq": 2
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292331868568,
+      "point": "store_reply",
+      "scb": 65677544938176,
+      "seq": 3
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292329772478,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292331890503,
+      "point": "store_send",
+      "scb": 65677544938176,
+      "seq": 4
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292333991751,
+      "point": "store_reply",
+      "scb": 65677544938176,
+      "seq": 5
+    },
+    {
+      "a": 4,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292334042974,
+      "point": "event",
+      "scb": 65677544938176,
+      "seq": 6
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690542589,
+      "point": "reply_parse",
+      "scb": 65677544938176,
+      "seq": 7
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292329772478,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690570999,
+      "point": "publish",
+      "scb": 65677544938176,
+      "seq": 8
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292329772478,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690585992,
+      "point": "store_send",
+      "scb": 65677544938176,
+      "seq": 9
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690608195,
+      "point": "reply_parse",
+      "scb": 65677544938176,
+      "seq": 10
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690641444,
+      "point": "reply_done",
+      "scb": 65677544938176,
+      "seq": 11
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292329772478,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292690643711,
+      "point": "reply_done",
+      "scb": 65677544938176,
+      "seq": 12
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292695935737,
+      "point": "admit",
+      "scb": 65677544938816,
+      "seq": 13
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292695935737,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292695966810,
+      "point": "store_send",
+      "scb": 65677544938816,
+      "seq": 14
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292698066784,
+      "point": "store_reply",
+      "scb": 65677544938816,
+      "seq": 15
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292695935737,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292698083531,
+      "point": "store_send",
+      "scb": 65677544938816,
+      "seq": 16
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292700098438,
+      "point": "store_reply",
+      "scb": 65677544938816,
+      "seq": 17
+    },
+    {
+      "a": 4,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634292700116175,
+      "point": "event",
+      "scb": 65677544938816,
+      "seq": 18
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055247040,
+      "point": "reply_parse",
+      "scb": 65677544938816,
+      "seq": 19
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292695935737,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055281230,
+      "point": "publish",
+      "scb": 65677544938816,
+      "seq": 20
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634292695935737,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055294623,
+      "point": "store_send",
+      "scb": 65677544938816,
+      "seq": 21
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055331388,
+      "point": "reply_parse",
+      "scb": 65677544938816,
+      "seq": 22
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055358339,
+      "point": "reply_done",
+      "scb": 65677544938816,
+      "seq": 23
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634292695935737,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293055361147,
+      "point": "reply_done",
+      "scb": 65677544938816,
+      "seq": 24
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293065984970,
+      "point": "admit",
+      "scb": 65677544933376,
+      "seq": 25
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293065984970,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293066032473,
+      "point": "store_send",
+      "scb": 65677544933376,
+      "seq": 26
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293067251402,
+      "point": "store_reply",
+      "scb": 65677544933376,
+      "seq": 27
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293065984970,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293067269856,
+      "point": "store_send",
+      "scb": 65677544933376,
+      "seq": 28
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293069405850,
+      "point": "store_reply",
+      "scb": 65677544933376,
+      "seq": 29
+    },
+    {
+      "a": 4,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293069454096,
+      "point": "event",
+      "scb": 65677544933376,
+      "seq": 30
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425235297,
+      "point": "reply_parse",
+      "scb": 65677544933376,
+      "seq": 31
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293065984970,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425272329,
+      "point": "publish",
+      "scb": 65677544933376,
+      "seq": 32
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293065984970,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425292916,
+      "point": "store_send",
+      "scb": 65677544933376,
+      "seq": 33
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425324963,
+      "point": "reply_parse",
+      "scb": 65677544933376,
+      "seq": 34
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425351853,
+      "point": "reply_done",
+      "scb": 65677544933376,
+      "seq": 35
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293065984970,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293425354119,
+      "point": "reply_done",
+      "scb": 65677544933376,
+      "seq": 36
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293429489918,
+      "point": "admit",
+      "scb": 65677544936576,
+      "seq": 37
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429489918,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293429519487,
+      "point": "store_send",
+      "scb": 65677544936576,
+      "seq": 38
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293429554345,
+      "point": "admit",
+      "scb": 65677544934976,
+      "seq": 39
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429554345,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293429560130,
+      "point": "store_send",
+      "scb": 65677544934976,
+      "seq": 40
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293431661712,
+      "point": "store_reply",
+      "scb": 65677544936576,
+      "seq": 41
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429489918,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293431680770,
+      "point": "store_send",
+      "scb": 65677544936576,
+      "seq": 42
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293433724731,
+      "point": "store_reply",
+      "scb": 65677544934976,
+      "seq": 43
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429554345,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293433737352,
+      "point": "store_send",
+      "scb": 65677544934976,
+      "seq": 44
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293433754889,
+      "point": "store_reply",
+      "scb": 65677544936576,
+      "seq": 45
+    },
+    {
+      "a": 4,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293433772808,
+      "point": "event",
+      "scb": 65677544936576,
+      "seq": 46
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293435920864,
+      "point": "store_reply",
+      "scb": 65677544934976,
+      "seq": 47
+    },
+    {
+      "a": 4,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293435936894,
+      "point": "event",
+      "scb": 65677544934976,
+      "seq": 48
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790351826,
+      "point": "reply_parse",
+      "scb": 65677544936576,
+      "seq": 49
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429489918,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790385174,
+      "point": "publish",
+      "scb": 65677544936576,
+      "seq": 50
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429489918,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790398227,
+      "point": "store_send",
+      "scb": 65677544936576,
+      "seq": 51
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790430923,
+      "point": "reply_parse",
+      "scb": 65677544936576,
+      "seq": 52
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790452862,
+      "point": "reply_done",
+      "scb": 65677544936576,
+      "seq": 53
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429489918,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293790455464,
+      "point": "reply_done",
+      "scb": 65677544936576,
+      "seq": 54
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792363228,
+      "point": "reply_parse",
+      "scb": 65677544934976,
+      "seq": 55
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429554345,
+      "b": 1002,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792380651,
+      "point": "publish",
+      "scb": 65677544934976,
+      "seq": 56
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293429554345,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792389045,
+      "point": "store_send",
+      "scb": 65677544934976,
+      "seq": 57
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792400168,
+      "point": "reply_parse",
+      "scb": 65677544934976,
+      "seq": 58
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792428615,
+      "point": "reply_done",
+      "scb": 65677544934976,
+      "seq": 59
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293429554345,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293792431167,
+      "point": "reply_done",
+      "scb": 65677544934976,
+      "seq": 60
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293796650664,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293796650664,
+      "point": "admit",
+      "scb": 65677544933056,
+      "seq": 61
+    },
+    {
+      "a": 2,
+      "admit_ns": 3634293796650664,
+      "b": 1,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293796675778,
+      "point": "store_send",
+      "scb": 65677544933056,
+      "seq": 62
+    },
+    {
+      "a": 1,
+      "admit_ns": 3634293796650664,
+      "b": 0,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293798690871,
+      "point": "store_reply",
+      "scb": 65677544933056,
+      "seq": 63
+    },
+    {
+      "a": 0,
+      "admit_ns": 3634293796650664,
+      "b": 969,
+      "flags": 0,
+      "instance": 9223372036854776248,
+      "ns": 3634293798699206,
+      "point": "publish",
+      "scb": 65677544933056,
+      "seq": 64
+    }
+  ],
+  "finished_ns": 1790969251442380019,
+  "passed": true,
+  "program_status_end": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=1 config_slot=56\n",
+  "program_status_start": "OK program=0 instance=9223372036854776248 entries=8 attached=8 mode=1 config_slot=56\n",
+  "requests": [
+    {
+      "admission": 4270,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "store_send",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "store_send",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 98,
+      "provider_first_byte": 356499,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [
+        2047,
+        2101
+      ],
+      "store_sends": 3,
+      "store_total": 4148,
+      "total": 360871
+    },
+    {
+      "admission": 4180,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "store_send",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "store_send",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 111,
+      "provider_first_byte": 355130,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [
+        2099,
+        2014
+      ],
+      "store_sends": 3,
+      "store_total": 4113,
+      "total": 359425
+    },
+    {
+      "admission": 3469,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "store_send",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "store_send",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 116,
+      "provider_first_byte": 355781,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [
+        1218,
+        2135
+      ],
+      "store_sends": 3,
+      "store_total": 3353,
+      "total": 359369
+    },
+    {
+      "admission": 4282,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "store_send",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "store_send",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 101,
+      "provider_first_byte": 356579,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [
+        2142,
+        2074
+      ],
+      "store_sends": 3,
+      "store_total": 4216,
+      "total": 360965
+    },
+    {
+      "admission": 6382,
+      "admit_consistent": true,
+      "delivery": 2,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "store_send",
+        "store_reply",
+        "event",
+        "reply_parse",
+        "publish",
+        "store_send",
+        "reply_parse",
+        "reply_done",
+        "reply_done"
+      ],
+      "provider_body": 65,
+      "provider_first_byte": 356426,
+      "published": true,
+      "store_replies": 2,
+      "store_round_trips": [
+        4164,
+        2183
+      ],
+      "store_sends": 3,
+      "store_total": 6347,
+      "total": 362876
+    },
+    {
+      "admission": null,
+      "admit_consistent": true,
+      "delivery": null,
+      "points": [
+        "admit",
+        "store_send",
+        "store_reply",
+        "publish"
+      ],
+      "provider_body": null,
+      "provider_first_byte": null,
+      "published": true,
+      "store_replies": 1,
+      "store_round_trips": [
+        2015
+      ],
+      "store_sends": 1,
+      "store_total": 2015,
+      "total": null
+    }
+  ],
+  "started_ns": 1790969243752516237,
+  "unkeyed_events": []
+}

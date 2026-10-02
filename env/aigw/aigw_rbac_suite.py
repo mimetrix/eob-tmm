@@ -7,8 +7,7 @@ rate-limit definition), using fixture identities only.
 
 Probes (both monitor-only, signed for this build):
 - aigw_record at aigw_host_obs_publish: every per-request record;
-- aigw_verdict at aigw_rbac_verdict: each admission verdict, its status and
-  its reason code, as the gateway decides it.
+(Admission timing and outcome per stage are covered by aigw_timing_suite.py.)
 
 Cases, each with an independently stated expected outcome:
   valid key, allowed model            200, provider called once
@@ -41,7 +40,6 @@ REDIS = os.environ.get("AIGW_REDIS", "10.203.82.20")
 PREFIX = "eob:"
 HOOKS = {
     "record": ("4", "aigw_host_obs_publish", "aigw_record"),
-    "verdict": ("5", "aigw_rbac_verdict", "aigw_verdict"),
 }
 
 
@@ -74,11 +72,38 @@ async def seed(keys):
     assert await redis("PING") == b"+PONG"
     await redis("FLUSHALL")
     for name, (token, fields) in keys.items():
-        await redis("HSET", PREFIX + "vk:resolved:" + vk_hash(token), *sum(
-            ([k, v] for k, v in fields.items()), []))
+        await redis(
+            "HSET",
+            PREFIX + "vk:resolved:" + vk_hash(token),
+            *sum(([k, v] for k, v in fields.items()), []),
+        )
+    # The live-scope script reads principal:, team: and org: (unprefixed) and
+    # treats a MISSING record as deny-all (a deleted team or org must not read
+    # as unrestricted). Seed each owner with an empty, i.e. unrestricted, scope.
+    for name, (_token, fields) in keys.items():
+        await redis(
+            "HSET",
+            "principal:" + fields["principal_id"],
+            "name",
+            name,
+            "team_ref",
+            fields["team_id"],
+            "model_scope",
+            "",
+        )
+    await redis(
+        "HSET", "team:team-a", "name", "team-a", "org_ref", "org-a", "model_scope", ""
+    )
+    await redis("HSET", "org:org-a", "name", "org-a", "model_scope", "")
     await redis("SADD", PREFIX + "owner:vk:vk-limited:ratelimits", "rl-two")
-    await redis("HSET", PREFIX + "ratelimit:rl-two", "max_requests", "2",
-                "request_window", "hourly")
+    await redis(
+        "HSET",
+        PREFIX + "ratelimit:rl-two",
+        "max_requests",
+        "2",
+        "request_window",
+        "hourly",
+    )
 
 
 def library_config(pool):
@@ -115,26 +140,40 @@ async def configure(log, provider_key):
     while True:
         message = await asyncio.wait_for(heartbeat.get(), 10)
         ack = await client.unpack_dpc_msg(message.body)
-        acks.append({"generation": ack.generation, "sequence": ack.seq_start,
-                     "status": ack.status, "description": ack.description})
+        acks.append(
+            {
+                "generation": ack.generation,
+                "sequence": ack.seq_start,
+                "status": ack.status,
+                "description": ack.description,
+            }
+        )
         assert ack.status == 0, str(ack)
-        if (ack.generation == server.generation
-                and ack.seq_start >= server.current_sequence):
+        if (
+            ack.generation == server.generation
+            and ack.seq_start >= server.current_sequence
+        ):
             break
     return recorded, acks
 
 
 async def request(token, model):
-    data = json.dumps({"model": model,
-                       "messages": [{"role": "user", "content": "ping"}]}).encode()
+    data = json.dumps(
+        {"model": model, "messages": [{"role": "user", "content": "ping"}]}
+    ).encode()
     auth = "" if token is None else f"Authorization: Bearer {token}\r\n"
     reader, writer = await asyncio.wait_for(
-        asyncio.open_connection(smoke.VIP, smoke.GATEWAY), 10)
+        asyncio.open_connection(smoke.VIP, smoke.GATEWAY), 10
+    )
     try:
-        writer.write((
-            "POST /v1/chat/completions HTTP/1.1\r\nHost: gateway.local\r\n"
-            f"{auth}Content-Type: application/json\r\nConnection: close\r\n"
-            f"Content-Length: {len(data)}\r\n\r\n").encode() + data)
+        writer.write(
+            (
+                "POST /v1/chat/completions HTTP/1.1\r\nHost: gateway.local\r\n"
+                f"{auth}Content-Type: application/json\r\nConnection: close\r\n"
+                f"Content-Length: {len(data)}\r\n\r\n"
+            ).encode()
+            + data
+        )
         await writer.drain()
         response = await asyncio.wait_for(reader.read(), 15)
     finally:
@@ -146,8 +185,14 @@ async def request(token, model):
 
 async def load_probe(result, directory, label, config_path):
     slot, _hook, obj = HOOKS[label]
-    text = await cli(result, "load-signed", slot, str(directory / f"{obj}.bpf.o"),
-                     str(directory / f"{obj}.sig"), "1")
+    text = await cli(
+        result,
+        "load-signed",
+        slot,
+        str(directory / f"{obj}.bpf.o"),
+        str(directory / f"{obj}.sig"),
+        "1",
+    )
     assert "signature=verified" in text, text
     identity = json.loads(await cli(result, "config-status", slot))
     doc = dict(identity)
@@ -164,37 +209,61 @@ async def rbac_test(log, _config):
     output = Path(os.environ["AIGW_RESULT"])
     directory = Path(os.environ["AIGW_PROBE_DIR"])
     provider_key = "sk-rbac-" + secrets.token_hex(16)
-    tokens = {name: "vk-fixture-" + secrets.token_hex(12)
-              for name in ("alice", "revoked", "scoped", "limited", "unknown")}
-    base = {"active": "1", "team_id": "team-a", "org_id": "org-a",
-            "model_scope": "", "vk_model_scope": ""}
+    tokens = {
+        name: "vk-fixture-" + secrets.token_hex(12)
+        for name in ("alice", "revoked", "scoped", "limited", "unknown")
+    }
+    base = {
+        "active": "1",
+        "team_id": "team-a",
+        "org_id": "org-a",
+        "model_scope": "",
+        "vk_model_scope": "",
+    }
     keys = {
-        "alice": (tokens["alice"], dict(base, vkid="vk-alice",
-                                        principal_id="alice")),
-        "revoked": (tokens["revoked"], dict(base, vkid="vk-revoked",
-                                            principal_id="bob", active="0")),
-        "scoped": (tokens["scoped"], dict(base, vkid="vk-scoped",
-                                          principal_id="carol",
-                                          vk_model_scope="other-model")),
-        "limited": (tokens["limited"], dict(base, vkid="vk-limited",
-                                            principal_id="dave")),
+        "alice": (tokens["alice"], dict(base, vkid="vk-alice", principal_id="alice")),
+        "revoked": (
+            tokens["revoked"],
+            dict(base, vkid="vk-revoked", principal_id="bob", active="0"),
+        ),
+        "scoped": (
+            tokens["scoped"],
+            dict(
+                base,
+                vkid="vk-scoped",
+                principal_id="carol",
+                vk_model_scope="other-model",
+            ),
+        ),
+        "limited": (
+            tokens["limited"],
+            dict(base, vkid="vk-limited", principal_id="dave"),
+        ),
     }
     mock = smoke.Mock(provider_key)
-    result = {"passed": False, "commands": [], "drains": [], "cases": [],
-              "started_ns": time.time_ns()}
+    result = {
+        "passed": False,
+        "commands": [],
+        "drains": [],
+        "cases": [],
+        "started_ns": time.time_ns(),
+    }
     loaded, armed = set(), set()
     secrets_in_run = [provider_key] + list(tokens.values())
     with output.open("x", encoding="utf-8") as receipt:
         try:
             await seed(keys)
-            result["configuration"], result["acknowledgements"] = (
-                await configure(log, provider_key))
+            result["configuration"], result["acknowledgements"] = await configure(
+                log, provider_key
+            )
             for label in HOOKS:
-                await load_probe(result, directory, label,
-                                 output.parent / f"{label}-config.json")
+                await load_probe(
+                    result, directory, label, output.parent / f"{label}-config.json"
+                )
                 loaded.add(label)
-            start = {label: await cli(result, "status", HOOKS[label][0])
-                     for label in HOOKS}
+            start = {
+                label: await cli(result, "status", HOOKS[label][0]) for label in HOOKS
+            }
             for label in HOOKS:
                 await cli(result, "arm", HOOKS[label][0])
                 armed.add(label)
@@ -208,46 +277,55 @@ async def rbac_test(log, _config):
                 ("limit-2", tokens["limited"], smoke.MODEL, 200, 1),
                 ("limit-3", tokens["limited"], smoke.MODEL, 429, 0),
             ]
-            async with await asyncio.start_server(mock.serve, smoke.BACKEND,
-                                                  smoke.MOCK):
+            async with await asyncio.start_server(
+                mock.serve, smoke.BACKEND, smoke.MOCK
+            ):
                 for name, token, model, want, calls in plan:
                     before = len(mock.requests)
                     status, body = await request(token, model)
-                    row = {"case": name, "status": status, "expected": want,
-                           "provider_calls": len(mock.requests) - before,
-                           "expected_provider_calls": calls,
-                           "body_prefix": body[:200]}
+                    row = {
+                        "case": name,
+                        "status": status,
+                        "expected": want,
+                        "provider_calls": len(mock.requests) - before,
+                        "expected_provider_calls": calls,
+                        "body_prefix": body[:200],
+                    }
                     if mock.requests[before:]:
                         row["provider_saw_only_provider_key"] = all(
                             r["authorization_is_provider_key"]
-                            and not any(t in json.dumps(r)
-                                        for t in tokens.values())
-                            for r in mock.requests[before:])
+                            and not any(t in json.dumps(r) for t in tokens.values())
+                            for r in mock.requests[before:]
+                        )
                     result["cases"].append(row)
                 frames = await drain(result)
-            end = {label: await cli(result, "status", HOOKS[label][0])
-                   for label in HOOKS}
+            end = {
+                label: await cli(result, "status", HOOKS[label][0]) for label in HOOKS
+            }
             for label in list(armed):
                 await cli(result, "disarm", HOOKS[label][1])
                 armed.discard(label)
             for label in list(loaded):
                 await cli(result, "revoke", HOOKS[label][0])
                 loaded.discard(label)
-            result["counter"] = await redis(
-                "GET", PREFIX + "counter:rl:req:vk:vk-limited:"
-                + time.strftime("%Y-%m-%dT%H", time.gmtime()))
+            result["counter"] = (
+                await redis(
+                    "GET",
+                    PREFIX
+                    + "counter:rl:req:vk:vk-limited:"
+                    + time.strftime("%Y-%m-%dT%H", time.gmtime()),
+                )
+            ).decode()
             by_slot = {}
             for item in frames:
                 by_slot.setdefault(item["slot"], []).append(item)
             result["records"] = records(by_slot.get(int(HOOKS["record"][0]), []))
-            result["verdicts"] = [bytes.fromhex(i["data"]).hex()
-                                  for i in by_slot.get(int(HOOKS["verdict"][0]), [])]
             result["status_start"], result["status_end"] = start, end
             for row in result["cases"]:
                 assert row["status"] == row["expected"], row
                 assert row["provider_calls"] == row["expected_provider_calls"], row
                 assert row.get("provider_saw_only_provider_key", True), row
-            assert result["counter"] == b"2", result["counter"]
+            assert result["counter"] == "2", result["counter"]
             result["passed"] = True
             return tao.Result.PASS
         except Exception as error:
