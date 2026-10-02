@@ -1072,8 +1072,8 @@ the monotonic clock:
 |---|---|
 | admission | `aigw_rbac_admit` → `FORWARDED` event at `aigw_host_session_event` |
 | store, each round trip | `aigw_dssm_send` → `aigw_host_store_reply` (joined on `hc->scb`) |
-| provider until first byte | `FORWARDED` → server-side `aigw_host_reply_parse` |
-| provider body | first server-side reply pass → server-side `aigw_host_reply_done` |
+| provider until first byte (**falsified** for buffered JSON, see Status) | `FORWARDED` → server-side `aigw_host_reply_parse` |
+| provider body (**see Status**) | first server-side reply pass → server-side `aigw_host_reply_done` |
 | delivery to client | server-side `reply_done` → client-side `reply_done` |
 | total | `aigw_rbac_admit` → client-side `reply_done` |
 
@@ -1098,7 +1098,23 @@ previous request ends is a falsifier. Probe overhead is measured as a side
 result, not claimed as a per-call cost. Tool and inspection time are not
 available in this gateway build.
 
-**Status:** unrun, IDEA.
+**Status:** in progress. **Attempt 02 falsified one registered stage definition**,
+2026-10-02. With the mock holding headers D1 = 200 ms and pausing D2 = 150 ms
+between two body chunks, "provider until first byte" measured 354.9–356.9 ms in
+all five served requests, about D1 + D2, outside the 20 ms bound. The server-side
+`aigw_host_reply_parse` runs only when the JSON filter below AIGW raises
+`HUDEVT_RESPONSE`, after it has parsed the whole body (`json_filter.c:649`). For
+a non-streamed JSON reply, that point is "complete reply", not "first byte". The
+library sets its own `t_rsp_us`, and so `latency_ttft_us`, on the same event,
+so the gateway's TTFT field for non-streamed JSON is also complete-reply time.
+Every other check passed in attempt 02: all 64 events keyed, sequences
+continuous, admission and store stages non-negative, store total below admission.
+
+**Corrected stage definition, registered before attempt 03:** rename the stage
+to "provider until complete reply", reference D1 + D2 within the same 20 ms bound.
+"Provider body" then measures only reply processing inside TMM, not D2. A true
+first-byte point needs a server-side HTTP response-header hook and a streamed
+(SSE) request; that is a separate test.
 
 ## Retired
 
