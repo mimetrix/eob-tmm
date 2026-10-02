@@ -1,0 +1,597 @@
+{
+  "acknowledgements": [
+    {
+      "description": "reset_config_timestamp=1790956577678724",
+      "generation": 0,
+      "sequence": 1,
+      "status": 0
+    }
+  ],
+  "cases": [
+    {
+      "body": "{\"id\": \"chatcmpl-smoke\", \"object\": \"chat.completion\", \"model\": \"smoke-model\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"pong\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 3, \"completion_tokens\": 1, \"total_tokens\": 4}}",
+      "case": "chat",
+      "head": "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: 256",
+      "mock_requests": [
+        {
+          "authorization_count": 1,
+          "authorization_is_provider_key": true,
+          "body_sha256": "789117647f9192bf841b58cd39b6ec3dbd6d25d9a95fe35836733070153a0dda",
+          "client_credential_reached_mock": false,
+          "header_names": [
+            "authorization",
+            "connection",
+            "content-length",
+            "content-type",
+            "host"
+          ],
+          "host": [
+            "mock-provider.local"
+          ],
+          "request_line": "POST /v1/chat/completions HTTP/1.1"
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": "{\"object\":\"list\",\"data\":[{\"id\":\"smoke-model\",\"object\":\"model\",\"created\":0,\"owned_by\":\"bnk-ai-gateway\",\"type\":\"model\",\"display_name\":\"smoke-model\",\"created_at\":\"1970-01-01T00:00:00Z\"}],\"has_more\":false,\"first_id\":\"smoke-model\",\"last_id\":\"smoke-model\"}",
+      "case": "models",
+      "head": "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 250\r\nConnection: close",
+      "mock_requests": [],
+      "status": 200
+    },
+    {
+      "body": "{\"error\":{\"message\":\"No provider serves the requested model\",\"type\":\"model_not_found\",\"param\":null,\"code\":\"404\"}}",
+      "case": "unknown-model",
+      "head": "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: 113\r\nConnection: close",
+      "mock_requests": [],
+      "status": 404
+    },
+    {
+      "body": "{\"error\":{\"message\":\"AI gateway unavailable\",\"type\":\"internal_server_error\",\"param\":null,\"code\":\"503\"}}",
+      "case": "empty-config",
+      "head": "HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: 103\r\nConnection: close",
+      "mock_requests": [],
+      "status": 503
+    }
+  ],
+  "configuration": [
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-gateway-port-list-anchor",
+        "id": "f1770ca0-be79-11f1-b364-caffb83b7d4d",
+        "ports": [
+          18101,
+          18101
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-gateway-address-list-anchor",
+        "id": "f1770eee-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "f1787f9a-be79-11f1-b364-caffb83b7d4d",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-gateway-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "f1788170-be79-11f1-b364-caffb83b7d4d",
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-gateway-address-list-anchor",
+        "destPorts": "aigw-smoke-gateway-port-list-anchor",
+        "id": "f1788210-be79-11f1-b364-caffb83b7d4d",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "f1787f9a-be79-11f1-b364-caffb83b7d4d",
+        "enabled": true,
+        "id": "f17882c4-be79-11f1-b364-caffb83b7d4d",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "f1788210-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "f178c93c-be79-11f1-b364-caffb83b7d4d",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "f1788170-be79-11f1-b364-caffb83b7d4d",
+        "members": [
+          "f178c93c-be79-11f1-b364-caffb83b7d4d"
+        ],
+        "name": "aigw-smoke-gateway-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "f179c3fa-be79-11f1-b364-caffb83b7d4d",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b3ca8-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f179c3fa-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "f17a83b2-be79-11f1-b364-caffb83b7d4d",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b3e1a-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17a83b2-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "f17aafcc-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b3eec-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17aafcc-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "f17aeac8-be79-11f1-b364-caffb83b7d4d",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "f17aeac8-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b3fb4-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17aeac8-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "f17b1124-be79-11f1-b364-caffb83b7d4d",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "f17b1124-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b4072-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b1124-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "6b4abbfa-2152-4e09-a18c-4432da77749f",
+        "libraryConfig": "{\"kind\": \"aigw.profile\", \"version\": 1, \"requires\": [], \"source\": {\"profile\": \"eob/aigw-smoke\", \"generation\": 1}, \"features\": {\"rbac\": false, \"rate_limit\": false, \"budget\": false, \"model_routing\": false, \"prompt_cache\": false, \"param_governance\": false, \"translation\": false, \"dlp\": false, \"guardrail\": false, \"observability\": false}, \"providers\": [{\"name\": \"mock-openai\", \"usable\": true, \"pool\": \"f1787f9a-be79-11f1-b364-caffb83b7d4d\", \"serverssl\": \"\", \"format\": \"openai\", \"dialect\": \"openai\", \"hosting\": \"compatible\", \"host\": \"mock-provider.local\", \"path_template\": \"/v1/{op}\", \"auth\": {\"kind\": \"bearer\", \"key_slot\": 0}, \"models\": [\"smoke-model\"], \"model_map\": [], \"weight\": 1, \"priority\": 1}]}",
+        "name": "6b4abbfa-2152-4e09-a18c-4432da77749f",
+        "providerSecrets": [
+          "<omitted sha256=94dcfb934fa40a15b0bcc4b8641cfd5730bb6c6677927979614b434cc91825a3>"
+        ]
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b44f0-be79-11f1-b364-caffb83b7d4d",
+        "profile": "6b4abbfa-2152-4e09-a18c-4432da77749f",
+        "virtualServer": "f17882c4-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.port_list",
+      "value": {
+        "anchor": "aigw-smoke-refused-port-list-anchor",
+        "id": "f17b4612-be79-11f1-b364-caffb83b7d4d",
+        "ports": [
+          18102,
+          18102
+        ]
+      }
+    },
+    {
+      "type": "declTmm.address_list",
+      "value": {
+        "addresses": [
+          {
+            "ip": {
+              "a2": "3626183898091683840"
+            },
+            "pl": 32
+          }
+        ],
+        "anchor": "aigw-smoke-refused-address-list-anchor",
+        "id": "f17b46a8-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.pool",
+      "value": {
+        "id": "f17b4950-be79-11f1-b364-caffb83b7d4d",
+        "lbMode": "ROUND_ROBIN",
+        "poolMemberList": "aigw-smoke-refused-pool-member-list-anchor",
+        "serviceDownAction": "POOLMBR_ACTION_NONE"
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "f17b49fa-be79-11f1-b364-caffb83b7d4d",
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.traffic_matching_criteria",
+      "value": {
+        "destAddresses": "aigw-smoke-refused-address-list-anchor",
+        "destPorts": "aigw-smoke-refused-port-list-anchor",
+        "id": "f17b4a86-be79-11f1-b364-caffb83b7d4d",
+        "ipProto": 6
+      }
+    },
+    {
+      "type": "declTmm.virtual_server",
+      "value": {
+        "defaultPool": "f17b4950-be79-11f1-b364-caffb83b7d4d",
+        "enabled": true,
+        "id": "f17b4b26-be79-11f1-b364-caffb83b7d4d",
+        "l4MirroringMode": "L4_CONNECTION_MIRROR",
+        "mirroring": "MODE_DISABLE",
+        "portTranslation": true,
+        "sourceAddressTranslationType": "SRC_TRANS_AUTOMAP",
+        "trafficMatchingCriteria": "f17b4a86-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.pool_member",
+      "value": {
+        "address": {
+          "a2": "815937730612494336"
+        },
+        "id": "f17b4c8e-be79-11f1-b364-caffb83b7d4d",
+        "port": 18110,
+        "ratio": 1
+      }
+    },
+    {
+      "type": "declTmm.pool_member_list",
+      "value": {
+        "id": "f17b49fa-be79-11f1-b364-caffb83b7d4d",
+        "members": [
+          "f17b4c8e-be79-11f1-b364-caffb83b7d4d"
+        ],
+        "name": "aigw-smoke-refused-pool-member-list-anchor"
+      }
+    },
+    {
+      "type": "declTmm.profile_tcp",
+      "value": {
+        "abc": true,
+        "ackOnPush": true,
+        "autoNagle": "TCP_MODE_ENABLED",
+        "closeWaitTimeout": 5,
+        "cmetricsCache": true,
+        "delayedAcks": true,
+        "earlyRetransmit": true,
+        "ecn": true,
+        "enhancedlossRecovery": true,
+        "fastOpenCookieExpiration": 21600,
+        "finWait2Timeout": 300,
+        "finWaitTimeout": 5,
+        "id": "f17b4dec-be79-11f1-b364-caffb83b7d4d",
+        "idleTimeout": 300,
+        "initCwnd": 16,
+        "initRwnd": 16,
+        "ipDfMode": "IP_PKT_DF_PMTU",
+        "ipTtlMode": "IP_PKT_TTL_PROXY",
+        "ipTtlV4": 255,
+        "ipTtlV6": 64,
+        "keepAliveInterval": 1800,
+        "limitedTransmit": true,
+        "maxrtx": 8,
+        "mptcpFallback": "MPTCP_FB_RESET",
+        "mptcpIdleTimeout": 300,
+        "mptcpJoinmax": 5,
+        "mptcpMode": "TCP_MPTCP_MODE_DISABLED",
+        "mptcpRtomax": 5,
+        "mptcpRxmitmin": 1000,
+        "mptcpSubflowmax": 6,
+        "mptcpTimeout": 3600,
+        "mss": 1460,
+        "proxyBufferHigh": 16384,
+        "proxyBufferLow": 4096,
+        "pushFlag": "TCP_PUSHFLAG_DEFAULT",
+        "ratePace": true,
+        "rcvwnd": 65535,
+        "resetOnTimeout": true,
+        "rexmtThresh": 3,
+        "selectiveAcks": true,
+        "slowStart": true,
+        "sndbuf": 65535,
+        "synMaxrtx": 3,
+        "syncookieEnable": true,
+        "tailLossProbe": true,
+        "timeWaitRecycle": true,
+        "timeWaitTimeout": 2000,
+        "timestamps": true,
+        "zeroWindowTimeout": 20000
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b529c-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b4dec-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_http",
+      "value": {
+        "hstsIncludeSubdomains": "MODE_ENABLE",
+        "hstsMaximumAge": 16070400,
+        "hstsMode": "MODE_DISABLE",
+        "hstsPreload": "MODE_DISABLE",
+        "id": "f17b4f54-be79-11f1-b364-caffb83b7d4d",
+        "insertXforwardedFor": "MODE_DISABLE",
+        "knownMethods": [
+          "CONNECT",
+          "DELETE",
+          "GET",
+          "HEAD",
+          "LOCK",
+          "OPTIONS",
+          "POST",
+          "PROPFIND",
+          "PUT",
+          "TRACE",
+          "UNLOCK"
+        ],
+        "lwsMaxColumn": 80,
+        "lwsSeparator": "\r\n ",
+        "maxHeaderCount": 64,
+        "maxHeaderSize": 32768,
+        "oneConnectStatusReuse": "200 206",
+        "passthroughPipeline": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "passthroughUnknownMethod": "HTTP_PASSTHROUGH_MODE_ALLOW",
+        "pipelining": "MODE_DISABLE",
+        "proxyType": "HTTP_PROXY_TYPE_REVERSE",
+        "redirectRewrite": "HTTP_REDIRECT_NONE",
+        "requestChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "responseChunking": "HTTP_CHUNK_MODE_SUSTAIN",
+        "sendProxyViaHeaderInRequest": "HTTP_VIA_HEADER_PRESERVE",
+        "sendProxyViaHeaderInResponse": "HTTP_VIA_HEADER_PRESERVE",
+        "serverAgentName": "BigIP",
+        "truncatedRedirects": "MODE_DISABLE"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b5350-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b4f54-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_httprouter",
+      "value": {
+        "id": "f17b50b2-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b5404-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b50b2-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_json",
+      "value": {
+        "id": "f17b5148-be79-11f1-b364-caffb83b7d4d",
+        "maximumBytes": 65536,
+        "maximumEntries": 2048,
+        "maximumNonJsonBytes": 32768,
+        "name": "f17b5148-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b54b8-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b5148-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_sse",
+      "value": {
+        "id": "f17b51e8-be79-11f1-b364-caffb83b7d4d",
+        "maxBufferedMsgBytes": 65536,
+        "maxFieldNameSize": 1024,
+        "name": "f17b51e8-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b556c-be79-11f1-b364-caffb83b7d4d",
+        "profile": "f17b51e8-be79-11f1-b364-caffb83b7d4d",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    },
+    {
+      "type": "declTmm.profile_ai_gateway",
+      "value": {
+        "id": "97552493-ab84-46a5-85a1-e7a5fd104e0e",
+        "name": "97552493-ab84-46a5-85a1-e7a5fd104e0e"
+      }
+    },
+    {
+      "type": "declTmm.virtual_server_profile",
+      "value": {
+        "context": "ALL",
+        "id": "f17b56a2-be79-11f1-b364-caffb83b7d4d",
+        "profile": "97552493-ab84-46a5-85a1-e7a5fd104e0e",
+        "virtualServer": "f17b4b26-be79-11f1-b364-caffb83b7d4d"
+      }
+    }
+  ],
+  "finished_ns": 1790956638671897175,
+  "passed": true,
+  "started_ns": 1790956634548683114
+}

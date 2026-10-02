@@ -13,6 +13,11 @@ rule, not a substitute for it.
 
 ## Start here
 
+**2026-10-02 AI gateway TMM:** [env/aigw/README.md](env/aigw/README.md) records an
+isolated build and smoke test of MR !21165, unmodified. The gateway library loads,
+forwards with the provider key, answers the model list and refuses an unknown
+model and an empty config. No eBPF is in this build yet.
+
 **2026-10-01 client TLS mode:** [TLS-MODE.md](env/ai-traffic/TLS-MODE.md) is the
 current record. Each combined activity record states how TMM handled client TLS.
 16 live exchanges give the expected class, and protocol and cipher match the

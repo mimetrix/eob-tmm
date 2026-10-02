@@ -1,0 +1,76 @@
+# Isolated smoke test of the unmodified MR !21165 AI-gateway TMM image.
+# Own project, subnets and volumes; shares nothing with eob-template-20260925.
+name: eob-aigw-20261002
+
+services:
+  fixture:
+    image: artifactory.f5net.com/f5-tmm-docker/f5-tmm-test-image/tao@sha256:b90de5cbafe343f4d0b06abcdb2f82af8a1b46a23b208da8a2a6acc1f3f8894c
+    entrypoint: [/bin/bash, /work/bootstrap.sh]
+    environment:
+      DEPLOYMENT: development
+      WITH_GRPC: "false"
+      CONF_TRANSPORT: nats-tls
+      NATS_CERTS_PATH: /package/nats_certs
+      ICB_ASYNCAPI_PROTO_VERSION: v2
+      PYTHONUNBUFFERED: "1"
+      CONFIG_SERVER_DPC_RAISE_ON_ERROR: "false"
+      AIGW_VIP: 10.203.82.50
+      AIGW_BACKEND: 10.203.82.11
+    volumes:
+      - nats-certs:/package/nats_certs/tmm
+      - .:/work:ro
+      - evidence:/evidence
+    networks:
+      management: {ipv4_address: 10.203.81.11, priority: 100}
+      data: {ipv4_address: 10.203.82.11, priority: 50}
+    cap_add: [NET_ADMIN]
+    healthcheck:
+      test: [CMD-SHELL, "test -f /package/nats_certs/tmm/ca.pem && test -f /package/py_libs/mbip/profile_ai_gateway_pb2.py"]
+      interval: 2s
+      timeout: 2s
+      retries: 120
+
+  tmm:
+    image: ${AIGW_IMAGE:?provide the checked image ID}
+    pull_policy: never
+    entrypoint: [/opt/bin/init.tmm.sh]
+    privileged: true
+    init: true
+    mem_limit: 4g
+    depends_on:
+      fixture: {condition: service_healthy}
+    environment:
+      CONF_TRANSPORT: nats-tls
+      PAL_CPU_SET: 0-0
+      TMM_MAPRES_IGNORE_MEM_LIMIT: "yes"
+      TMM_IGNORE_MEM_LIMIT: "yes"
+      TMM_MAPRES_NO_IPV6_RULES: "yes"
+      TMM_ENFORCE_LICENSING: "false"
+      ENABLE_TMROUTED_PROXY: "false"
+      SESSIONDB_EXTERNAL_STORAGE: "FALSE"
+      MSG_BUS_ADDR: fixture
+      MSG_BUS_PORT: "4222"
+      MSG_BUS_USER: tmm
+      MSG_BUS_PASS: insecure_password_tmm
+      CONFIG_SUBJECT: internal-config
+      PUBLISH_SUBJECT: dataplane-client
+      PROCESS_NAME: TMM
+      TMM_QUERY_INTERVAL_SECS: "120"
+      NATS_TLS_AUTH_CERT: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm.pem
+      NATS_TLS_AUTH_KEY: /opt/f5/mbip/fsm/certificates/f5-fsm-tmm-key.pem
+      NATS_TLS_CA_FILE: /opt/f5/mbip/fsm/certificates/ca.pem
+    volumes:
+      - nats-certs:/opt/f5/mbip/fsm/certificates:ro
+    networks:
+      management: {ipv4_address: 10.203.81.10, priority: 100}
+      data: {ipv4_address: 10.203.82.10, priority: 50}
+
+networks:
+  management:
+    ipam: {config: [{subnet: 10.203.81.0/24}]}
+  data:
+    ipam: {config: [{subnet: 10.203.82.0/24}]}
+
+volumes:
+  nats-certs:
+  evidence:

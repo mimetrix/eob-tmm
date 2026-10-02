@@ -10,6 +10,68 @@ cd evidence/cache && sha256sum * > MANIFEST.sha256
 
 ## Retrieved
 
+### AI gateway in TMM: MR !21165 and "BNK as LLM Gateway", 2026-10-02
+
+**Merge request `tmm/tmm` !21165** — retrieved with git over SSH on the build box
+(`refs/merge-requests/21165/head`), not through the web page. Head
+`74cf09df69ef51fcf197df61d512c4a2b8cefec2`; branches from `origin/rel-k8s-2.4.x`
+(merge base `c51117b121`), not from `main`. 76 commits on that branch; 30 are the
+AI gateway work (Raghav Potluri, khaji). Adds `src/modules/hudfilter/aigw/`
+(34 files), a host for the external `libaigw.so` (repo `f5ingress/f5-analyzer/aigw`,
+pinned 0.6.0, ABI 4.3) and a temporary `modular_bip` branch artifact. The
+merge-request web page itself (description, review state) is **NOT_RETRIEVED**:
+only git was used.
+
+**Confluence "BNK as LLM Gateway"** (space PDBIPNEXTSP, page 1262160949) — the
+page URL redirects to an SSO login from both hosts. The owner supplied a PDF
+export (31 pages); text was extracted with pypdf 6.19.0 on the build box. The
+PDF is the source; the text is a derived convenience copy and loses some layout.
+Status on the page: IN REVIEW.
+
+**These are internal F5 documents and source, so they are not cached in this
+repository**, which is pushed to GitHub (`.gitignore`: internal-document exports
+stay out). They are held on the build box in
+`/home/starin/aigw-build-20261002/sources/` with a `SHA256SUMS` file:
+
+| Internal file (not in this repo) | SHA-256 | What it is |
+|---|---|---|
+| `mr-21165-summary.txt` | `4550cb9f325a3128d36240393ddb8d446ab124519632a674e812b2bd38798a02` | Commit list, full diffstat and packaging diff from the merge base to the MR head. |
+| `mr-21165-aigw-mr10-review-resolution.md` | `32fc9feecb6304b4518840a1367bfa61eee9b8e72db3b5482e8436350a6cc375` | `documents/design/aigw-mr10-review-resolution.md` at the MR head. States the work was not yet built into a TMM image or deployed. |
+| `mr-21165-aigw-src.tar.gz` | `2105eade4463a63b88445c0f27e5ee628ff1044cbea93c3d8470f4a7cf258ded` | `src/modules/hudfilter/aigw/` and `hud_stage.h` at the MR head. |
+| `bnk-as-llm-gateway-20261002.pdf` | `c9e3d41ebe5bd8be05ecc0aea0fe9a5d3cf47bbb33593d27c668872d775481e0` | Owner-supplied PDF export of the Confluence page, 2026-10-02 13:41. |
+| `bnk-as-llm-gateway-20261002.txt` | `b7d1b78032c2435deb6e219259c277988f3b3bcc66622e108cbf1c377f58ba0c` | Text extracted from the PDF above. |
+
+This is a deliberate exception to rule 1: each file exists and is hashed, but on
+F5 infrastructure rather than here. Facts used from them are restated in this
+repository in our own words.
+
+**Isolated build of the MR, 2026-10-02 — MEASURED (TOOL).** Separate clone
+`~/code/tmm-aigw` at `74cf09df69`, unmodified; its own toolchain container
+`10.204.15_0.1.58-HEAD.cf619836a9` (`tc-tmm:v2.3.1`). `make start` installed
+`aigw-lib-0.6.0-1`; `make tmm` passed with zero compile errors (compile build ID
+`815d64f0…`, 226 `aigw_*` text symbols); packaging passed on the first attempt.
+Images: `eob-aigw/tmm:mr21165-74cf09df69` (runtime `tmm64.no_pgo` SHA-256
+`db89e13feee7ddfacdab17588f3c4e0639fe0df4a099cdebb89cb46409caaea1`; `libaigw.so`
+`8171400745e867a07345387dcc72caa3c2abc5a26eba904ca86963ca71c039a0`), plus `-test`
+and `tmm_gdb` variants. The shared tags `tmm:local`, `tmm:local_img` and
+`tmm_gdb:latest` were saved before and restored after; a before/after snapshot of
+the existing tree, its diff and its toolchain container is identical. Nothing was
+pushed or merged. Logs: `aigw-build-20261002/make-{start,tmm,container-1}.log`.
+
+**Smoke test, 2026-10-02 — MEASURED (SELF; TMM log).** Isolated Compose project
+`eob-aigw-20261002` with the MR's branch API schema (SHA-256 `be3b9670…`).
+Chat request 200 with the provider key written by the library and the client
+token stripped; `/v1/models` answered by TMM; unknown model 404; empty
+`library_config` 503. TMM log shows the library load and both refusals; zero
+restarts. Fixture removed. [Record](env/aigw/README.md).
+
+| Cached file | SHA-256 | Result |
+|---|---|---|
+| `aigw-smoke-01-result.json` | `32c0a5241d270645c898afca79361675f6f55044984508833e59ff309b4dee86` | Four cases pass; mock-provider observations; configuration with the key redacted. |
+
+The full fixture archive (`9ff87075…`) and the TMM log (`cde84178…`) stay on the
+build box in `aigw-build-20261002/`, because the log carries internal detail.
+
 ### Client TLS mode, 2026-10-01
 
 **MEASURED: native tests, pinned build checks and isolated single-worker HTTP/1
